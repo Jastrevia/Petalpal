@@ -142,6 +142,7 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { isBetaTester } from "./lib/beta-cohort.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1492,7 +1493,7 @@ app.get("/session", async (req, res) => {
   if (req.query.view !== undefined && (!metadata || Object.keys(req.query).some(key => key !== "view"))) {
     return res.status(400).json({ error: "Invalid session view" });
   }
-  const user = await prisma.user.findUnique({
+  const account = await prisma.user.findUnique({
     where: { id: req.auth.userId },
     select: {
       id: true,
@@ -1501,13 +1502,16 @@ app.get("/session", async (req, res) => {
       email: true,
       avatar: true,
       timezone: true,
-      preferredLocale: true
+      preferredLocale: true,
+      createdAt: true
     }
   });
 
-  if (!user) {
+  if (!account) {
     return res.status(401).json({ error: "Authenticated user no longer exists" });
   }
+  const { createdAt, ...profile } = account;
+  const user = { ...profile, betaTester: isBetaTester(createdAt) };
 
   const timezone = normalizeTimezone(user.timezone) || "UTC";
   const localDate = getLocalDate(timezone);
