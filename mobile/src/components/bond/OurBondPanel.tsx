@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ClosenessSummary } from '../../services/fairyCloseness';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import type { ClosenessSource, ClosenessSummary } from '../../services/fairyCloseness';
 import { BOND, BOND_COPY, BOND_TIERS, type BondLocale } from './bondCopy';
 import { KeepsakeBook } from './KeepsakeBook';
 import { keepsakeArt } from './keepsakeArt';
@@ -9,6 +9,15 @@ import { keepsakeArt } from './keepsakeArt';
 const BANNER = require('@/assets/bond/ppl-banner.webp');
 const PORTRAIT = require('@/assets/bond/ppl-portrait.webp');
 const REWARD = require('@/assets/keepsakes/star-candy-jar.webp');
+// One painted medallion per Today's progress row; the 7th-day bonus reuses its reward keepsake.
+const TASK_ART: Record<ClosenessSource, ImageSourcePropType> = {
+  CHECK_IN: require('@/assets/bond/task-check-in.webp'),
+  STREAK_7: REWARD,
+  EVENT: require('@/assets/bond/task-write-mood.webp'),
+  MOMENT_LIKE: require('@/assets/bond/task-like-moments.webp'),
+  FAIRY_TAP: require('@/assets/bond/task-garden-time.webp'),
+  WEEKLY_READ: require('@/assets/bond/task-weekly-report.webp'),
+};
 
 // Our Bond (亲密度): the design's closeness screens in one scroll — level and progress (6),
 // today's progress (7), check-in rewards (5), levels and unlocks (8), and the keepsake book (9).
@@ -63,6 +72,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
 
             <Section title={copy.today}>
               {summary.today.filter(row => row.source !== 'STREAK_7' || row.count > 0).map(row => <View key={row.source} style={styles.row}>
+                <Image source={TASK_ART[row.source]} style={styles.taskIcon} resizeMode="cover" accessibilityIgnoresInvertColors />
                 <View style={styles.rowText}>
                   <Text style={styles.rowTitle}>{copy.sources[row.source]}</Text>
                   <Text style={styles.small}>{copy.points(row.pointsEach)}</Text>
@@ -166,6 +176,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 6, borderRadius: 10 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rowText: { flex: 1 },
+  taskIcon: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: BOND.gold, backgroundColor: '#F6EDD6' },
   rowTitle: { fontFamily: 'serif', fontSize: 15, color: BOND.ink },
   small: { fontSize: 12, color: BOND.muted },
   tiny: { fontSize: 10, color: BOND.muted },
