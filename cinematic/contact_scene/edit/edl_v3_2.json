@@ -1,0 +1,167 @@
+{
+ "fps": 24,
+ "total_frames": 1533,
+ "seconds": 63.875,
+ "shots": [
+  {
+   "beat": 1,
+   "label": "Dreamy rainy night (V01)",
+   "source": "film_v1/shots/V01.mp4",
+   "src_start_frame": 0,
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "end_s": 3.5
+  },
+  {
+   "beat": 2,
+   "label": "Phone notification and tap (take A)",
+   "source": "contact/takes/contact_A.mp4",
+   "src_start_frame": 0,
+   "start_frame": 84,
+   "frames": 121,
+   "start_s": 3.5,
+   "end_s": 8.542
+  },
+  {
+   "beat": 3,
+   "label": "Invitation opens a portal; the fairy emerges from the phone (take B)",
+   "source": "contact/takes/contact_B.mp4",
+   "src_start_frame": 1,
+   "start_frame": 205,
+   "frames": 120,
+   "start_s": 8.542,
+   "end_s": 13.542
+  },
+  {
+   "beat": 4,
+   "label": "Accepted A01 performance in the room above the phone portal",
+   "source": "contact/takes/A01_contactroom.mp4",
+   "src_start_frame": 1,
+   "start_frame": 325,
+   "frames": 167,
+   "start_s": 13.542,
+   "end_s": 20.5
+  },
+  {
+   "beat": 5,
+   "label": "She takes the invitation and reaches toward the viewer (take C)",
+   "source": "contact/takes/contact_C.mp4",
+   "src_start_frame": 1,
+   "start_frame": 492,
+   "frames": 120,
+   "start_s": 20.5,
+   "end_s": 25.5
+  },
+  {
+   "beat": 6,
+   "label": "The viewer's hand meets hers; golden light (take D)",
+   "source": "contact/takes/contact_D.mp4",
+   "src_start_frame": 1,
+   "start_frame": 612,
+   "frames": 96,
+   "start_s": 25.5,
+   "end_s": 29.5
+  },
+  {
+   "beat": 7,
+   "label": "She guides the viewer through the portal into the passage (take E)",
+   "source": "contact/takes/contact_E.mp4",
+   "src_start_frame": 1,
+   "start_frame": 708,
+   "frames": 120,
+   "start_s": 29.5,
+   "end_s": 34.5
+  },
+  {
+   "beat": 7,
+   "label": "Wisteria passage, her light leads (K03orb)",
+   "source": "film_v1/vfx/K03orb.mp4",
+   "src_start_frame": 1,
+   "start_frame": 828,
+   "frames": 48,
+   "start_s": 34.5,
+   "end_s": 36.5
+  },
+  {
+   "beat": 8,
+   "label": "Garden reveal (S09a)",
+   "source": "film_v2/shots/S09a_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 876,
+   "frames": 72,
+   "start_s": 36.5,
+   "end_s": 39.5
+  },
+  {
+   "beat": 8,
+   "label": "Pavilion over the water (S09b)",
+   "source": "film_v2/shots/S09b_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 948,
+   "frames": 48,
+   "start_s": 39.5,
+   "end_s": 41.5
+  },
+  {
+   "beat": 9,
+   "label": "Journal entry; words become a seed (S10)",
+   "source": "film_v2/shots/S10_journal.mp4",
+   "src_start_frame": 0,
+   "start_frame": 996,
+   "frames": 96,
+   "start_s": 41.5,
+   "end_s": 45.5
+  },
+  {
+   "beat": 10,
+   "label": "Seed and preserved crocus bloom",
+   "source": "film_v3/shots/V3_crocus.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1092,
+   "frames": 120,
+   "start_s": 45.5,
+   "end_s": 50.5
+  },
+  {
+   "beat": 11,
+   "label": "Treehouse mailbox, the letter glows (S13)",
+   "source": "film_v2/shots/S13_mailbox.mp4",
+   "src_start_frame": 24,
+   "start_frame": 1212,
+   "frames": 48,
+   "start_s": 50.5,
+   "end_s": 52.5
+  },
+  {
+   "beat": 11,
+   "label": "The letter comes to the viewer and opens (S14)",
+   "source": "film_v2/shots/S14_letter.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1260,
+   "frames": 120,
+   "start_s": 52.5,
+   "end_s": 57.5
+  },
+  {
+   "beat": 12,
+   "label": "Return to the real world at dawn (S15)",
+   "source": "film_v2/shots/S15_dawn.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1380,
+   "frames": 60,
+   "start_s": 57.5,
+   "end_s": 60.0
+  },
+  {
+   "beat": 13,
+   "label": "PetalPal logo and slogan (S19)",
+   "source": "film_v1/vfx/S19.mp4",
+   "src_start_frame": 28,
+   "start_frame": 1440,
+   "frames": 93,
+   "start_s": 60.0,
+   "end_s": 63.875
+  }
+ ]
+}

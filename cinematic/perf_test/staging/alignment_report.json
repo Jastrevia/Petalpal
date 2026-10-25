@@ -1,0 +1,76 @@
+{
+ "canvas": {
+  "start": [
+   2752,
+   1536
+  ],
+  "middle": [
+   2752,
+   1536
+  ],
+  "end": [
+   2752,
+   1536
+  ]
+ },
+ "paper_common_px": 2720109,
+ "paper_diff_start_middle": {
+  "mean": 0.03,
+  "p99": 1
+ },
+ "paper_diff_middle_end": {
+  "mean": 1.76,
+  "p99": 5
+ },
+ "paper_diff_start_end": {
+  "mean": 1.77,
+  "p99": 5
+ },
+ "paper_median_rgb": {
+  "start": [
+   253,
+   245,
+   237
+  ],
+  "middle": [
+   253,
+   245,
+   237
+  ],
+  "end": [
+   253,
+   246,
+   237
+  ]
+ },
+ "start": {
+  "match": 0.96,
+  "scale_vs_master": 1.1,
+  "eye_dist_px": 61.5,
+  "head_roll_vs_master_deg": -2,
+  "eye_mid": [
+   1905,
+   225
+  ]
+ },
+ "middle": {
+  "match": 0.936,
+  "scale_vs_master": 1.3,
+  "eye_dist_px": 72.7,
+  "head_roll_vs_master_deg": 0,
+  "eye_mid": [
+   1838,
+   281
+  ]
+ },
+ "end": {
+  "match": 0.942,
+  "scale_vs_master": 2.12,
+  "eye_dist_px": 118.5,
+  "head_roll_vs_master_deg": 0,
+  "eye_mid": [
+   1766,
+   388
+  ]
+ }
+}

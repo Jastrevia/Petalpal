@@ -1,0 +1,159 @@
+{
+ "fps": 24,
+ "total_frames": 1433,
+ "seconds": 59.708333333333336,
+ "shots": [
+  {
+   "label": "01 rain",
+   "source": "shots/V01.mp4",
+   "src_in": 0.0,
+   "src_out": 3.5,
+   "start_frame": 0,
+   "frames": 84
+  },
+  {
+   "label": "02 girl at desk",
+   "source": "shots/V02.mp4",
+   "src_in": 0.4,
+   "src_out": 4.4,
+   "start_frame": 84,
+   "frames": 96
+  },
+  {
+   "label": "03 lights",
+   "source": "shots/V03.mp4",
+   "src_in": 0.6,
+   "src_out": 3.1,
+   "start_frame": 180,
+   "frames": 60
+  },
+  {
+   "label": "04 invitation",
+   "source": "shots/V04r.mp4",
+   "src_in": 1.0,
+   "src_out": 4.2,
+   "start_frame": 240,
+   "frames": 77
+  },
+  {
+   "label": "05 touch, fairy",
+   "source": "shots/V05.mp4",
+   "src_in": 1.6,
+   "src_out": 4.6,
+   "start_frame": 317,
+   "frames": 72
+  },
+  {
+   "label": "06 take my hand",
+   "source": "shots/V06a.mp4",
+   "src_in": 1.5,
+   "src_out": 5.04,
+   "start_frame": 389,
+   "frames": 85
+  },
+  {
+   "label": "07 pull-through",
+   "source": "shots/V07a.mp4",
+   "src_in": 0.0,
+   "src_out": 5.04,
+   "start_frame": 474,
+   "frames": 121
+  },
+  {
+   "label": "08 passage (K03)",
+   "source": "vfx/K03orb.mp4",
+   "src_in": 0.0,
+   "src_out": 5.25,
+   "start_frame": 595,
+   "frames": 126
+  },
+  {
+   "label": "09 garden entrance",
+   "source": "shots/V09a.mp4",
+   "src_in": 0.0,
+   "src_out": 3.0,
+   "start_frame": 711,
+   "frames": 72
+  },
+  {
+   "label": "10 wide garden",
+   "source": "shots/V10.mp4",
+   "src_in": 0.5,
+   "src_out": 3.6,
+   "start_frame": 783,
+   "frames": 74
+  },
+  {
+   "label": "11 journal",
+   "source": "vfx/S11.mp4",
+   "src_in": 0.0,
+   "src_out": 2.6,
+   "start_frame": 857,
+   "frames": 62
+  },
+  {
+   "label": "12 words to seed",
+   "source": "vfx/S12.mp4",
+   "src_in": 0.0,
+   "src_out": 1.75,
+   "start_frame": 919,
+   "frames": 42
+  },
+  {
+   "label": "13 crocus blooms",
+   "source": "shots/V13.mp4",
+   "src_in": 0.0,
+   "src_out": 3.5,
+   "start_frame": 953,
+   "frames": 84
+  },
+  {
+   "label": "14 fairy stays",
+   "source": "shots/V14.mp4",
+   "src_in": 0.5,
+   "src_out": 3.0,
+   "start_frame": 1037,
+   "frames": 60
+  },
+  {
+   "label": "15 mailbox",
+   "source": "shots/V15.mp4",
+   "src_in": 0.3,
+   "src_out": 2.8,
+   "start_frame": 1097,
+   "frames": 60
+  },
+  {
+   "label": "16 a letter for you",
+   "source": "shots/V16.mp4",
+   "src_in": 1.5,
+   "src_out": 4.0,
+   "start_frame": 1157,
+   "frames": 60
+  },
+  {
+   "label": "17 the letter",
+   "source": "shots/V17.mp4",
+   "src_in": 0.5,
+   "src_out": 3.0,
+   "start_frame": 1217,
+   "frames": 60
+  },
+  {
+   "label": "18 morning",
+   "source": "shots/V18.mp4",
+   "src_in": 1.3,
+   "src_out": 4.8,
+   "start_frame": 1277,
+   "frames": 84
+  },
+  {
+   "label": "19 title",
+   "source": "vfx/S19.mp4",
+   "src_in": 0.0,
+   "src_out": 3.5,
+   "start_frame": 1349,
+   "frames": 84
+  }
+ ]
+}

@@ -1,0 +1,147 @@
+{
+ "fps": 24,
+ "total_frames": 1440,
+ "seconds": 60.0,
+ "shots": [
+  {
+   "beat": 1,
+   "label": "Dreamy rainy night (V01)",
+   "source": "film_v1/shots/V01.mp4",
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "end_s": 3.5,
+   "note": ""
+  },
+  {
+   "beat": 2,
+   "label": "Phone notification, viewer opens the invitation (S02)",
+   "source": "film_v2/shots/S02_phone.mp4",
+   "start_frame": 84,
+   "frames": 209,
+   "start_s": 3.5,
+   "end_s": 12.208,
+   "note": "dissolve in 12f from V01"
+  },
+  {
+   "beat": 4,
+   "label": "Fairy emerges from the invitation into the room (A01, accepted performance, in the room)",
+   "source": "film_v31/shots/A01_room.mp4",
+   "start_frame": 293,
+   "frames": 168,
+   "start_s": 12.208,
+   "end_s": 19.208,
+   "note": ""
+  },
+  {
+   "beat": 6,
+   "label": "First-person touch in the room (S06)",
+   "source": "film_v31/shots/S06_room.mp4",
+   "start_frame": 461,
+   "frames": 72,
+   "start_s": 19.208,
+   "end_s": 22.208,
+   "note": ""
+  },
+  {
+   "beat": 7,
+   "label": "Magic swirl into the wisteria passage (S07)",
+   "source": "film_v2/shots/S07_swirl.mp4",
+   "start_frame": 533,
+   "frames": 62,
+   "start_s": 22.208,
+   "end_s": 24.792,
+   "note": ""
+  },
+  {
+   "beat": 7,
+   "label": "Wisteria passage, her light leads (K03orb, approved Kling 03)",
+   "source": "film_v1/vfx/K03orb.mp4",
+   "start_frame": 595,
+   "frames": 126,
+   "start_s": 24.792,
+   "end_s": 30.042,
+   "note": ""
+  },
+  {
+   "beat": 8,
+   "label": "Garden reveal (S09a)",
+   "source": "film_v2/shots/S09a_garden.mp4",
+   "start_frame": 721,
+   "frames": 72,
+   "start_s": 30.042,
+   "end_s": 33.042,
+   "note": ""
+  },
+  {
+   "beat": 8,
+   "label": "Pavilion over the water (S09b)",
+   "source": "film_v2/shots/S09b_garden.mp4",
+   "start_frame": 793,
+   "frames": 74,
+   "start_s": 33.042,
+   "end_s": 36.125,
+   "note": ""
+  },
+  {
+   "beat": 9,
+   "label": "Journal entry; words become a seed (S10)",
+   "source": "film_v2/shots/S10_journal.mp4",
+   "start_frame": 867,
+   "frames": 96,
+   "start_s": 36.125,
+   "end_s": 40.125,
+   "note": ""
+  },
+  {
+   "beat": 10,
+   "label": "Seed and preserved crocus bloom (V13 flower, restyled surroundings)",
+   "source": "film_v3/shots/V3_crocus.mp4",
+   "start_frame": 963,
+   "frames": 120,
+   "start_s": 40.125,
+   "end_s": 45.125,
+   "note": ""
+  },
+  {
+   "beat": 11,
+   "label": "Treehouse mailbox, the letter glows (S13)",
+   "source": "film_v2/shots/S13_mailbox.mp4",
+   "start_frame": 1083,
+   "frames": 72,
+   "start_s": 45.125,
+   "end_s": 48.125,
+   "note": ""
+  },
+  {
+   "beat": 11,
+   "label": "The letter comes to the viewer and opens (S14)",
+   "source": "film_v2/shots/S14_letter.mp4",
+   "start_frame": 1155,
+   "frames": 120,
+   "start_s": 48.125,
+   "end_s": 53.125,
+   "note": "fade to warm light, last 10f"
+  },
+  {
+   "beat": 12,
+   "label": "Return to the real world at dawn (S15)",
+   "source": "film_v2/shots/S15_dawn.mp4",
+   "start_frame": 1275,
+   "frames": 72,
+   "start_s": 53.125,
+   "end_s": 56.125,
+   "note": "from warm light, first 10f"
+  },
+  {
+   "beat": 13,
+   "label": "PetalPal logo and slogan (S19)",
+   "source": "film_v1/vfx/S19.mp4",
+   "start_frame": 1347,
+   "frames": 93,
+   "start_s": 56.125,
+   "end_s": 60.0,
+   "note": "dissolve in 12f over the end of the previous shot"
+  }
+ ]
+}

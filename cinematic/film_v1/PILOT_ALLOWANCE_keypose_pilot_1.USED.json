@@ -1,0 +1,13 @@
+{
+ "name": "keypose_pilot_1",
+ "authorised_by": "owner 2026-10-20 21:51",
+ "max_usd": 0.6,
+ "labels": [
+  "poseA_smile",
+  "poseB_reach",
+  "poseC_turn_lead"
+ ],
+ "consumed": [
+  "poseC_turn_lead"
+ ]
+}

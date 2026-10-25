@@ -1,0 +1,25 @@
+{
+ "name": "contact_scene_1",
+ "authorised_by": "owner 2026-10-22 15:22 (max USD 3.50, one take per shot, no retakes)",
+ "max_usd": 3.5,
+ "labels": [
+  "contact_SA",
+  "contact_SC",
+  "contact_SD",
+  "contact_A",
+  "contact_B",
+  "contact_C",
+  "contact_D",
+  "contact_E"
+ ],
+ "consumed": [
+  "contact_SA",
+  "contact_SC",
+  "contact_SD",
+  "contact_A",
+  "contact_B",
+  "contact_C",
+  "contact_D",
+  "contact_E"
+ ]
+}

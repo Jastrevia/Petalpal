@@ -1,0 +1,11 @@
+{
+ "name": "perf_test_1",
+ "authorised_by": "owner 2026-10-21 11:25",
+ "max_usd": 0.56,
+ "labels": [
+  "perf_test_1"
+ ],
+ "consumed": [
+  "perf_test_1"
+ ]
+}

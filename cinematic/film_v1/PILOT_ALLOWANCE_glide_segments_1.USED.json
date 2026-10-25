@@ -1,0 +1,13 @@
+{
+ "name": "glide_segments_1",
+ "authorised_by": "owner 2026-10-21 12:08",
+ "max_usd": 0.9,
+ "labels": [
+  "glide_seg1",
+  "glide_seg2"
+ ],
+ "consumed": [
+  "glide_seg1",
+  "glide_seg2"
+ ]
+}

@@ -1,0 +1,177 @@
+{
+ "fps": 24,
+ "total_frames": 1380,
+ "seconds": 57.5,
+ "shots": [
+  {
+   "beat": 1,
+   "label": "Dreamy rainy night (V01)",
+   "source": "film_v1/shots/V01.mp4",
+   "src_start_frame": 0,
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "end_s": 3.5
+  },
+  {
+   "beat": 2,
+   "label": "Phone notification and tap; the one invitation opens (take A, fixed)",
+   "source": "contact/takes/fixed/A_fixed.mp4",
+   "src_start_frame": 0,
+   "start_frame": 84,
+   "frames": 121,
+   "start_s": 3.5,
+   "end_s": 8.542
+  },
+  {
+   "beat": 3,
+   "label": "Inside the screen the invitation is revealed in her hand (T1)",
+   "source": "contact/takes/fixed/emerge_T1_fixed.mp4",
+   "src_start_frame": 1,
+   "start_frame": 205,
+   "frames": 72,
+   "start_s": 8.542,
+   "end_s": 11.542
+  },
+  {
+   "beat": 3,
+   "label": "She flies forward through the screen glass (T2: free animation between the approved S1 and S2 v2 keyframes)",
+   "source": "contact/takes/fixed/emerge_T2_bridge_seamless.mp4",
+   "src_start_frame": 1,
+   "start_frame": 277,
+   "frames": 66,
+   "start_s": 11.542,
+   "end_s": 14.292
+  },
+  {
+   "beat": 3,
+   "label": "She completes the crossing and reaches toward the viewer (T3)",
+   "source": "contact/takes/fixed/emerge_T3_fixed.mp4",
+   "src_start_frame": 1,
+   "start_frame": 343,
+   "frames": 96,
+   "start_s": 14.292,
+   "end_s": 18.292
+  },
+  {
+   "beat": 4,
+   "label": "The viewer's hand meets hers; golden light (take D, fixed)",
+   "source": "contact/takes/fixed/D_fixed.mp4",
+   "src_start_frame": 1,
+   "start_frame": 439,
+   "frames": 96,
+   "start_s": 18.292,
+   "end_s": 22.292
+  },
+  {
+   "beat": 5,
+   "label": "She leads the viewer into the screen (T4)",
+   "source": "contact/takes/emerge_T4.mp4",
+   "src_start_frame": 1,
+   "start_frame": 535,
+   "frames": 120,
+   "start_s": 22.292,
+   "end_s": 27.292
+  },
+  {
+   "beat": 5,
+   "label": "Through the screen into the passage (portal pass-through)",
+   "source": "contact/takes/fixed/portal_bridge.mp4",
+   "src_start_frame": 0,
+   "start_frame": 655,
+   "frames": 20,
+   "start_s": 27.292,
+   "end_s": 28.125
+  },
+  {
+   "beat": 7,
+   "label": "Wisteria passage, her light leads (K03orb)",
+   "source": "film_v1/vfx/K03orb.mp4",
+   "src_start_frame": 21,
+   "start_frame": 675,
+   "frames": 48,
+   "start_s": 28.125,
+   "end_s": 30.125
+  },
+  {
+   "beat": 8,
+   "label": "Garden reveal (S09a)",
+   "source": "film_v2/shots/S09a_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 723,
+   "frames": 72,
+   "start_s": 30.125,
+   "end_s": 33.125
+  },
+  {
+   "beat": 8,
+   "label": "Pavilion over the water (S09b)",
+   "source": "film_v2/shots/S09b_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 795,
+   "frames": 48,
+   "start_s": 33.125,
+   "end_s": 35.125
+  },
+  {
+   "beat": 9,
+   "label": "Journal entry; words become a seed (S10)",
+   "source": "film_v2/shots/S10_journal.mp4",
+   "src_start_frame": 0,
+   "start_frame": 843,
+   "frames": 96,
+   "start_s": 35.125,
+   "end_s": 39.125
+  },
+  {
+   "beat": 10,
+   "label": "Seed and preserved crocus bloom",
+   "source": "film_v3/shots/V3_crocus.mp4",
+   "src_start_frame": 0,
+   "start_frame": 939,
+   "frames": 120,
+   "start_s": 39.125,
+   "end_s": 44.125
+  },
+  {
+   "beat": 11,
+   "label": "Treehouse mailbox, the letter glows (S13)",
+   "source": "film_v2/shots/S13_mailbox.mp4",
+   "src_start_frame": 24,
+   "start_frame": 1059,
+   "frames": 48,
+   "start_s": 44.125,
+   "end_s": 46.125
+  },
+  {
+   "beat": 11,
+   "label": "The letter comes to the viewer and opens (S14)",
+   "source": "film_v2/shots/S14_letter.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1107,
+   "frames": 120,
+   "start_s": 46.125,
+   "end_s": 51.125
+  },
+  {
+   "beat": 12,
+   "label": "Return to the real world at dawn (S15)",
+   "source": "film_v2/shots/S15_dawn.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1227,
+   "frames": 60,
+   "start_s": 51.125,
+   "end_s": 53.625
+  },
+  {
+   "beat": 13,
+   "label": "PetalPal logo and slogan (S19)",
+   "source": "film_v1/vfx/S19.mp4",
+   "src_start_frame": 28,
+   "start_frame": 1287,
+   "frames": 93,
+   "start_s": 53.625,
+   "end_s": 57.5
+  }
+ ]
+}

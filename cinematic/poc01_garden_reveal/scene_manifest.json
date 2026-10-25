@@ -1,0 +1,2250 @@
+{
+ "version": 1,
+ "generated": "2026-10-20",
+ "branch": "frontend-MVP-all",
+ "head": "51ffd0b2",
+ "note": "All assets are read in place from the repository and never modified. World units are app map pixels (y down).",
+ "world": {
+  "width": 2400,
+  "height": 1800,
+  "boundsY": [
+   -309,
+   1810
+  ],
+  "source": "gardenMapLayout.ts, rendering/gardenWorldBounds.ts"
+ },
+ "units": {
+  "metersPerWorldPixel": 0.03,
+  "note": "Scale chosen so the pavilion (206 px) is about 6 m wide; PROVISIONAL artistic choice."
+ },
+ "heights": {
+  "waterSurface": 0.0,
+  "lakebed": -1.6,
+  "landTop": 0.55,
+  "overlayLift": 0.012,
+  "waterfallTop": 8.6,
+  "waterfallFallDeg": 72
+ },
+ "camera": {
+  "fps": 24,
+  "frames": 150,
+  "lensMm": 24,
+  "sensorMm": 36,
+  "path": [
+   {
+    "x": 800,
+    "y": 1915,
+    "z": 1.8,
+    "heading": 8,
+    "pitch": -3,
+    "focus": 2.6,
+    "fstop": 1.8
+   },
+   {
+    "x": 838,
+    "y": 1730,
+    "z": 1.5,
+    "heading": 7,
+    "pitch": -3,
+    "focus": 10.0,
+    "fstop": 2.1
+   },
+   {
+    "x": 866,
+    "y": 1560,
+    "z": 6.5,
+    "heading": 6,
+    "pitch": -9,
+    "focus": 19.0,
+    "fstop": 2.5
+   },
+   {
+    "x": 888,
+    "y": 1400,
+    "z": 17.0,
+    "heading": 5,
+    "pitch": -25,
+    "focus": 26.0,
+    "fstop": 3.3
+   },
+   {
+    "x": 900,
+    "y": 1280,
+    "z": 26.0,
+    "heading": 6,
+    "pitch": -37,
+    "focus": 30.0,
+    "fstop": 4.0
+   }
+  ],
+  "limits": {
+   "aLat": 8.0,
+   "aLong": 4.0,
+   "vMax": 14.0
+  },
+  "keyStep": 1,
+  "note": "Constant focal length: every change of framing comes from camera movement, never zoom.",
+  "keys": [
+   {
+    "f": 1,
+    "x": 800.0,
+    "y": 1915.0,
+    "z": 1.8,
+    "heading": 8.0,
+    "pitch": -3.0,
+    "focus": 2.6,
+    "fstop": 1.8
+   },
+   {
+    "f": 2,
+    "x": 800.03,
+    "y": 1914.86,
+    "z": 1.8,
+    "heading": 8.0,
+    "pitch": -3.0,
+    "focus": 2.603,
+    "fstop": 1.8
+   },
+   {
+    "f": 3,
+    "x": 800.09,
+    "y": 1914.56,
+    "z": 1.799,
+    "heading": 7.999,
+    "pitch": -3.0,
+    "focus": 2.609,
+    "fstop": 1.8
+   },
+   {
+    "f": 4,
+    "x": 800.2,
+    "y": 1914.03,
+    "z": 1.798,
+    "heading": 7.997,
+    "pitch": -3.0,
+    "focus": 2.619,
+    "fstop": 1.801
+   },
+   {
+    "f": 5,
+    "x": 800.36,
+    "y": 1913.27,
+    "z": 1.797,
+    "heading": 7.995,
+    "pitch": -3.0,
+    "focus": 2.635,
+    "fstop": 1.801
+   },
+   {
+    "f": 6,
+    "x": 800.56,
+    "y": 1912.3,
+    "z": 1.795,
+    "heading": 7.993,
+    "pitch": -2.999,
+    "focus": 2.655,
+    "fstop": 1.802
+   },
+   {
+    "f": 7,
+    "x": 800.8,
+    "y": 1911.11,
+    "z": 1.793,
+    "heading": 7.989,
+    "pitch": -2.999,
+    "focus": 2.68,
+    "fstop": 1.803
+   },
+   {
+    "f": 8,
+    "x": 801.09,
+    "y": 1909.71,
+    "z": 1.79,
+    "heading": 7.985,
+    "pitch": -2.998,
+    "focus": 2.71,
+    "fstop": 1.804
+   },
+   {
+    "f": 9,
+    "x": 801.42,
+    "y": 1908.09,
+    "z": 1.786,
+    "heading": 7.98,
+    "pitch": -2.996,
+    "focus": 2.746,
+    "fstop": 1.806
+   },
+   {
+    "f": 10,
+    "x": 801.8,
+    "y": 1906.25,
+    "z": 1.781,
+    "heading": 7.974,
+    "pitch": -2.994,
+    "focus": 2.788,
+    "fstop": 1.808
+   },
+   {
+    "f": 11,
+    "x": 802.23,
+    "y": 1904.21,
+    "z": 1.775,
+    "heading": 7.968,
+    "pitch": -2.991,
+    "focus": 2.835,
+    "fstop": 1.809
+   },
+   {
+    "f": 12,
+    "x": 802.69,
+    "y": 1901.95,
+    "z": 1.769,
+    "heading": 7.96,
+    "pitch": -2.986,
+    "focus": 2.89,
+    "fstop": 1.812
+   },
+   {
+    "f": 13,
+    "x": 803.21,
+    "y": 1899.47,
+    "z": 1.761,
+    "heading": 7.952,
+    "pitch": -2.981,
+    "focus": 2.952,
+    "fstop": 1.814
+   },
+   {
+    "f": 14,
+    "x": 803.77,
+    "y": 1896.78,
+    "z": 1.751,
+    "heading": 7.942,
+    "pitch": -2.974,
+    "focus": 3.022,
+    "fstop": 1.817
+   },
+   {
+    "f": 15,
+    "x": 804.37,
+    "y": 1893.88,
+    "z": 1.741,
+    "heading": 7.931,
+    "pitch": -2.966,
+    "focus": 3.1,
+    "fstop": 1.82
+   },
+   {
+    "f": 16,
+    "x": 805.02,
+    "y": 1890.77,
+    "z": 1.728,
+    "heading": 7.919,
+    "pitch": -2.956,
+    "focus": 3.187,
+    "fstop": 1.824
+   },
+   {
+    "f": 17,
+    "x": 805.71,
+    "y": 1887.45,
+    "z": 1.715,
+    "heading": 7.906,
+    "pitch": -2.944,
+    "focus": 3.283,
+    "fstop": 1.827
+   },
+   {
+    "f": 18,
+    "x": 806.45,
+    "y": 1883.92,
+    "z": 1.699,
+    "heading": 7.891,
+    "pitch": -2.93,
+    "focus": 3.389,
+    "fstop": 1.832
+   },
+   {
+    "f": 19,
+    "x": 807.24,
+    "y": 1880.17,
+    "z": 1.682,
+    "heading": 7.874,
+    "pitch": -2.914,
+    "focus": 3.506,
+    "fstop": 1.836
+   },
+   {
+    "f": 20,
+    "x": 808.06,
+    "y": 1876.22,
+    "z": 1.662,
+    "heading": 7.857,
+    "pitch": -2.897,
+    "focus": 3.634,
+    "fstop": 1.841
+   },
+   {
+    "f": 21,
+    "x": 808.94,
+    "y": 1872.06,
+    "z": 1.641,
+    "heading": 7.837,
+    "pitch": -2.877,
+    "focus": 3.773,
+    "fstop": 1.847
+   },
+   {
+    "f": 22,
+    "x": 809.86,
+    "y": 1867.68,
+    "z": 1.619,
+    "heading": 7.816,
+    "pitch": -2.855,
+    "focus": 3.925,
+    "fstop": 1.853
+   },
+   {
+    "f": 23,
+    "x": 810.82,
+    "y": 1863.1,
+    "z": 1.594,
+    "heading": 7.793,
+    "pitch": -2.831,
+    "focus": 4.089,
+    "fstop": 1.859
+   },
+   {
+    "f": 24,
+    "x": 811.83,
+    "y": 1858.31,
+    "z": 1.569,
+    "heading": 7.768,
+    "pitch": -2.805,
+    "focus": 4.267,
+    "fstop": 1.866
+   },
+   {
+    "f": 25,
+    "x": 812.88,
+    "y": 1853.31,
+    "z": 1.541,
+    "heading": 7.741,
+    "pitch": -2.778,
+    "focus": 4.458,
+    "fstop": 1.874
+   },
+   {
+    "f": 26,
+    "x": 813.98,
+    "y": 1848.09,
+    "z": 1.513,
+    "heading": 7.712,
+    "pitch": -2.75,
+    "focus": 4.663,
+    "fstop": 1.882
+   },
+   {
+    "f": 27,
+    "x": 815.12,
+    "y": 1842.66,
+    "z": 1.483,
+    "heading": 7.682,
+    "pitch": -2.721,
+    "focus": 4.882,
+    "fstop": 1.891
+   },
+   {
+    "f": 28,
+    "x": 816.31,
+    "y": 1837.01,
+    "z": 1.453,
+    "heading": 7.649,
+    "pitch": -2.692,
+    "focus": 5.116,
+    "fstop": 1.9
+   },
+   {
+    "f": 29,
+    "x": 817.54,
+    "y": 1831.15,
+    "z": 1.423,
+    "heading": 7.614,
+    "pitch": -2.663,
+    "focus": 5.364,
+    "fstop": 1.91
+   },
+   {
+    "f": 30,
+    "x": 818.82,
+    "y": 1825.06,
+    "z": 1.393,
+    "heading": 7.578,
+    "pitch": -2.635,
+    "focus": 5.627,
+    "fstop": 1.921
+   },
+   {
+    "f": 31,
+    "x": 820.14,
+    "y": 1818.75,
+    "z": 1.363,
+    "heading": 7.539,
+    "pitch": -2.61,
+    "focus": 5.905,
+    "fstop": 1.932
+   },
+   {
+    "f": 32,
+    "x": 821.5,
+    "y": 1812.21,
+    "z": 1.336,
+    "heading": 7.499,
+    "pitch": -2.588,
+    "focus": 6.197,
+    "fstop": 1.943
+   },
+   {
+    "f": 33,
+    "x": 822.91,
+    "y": 1805.45,
+    "z": 1.311,
+    "heading": 7.457,
+    "pitch": -2.571,
+    "focus": 6.503,
+    "fstop": 1.956
+   },
+   {
+    "f": 34,
+    "x": 824.36,
+    "y": 1798.45,
+    "z": 1.29,
+    "heading": 7.413,
+    "pitch": -2.559,
+    "focus": 6.824,
+    "fstop": 1.969
+   },
+   {
+    "f": 35,
+    "x": 825.85,
+    "y": 1791.22,
+    "z": 1.273,
+    "heading": 7.368,
+    "pitch": -2.556,
+    "focus": 7.157,
+    "fstop": 1.982
+   },
+   {
+    "f": 36,
+    "x": 827.38,
+    "y": 1783.75,
+    "z": 1.263,
+    "heading": 7.322,
+    "pitch": -2.561,
+    "focus": 7.503,
+    "fstop": 1.996
+   },
+   {
+    "f": 37,
+    "x": 828.95,
+    "y": 1776.07,
+    "z": 1.26,
+    "heading": 7.274,
+    "pitch": -2.578,
+    "focus": 7.86,
+    "fstop": 2.011
+   },
+   {
+    "f": 38,
+    "x": 830.54,
+    "y": 1768.17,
+    "z": 1.268,
+    "heading": 7.225,
+    "pitch": -2.608,
+    "focus": 8.227,
+    "fstop": 2.026
+   },
+   {
+    "f": 39,
+    "x": 832.11,
+    "y": 1760.37,
+    "z": 1.287,
+    "heading": 7.178,
+    "pitch": -2.653,
+    "focus": 8.59,
+    "fstop": 2.041
+   },
+   {
+    "f": 40,
+    "x": 833.6,
+    "y": 1752.81,
+    "z": 1.318,
+    "heading": 7.133,
+    "pitch": -2.711,
+    "focus": 8.94,
+    "fstop": 2.055
+   },
+   {
+    "f": 41,
+    "x": 835.02,
+    "y": 1745.54,
+    "z": 1.36,
+    "heading": 7.09,
+    "pitch": -2.784,
+    "focus": 9.278,
+    "fstop": 2.069
+   },
+   {
+    "f": 42,
+    "x": 836.37,
+    "y": 1738.57,
+    "z": 1.414,
+    "heading": 7.049,
+    "pitch": -2.869,
+    "focus": 9.601,
+    "fstop": 2.083
+   },
+   {
+    "f": 43,
+    "x": 837.64,
+    "y": 1731.89,
+    "z": 1.479,
+    "heading": 7.011,
+    "pitch": -2.968,
+    "focus": 9.912,
+    "fstop": 2.096
+   },
+   {
+    "f": 44,
+    "x": 838.88,
+    "y": 1725.3,
+    "z": 1.556,
+    "heading": 6.979,
+    "pitch": -3.064,
+    "focus": 10.175,
+    "fstop": 2.107
+   },
+   {
+    "f": 45,
+    "x": 840.12,
+    "y": 1718.63,
+    "z": 1.646,
+    "heading": 6.948,
+    "pitch": -3.158,
+    "focus": 10.43,
+    "fstop": 2.118
+   },
+   {
+    "f": 46,
+    "x": 841.35,
+    "y": 1711.89,
+    "z": 1.747,
+    "heading": 6.917,
+    "pitch": -3.257,
+    "focus": 10.698,
+    "fstop": 2.128
+   },
+   {
+    "f": 47,
+    "x": 842.57,
+    "y": 1705.11,
+    "z": 1.859,
+    "heading": 6.885,
+    "pitch": -3.362,
+    "focus": 10.978,
+    "fstop": 2.139
+   },
+   {
+    "f": 48,
+    "x": 843.78,
+    "y": 1698.29,
+    "z": 1.984,
+    "heading": 6.851,
+    "pitch": -3.474,
+    "focus": 11.27,
+    "fstop": 2.15
+   },
+   {
+    "f": 49,
+    "x": 844.99,
+    "y": 1691.44,
+    "z": 2.119,
+    "heading": 6.817,
+    "pitch": -3.594,
+    "focus": 11.574,
+    "fstop": 2.162
+   },
+   {
+    "f": 50,
+    "x": 846.18,
+    "y": 1684.58,
+    "z": 2.266,
+    "heading": 6.782,
+    "pitch": -3.721,
+    "focus": 11.89,
+    "fstop": 2.173
+   },
+   {
+    "f": 51,
+    "x": 847.35,
+    "y": 1677.7,
+    "z": 2.424,
+    "heading": 6.746,
+    "pitch": -3.858,
+    "focus": 12.218,
+    "fstop": 2.185
+   },
+   {
+    "f": 52,
+    "x": 848.52,
+    "y": 1670.81,
+    "z": 2.592,
+    "heading": 6.709,
+    "pitch": -4.005,
+    "focus": 12.558,
+    "fstop": 2.197
+   },
+   {
+    "f": 53,
+    "x": 849.67,
+    "y": 1663.93,
+    "z": 2.771,
+    "heading": 6.672,
+    "pitch": -4.164,
+    "focus": 12.909,
+    "fstop": 2.209
+   },
+   {
+    "f": 54,
+    "x": 850.81,
+    "y": 1657.04,
+    "z": 2.959,
+    "heading": 6.633,
+    "pitch": -4.335,
+    "focus": 13.271,
+    "fstop": 2.222
+   },
+   {
+    "f": 55,
+    "x": 851.94,
+    "y": 1650.15,
+    "z": 3.158,
+    "heading": 6.593,
+    "pitch": -4.52,
+    "focus": 13.643,
+    "fstop": 2.236
+   },
+   {
+    "f": 56,
+    "x": 853.05,
+    "y": 1643.25,
+    "z": 3.366,
+    "heading": 6.553,
+    "pitch": -4.72,
+    "focus": 14.025,
+    "fstop": 2.25
+   },
+   {
+    "f": 57,
+    "x": 854.16,
+    "y": 1636.36,
+    "z": 3.583,
+    "heading": 6.512,
+    "pitch": -4.937,
+    "focus": 14.416,
+    "fstop": 2.265
+   },
+   {
+    "f": 58,
+    "x": 855.25,
+    "y": 1629.46,
+    "z": 3.81,
+    "heading": 6.469,
+    "pitch": -5.173,
+    "focus": 14.816,
+    "fstop": 2.28
+   },
+   {
+    "f": 59,
+    "x": 856.34,
+    "y": 1622.56,
+    "z": 4.045,
+    "heading": 6.426,
+    "pitch": -5.43,
+    "focus": 15.223,
+    "fstop": 2.296
+   },
+   {
+    "f": 60,
+    "x": 857.42,
+    "y": 1615.65,
+    "z": 4.289,
+    "heading": 6.382,
+    "pitch": -5.709,
+    "focus": 15.637,
+    "fstop": 2.314
+   },
+   {
+    "f": 61,
+    "x": 858.5,
+    "y": 1608.72,
+    "z": 4.541,
+    "heading": 6.337,
+    "pitch": -6.013,
+    "focus": 16.057,
+    "fstop": 2.332
+   },
+   {
+    "f": 62,
+    "x": 859.57,
+    "y": 1601.78,
+    "z": 4.801,
+    "heading": 6.291,
+    "pitch": -6.344,
+    "focus": 16.481,
+    "fstop": 2.351
+   },
+   {
+    "f": 63,
+    "x": 860.65,
+    "y": 1594.81,
+    "z": 5.07,
+    "heading": 6.244,
+    "pitch": -6.704,
+    "focus": 16.908,
+    "fstop": 2.372
+   },
+   {
+    "f": 64,
+    "x": 861.72,
+    "y": 1587.82,
+    "z": 5.346,
+    "heading": 6.196,
+    "pitch": -7.096,
+    "focus": 17.336,
+    "fstop": 2.395
+   },
+   {
+    "f": 65,
+    "x": 862.8,
+    "y": 1580.79,
+    "z": 5.63,
+    "heading": 6.147,
+    "pitch": -7.523,
+    "focus": 17.765,
+    "fstop": 2.419
+   },
+   {
+    "f": 66,
+    "x": 863.88,
+    "y": 1573.73,
+    "z": 5.921,
+    "heading": 6.098,
+    "pitch": -7.988,
+    "focus": 18.192,
+    "fstop": 2.444
+   },
+   {
+    "f": 67,
+    "x": 864.98,
+    "y": 1566.61,
+    "z": 6.219,
+    "heading": 6.047,
+    "pitch": -8.494,
+    "focus": 18.615,
+    "fstop": 2.472
+   },
+   {
+    "f": 68,
+    "x": 866.09,
+    "y": 1559.44,
+    "z": 6.524,
+    "heading": 5.997,
+    "pitch": -9.028,
+    "focus": 19.02,
+    "fstop": 2.502
+   },
+   {
+    "f": 69,
+    "x": 867.18,
+    "y": 1552.35,
+    "z": 6.839,
+    "heading": 5.963,
+    "pitch": -9.405,
+    "focus": 19.283,
+    "fstop": 2.522
+   },
+   {
+    "f": 70,
+    "x": 868.24,
+    "y": 1545.42,
+    "z": 7.165,
+    "heading": 5.927,
+    "pitch": -9.813,
+    "focus": 19.549,
+    "fstop": 2.543
+   },
+   {
+    "f": 71,
+    "x": 869.26,
+    "y": 1538.64,
+    "z": 7.502,
+    "heading": 5.887,
+    "pitch": -10.253,
+    "focus": 19.818,
+    "fstop": 2.566
+   },
+   {
+    "f": 72,
+    "x": 870.26,
+    "y": 1531.99,
+    "z": 7.849,
+    "heading": 5.846,
+    "pitch": -10.723,
+    "focus": 20.09,
+    "fstop": 2.59
+   },
+   {
+    "f": 73,
+    "x": 871.23,
+    "y": 1525.46,
+    "z": 8.205,
+    "heading": 5.802,
+    "pitch": -11.224,
+    "focus": 20.365,
+    "fstop": 2.616
+   },
+   {
+    "f": 74,
+    "x": 872.18,
+    "y": 1519.05,
+    "z": 8.571,
+    "heading": 5.757,
+    "pitch": -11.754,
+    "focus": 20.643,
+    "fstop": 2.642
+   },
+   {
+    "f": 75,
+    "x": 873.1,
+    "y": 1512.72,
+    "z": 8.946,
+    "heading": 5.71,
+    "pitch": -12.312,
+    "focus": 20.922,
+    "fstop": 2.67
+   },
+   {
+    "f": 76,
+    "x": 874.0,
+    "y": 1506.48,
+    "z": 9.33,
+    "heading": 5.661,
+    "pitch": -12.898,
+    "focus": 21.204,
+    "fstop": 2.699
+   },
+   {
+    "f": 77,
+    "x": 874.89,
+    "y": 1500.31,
+    "z": 9.722,
+    "heading": 5.611,
+    "pitch": -13.509,
+    "focus": 21.488,
+    "fstop": 2.729
+   },
+   {
+    "f": 78,
+    "x": 875.75,
+    "y": 1494.2,
+    "z": 10.123,
+    "heading": 5.56,
+    "pitch": -14.146,
+    "focus": 21.773,
+    "fstop": 2.761
+   },
+   {
+    "f": 79,
+    "x": 876.61,
+    "y": 1488.13,
+    "z": 10.531,
+    "heading": 5.509,
+    "pitch": -14.805,
+    "focus": 22.059,
+    "fstop": 2.793
+   },
+   {
+    "f": 80,
+    "x": 877.44,
+    "y": 1482.1,
+    "z": 10.947,
+    "heading": 5.458,
+    "pitch": -15.485,
+    "focus": 22.347,
+    "fstop": 2.826
+   },
+   {
+    "f": 81,
+    "x": 878.27,
+    "y": 1476.11,
+    "z": 11.369,
+    "heading": 5.407,
+    "pitch": -16.181,
+    "focus": 22.633,
+    "fstop": 2.86
+   },
+   {
+    "f": 82,
+    "x": 879.06,
+    "y": 1470.28,
+    "z": 11.787,
+    "heading": 5.357,
+    "pitch": -16.876,
+    "focus": 22.913,
+    "fstop": 2.893
+   },
+   {
+    "f": 83,
+    "x": 879.82,
+    "y": 1464.61,
+    "z": 12.201,
+    "heading": 5.311,
+    "pitch": -17.565,
+    "focus": 23.185,
+    "fstop": 2.927
+   },
+   {
+    "f": 84,
+    "x": 880.56,
+    "y": 1459.09,
+    "z": 12.609,
+    "heading": 5.266,
+    "pitch": -18.244,
+    "focus": 23.449,
+    "fstop": 2.96
+   },
+   {
+    "f": 85,
+    "x": 881.27,
+    "y": 1453.7,
+    "z": 13.011,
+    "heading": 5.225,
+    "pitch": -18.912,
+    "focus": 23.705,
+    "fstop": 2.993
+   },
+   {
+    "f": 86,
+    "x": 881.96,
+    "y": 1448.42,
+    "z": 13.408,
+    "heading": 5.187,
+    "pitch": -19.567,
+    "focus": 23.953,
+    "fstop": 3.025
+   },
+   {
+    "f": 87,
+    "x": 882.63,
+    "y": 1443.24,
+    "z": 13.799,
+    "heading": 5.152,
+    "pitch": -20.206,
+    "focus": 24.194,
+    "fstop": 3.056
+   },
+   {
+    "f": 88,
+    "x": 883.29,
+    "y": 1438.16,
+    "z": 14.184,
+    "heading": 5.12,
+    "pitch": -20.828,
+    "focus": 24.426,
+    "fstop": 3.087
+   },
+   {
+    "f": 89,
+    "x": 883.92,
+    "y": 1433.15,
+    "z": 14.562,
+    "heading": 5.092,
+    "pitch": -21.432,
+    "focus": 24.651,
+    "fstop": 3.117
+   },
+   {
+    "f": 90,
+    "x": 884.54,
+    "y": 1428.22,
+    "z": 14.935,
+    "heading": 5.067,
+    "pitch": -22.015,
+    "focus": 24.868,
+    "fstop": 3.146
+   },
+   {
+    "f": 91,
+    "x": 885.15,
+    "y": 1423.35,
+    "z": 15.301,
+    "heading": 5.046,
+    "pitch": -22.578,
+    "focus": 25.078,
+    "fstop": 3.174
+   },
+   {
+    "f": 92,
+    "x": 885.75,
+    "y": 1418.52,
+    "z": 15.66,
+    "heading": 5.029,
+    "pitch": -23.118,
+    "focus": 25.28,
+    "fstop": 3.202
+   },
+   {
+    "f": 93,
+    "x": 886.34,
+    "y": 1413.74,
+    "z": 16.013,
+    "heading": 5.016,
+    "pitch": -23.635,
+    "focus": 25.475,
+    "fstop": 3.228
+   },
+   {
+    "f": 94,
+    "x": 886.92,
+    "y": 1409.0,
+    "z": 16.359,
+    "heading": 5.007,
+    "pitch": -24.128,
+    "focus": 25.662,
+    "fstop": 3.254
+   },
+   {
+    "f": 95,
+    "x": 887.49,
+    "y": 1404.27,
+    "z": 16.698,
+    "heading": 5.002,
+    "pitch": -24.596,
+    "focus": 25.843,
+    "fstop": 3.279
+   },
+   {
+    "f": 96,
+    "x": 888.05,
+    "y": 1399.57,
+    "z": 17.03,
+    "heading": 5.0,
+    "pitch": -25.048,
+    "focus": 26.019,
+    "fstop": 3.303
+   },
+   {
+    "f": 97,
+    "x": 888.6,
+    "y": 1394.94,
+    "z": 17.356,
+    "heading": 5.004,
+    "pitch": -25.563,
+    "focus": 26.218,
+    "fstop": 3.33
+   },
+   {
+    "f": 98,
+    "x": 889.12,
+    "y": 1390.43,
+    "z": 17.677,
+    "heading": 5.014,
+    "pitch": -26.072,
+    "focus": 26.411,
+    "fstop": 3.358
+   },
+   {
+    "f": 99,
+    "x": 889.62,
+    "y": 1386.03,
+    "z": 17.991,
+    "heading": 5.029,
+    "pitch": -26.574,
+    "focus": 26.598,
+    "fstop": 3.386
+   },
+   {
+    "f": 100,
+    "x": 890.1,
+    "y": 1381.75,
+    "z": 18.3,
+    "heading": 5.048,
+    "pitch": -27.068,
+    "focus": 26.778,
+    "fstop": 3.414
+   },
+   {
+    "f": 101,
+    "x": 890.55,
+    "y": 1377.58,
+    "z": 18.603,
+    "heading": 5.072,
+    "pitch": -27.553,
+    "focus": 26.952,
+    "fstop": 3.441
+   },
+   {
+    "f": 102,
+    "x": 890.99,
+    "y": 1373.52,
+    "z": 18.901,
+    "heading": 5.099,
+    "pitch": -28.028,
+    "focus": 27.119,
+    "fstop": 3.468
+   },
+   {
+    "f": 103,
+    "x": 891.41,
+    "y": 1369.56,
+    "z": 19.192,
+    "heading": 5.128,
+    "pitch": -28.492,
+    "focus": 27.28,
+    "fstop": 3.494
+   },
+   {
+    "f": 104,
+    "x": 891.81,
+    "y": 1365.7,
+    "z": 19.478,
+    "heading": 5.16,
+    "pitch": -28.944,
+    "focus": 27.435,
+    "fstop": 3.52
+   },
+   {
+    "f": 105,
+    "x": 892.19,
+    "y": 1361.95,
+    "z": 19.757,
+    "heading": 5.193,
+    "pitch": -29.384,
+    "focus": 27.584,
+    "fstop": 3.546
+   },
+   {
+    "f": 106,
+    "x": 892.56,
+    "y": 1358.29,
+    "z": 20.031,
+    "heading": 5.228,
+    "pitch": -29.811,
+    "focus": 27.727,
+    "fstop": 3.571
+   },
+   {
+    "f": 107,
+    "x": 892.91,
+    "y": 1354.73,
+    "z": 20.299,
+    "heading": 5.264,
+    "pitch": -30.224,
+    "focus": 27.864,
+    "fstop": 3.595
+   },
+   {
+    "f": 108,
+    "x": 893.26,
+    "y": 1351.26,
+    "z": 20.56,
+    "heading": 5.3,
+    "pitch": -30.625,
+    "focus": 27.995,
+    "fstop": 3.618
+   },
+   {
+    "f": 109,
+    "x": 893.58,
+    "y": 1347.88,
+    "z": 20.816,
+    "heading": 5.337,
+    "pitch": -31.011,
+    "focus": 28.121,
+    "fstop": 3.641
+   },
+   {
+    "f": 110,
+    "x": 893.9,
+    "y": 1344.6,
+    "z": 21.066,
+    "heading": 5.374,
+    "pitch": -31.383,
+    "focus": 28.241,
+    "fstop": 3.663
+   },
+   {
+    "f": 111,
+    "x": 894.2,
+    "y": 1341.4,
+    "z": 21.309,
+    "heading": 5.41,
+    "pitch": -31.741,
+    "focus": 28.355,
+    "fstop": 3.685
+   },
+   {
+    "f": 112,
+    "x": 894.5,
+    "y": 1338.29,
+    "z": 21.547,
+    "heading": 5.446,
+    "pitch": -32.084,
+    "focus": 28.464,
+    "fstop": 3.705
+   },
+   {
+    "f": 113,
+    "x": 894.78,
+    "y": 1335.26,
+    "z": 21.778,
+    "heading": 5.482,
+    "pitch": -32.413,
+    "focus": 28.568,
+    "fstop": 3.725
+   },
+   {
+    "f": 114,
+    "x": 895.06,
+    "y": 1332.32,
+    "z": 22.003,
+    "heading": 5.517,
+    "pitch": -32.728,
+    "focus": 28.667,
+    "fstop": 3.744
+   },
+   {
+    "f": 115,
+    "x": 895.32,
+    "y": 1329.47,
+    "z": 22.222,
+    "heading": 5.55,
+    "pitch": -33.029,
+    "focus": 28.761,
+    "fstop": 3.762
+   },
+   {
+    "f": 116,
+    "x": 895.58,
+    "y": 1326.69,
+    "z": 22.435,
+    "heading": 5.583,
+    "pitch": -33.315,
+    "focus": 28.85,
+    "fstop": 3.779
+   },
+   {
+    "f": 117,
+    "x": 895.83,
+    "y": 1324.0,
+    "z": 22.642,
+    "heading": 5.614,
+    "pitch": -33.588,
+    "focus": 28.935,
+    "fstop": 3.795
+   },
+   {
+    "f": 118,
+    "x": 896.07,
+    "y": 1321.39,
+    "z": 22.843,
+    "heading": 5.644,
+    "pitch": -33.847,
+    "focus": 29.015,
+    "fstop": 3.811
+   },
+   {
+    "f": 119,
+    "x": 896.31,
+    "y": 1318.86,
+    "z": 23.037,
+    "heading": 5.673,
+    "pitch": -34.092,
+    "focus": 29.091,
+    "fstop": 3.826
+   },
+   {
+    "f": 120,
+    "x": 896.53,
+    "y": 1316.41,
+    "z": 23.225,
+    "heading": 5.701,
+    "pitch": -34.325,
+    "focus": 29.163,
+    "fstop": 3.84
+   },
+   {
+    "f": 121,
+    "x": 896.75,
+    "y": 1314.04,
+    "z": 23.407,
+    "heading": 5.727,
+    "pitch": -34.544,
+    "focus": 29.23,
+    "fstop": 3.853
+   },
+   {
+    "f": 122,
+    "x": 896.96,
+    "y": 1311.75,
+    "z": 23.583,
+    "heading": 5.751,
+    "pitch": -34.751,
+    "focus": 29.294,
+    "fstop": 3.865
+   },
+   {
+    "f": 123,
+    "x": 897.17,
+    "y": 1309.54,
+    "z": 23.753,
+    "heading": 5.774,
+    "pitch": -34.946,
+    "focus": 29.354,
+    "fstop": 3.877
+   },
+   {
+    "f": 124,
+    "x": 897.37,
+    "y": 1307.41,
+    "z": 23.917,
+    "heading": 5.796,
+    "pitch": -35.129,
+    "focus": 29.411,
+    "fstop": 3.888
+   },
+   {
+    "f": 125,
+    "x": 897.56,
+    "y": 1305.36,
+    "z": 24.074,
+    "heading": 5.817,
+    "pitch": -35.301,
+    "focus": 29.464,
+    "fstop": 3.899
+   },
+   {
+    "f": 126,
+    "x": 897.74,
+    "y": 1303.39,
+    "z": 24.225,
+    "heading": 5.836,
+    "pitch": -35.462,
+    "focus": 29.513,
+    "fstop": 3.908
+   },
+   {
+    "f": 127,
+    "x": 897.92,
+    "y": 1301.49,
+    "z": 24.37,
+    "heading": 5.853,
+    "pitch": -35.612,
+    "focus": 29.56,
+    "fstop": 3.917
+   },
+   {
+    "f": 128,
+    "x": 898.09,
+    "y": 1299.68,
+    "z": 24.509,
+    "heading": 5.869,
+    "pitch": -35.752,
+    "focus": 29.603,
+    "fstop": 3.926
+   },
+   {
+    "f": 129,
+    "x": 898.26,
+    "y": 1297.94,
+    "z": 24.642,
+    "heading": 5.884,
+    "pitch": -35.882,
+    "focus": 29.643,
+    "fstop": 3.934
+   },
+   {
+    "f": 130,
+    "x": 898.41,
+    "y": 1296.28,
+    "z": 24.768,
+    "heading": 5.898,
+    "pitch": -36.003,
+    "focus": 29.681,
+    "fstop": 3.941
+   },
+   {
+    "f": 131,
+    "x": 898.56,
+    "y": 1294.71,
+    "z": 24.888,
+    "heading": 5.911,
+    "pitch": -36.115,
+    "focus": 29.716,
+    "fstop": 3.947
+   },
+   {
+    "f": 132,
+    "x": 898.71,
+    "y": 1293.21,
+    "z": 25.002,
+    "heading": 5.922,
+    "pitch": -36.218,
+    "focus": 29.749,
+    "fstop": 3.954
+   },
+   {
+    "f": 133,
+    "x": 898.84,
+    "y": 1291.79,
+    "z": 25.11,
+    "heading": 5.933,
+    "pitch": -36.314,
+    "focus": 29.779,
+    "fstop": 3.959
+   },
+   {
+    "f": 134,
+    "x": 898.97,
+    "y": 1290.45,
+    "z": 25.212,
+    "heading": 5.942,
+    "pitch": -36.401,
+    "focus": 29.806,
+    "fstop": 3.965
+   },
+   {
+    "f": 135,
+    "x": 899.1,
+    "y": 1289.19,
+    "z": 25.307,
+    "heading": 5.95,
+    "pitch": -36.481,
+    "focus": 29.832,
+    "fstop": 3.969
+   },
+   {
+    "f": 136,
+    "x": 899.21,
+    "y": 1288.01,
+    "z": 25.397,
+    "heading": 5.958,
+    "pitch": -36.554,
+    "focus": 29.855,
+    "fstop": 3.974
+   },
+   {
+    "f": 137,
+    "x": 899.32,
+    "y": 1286.91,
+    "z": 25.48,
+    "heading": 5.965,
+    "pitch": -36.621,
+    "focus": 29.876,
+    "fstop": 3.978
+   },
+   {
+    "f": 138,
+    "x": 899.42,
+    "y": 1285.89,
+    "z": 25.557,
+    "heading": 5.971,
+    "pitch": -36.681,
+    "focus": 29.896,
+    "fstop": 3.981
+   },
+   {
+    "f": 139,
+    "x": 899.51,
+    "y": 1284.95,
+    "z": 25.628,
+    "heading": 5.976,
+    "pitch": -36.735,
+    "focus": 29.913,
+    "fstop": 3.984
+   },
+   {
+    "f": 140,
+    "x": 899.59,
+    "y": 1284.09,
+    "z": 25.692,
+    "heading": 5.981,
+    "pitch": -36.783,
+    "focus": 29.929,
+    "fstop": 3.987
+   },
+   {
+    "f": 141,
+    "x": 899.67,
+    "y": 1283.32,
+    "z": 25.751,
+    "heading": 5.985,
+    "pitch": -36.826,
+    "focus": 29.943,
+    "fstop": 3.99
+   },
+   {
+    "f": 142,
+    "x": 899.74,
+    "y": 1282.62,
+    "z": 25.803,
+    "heading": 5.988,
+    "pitch": -36.864,
+    "focus": 29.955,
+    "fstop": 3.992
+   },
+   {
+    "f": 143,
+    "x": 899.8,
+    "y": 1282.01,
+    "z": 25.849,
+    "heading": 5.991,
+    "pitch": -36.897,
+    "focus": 29.966,
+    "fstop": 3.994
+   },
+   {
+    "f": 144,
+    "x": 899.85,
+    "y": 1281.48,
+    "z": 25.889,
+    "heading": 5.994,
+    "pitch": -36.925,
+    "focus": 29.975,
+    "fstop": 3.996
+   },
+   {
+    "f": 145,
+    "x": 899.9,
+    "y": 1281.03,
+    "z": 25.923,
+    "heading": 5.996,
+    "pitch": -36.948,
+    "focus": 29.983,
+    "fstop": 3.997
+   },
+   {
+    "f": 146,
+    "x": 899.93,
+    "y": 1280.66,
+    "z": 25.951,
+    "heading": 5.997,
+    "pitch": -36.967,
+    "focus": 29.989,
+    "fstop": 3.998
+   },
+   {
+    "f": 147,
+    "x": 899.96,
+    "y": 1280.37,
+    "z": 25.972,
+    "heading": 5.998,
+    "pitch": -36.981,
+    "focus": 29.994,
+    "fstop": 3.999
+   },
+   {
+    "f": 148,
+    "x": 899.98,
+    "y": 1280.17,
+    "z": 25.987,
+    "heading": 5.999,
+    "pitch": -36.992,
+    "focus": 29.997,
+    "fstop": 4.0
+   },
+   {
+    "f": 149,
+    "x": 899.99,
+    "y": 1280.07,
+    "z": 25.995,
+    "heading": 6.0,
+    "pitch": -36.996,
+    "focus": 29.999,
+    "fstop": 4.0
+   },
+   {
+    "f": 150,
+    "x": 900.0,
+    "y": 1280.0,
+    "z": 26.0,
+    "heading": 6.0,
+    "pitch": -37.0,
+    "focus": 30.0,
+    "fstop": 4.0
+   }
+  ],
+  "naturalSeconds": 6.07
+ },
+ "light": {
+  "sunElevationDeg": 19,
+  "sunAzimuthDeg": 250,
+  "sunStrength": 3.6,
+  "sunColor": [
+   1.0,
+   0.86,
+   0.7
+  ],
+  "sunAngleDeg": 1.2,
+  "skyStrength": 0.35,
+  "hazeDensity": 0.0014,
+  "hazeAnisotropy": 0.55,
+  "hazeColor": [
+   1.0,
+   0.93,
+   0.84
+  ]
+ },
+ "water": {
+  "absorbColor": [
+   0.32,
+   0.74,
+   0.72
+  ],
+  "absorbDensity": 0.55,
+  "roughness": 0.035,
+  "ior": 1.333,
+  "waveScale": 1.6,
+  "waveStrength": 0.18
+ },
+ "paletteRefs": {
+  "turquoise": "#5AA4AB",
+  "lavender": "#A67EB7",
+  "appWater": "#78b8b2"
+ },
+ "layers": [
+  {
+   "id": "lakebed",
+   "role": "lakebed",
+   "asset": "mobile/src/components/garden/water/assets/ornamental-water-floor.png",
+   "x": -2400,
+   "y": -2400,
+   "width": 7200,
+   "height": 6600,
+   "rotationDeg": 0.0,
+   "source": "GardenWaterField.tsx floor shader",
+   "tile": {
+    "mode": "mirror",
+    "rect": [
+     0,
+     0,
+     2400,
+     1800
+    ]
+   }
+  },
+  {
+   "id": "upland",
+   "role": "matte",
+   "asset": "mobile/src/components/garden/terrain/outer-upland-v1.png",
+   "x": -1700,
+   "y": -2250,
+   "width": 3000,
+   "height": 2000,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx upland rect; app masks it with OUTER_GROUND shader",
+   "tile": {
+    "mode": "mirror",
+    "rect": [
+     -1700,
+     -2250,
+     3000,
+     2000
+    ]
+   }
+  },
+  {
+   "id": "outer_basin",
+   "role": "terrain",
+   "asset": "mobile/src/components/garden/terrain/outer-basin-floral-v3.png",
+   "x": -700,
+   "y": -800,
+   "width": 3800,
+   "height": 3400,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx TerrainJoin bounds (floral painting)",
+   "relief": {
+    "base": -0.4,
+    "top": 1.0,
+    "blur": 70
+   }
+  },
+  {
+   "id": "treehouse_cliffs",
+   "role": "matte",
+   "asset": "mobile/src/components/garden/terrain/treehouse-cliff-backing-v1.png",
+   "x": -350,
+   "y": -200,
+   "width": 1300,
+   "height": 1100,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx treeCliffs bounds",
+   "pivotY": 440,
+   "groundSplit": true
+  },
+  {
+   "id": "right_shoulder",
+   "role": "matte",
+   "asset": "mobile/src/components/garden/terrain/outer-right-bank-floral-v2.png",
+   "x": 1010,
+   "y": -1480,
+   "width": 550,
+   "height": 1660,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx rightBank bounds",
+   "pivotY": -160,
+   "groundSplit": true
+  },
+  {
+   "id": "right_perimeter",
+   "role": "terrain",
+   "asset": "mobile/src/components/garden/terrain/outer-right-bank-floral-v2.png",
+   "x": 2140,
+   "y": -260,
+   "width": 680,
+   "height": 2300,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx right perimeter rect",
+   "relief": {
+    "base": -0.4,
+    "top": 1.0,
+    "blur": 70
+   }
+  },
+  {
+   "id": "source_banks",
+   "role": "matte",
+   "asset": "mobile/src/components/garden/terrain/waterfall-source-banks-v1.png",
+   "x": 645,
+   "y": -1160,
+   "width": 600,
+   "height": 900,
+   "rotationDeg": 0.0,
+   "source": "GardenOuterBasin.tsx INLET_BOUNDS"
+  },
+  {
+   "id": "upper_right_scenic",
+   "role": "matte",
+   "asset": "mobile/src/components/garden/terrain/upper-right-scenic-v2.png",
+   "x": 1330,
+   "y": -420,
+   "width": 1200,
+   "height": 700,
+   "rotationDeg": 0.0,
+   "source": "terrain/upper-right-scenic.json bounds (app applies a shader cutout)",
+   "pivotY": 120,
+   "groundSplit": false
+  },
+  {
+   "id": "land_central",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/central-land.png",
+   "x": 768,
+   "y": 297,
+   "width": 831,
+   "height": 831.0,
+   "rotationDeg": 0,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_0405",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-0405.png",
+   "x": 1135,
+   "y": -60,
+   "width": 597,
+   "height": 597.0,
+   "rotationDeg": 1.5,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_06",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-06.png",
+   "x": 1638,
+   "y": 230,
+   "width": 598,
+   "height": 398.67,
+   "rotationDeg": -1.33,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_07",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-07.png",
+   "x": 1737,
+   "y": 407,
+   "width": 689,
+   "height": 689.0,
+   "rotationDeg": 7.24,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_08",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-08.png",
+   "x": 1667,
+   "y": 924,
+   "width": 673,
+   "height": 673.0,
+   "rotationDeg": 16.9,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_09",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-09.png",
+   "x": 936,
+   "y": 1000,
+   "width": 597,
+   "height": 597.0,
+   "rotationDeg": 8.28,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "land_101112",
+   "role": "land",
+   "asset": "mobile/assets/garden/land/land-101112.png",
+   "x": -27,
+   "y": 373,
+   "width": 1008,
+   "height": 1008.0,
+   "rotationDeg": 0,
+   "source": "gardenMapLayout.ts GARDEN_LANDS",
+   "relief": {
+    "base": -0.45,
+    "top": 0.55,
+    "blur": 10
+   }
+  },
+  {
+   "id": "env_central",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_central_environment.png",
+   "x": 798,
+   "y": 359,
+   "width": 605,
+   "height": 663,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_101112",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_101112_environment.png",
+   "x": 59,
+   "y": 499,
+   "width": 787,
+   "height": 822,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_0405",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_0405_environment.png",
+   "x": 1163,
+   "y": 51,
+   "width": 520,
+   "height": 290,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_06",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_06_environment.png",
+   "x": 1732,
+   "y": 275,
+   "width": 414,
+   "height": 294,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_07",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_07_environment.png",
+   "x": 1851,
+   "y": 595,
+   "width": 502,
+   "height": 326,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_08",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_08_environment.png",
+   "x": 1779,
+   "y": 1134,
+   "width": 474,
+   "height": 433,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "env_09",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/environment/layers/land_09_environment.png",
+   "x": 1000,
+   "y": 1075,
+   "width": 407,
+   "height": 501,
+   "rotationDeg": 0,
+   "source": "environment/layers.json"
+  },
+  {
+   "id": "main_road",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/bridges/approved-circulation/main-road-connected.png",
+   "x": 1300,
+   "y": 1350,
+   "width": 680,
+   "height": 2950,
+   "rotationDeg": 0.0,
+   "source": "approved-circulation/manifest.json main-road-connected"
+  },
+  {
+   "id": "infra_00",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/seams/Road_west_seamed.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_01",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/seams/Road_other_seamed.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_02",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/seams/Road_entrance09_seamed.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_03",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/SS01_stepping_stones.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_04",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/b02-land06-connection/land06-approach.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_05",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/final/B02_bridge.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_06",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/final/ST01_approved.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_07",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/b02-land06-connection/b02-foreground-local-opening.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_08",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/seams/ST01_feet_occlusion.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_09",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/entrance-connections/land09-transition.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_10",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/land09-interface-v2/land09-interface-foreground.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_11",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/entrance-connections/b01-foot-landing.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_12",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/final/B01_bridge.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  },
+  {
+   "id": "infra_13",
+   "role": "overlay",
+   "asset": "mobile/assets/garden/infrastructure/seams/B01_land08_occlusion.png",
+   "x": 0,
+   "y": 0,
+   "width": 2400,
+   "height": 1800,
+   "rotationDeg": 0.0,
+   "source": "GardenInfrastructureLayer.tsx images[] order"
+  }
+ ],
+ "landmarkCards": [
+  {
+   "id": "pavilion",
+   "asset": "mobile/assets/garden/landmarks/pavilion.png",
+   "x": 1086,
+   "y": 514,
+   "width": 206.38000000000002,
+   "height": 220.15,
+   "rotationDeg": 0,
+   "groundV": 0.913,
+   "source": "staticLandmarkMapPlacements.ts + StaticLandmarkEntities.tsx",
+   "group": "pavilion"
+  },
+  {
+   "id": "garden_arch",
+   "asset": "mobile/assets/garden/landmarks/garden-arch.png",
+   "x": 1380,
+   "y": 1450,
+   "width": 393.59999999999997,
+   "height": 359.7,
+   "rotationDeg": -6,
+   "groundV": 0.961,
+   "source": "staticLandmarkMapPlacements.ts",
+   "group": "garden_arch"
+  },
+  {
+   "id": "treehouse_tree-base",
+   "asset": "mobile/assets/garden/landmarks/treehouse/tree-base.png",
+   "x": 70,
+   "y": -140,
+   "width": 941.2,
+   "height": 705.9,
+   "rotationDeg": 0,
+   "groundV": 0.95,
+   "source": "treehouseMapPlacement.ts + TreehouseEntity.tsx",
+   "group": "treehouse"
+  },
+  {
+   "id": "treehouse_canopy-overlay",
+   "asset": "mobile/assets/garden/landmarks/treehouse/canopy-overlay.png",
+   "x": 70,
+   "y": -140,
+   "width": 941.2,
+   "height": 705.9,
+   "rotationDeg": 0,
+   "groundV": 0.95,
+   "source": "treehouseMapPlacement.ts + TreehouseEntity.tsx",
+   "group": "treehouse"
+  },
+  {
+   "id": "treehouse_wisteria-overlay",
+   "asset": "mobile/assets/garden/landmarks/treehouse/wisteria-overlay.png",
+   "x": 70,
+   "y": -140,
+   "width": 941.2,
+   "height": 705.9,
+   "rotationDeg": 0,
+   "groundV": 0.95,
+   "source": "treehouseMapPlacement.ts + TreehouseEntity.tsx",
+   "group": "treehouse"
+  },
+  {
+   "id": "treehouse_foreground-overlay",
+   "asset": "mobile/assets/garden/landmarks/treehouse/foreground-overlay.png",
+   "x": 70,
+   "y": -140,
+   "width": 941.2,
+   "height": 705.9,
+   "rotationDeg": 0,
+   "groundV": 0.95,
+   "source": "treehouseMapPlacement.ts + TreehouseEntity.tsx",
+   "group": "treehouse"
+  },
+  {
+   "id": "treehouse_mailbox",
+   "asset": "mobile/assets/garden/landmarks/treehouse/mailbox.png",
+   "x": 70,
+   "y": -140,
+   "width": 941.2,
+   "height": 705.9,
+   "rotationDeg": 0,
+   "groundV": 0.95,
+   "source": "treehouseMapPlacement.ts + TreehouseEntity.tsx",
+   "group": "treehouse"
+  }
+ ],
+ "waterfall": {
+  "id": "waterfall_v2",
+  "asset": "mobile/assets/garden/landmarks/waterfall-v2/waterfall-v2-compact-r3.png",
+  "x": 742.6,
+  "y": -656,
+  "scale": 0.5,
+  "rotationDeg": -2.5,
+  "canvas": [
+   1024,
+   2048
+  ],
+  "bands": [
+   {
+    "start": 0,
+    "end": 767,
+    "scaleY": 0.58,
+    "translateY": 676.14,
+    "shape": "source_top"
+   },
+   {
+    "start": 767,
+    "end": 1652,
+    "scaleY": 0.6,
+    "translateY": 660.8,
+    "shape": "fall"
+   },
+   {
+    "start": 1652,
+    "end": 2048,
+    "scaleY": 1,
+    "translateY": 0,
+    "shape": "pool"
+   }
+  ],
+  "source": "waterfallV2Placement.ts + waterfallV2Proportions.ts (short-r1) + WaterfallV2Entity.tsx"
+ },
+ "foregroundFlowers": [
+  "mobile/assets/garden/environment/flowers/crocus_lavender.png",
+  "mobile/assets/garden/environment/flowers/crocus_crescent.png",
+  "mobile/assets/garden/environment/flowers/crocus_ivory.png",
+  "mobile/assets/garden/environment/flowers/ivory_wildflowers.png",
+  "mobile/assets/garden/environment/flowers/pale_blue.png",
+  "mobile/assets/garden/environment/flowers/pale_pink.png",
+  "mobile/assets/garden/environment/flowers/ivory_sage.png",
+  "mobile/assets/garden/environment/flowers/sparse_sprig.png",
+  "mobile/assets/garden/environment/foliage/fern_groundcover.png",
+  "mobile/assets/garden/environment/foliage/leaf_tuft.png"
+ ],
+ "scatter": {
+  "seed": 7,
+  "count": 90,
+  "distMin": 1.4,
+  "distMax": 7.0,
+  "halfAngleDeg": 60,
+  "heightMin": 0.32,
+  "heightMax": 0.95,
+  "minGroundAboveWater": 0.6,
+  "note": "Foreground flower cards from the approved environment sprite set, placed only on dry ground near the camera start."
+ }
+}

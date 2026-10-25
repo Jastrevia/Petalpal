@@ -1,0 +1,137 @@
+{
+ "fps": 24,
+ "total_frames": 1395,
+ "seconds": 58.125,
+ "shots": [
+  {
+   "label": "01 rain at night (V01, kept)",
+   "source": "film_v1/shots/V01.mp4",
+   "src_start_frame": 0,
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "dur_s": 3.5,
+   "note": ""
+  },
+  {
+   "label": "02 phone notification and tap (R2)",
+   "source": "film_v3/shots/V3_phone.mp4",
+   "src_start_frame": 0,
+   "start_frame": 84,
+   "frames": 156,
+   "start_s": 3.5,
+   "dur_s": 6.5,
+   "note": "dissolve in 12f from V01"
+  },
+  {
+   "label": "03 A01 fairy opening (ACCEPTED, unmodified)",
+   "source": "perf_test/glide_review/glide_v1_7s_retimed.mp4",
+   "src_start_frame": 0,
+   "start_frame": 240,
+   "frames": 168,
+   "start_s": 10.0,
+   "dur_s": 7.0,
+   "note": ""
+  },
+  {
+   "label": "04 she presents the invitation (R1)",
+   "source": "film_v3/shots/V3_present.mp4",
+   "src_start_frame": 0,
+   "start_frame": 408,
+   "frames": 72,
+   "start_s": 17.0,
+   "dur_s": 3.0,
+   "note": "from light, first 8f"
+  },
+  {
+   "label": "05 reach and touch (R3)",
+   "source": "film_v3/shots/V3_reach.mp4",
+   "src_start_frame": 0,
+   "start_frame": 480,
+   "frames": 84,
+   "start_s": 20.0,
+   "dur_s": 3.5,
+   "note": ""
+  },
+  {
+   "label": "06 into the wisteria passage (R4)",
+   "source": "film_v3/shots/V3_passage.mp4",
+   "src_start_frame": 0,
+   "start_frame": 564,
+   "frames": 72,
+   "start_s": 23.5,
+   "dur_s": 3.0,
+   "note": ""
+  },
+  {
+   "label": "07 garden reveal (S09a, kept)",
+   "source": "film_v2/shots/S09a_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 636,
+   "frames": 72,
+   "start_s": 26.5,
+   "dur_s": 3.0,
+   "note": "from light, first 8f"
+  },
+  {
+   "label": "08 pavilion over the water (S09b, kept)",
+   "source": "film_v2/shots/S09b_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 708,
+   "frames": 74,
+   "start_s": 29.5,
+   "dur_s": 3.083,
+   "note": ""
+  },
+  {
+   "label": "09 journal: words become a seed (S10, kept)",
+   "source": "film_v2/shots/S10_journal.mp4",
+   "src_start_frame": 0,
+   "start_frame": 782,
+   "frames": 96,
+   "start_s": 32.583,
+   "dur_s": 4.0,
+   "note": ""
+  },
+  {
+   "label": "10 crocus blooms (V13 flower preserved; surroundings after R5)",
+   "source": "film_v3/shots/V3_crocus.mp4",
+   "src_start_frame": 0,
+   "start_frame": 878,
+   "frames": 120,
+   "start_s": 36.583,
+   "dur_s": 5.0,
+   "note": ""
+  },
+  {
+   "label": "11 treehouse letter (R6)",
+   "source": "film_v3/shots/V3_letter.mp4",
+   "src_start_frame": 0,
+   "start_frame": 998,
+   "frames": 192,
+   "start_s": 41.583,
+   "dur_s": 8.0,
+   "note": "fade to warm light, last 10f"
+  },
+  {
+   "label": "12 morning (R2 at dawn)",
+   "source": "film_v3/shots/V3_dawn.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1190,
+   "frames": 84,
+   "start_s": 49.583,
+   "dur_s": 3.5,
+   "note": ""
+  },
+  {
+   "label": "13 title (S19, kept)",
+   "source": "film_v1/vfx/S19.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1274,
+   "frames": 121,
+   "start_s": 53.083,
+   "dur_s": 5.042,
+   "note": "dissolve in 12f over the end of 12"
+  }
+ ]
+}

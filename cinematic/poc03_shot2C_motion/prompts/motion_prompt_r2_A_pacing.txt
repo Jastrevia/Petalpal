@@ -1,0 +1,8 @@
+# Round 2, take A (pacing emphasis). First frame K1, last frame K2. Kling 3.0 Pro, 6 s. Negative: negative_prompt_r2.txt
+# ---
+One continuous first-person Steadicam shot, six seconds, no cuts, starting exactly on the first frame and ending exactly on the last frame. The camera glides at standing eye height along the wet flagstone path of a wisteria-covered limestone passage toward the sunlit gilded arch.
+0 to 2.5 seconds: an unhurried, quiet glide through the warm, deep shade of the passage. Hanging wisteria brushes past the top of the frame, and crocus and mossy stones slide past the lower corners with strong parallax.
+2.5 to 4.5 seconds: the camera gathers momentum and accelerates decisively toward the bright exit. The limestone walls rush past the edges of the frame and the gilded arch swells to fill the view.
+4.5 to 5.5 seconds: the camera crosses from shade into warm morning sunlight and the space opens up. The luminous turquoise lake spreads wide below, the tall waterfall pours brightly on the right in sunlit mist, and golden volumetric sunbeams slant through the hanging wisteria.
+5.5 to 6 seconds: the camera eases to a complete stop and holds perfectly still on the final composition, letting the garden breathe; only the waterfall, mist, drifting petals and gently swaying wisteria move.
+The exposure adapts smoothly and naturally as the camera leaves the shade. Real 3D perspective, parallax and occlusion, with cinematic 180-degree-shutter motion blur at the fastest moment. The gilded arch, its lanterns with turquoise crystals, the pavilion, cliffs and waterfall keep exactly the design of the final frame. The same low golden sun ahead and slightly left throughout. Premium fantasy feature-film realism, soft contrast, fine film grain.

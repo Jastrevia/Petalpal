@@ -1,0 +1,147 @@
+{
+ "fps": 24,
+ "total_frames": 1440,
+ "seconds": 60.0,
+ "shots": [
+  {
+   "label": "01 rain at night (reused V01)",
+   "source": "film_v1/shots/V01.mp4",
+   "src_start_frame": 0,
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "dur_s": 3.5,
+   "note": ""
+  },
+  {
+   "label": "02 phone: invitation arrives",
+   "source": "film_v2/shots/S02_phone.mp4",
+   "src_start_frame": 0,
+   "start_frame": 84,
+   "frames": 209,
+   "start_s": 3.5,
+   "dur_s": 8.708,
+   "note": "dissolve in 12f from V01"
+  },
+  {
+   "label": "03 A01 fairy opening (ACCEPTED, unmodified)",
+   "source": "perf_test/glide_review/glide_v1_7s_retimed.mp4",
+   "src_start_frame": 0,
+   "start_frame": 293,
+   "frames": 168,
+   "start_s": 12.208,
+   "dur_s": 7.0,
+   "note": ""
+  },
+  {
+   "label": "04 touch",
+   "source": "film_v2/shots/S06_touch.mp4",
+   "src_start_frame": 0,
+   "start_frame": 461,
+   "frames": 72,
+   "start_s": 19.208,
+   "dur_s": 3.0,
+   "note": ""
+  },
+  {
+   "label": "05 petal swirl to the passage",
+   "source": "film_v2/shots/S07_swirl.mp4",
+   "src_start_frame": 0,
+   "start_frame": 533,
+   "frames": 62,
+   "start_s": 22.208,
+   "dur_s": 2.583,
+   "note": ""
+  },
+  {
+   "label": "06 passage (reused K03orb / Kling 03)",
+   "source": "film_v1/vfx/K03orb.mp4",
+   "src_start_frame": 0,
+   "start_frame": 595,
+   "frames": 126,
+   "start_s": 24.792,
+   "dur_s": 5.25,
+   "note": ""
+  },
+  {
+   "label": "07 garden reveal",
+   "source": "film_v2/shots/S09a_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 721,
+   "frames": 72,
+   "start_s": 30.042,
+   "dur_s": 3.0,
+   "note": ""
+  },
+  {
+   "label": "08 pavilion over the water",
+   "source": "film_v2/shots/S09b_garden.mp4",
+   "src_start_frame": 0,
+   "start_frame": 793,
+   "frames": 74,
+   "start_s": 33.042,
+   "dur_s": 3.083,
+   "note": ""
+  },
+  {
+   "label": "09 journal: words become a seed",
+   "source": "film_v2/shots/S10_journal.mp4",
+   "src_start_frame": 0,
+   "start_frame": 867,
+   "frames": 96,
+   "start_s": 36.125,
+   "dur_s": 4.0,
+   "note": ""
+  },
+  {
+   "label": "10 crocus blooms (reused V13)",
+   "source": "film_v2/shots/S12_crocus.mp4",
+   "src_start_frame": 0,
+   "start_frame": 963,
+   "frames": 120,
+   "start_s": 40.125,
+   "dur_s": 5.0,
+   "note": ""
+  },
+  {
+   "label": "11 treehouse mailbox",
+   "source": "film_v2/shots/S13_mailbox.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1083,
+   "frames": 72,
+   "start_s": 45.125,
+   "dur_s": 3.0,
+   "note": ""
+  },
+  {
+   "label": "12 the letter",
+   "source": "film_v2/shots/S14_letter.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1155,
+   "frames": 120,
+   "start_s": 48.125,
+   "dur_s": 5.0,
+   "note": "fade to warm light, last 10f"
+  },
+  {
+   "label": "13 morning",
+   "source": "film_v2/shots/S15_dawn.mp4",
+   "src_start_frame": 0,
+   "start_frame": 1275,
+   "frames": 72,
+   "start_s": 53.125,
+   "dur_s": 3.0,
+   "note": "from warm light, first 10f"
+  },
+  {
+   "label": "14 title (reused S19)",
+   "source": "film_v1/vfx/S19.mp4",
+   "src_start_frame": 28,
+   "start_frame": 1347,
+   "frames": 93,
+   "start_s": 56.125,
+   "dur_s": 3.875,
+   "note": "dissolve in 12f over the end of 13"
+  }
+ ]
+}

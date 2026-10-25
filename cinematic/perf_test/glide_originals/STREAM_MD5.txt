@@ -1,0 +1,6 @@
+# Integrity of the original Kling outputs
+# Whole-file hashes are NOT stable here: the workspace stamps each saved .mp4 with a C2PA content-credentials box
+# (unique id per copy, ~6 KB). The video bitstream itself is untouched, so integrity is recorded as the MD5 of the
+# video packets: ffmpeg -i FILE -map 0:v -c copy -f md5 -
+ad41b2a138f4f74de9a06d956d11dbc6  glide_seg1.mp4  (video stream)
+7a82c5654bf23c3b00a7a32d073170f7  glide_seg2.mp4  (video stream)

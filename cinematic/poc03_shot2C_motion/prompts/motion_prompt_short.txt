@@ -1,0 +1,3 @@
+# Short version for services with tight prompt limits (keep the same first and last frames).
+# ---
+Continuous first-person Steadicam glide forward along a wet flagstone path through a wisteria-covered limestone tunnel toward a sunlit gilded arch, six seconds, no cuts. Slow creep in warm shade for two seconds, smooth acceleration as the walls sweep past and the valley opens, then into warm sunlight at the mouth, turning slightly right as the turquoise lake and tall waterfall appear from behind the arch, easing to a stop exactly on the final frame. Strong parallax and real occlusion, natural motion blur, wisteria swaying, petals drifting in sunbeams, waterfall flowing. Arch, lanterns and pavilion keep their exact design; same golden sun ahead-left throughout.

@@ -1,0 +1,15 @@
+# Midjourney look-test shorts for the four Grand Reveal directions.
+# Do not use the motif board as --sref: it would pull the look toward mobile-game rendering.
+# Save as concept/candidates/f2A_mj_01.png ... f2D_mj_04.png
+
+## A · Epic Valley
+cinematic fantasy realism, vast hidden valley from a limestone promontory 150m above an immense turquoise lake, one majestic three-tier waterfall down colossal ivory cliffs right of centre, two slender ribbon falls on the left cliffs, hanging gardens and cascading lavender wisteria, tiny island pavilion with slate-blue tiered roof for scale, colossal wisteria tree far below left, layered misty mountains, cloud bank in the far valley, low golden sun from the left, god rays through mist and spray, 21mm, horizon on upper third, calm and luminous, feature-film grade, fine film grain --ar 16:9
+
+## B · Enchanted Paradise
+cinematic fantasy realism, intimate low view from the water's edge 1m above crystal-clear turquoise shallows, curtain of backlit translucent lavender wisteria upper left, dense drift of lavender violet and ivory crocus with glowing saffron stamens and dew on a mossy terrace lower right, pebbles and caustics under glass-clear water, floating petals, soft defocused waterfall veil, island pavilion with slate-blue roof and wisteria cliffs in golden haze beyond, contre-jour morning sun, light shafts, drifting pollen, highlight bloom, 40mm f/2.8, feature-film grade, fine film grain --ar 16:9
+
+## C · Portal Reveal
+cinematic fantasy realism, first-person view at eye height inside a shadowy tunnel of living wisteria over pale limestone, moss and ferns, deep cool violet-teal shade with full detail, damp mossy flagstone path leading through a tall natural limestone arch with an inset antique gilded-bronze leaf-filigree arch wound with wisteria, arch slightly left of centre, sunlit hidden valley beyond with luminous turquoise lake, two-tier waterfall, island pavilion with slate-blue tiered roof, golden haze, warm volumetric beams across the floor, drifting petals, 24mm, level camera, feature-film grade, fine film grain --ar 16:9
+
+## D · PetalPal Wonderland
+cinematic fantasy realism, mossy terrace 6m above a luminous turquoise lake beside an immense ancient wisteria tree with teal-green canopy, tiny knee-high round honey-wood fairy door with petal stained glass and warm lamplight in the trunk, turquoise-tiled hood with upswept eaves, glass lanterns on the roots, root and stone stairs, crocus-bud mailbox, island pavilion with slate-blue two-tier tiled roof, curled upswept eaves and gold lotus finial, arched stone bridges, gilded bronze leaf-filigree garden arch with wisteria, tall waterfall behind, crocus terrace foreground, golden morning god rays, mist, 32mm, eye level, feature-film grade, fine film grain --ar 16:9

@@ -1,0 +1,948 @@
+{
+ "cap_usd": 30.0,
+ "entries": [
+  {
+   "label": "girl_sheet",
+   "endpoint": "fal-ai/nano-banana-pro",
+   "usd_est": 0.0,
+   "status": "refused_by_fal_key_restriction",
+   "t": "2026-10-20T16:59:03",
+   "request_id": "01a15bc1-1aa1-7d71-b1f8-bcf20ba906e6",
+   "error": "{\"detail\":\"API key does not have access to model: fal-ai/nano-banana-pro\",\"type\":\"resource_restricted\"}"
+  },
+  {
+   "label": "fairy_sheet",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.0,
+   "status": "refused_by_fal_key_restriction",
+   "t": "2026-10-20T16:59:03",
+   "request_id": "01a15bc1-1b3f-7cd2-a4e4-8485edea9af2",
+   "error": "{\"detail\":\"API key does not have access to model: fal-ai/nano-banana-pro/edit\",\"type\":\"resource_restricted\"}"
+  },
+  {
+   "label": "girl_sheet",
+   "endpoint": "fal-ai/nano-banana-pro",
+   "usd_est": 0.3,
+   "status": "completed",
+   "t": "2026-10-20T17:05:38",
+   "request_id": "01a15bc7-223f-72f2-bbce-098061625594",
+   "outputs": [
+    "chars/girl_sheet_1.png",
+    "chars/girl_sheet_2.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "fairy_sheet",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.3,
+   "status": "completed",
+   "t": "2026-10-20T17:05:38",
+   "request_id": "01a15bc7-239b-7213-87b6-7fb20ed16ae3",
+   "outputs": [
+    "chars/fairy_sheet_1.png",
+    "chars/fairy_sheet_2.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "girl_ctx",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:06:53",
+   "request_id": "01a15bc8-4725-7d41-9f52-6a985bdf5f02",
+   "outputs": [
+    "chars/girl_ctx.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "fairy_ctx",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:06:53",
+   "request_id": "01a15bc8-4708-7fe1-beca-569cd2ecd07d",
+   "outputs": [
+    "chars/fairy_ctx.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S01",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be22-7ab1-8f36-106fa3c3f28e",
+   "outputs": [
+    "keyframes/S01.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S03",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be69-7833-925a-ef78bd91f167",
+   "outputs": [
+    "keyframes/S03.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S04",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be4e-7840-be12-03d6178464aa",
+   "outputs": [
+    "keyframes/S04.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S05a",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be2a-7ae3-a3f4-2804ca36f75d",
+   "outputs": [
+    "keyframes/S05a.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S05b",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be28-7003-8e63-4fe7abeddb0b",
+   "outputs": [
+    "keyframes/S05b.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S06",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.3,
+   "status": "completed",
+   "t": "2026-10-20T17:11:46",
+   "request_id": "01a15bcc-be07-7523-bfe1-28a39d6653a0",
+   "outputs": [
+    "keyframes/S06_1.png",
+    "keyframes/S06_2.png"
+   ],
+   "seconds": 37
+  },
+  {
+   "label": "S09",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.3,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-505b-7ef3-bca5-2f612b46d027",
+   "outputs": [
+    "keyframes/S09_1.png",
+    "keyframes/S09_2.png"
+   ],
+   "seconds": 39
+  },
+  {
+   "label": "S10",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-4fd5-77a1-b86d-6ddd1ca13238",
+   "outputs": [
+    "keyframes/S10.png"
+   ],
+   "seconds": 25
+  },
+  {
+   "label": "S11b",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-4fe6-7181-93ff-e3c31e5f1519",
+   "outputs": [
+    "keyframes/S11b.png"
+   ],
+   "seconds": 31
+  },
+  {
+   "label": "S13a",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-5007-7081-a3a3-de9b3ec7083f",
+   "outputs": [
+    "keyframes/S13a.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S15",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-5116-7162-84e2-06e925e35a8a",
+   "outputs": [
+    "keyframes/S15.png"
+   ],
+   "seconds": 38
+  },
+  {
+   "label": "S16",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:12:23",
+   "request_id": "01a15bcd-51c9-7471-bb16-d0188ca853c5",
+   "outputs": [
+    "keyframes/S16.png"
+   ],
+   "seconds": 31
+  },
+  {
+   "label": "S17",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:02",
+   "request_id": "01a15bcd-e82a-7f00-abef-546b58d58c3f",
+   "outputs": [
+    "keyframes/S17.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S18",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:02",
+   "request_id": "01a15bcd-e84b-7b70-aeb8-55f4945d33c7",
+   "outputs": [
+    "keyframes/S18.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S19plate",
+   "endpoint": "fal-ai/nano-banana-pro",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:02",
+   "request_id": "01a15bcd-e7c5-7bc1-96b9-a3f1125f1a01",
+   "outputs": [
+    "keyframes/S19plate.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S19title",
+   "endpoint": "fal-ai/nano-banana-pro",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:02",
+   "request_id": "01a15bcd-e8e2-7e13-bf9d-e2eab55e93f9",
+   "outputs": [
+    "keyframes/S19title.png"
+   ],
+   "seconds": 26
+  },
+  {
+   "label": "S11a",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:46",
+   "request_id": "01a15bce-95f6-7a82-a15a-0f5b2b6b7edb",
+   "outputs": [
+    "keyframes/S11a.png"
+   ],
+   "seconds": 26
+  },
+  {
+   "label": "S13b",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:13:46",
+   "request_id": "01a15bce-95ed-7e43-819d-b35a04e575a2",
+   "outputs": [
+    "keyframes/S13b.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "S14",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:14:19",
+   "request_id": "01a15bcf-15f4-77d1-bbda-094316d03412",
+   "outputs": [
+    "keyframes/S14.png"
+   ],
+   "seconds": 31
+  },
+  {
+   "label": "S10v2",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T17:16:13",
+   "request_id": "01a15bd0-d11b-77f2-acaa-4cfdda8051a9",
+   "outputs": [
+    "keyframes/S10v2.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "V06a",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e43-73f2-8862-a47d8227eccc",
+   "outputs": [
+    "shots/V06a.mp4"
+   ],
+   "seconds": 198
+  },
+  {
+   "label": "V06b",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e65-7ec2-af14-f089cee491bd",
+   "outputs": [
+    "shots/V06b.mp4"
+   ],
+   "seconds": 149
+  },
+  {
+   "label": "V09a",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e92-7731-b163-49d86dc59af0",
+   "outputs": [
+    "shots/V09a.mp4"
+   ],
+   "seconds": 168
+  },
+  {
+   "label": "V09b",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e56-7a21-9f80-b6083f48c859",
+   "outputs": [
+    "shots/V09b.mp4"
+   ],
+   "seconds": 242
+  },
+  {
+   "label": "V05",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e74-7222-84e7-1190f7ae0159",
+   "outputs": [
+    "shots/V05.mp4"
+   ],
+   "seconds": 180
+  },
+  {
+   "label": "V02",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:17:58",
+   "request_id": "01a15bd2-6e72-7040-a543-1cc7f99e0f2d",
+   "outputs": [
+    "shots/V02.mp4"
+   ],
+   "seconds": 167
+  },
+  {
+   "label": "score_v1",
+   "endpoint": "fal-ai/elevenlabs/music",
+   "usd_est": 0.6,
+   "status": "completed",
+   "t": "2026-10-20T17:20:07",
+   "request_id": "01a15bd4-62d2-7d71-8640-664fc32f5864",
+   "status_url": "https://queue.fal.run/fal-ai/elevenlabs/requests/01a15bd4-62d2-7d71-8640-664fc32f5864/status",
+   "response_url": "https://queue.fal.run/fal-ai/elevenlabs/requests/01a15bd4-62d2-7d71-8640-664fc32f5864",
+   "outputs": [
+    "audio/score_v1.mp3"
+   ],
+   "seconds": 19
+  },
+  {
+   "label": "score_v2",
+   "endpoint": "fal-ai/elevenlabs/music",
+   "usd_est": 0.6,
+   "status": "completed",
+   "t": "2026-10-20T17:21:01",
+   "request_id": "01a15bd5-3643-78a1-8c81-cdfe96ea105f",
+   "status_url": "https://queue.fal.run/fal-ai/elevenlabs/requests/01a15bd5-3643-78a1-8c81-cdfe96ea105f/status",
+   "response_url": "https://queue.fal.run/fal-ai/elevenlabs/requests/01a15bd5-3643-78a1-8c81-cdfe96ea105f",
+   "outputs": [
+    "audio/score_v2.mp3"
+   ],
+   "seconds": 13
+  },
+  {
+   "label": "V03",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-2028-72a1-931f-87bc1af44406",
+   "outputs": [
+    "shots/V03.mp4"
+   ],
+   "seconds": 144
+  },
+  {
+   "label": "V04",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-20eb-7dd0-9141-04ef5ac8b3b3",
+   "outputs": [
+    "shots/V04.mp4"
+   ],
+   "seconds": 193
+  },
+  {
+   "label": "V10",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-2124-74e1-bfca-a9ea5f99892f",
+   "outputs": [
+    "shots/V10.mp4"
+   ],
+   "seconds": 174
+  },
+  {
+   "label": "V14",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-2102-7e23-a045-d71f06368d96",
+   "outputs": [
+    "shots/V14.mp4"
+   ],
+   "seconds": 236
+  },
+  {
+   "label": "V15",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-2144-7d63-907e-b6bac1c47e7c",
+   "outputs": [
+    "shots/V15.mp4"
+   ],
+   "seconds": 206
+  },
+  {
+   "label": "V16",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:22:01",
+   "request_id": "01a15bd6-20fc-71c1-b2c7-6e96a5c6d7f2",
+   "outputs": [
+    "shots/V16.mp4"
+   ],
+   "seconds": 305
+  },
+  {
+   "label": "V07a",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:26:13",
+   "request_id": "01a15bd9-f9fc-72a2-ab79-1dff045ac8f7",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bd9-f9fc-72a2-ab79-1dff045ac8f7/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bd9-f9fc-72a2-ab79-1dff045ac8f7",
+   "outputs": [
+    "shots/V07a.mp4"
+   ],
+   "seconds": 297
+  },
+  {
+   "label": "V07b",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:26:13",
+   "request_id": "01a15bd9-fad8-7d51-9ad2-a65876921ea5",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bd9-fad8-7d51-9ad2-a65876921ea5/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bd9-fad8-7d51-9ad2-a65876921ea5",
+   "outputs": [
+    "shots/V07b.mp4"
+   ],
+   "seconds": 180
+  },
+  {
+   "label": "V18",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c88f-7192-b9a6-28991168c7ae",
+   "outputs": [
+    "shots/V18.mp4"
+   ],
+   "seconds": 236
+  },
+  {
+   "label": "V01",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c9d5-7722-bf67-14eba68b51f7",
+   "outputs": [
+    "shots/V01.mp4"
+   ],
+   "seconds": 156
+  },
+  {
+   "label": "V11",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c9c7-72b0-9e73-02df73ada2f4",
+   "outputs": [
+    "shots/V11.mp4"
+   ],
+   "seconds": 248
+  },
+  {
+   "label": "V13",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c9e4-73d3-aebb-50f6d7e2fa57",
+   "outputs": [
+    "shots/V13.mp4"
+   ],
+   "seconds": 254
+  },
+  {
+   "label": "V17",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c9a8-7272-8d10-5e61b8905d8f",
+   "outputs": [
+    "shots/V17.mp4"
+   ],
+   "seconds": 155
+  },
+  {
+   "label": "V19",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T17:27:06",
+   "request_id": "01a15bda-c9d3-70f1-a92c-90b9af748438",
+   "outputs": [
+    "shots/V19.mp4"
+   ],
+   "seconds": 149
+  },
+  {
+   "label": "sfx_a",
+   "endpoint": "fal-ai/mmaudio-v2",
+   "usd_est": 0.0295,
+   "status": "completed",
+   "t": "2026-10-20T17:50:41",
+   "request_id": "01a15bf0-61ce-79e0-8593-c3265436f3fb",
+   "status_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15bf0-61ce-79e0-8593-c3265436f3fb/status",
+   "response_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15bf0-61ce-79e0-8593-c3265436f3fb",
+   "outputs": [
+    "audio/sfx_a.mp4"
+   ],
+   "seconds": 87
+  },
+  {
+   "label": "sfx_b",
+   "endpoint": "fal-ai/mmaudio-v2",
+   "usd_est": 0.03,
+   "status": "submitted",
+   "t": "2026-10-20T17:50:46",
+   "request_id": "01a15bf0-731c-7bb3-9b33-d750684e31b4",
+   "status_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15bf0-731c-7bb3-9b33-d750684e31b4/status",
+   "response_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15bf0-731c-7bb3-9b33-d750684e31b4"
+  },
+  {
+   "label": "V11r",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T18:03:52",
+   "request_id": "01a15bfc-72dc-7d93-9d3b-9177fdc0e9b1",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bfc-72dc-7d93-9d3b-9177fdc0e9b1/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15bfc-72dc-7d93-9d3b-9177fdc0e9b1",
+   "outputs": [
+    "shots/V11r.mp4"
+   ],
+   "seconds": 125
+  },
+  {
+   "label": "V04r",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-20T18:10:43",
+   "request_id": "01a15c02-b941-7540-9509-52c230c5f911",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15c02-b941-7540-9509-52c230c5f911/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15c02-b941-7540-9509-52c230c5f911",
+   "outputs": [
+    "shots/V04r.mp4"
+   ],
+   "seconds": 377
+  },
+  {
+   "label": "sfx_a",
+   "endpoint": "fal-ai/mmaudio-v2",
+   "usd_est": 0.0295,
+   "status": "submitted",
+   "t": "2026-10-20T18:30:13",
+   "request_id": "01a15c14-93cd-76c1-90e1-c76d07fa6582",
+   "status_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15c14-93cd-76c1-90e1-c76d07fa6582/status",
+   "response_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15c14-93cd-76c1-90e1-c76d07fa6582"
+  },
+  {
+   "label": "sfx_b",
+   "endpoint": "fal-ai/mmaudio-v2",
+   "usd_est": 0.03,
+   "status": "completed",
+   "t": "2026-10-20T18:30:17",
+   "request_id": "01a15c14-a381-7993-bb99-4a1909d853f2",
+   "status_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15c14-a381-7993-bb99-4a1909d853f2/status",
+   "response_url": "https://queue.fal.run/fal-ai/mmaudio-v2/requests/01a15c14-a381-7993-bb99-4a1909d853f2",
+   "outputs": [
+    "audio/sfx_b.mp4"
+   ],
+   "seconds": 111
+  },
+  {
+   "label": "poseB_reach",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T21:53:32",
+   "pilot": "keypose_pilot_1",
+   "request_id": "01a15cce-b66a-7aa3-8907-4e827174947c",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b66a-7aa3-8907-4e827174947c/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b66a-7aa3-8907-4e827174947c",
+   "outputs": [
+    "../keypose_pilot/candidates/poseB_reach.png"
+   ],
+   "seconds": 31
+  },
+  {
+   "label": "poseA_smile",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T21:53:32",
+   "pilot": "keypose_pilot_1",
+   "request_id": "01a15cce-b69f-7850-a768-49660cef54ba",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b69f-7850-a768-49660cef54ba/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b69f-7850-a768-49660cef54ba",
+   "outputs": [
+    "../keypose_pilot/candidates/poseA_smile.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "poseC_turn_lead",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T21:53:32",
+   "pilot": "keypose_pilot_1",
+   "request_id": "01a15cce-b6ad-7302-b60b-a39b3af89dce",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b6ad-7302-b60b-a39b3af89dce/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15cce-b6ad-7302-b60b-a39b3af89dce",
+   "outputs": [
+    "../keypose_pilot/candidates/poseC_turn_lead.png"
+   ],
+   "seconds": 25
+  },
+  {
+   "label": "reach_rebuild_1",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-20T22:56:47",
+   "pilot": "reach_rebuild_1",
+   "request_id": "01a15d08-9e25-7a41-862e-dd55394a6dad",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15d08-9e25-7a41-862e-dd55394a6dad/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15d08-9e25-7a41-862e-dd55394a6dad",
+   "outputs": [
+    "../keypose_pilot/reach/reach_rebuild_1.png"
+   ],
+   "seconds": 38
+  },
+  {
+   "label": "reach_hand_fix_1",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-21T11:07:17",
+   "pilot": "reach_hand_fix_1",
+   "request_id": "01a15fa5-6871-79d3-9b25-a81fcaf0b91b",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15fa5-6871-79d3-9b25-a81fcaf0b91b/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15fa5-6871-79d3-9b25-a81fcaf0b91b",
+   "outputs": [
+    "../keypose_pilot/reach/reach_hand_fix_1.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "perf_test_1",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-21T11:25:45",
+   "pilot": "perf_test_1",
+   "request_id": "01a15fb6-522d-74b3-943e-14362b4e20c5",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fb6-522d-74b3-943e-14362b4e20c5/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fb6-522d-74b3-943e-14362b4e20c5",
+   "outputs": [
+    "../perf_test/perf_test_1.mp4"
+   ],
+   "seconds": 198
+  },
+  {
+   "label": "midglide_1",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-21T11:41:24",
+   "pilot": "midglide_1",
+   "request_id": "01a15fc4-a427-7141-886a-c60d0258e925",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15fc4-a427-7141-886a-c60d0258e925/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a15fc4-a427-7141-886a-c60d0258e925",
+   "outputs": [
+    "../keypose_pilot/midglide/midglide_1.png"
+   ],
+   "seconds": 31
+  },
+  {
+   "label": "glide_seg1",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.448,
+   "status": "completed",
+   "t": "2026-10-21T12:08:59",
+   "pilot": "glide_segments_1",
+   "request_id": "01a15fdd-e3f2-7a91-904b-d3f13519343c",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fdd-e3f2-7a91-904b-d3f13519343c/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fdd-e3f2-7a91-904b-d3f13519343c",
+   "outputs": [
+    "../perf_test/glide_seg1.mp4"
+   ],
+   "seconds": 285
+  },
+  {
+   "label": "glide_seg2",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.448,
+   "status": "completed",
+   "t": "2026-10-21T12:13:47",
+   "pilot": "glide_segments_1",
+   "request_id": "01a15fe2-47f7-7670-b4b4-ac33511225ee",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fe2-47f7-7670-b4b4-ac33511225ee/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a15fe2-47f7-7670-b4b4-ac33511225ee",
+   "outputs": [
+    "../perf_test/glide_seg2.mp4"
+   ],
+   "seconds": 186
+  },
+  {
+   "label": "contact_SA",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-22T15:24:58",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165b7-ae29-7902-85a6-cfaecca53e74",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165b7-ae29-7902-85a6-cfaecca53e74/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165b7-ae29-7902-85a6-cfaecca53e74",
+   "outputs": [
+    "../contact/stills/contact_SA.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "contact_SC",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-22T15:30:01",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165bc-4f97-7100-a821-f8a30d6a69af",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165bc-4f97-7100-a821-f8a30d6a69af/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165bc-4f97-7100-a821-f8a30d6a69af",
+   "outputs": [
+    "../contact/stills/contact_SC.png"
+   ],
+   "seconds": 32
+  },
+  {
+   "label": "contact_SD",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-22T15:30:44",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165bc-f3b3-75d0-a755-1e0d42ccfc2e",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165bc-f3b3-75d0-a755-1e0d42ccfc2e/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165bc-f3b3-75d0-a755-1e0d42ccfc2e",
+   "outputs": [
+    "../contact/stills/contact_SD.png"
+   ],
+   "seconds": 39
+  },
+  {
+   "label": "contact_A",
+   "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-22T15:34:08",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165c0-1171-7350-bb61-ac2f7d15ed2e",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-1171-7350-bb61-ac2f7d15ed2e/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-1171-7350-bb61-ac2f7d15ed2e",
+   "outputs": [
+    "../contact/takes/contact_A.mp4"
+   ],
+   "seconds": 124
+  },
+  {
+   "label": "contact_B",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-22T15:34:13",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165c0-24b9-7123-a2b7-ead164271218",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-24b9-7123-a2b7-ead164271218/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-24b9-7123-a2b7-ead164271218",
+   "outputs": [
+    "../contact/takes/contact_B.mp4"
+   ],
+   "seconds": 198
+  },
+  {
+   "label": "contact_C",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-22T15:34:18",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165c0-37b9-7b70-92b3-0a409d8f9675",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-37b9-7b70-92b3-0a409d8f9675/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-37b9-7b70-92b3-0a409d8f9675",
+   "outputs": [
+    "../contact/takes/contact_C.mp4"
+   ],
+   "seconds": 185
+  },
+  {
+   "label": "contact_D",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.448,
+   "status": "completed",
+   "t": "2026-10-22T15:34:23",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165c0-4b8f-7e11-832a-892fecf918ff",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-4b8f-7e11-832a-892fecf918ff/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-4b8f-7e11-832a-892fecf918ff",
+   "outputs": [
+    "../contact/takes/contact_D.mp4"
+   ],
+   "seconds": 191
+  },
+  {
+   "label": "contact_E",
+   "endpoint": "fal-ai/kling-video/o3/pro/reference-to-video",
+   "usd_est": 0.56,
+   "status": "completed",
+   "t": "2026-10-22T15:34:27",
+   "pilot": "contact_scene_1",
+   "request_id": "01a165c0-5dc3-74d3-b1b9-817784e3f244",
+   "status_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-5dc3-74d3-b1b9-817784e3f244/status",
+   "response_url": "https://queue.fal.run/fal-ai/kling-video/requests/01a165c0-5dc3-74d3-b1b9-817784e3f244",
+   "outputs": [
+    "../contact/takes/contact_E.mp4"
+   ],
+   "seconds": 210
+  },
+  {
+   "label": "emerge_S1",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-22T16:35:33",
+   "pilot": "emergence_keys_1",
+   "request_id": "01a165f8-4ccd-7fe2-8d97-206afef687cd",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165f8-4ccd-7fe2-8d97-206afef687cd/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165f8-4ccd-7fe2-8d97-206afef687cd",
+   "outputs": [
+    "../contact/stills/emerge_S1.png"
+   ],
+   "seconds": 46
+  },
+  {
+   "label": "emerge_S2",
+   "endpoint": "fal-ai/nano-banana-pro/edit",
+   "usd_est": 0.15,
+   "status": "completed",
+   "t": "2026-10-22T16:41:01",
+   "pilot": "emergence_keys_1",
+   "request_id": "01a165fd-5048-78d0-9f6f-014e2765ad78",
+   "status_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165fd-5048-78d0-9f6f-014e2765ad78/status",
+   "response_url": "https://queue.fal.run/fal-ai/nano-banana-pro/requests/01a165fd-5048-78d0-9f6f-014e2765ad78",
+   "outputs": [
+    "../contact/stills/emerge_S2.png"
+   ],
+   "seconds": 52
+  }
+ ]
+}

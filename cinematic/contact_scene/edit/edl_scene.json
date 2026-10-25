@@ -1,0 +1,87 @@
+{
+ "fps": 24,
+ "total_frames": 953,
+ "seconds": 39.708333333333336,
+ "shots": [
+  {
+   "beat": 1,
+   "label": "Dreamy rainy night (V01)",
+   "source": "film_v1/shots/V01.mp4",
+   "src_start_frame": 0,
+   "start_frame": 0,
+   "frames": 84,
+   "start_s": 0.0,
+   "end_s": 3.5
+  },
+  {
+   "beat": 2,
+   "label": "Phone notification and tap (take A)",
+   "source": "contact/takes/contact_A.mp4",
+   "src_start_frame": 0,
+   "start_frame": 84,
+   "frames": 121,
+   "start_s": 3.5,
+   "end_s": 8.542
+  },
+  {
+   "beat": 3,
+   "label": "Invitation opens a portal; the fairy emerges from the phone (take B)",
+   "source": "contact/takes/contact_B.mp4",
+   "src_start_frame": 1,
+   "start_frame": 205,
+   "frames": 120,
+   "start_s": 8.542,
+   "end_s": 13.542
+  },
+  {
+   "beat": 4,
+   "label": "Accepted A01 performance in the room above the phone portal",
+   "source": "contact/takes/A01_contactroom.mp4",
+   "src_start_frame": 1,
+   "start_frame": 325,
+   "frames": 167,
+   "start_s": 13.542,
+   "end_s": 20.5
+  },
+  {
+   "beat": 5,
+   "label": "She takes the invitation and reaches toward the viewer (take C)",
+   "source": "contact/takes/contact_C.mp4",
+   "src_start_frame": 1,
+   "start_frame": 492,
+   "frames": 120,
+   "start_s": 20.5,
+   "end_s": 25.5
+  },
+  {
+   "beat": 6,
+   "label": "The viewer's hand meets hers; golden light (take D)",
+   "source": "contact/takes/contact_D.mp4",
+   "src_start_frame": 1,
+   "start_frame": 612,
+   "frames": 96,
+   "start_s": 25.5,
+   "end_s": 29.5
+  },
+  {
+   "beat": 7,
+   "label": "She guides the viewer through the portal into the passage (take E)",
+   "source": "contact/takes/contact_E.mp4",
+   "src_start_frame": 1,
+   "start_frame": 708,
+   "frames": 120,
+   "start_s": 29.5,
+   "end_s": 34.5
+  },
+  {
+   "beat": 7,
+   "label": "Wisteria passage (K03orb)",
+   "source": "film_v1/vfx/K03orb.mp4",
+   "src_start_frame": 1,
+   "start_frame": 828,
+   "frames": 125,
+   "start_s": 34.5,
+   "end_s": 39.708
+  }
+ ]
+}

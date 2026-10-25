@@ -1,0 +1,14 @@
+# Midjourney look-test variants. Prefix each with the first two sentences of 00_world_bible.txt if the prompt length allows.
+
+## Frame 2 - The Grand Reveal
+cinematic fantasy realism, immense secluded garden valley seen from a cliff-edge overlook 25m above a luminous turquoise lake, elegant two-tier waterfall at the valley head right of centre, ancient colossal tree draped in lavender wisteria on a cliff shelf on the left, small delicate pavilion with slate-blue tiled roof, upswept curled eaves and gold finial on an island, terraces of crocus flowers, pale limestone cliffs with hanging gardens, misty layered mountains, low golden morning sun from the left, volumetric god rays, mist on water, mirror reflections, floating petals, out-of-focus wisteria foreground, 24mm, soft contrast, feature-film colour grade, fine film grain --ar 16:9
+
+## Frame 1 - The Invitation Passage
+cinematic fantasy realism, first-person view inside a short curving pale limestone passage, worn damp flagstones with moss and tiny crocus shoots, arched opening framed by lavender wisteria over a delicate gilded bronze arch with leaf filigree, bright sunlit golden haze and hint of turquoise beyond, backlit translucent wisteria racemes hanging in the foreground, dim cool interior, warm volumetric light beams, small floating orb of warm gold light with lavender halo ahead, drifting petals, 24mm, soft contrast, feature-film grade, fine film grain --ar 16:9
+
+## Frame 3 - The Fairy's Treehouse
+cinematic fantasy realism, immense ancient twisting tree with buttress roots on a pale limestone cliff shelf above luminous turquoise water, canopy pouring lavender wisteria, tiny fairy-sized round arched wooden door with petal-shaped stained glass and warm lamplight grown into the trunk, little turquoise-tiled hood with upswept eaves, glass lanterns hanging from roots, root and stone stairs to a small landing, little mailbox shaped like a closed crocus bud, crocus clusters, moss, ferns, golden morning backlight, warm lamp glow in cool shade, light mist, drifting petals, soft waterfall in background, 35mm, eye level, feature-film grade, fine film grain --ar 16:9
+
+## Frame 4 - Every Feeling Blooms
+cinematic macro photograph, 100mm, ground level on a mossy lakeside bank, lavender-violet crocus with fine darker veins unfurling in a gentle sun-shower, glowing saffron stigma and golden stamens, ivory crocus and deep violet bud behind, raindrops beading on petals, one drop hanging from a petal tip, soft rain streaks with golden rim light, creamy bokeh of turquoise water and lavender wisteria, warm sunlight from the left, moss and a fallen wisteria floret, translucent petals, tender and hopeful, feature-film grade, fine film grain --ar 16:9
+

@@ -1,0 +1,13 @@
+# Shot 2C motion prompt, for first-frame + last-frame video generation.
+# First frame: inputs/K1_first_frame.png   Last frame: inputs/K2_last_frame.png   16:9, 6 seconds, 1080p, 24 fps if offered.
+# Paste everything below the line as the prompt. Put negative_prompt.txt in the negative / "avoid" field if the service has one.
+# ---
+One continuous first-person Steadicam shot, six seconds, no cuts. The camera physically glides forward at standing eye height along the wet flagstone path through a tunnel of wisteria-covered pale limestone toward a sunlit gilded arch. It begins exactly on the first frame and ends exactly on the last frame.
+
+0 to 2 seconds: a slow, gentle creep forward in the warm shade of the passage. Hanging wisteria close to the lens drifts past the top of the frame, and crocus and stones slide past the lower corners, with strong parallax.
+
+2 to 4 seconds: the camera smoothly gains speed toward the exit. The limestone walls and twisted wisteria trunks sweep past the edges of the frame, the arch grows larger, and the valley beyond opens up as the edges of the passage uncover more of it.
+
+4 to 6 seconds: the camera passes from shade into warm direct sunlight at the mouth of the passage, with a soft, natural exposure adjustment and gentle bloom. It turns very slightly to the right as the turquoise lake rises into view below and the tall waterfall emerges from behind the right side of the arch, then eases to a gentle stop on the final composition.
+
+Real three-dimensional perspective and occlusion, natural acceleration and deceleration, cinematic 180-degree-shutter motion blur. Wisteria racemes sway softly in a light breeze, petals drift through the sunbeams, mist moves slowly in the valley, the waterfall flows and the lake shimmers. The gilded arch, its lanterns with turquoise crystals, and the pavilion keep exactly their design. The same low golden morning sun ahead and slightly left throughout. Premium cinematic fantasy realism, soft contrast, fine film grain.

@@ -1,0 +1,18 @@
+{
+  "framesObserved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "grassRejected": true,
+  "roadClickArrived": true,
+  "leftFacing": true,
+  "neutralIdleFrame": 4,
+  "constrainedSamples": 837,
+  "errors": []
+}
