@@ -9,7 +9,7 @@ import { FEATURE_COLORS } from '../features/FeatureUI';
 import { SidebarIllustration } from './SidebarIllustration';
 import { usePlanting } from './planting/PlantingContext';
 import { FairyMomentsPanel } from '../moments/FairyMomentsPanel';
-import { markFairyMomentsRead, useFairyRuntime } from '../../services/fairyRuntime';
+import { markFairyMomentsRead, refreshFairyRuntime, useFairyRuntime } from '../../services/fairyRuntime';
 import { useClosenessSummary } from '../../services/fairyCloseness';
 import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
@@ -65,6 +65,9 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       onPress={() => {
         if (feature.id === 'fairy') {
           setOpenFeature(undefined);
+          // Her runtime is fetched as the Garden opens; if that failed (the API still waking),
+          // ask again so Fairy Moments joins the card when the answer arrives.
+          if (!runtime) void refreshFairyRuntime();
           if (moments.enabled || closeness.on) { setEntryOpen(true); setEntryOpens(count => count + 1); }
           else onFocusFairy?.();
         } else setOpenFeature(feature.id === 'garden' ? undefined : feature.id);
