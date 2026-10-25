@@ -48,8 +48,8 @@ export function WakingFlowerFacts({ delayMs = 2500, showNote = true }: { delayMs
 }
 
 const KEEPSAKE_ART: Record<string, number> = {
-  CROCUS: require('../../../assets/keepsakes/crocus-brooch.webp'),
-  SAFFRON: require('../../../assets/keepsakes/crocus-seed-pouch.webp'),
+  CROCUS: require('@/assets/keepsakes/crocus-brooch.webp'),
+  SAFFRON: require('@/assets/keepsakes/crocus-seed-pouch.webp'),
 };
 function FactArt({ species, name }: { species: string; name: string }) {
   if (KEEPSAKE_ART[species]) return <Image accessible={false} source={KEEPSAKE_ART[species]} style={styles.art} resizeMode="contain" />;
