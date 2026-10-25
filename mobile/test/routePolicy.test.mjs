@@ -44,7 +44,7 @@ function runtime(path, development = false, signedIn = true) {
   return { load, render, nodes, navigation, mounts: () => mounts };
 }
 const previews = ['/treehouse-test', '/swing-test', '/moon-bed-test', '/water-test', '/waterfall-test', '/tea-set-test', '/dev/backend-qa', '/explore',
-  '/player-preview', '/mailbox', '/flower-effects-test', '/fairy-test', '/fairy-swing-test', '/fairy-sprite-test',
+  '/player-preview', '/flower-effects-test', '/fairy-test', '/fairy-swing-test', '/fairy-sprite-test',
   '/login-preview', '/fairy-loading-test'];
 for (const path of previews) test(`direct production path denied before routed content: ${path}`, () => {
   const r = runtime(path); assert.match(r.render(r.load('../../../app/_layout').default()), /unavailable/); assert.equal(r.mounts(), 0);
@@ -53,7 +53,7 @@ test('development previews remain accessible behind AuthGate', () => {
   for (const path of previews) { const r = runtime(path, true); assert.match(r.render(r.load('../../../app/_layout').default()), /ROUTED_SCREEN/); }
 });
 test('real Garden/Fairy/history/feature/visit routes remain production-accessible', () => {
-  for (const path of ['/', '/garden-test', '/feature/fairy', '/journal', '/garden-history', '/bookhouse', '/reflection', '/feature/settings', '/visit/fixture']) {
+  for (const path of ['/', '/garden-test', '/feature/fairy', '/journal', '/garden-history', '/bookhouse', '/mailbox', '/reflection', '/feature/settings', '/visit/fixture']) {
     const r = runtime(path); assert.match(r.render(r.load('../../../app/_layout').default()), /ROUTED_SCREEN/);
   }
 });

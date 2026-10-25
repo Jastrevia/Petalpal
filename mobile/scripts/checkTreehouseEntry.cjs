@@ -58,6 +58,10 @@ for (const point of [approach, door, sourcePoint(710, 365), sourcePoint(860, 745
 for (const point of [sourcePoint(-100, 365), sourcePoint(1600, 745), { x: 1189, y: 710 }, { x: 1950, y: 650 }]) {
   assert.equal(hitsTreehouse(point), false, 'hitbox does not capture neighboring landmarks/outside treehouse');
 }
+// Just beside the mailbox (inside the trunk region) is a miss, not a trip indoors.
+for (const point of [sourcePoint(1068, 802), sourcePoint(908, 802)]) {
+  assert.equal(hitsTreehouse(point), false, 'the ring around the mailbox never opens the treehouse');
+}
 const alternatePlacement = { x: 400, y: 100, scale: .4 };
 assert.equal(hitsTreehouse({ x: 400 + 860 * .4, y: 100 + 745 * .4 }, alternatePlacement), true,
   'hit testing honors the supplied landmark transform');

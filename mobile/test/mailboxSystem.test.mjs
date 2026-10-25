@@ -56,7 +56,7 @@ function loadMailboxModule(relativePath) {
   return moduleObj.exports;
 }
 
-const { MOCK_LETTERS } = loadMailboxModule('mockLetters');
+const { MOCK_LETTERS, RELEASE_LETTERS } = loadMailboxModule('mockLetters');
 
 let passedTests = 0;
 function test(name, fn) {
@@ -81,6 +81,11 @@ console.log('--- SUITE 1: Letter Stationery Model & Integrity ---');
 test('Mock letters contains at least 5 rich letters', () => {
   assert.ok(Array.isArray(MOCK_LETTERS));
   assert.ok(MOCK_LETTERS.length >= 5, `Expected >= 5 letters, got ${MOCK_LETTERS.length}`);
+});
+
+test('Released builds show only PetalPal letters, undated', () => {
+  assert.equal(RELEASE_LETTERS.map((l) => l.id).join(), 'letter-garden-1,letter-moonbed-3,letter-news-5');
+  assert.ok(RELEASE_LETTERS.every((l) => l.category !== 'friend' && l.date === ''));
 });
 
 test('Every letter has unique ID and required stationery fields', () => {

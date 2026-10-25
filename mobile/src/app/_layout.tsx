@@ -42,7 +42,7 @@ function TabLayout() {
   // Functional Garden routes also need this navigator in exported builds.
   // Other existing preview/tab routes retain their current presentation.
   let content;
-  if (__DEV__ || pathname === '/' || pathname === '/journal' || pathname === '/garden-history' || pathname === '/bookhouse' || pathname === '/reflection' || pathname.startsWith('/feature/') || pathname.startsWith('/visit/')) {
+  if (__DEV__ || pathname === '/' || pathname === '/journal' || pathname === '/garden-history' || pathname === '/bookhouse' || pathname === '/mailbox' || pathname === '/reflection' || pathname.startsWith('/feature/') || pathname.startsWith('/visit/')) {
     content = (
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AnimatedSplashOverlay />
@@ -51,6 +51,7 @@ function TabLayout() {
           <Stack.Screen name="index" options={{ title: 'Garden', headerShown: false }} />
           <Stack.Screen name="reflection" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade' }} />
+          <Stack.Screen name="mailbox" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="journal" options={{ title: 'Events / Flowers' }} />
           <Stack.Screen name="garden-history" options={{ title: 'Garden history' }} />
           <Stack.Screen name="feature/[feature]" options={{ title: 'PetalPal' }} />

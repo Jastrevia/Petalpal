@@ -14,15 +14,16 @@ import { FloatingLetterStack } from './FloatingLetterStack';
 import { FloatingPetalsOverlay } from './FloatingPetalsOverlay';
 import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 import { MagicLevitationAura } from './MagicLevitationAura';
-import { MOCK_LETTERS } from './mockLetters';
+import { MOCK_LETTERS, RELEASE_LETTERS } from './mockLetters';
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
 
 const BACKGROUND_IMAGE = require('../../../assets/mailbox/mailbox_bg_clean.jpg');
+const LETTERS = __DEV__ ? MOCK_LETTERS : RELEASE_LETTERS;
 
 // Module-level mock session persistence for read letters during navigation and remounts.
 // (Persists read state across component unmounts/remounts until full backend integration)
 const sessionReadLetterIds = new Set<string>(
-  MOCK_LETTERS.filter((l) => l.read).map((l) => l.id)
+  LETTERS.filter((l) => l.read).map((l) => l.id)
 );
 
 export const MailboxPage = memo(function MailboxPage() {
@@ -34,12 +35,12 @@ export const MailboxPage = memo(function MailboxPage() {
   // Stage C ('extracting'): 380ms — Folded paper sheet visibly slides upward out of pocket
   // Stage D ('unfolding'): 460ms — Paper expands along creases into reading letter & settles
   const [letters, setLetters] = useState<Letter[]>(() =>
-    MOCK_LETTERS.map((letter) => ({
+    LETTERS.map((letter) => ({
       ...letter,
       read: sessionReadLetterIds.has(letter.id),
     }))
   );
-  const [selectedLetterId, setSelectedLetterId] = useState<string>(MOCK_LETTERS[1].id);
+  const [selectedLetterId, setSelectedLetterId] = useState<string>(LETTERS[Math.min(1, LETTERS.length - 1)].id);
   const [visualState, setVisualState] = useState<MailboxVisualState>('reading');
   const [phase, setPhase] = useState<MailboxPhase>('reading');
   const [pendingLetterId, setPendingLetterId] = useState<string | null>(null);
@@ -281,7 +282,7 @@ export const MailboxPage = memo(function MailboxPage() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/garden-test');
+      router.replace(__DEV__ ? '/garden-test' : '/');
     }
   }, []);
 

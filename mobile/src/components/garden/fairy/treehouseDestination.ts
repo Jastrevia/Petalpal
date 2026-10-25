@@ -1,5 +1,6 @@
 import { TREEHOUSE_MAP_X, TREEHOUSE_MAP_Y, TREEHOUSE_MAP_SCALE } from '../treehouseMapPlacement';
 import type { Point } from './walkNetwork';
+import { nearMailbox } from './mailboxDestination';
 
 // Source pixels share TreehouseEntity's untrimmed 1448 x 1086 registration.
 const world = (x: number, y: number): Point => ({
@@ -18,6 +19,8 @@ export function hitsTreehouse(p: Point, placement = {
 }) {
   const x = (p.x - placement.x) / placement.scale;
   const y = (p.y - placement.y) / placement.scale;
+  // The mailbox sits inside the trunk region; leave it and the ring around it alone.
+  if (nearMailbox(p, placement)) return false;
   // Follow canopy/trunk silhouette rather than capturing nearby water/path taps.
   return ((x - 710) / 630) ** 2 + ((y - 365) / 325) ** 2 <= 1 ||
     ((x - 860) / 220) ** 2 + ((y - 745) / 285) ** 2 <= 1;
