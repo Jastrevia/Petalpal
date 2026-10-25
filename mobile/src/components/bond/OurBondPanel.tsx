@@ -13,6 +13,9 @@ import { keepsakeArt } from './keepsakeArt';
 const PPL = require('@/assets/bond/ppl-lying.webp');
 const DECK = { light: require('@/assets/bond/garden-deck-light.webp'), dark: require('@/assets/bond/garden-deck-dark.webp') };
 const REWARD = require('@/assets/keepsakes/star-candy-jar.webp');
+// Each check-in day of the round is a painted crocus: open once checked in, a bud until then.
+const BLOOM = require('@/assets/bond/checkin-bloom.webp');
+const BUD = require('@/assets/bond/checkin-bud.webp');
 // One painted medallion per Today's progress row; the 7th-day bonus reuses its reward keepsake.
 const TASK_ART: Record<ClosenessSource, ImageSourcePropType> = {
   CHECK_IN: require('@/assets/bond/task-check-in.webp'),
@@ -117,10 +120,9 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                 <View style={styles.week}>
                   {Array.from({ length: 7 }, (_, i) => i + 1).map(day => <View key={day} style={styles.weekDay}>
                     {day === 7 ? <Image source={REWARD} style={[styles.dayCircle, styles.dayReward, day > summary.checkIn.cycleDay && styles.dim]} resizeMode="cover" />
-                      : <View style={[styles.dayCircle, day <= summary.checkIn.cycleDay && styles.dayGot]}>
-                        <Text style={[styles.dayNumber, day <= summary.checkIn.cycleDay && styles.dayNumberGot]}>{day}</Text>
-                      </View>}
-                    <Text style={styles.tiny}>{copy.day(day)}</Text>
+                      : <Image source={day <= summary.checkIn.cycleDay ? BLOOM : BUD} resizeMode="contain" accessible={false}
+                        style={[styles.dayFlower, day > summary.checkIn.cycleDay && styles.dayBud]} />}
+                    <Text style={[styles.tiny, day === summary.checkIn.cycleDay && styles.dayToday]}>{copy.day(day)}</Text>
                   </View>)}
                 </View>
                 <Text style={styles.caption}>{copy.seventh}</Text>
@@ -248,7 +250,11 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     dayReward: { width: 38, height: 38, borderRadius: 19, borderColor: theme.gold, backgroundColor: MEDALLION },
     dayNumber: { fontFamily: 'serif', fontSize: 15, color: theme.muted },
     dayNumberGot: { color: '#4B3B69' },
-    dim: { opacity: 0.45 },
+    dayFlower: { width: 46, height: 46 },
+    // Buds stay in colour (never grey or wilted), just quieter until the day is checked in.
+    dayBud: { opacity: light ? 0.62 : 0.82 },
+    dayToday: { color: theme.text, fontWeight: '600' },
+    dim: { opacity: 0.78 },
     gapTop: { marginTop: 12 },
     limited: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
     limitedArt: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: theme.gold, backgroundColor: MEDALLION },
