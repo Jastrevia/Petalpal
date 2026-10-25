@@ -140,9 +140,9 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, add
 
 const PROFILE_COPY = {
   en: { change: 'Change avatar', title: 'Choose your avatar', option: (n: number) => `Avatar ${n}`, close: 'Close',
-    failed: 'Your avatar was not saved. Please try again.' },
+    failed: 'Your avatar was not saved. Please try again.', beta: 'Beta tester', betaHint: 'One of the first to grow a PetalPal garden' },
   'zh-Hans': { change: '更换头像', title: '选择你的头像', option: (n: number) => `头像 ${n}`, close: '关闭',
-    failed: '头像没有保存成功，请再试一次。' },
+    failed: '头像没有保存成功，请再试一次。', beta: '内测用户', betaHint: '最早种下 PetalPal 花园的人之一' },
 };
 
 // Your avatar (tap to choose from the avatar library), name and time zone.
@@ -168,6 +168,8 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
       <View style={styles.avatarEdit}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor={colors.ink} /></View>
     </Pressable>
     <Text style={[ui.title, { color: theme.text }]}>{profile?.name || 'PetalPal account'}</Text>
+    {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
+      <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
     <AvatarPicker visible={choosing} title={copy.title} selected={profile?.avatar} busy={saving} error={error}
       closeLabel={copy.close} optionLabel={copy.option} onSelect={avatar => void choose(avatar)} onClose={() => setChoosing(false)} />
@@ -209,6 +211,8 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
     backgroundColor: colors.tealWash, borderWidth: 1, borderColor: colors.line },
   orbitDot: { position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.secondary },
   profileHero: { alignItems: 'center', gap: 10 },
+  betaBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#F6EBCB' },
+  betaText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, color: '#7A5A1E' },
   avatar: { backgroundColor: colors.purpleWash, borderWidth: 2, borderColor: colors.secondary },
   avatarEdit: { position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13, alignItems: 'center',
     justifyContent: 'center', backgroundColor: colors.tealWash, borderWidth: 1, borderColor: colors.line },

@@ -13,13 +13,17 @@ test("published policies are final: owners, contact, adult audience, no draft ma
     assert.match(html, /^<!doctype html>/i, name);
     assert.match(html, /Xingran Ma and Jinyin Cao/, name);
     assert.match(html, /contact@jastrevia\.com/, name);
-    assert.match(html, /Effective October 22, 2026/, name);
+    assert.match(html, name === "terms" ? /Effective October 22, 2026/ : /Effective October 23, 2026/, name);
     assert.doesNotMatch(html, /\[(?:OWNER|LEGAL|APPROVED|VERIFY)|draft|not been published|<script/i, name);
     for (const other of pages.filter(page => page !== name)) assert.ok(html.includes(`href="${other}.html"`), `${name} links ${other}`);
   }
   for (const name of ["privacy", "terms"]) assert.match(read(name), /at least 19 years old, or the age of majority where you live, whichever is higher/, name);
   assert.match(read("terms"), /laws of the Province of British Columbia/);
-  for (const name of ["privacy", "account-deletion"]) assert.match(read(name), /do not keep backups of deleted accounts/, name);
+  // Backups are manual database exports kept at most 30 days (owner decision, 2026-10-23).
+  for (const name of ["privacy", "account-deletion"]) {
+    assert.match(read(name), /no more than 30 days/, name);
+    assert.match(read(name), /never used to restore a deleted account|never to restore a deleted account/, name);
+  }
 });
 
 test("the Worker serves them as files, never the app shell, and the web build links them", () => {

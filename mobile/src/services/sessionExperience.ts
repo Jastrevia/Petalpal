@@ -5,6 +5,7 @@ export type SessionUser = FlowerSession['user'] & {
   email?: string;
   accountId?: string;
   preferredLocale?: string;
+  betaTester?: boolean; // joined during the beta (server: lib/beta-cohort.js)
 };
 export interface SessionExperience {
   user: SessionUser;

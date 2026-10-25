@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { reportGardenLoadFailure, useGardenLoadState } from './gardenReadiness';
+import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
 
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
@@ -44,6 +45,7 @@ export function GardenLoadingOverlay() {
     <Text style={styles.hint}>{progress}</Text>
     {failures ? <Text style={styles.hint}>{failures}</Text> : null}
     {elapsed >= 12_000 ? <Text style={styles.hint}>The first visit can take up to a minute on a slow connection.</Text> : null}
+    <WakingFlowerFacts delayMs={4000} showNote={false} />
   </View>;
 }
 

@@ -223,6 +223,10 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   localDate])`, the same `localDateForInstant(now, User.timezone)` rule). The deck order is seeded
   by owner + local date, and the card back alternates by calendar-day number, so both change at
   local midnight. **VERIFIED:** [test/back/petal-card-draw.test.js](test/back/petal-card-draw.test.js).
+- **Beta badge** ([lib/beta-cohort.js](lib/beta-cohort.js)): an account is a beta tester when
+  `User.createdAt` (UTC) is before the instant in `BETA_COHORT_ENDS_AT`; unset means the beta is
+  still on and every account is one. No local date is involved, so time zones do not move the
+  boundary. **VERIFIED:** [test/back/beta-cohort.test.js](test/back/beta-cohort.test.js).
 - **Daily flower limit** ([lib/flower-quota.js](lib/flower-quota.js), on unless
   `DAILY_GROW_LIMIT_ENABLED=false`): at most 2 new flowers per account-local date, counted in
   `DailyFlowerQuota(userId, localDate)`. An Event's flower counts against `Event.localDate` (set at

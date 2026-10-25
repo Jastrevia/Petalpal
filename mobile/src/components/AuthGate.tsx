@@ -9,6 +9,7 @@ import { useAuth } from '../services/auth';
 import { LoginPreviewPage } from './auth/LoginPreviewPage';
 import { AVATAR_IDS, DEFAULT_AVATAR } from './avatars/avatarArt';
 import { UserAvatar } from './avatars/UserAvatar';
+import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -33,6 +34,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!auth.loading) void SplashScreen.hideAsync().catch(() => {});
   }, [auth.loading]);
+  const signedInLocale = auth.experience?.user.preferredLocale;
+  useEffect(() => { if (signedInLocale) rememberDisplayLocale(signedInLocale); }, [signedInLocale]);
   useEffect(() => {
     if (auth.phase !== 'verificationPending') return;
     // Resume after visiting the verification link, without polling or forcing
@@ -78,6 +81,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (auth.loading) return <View style={styles.loading}>
     <ActivityIndicator color="#365b42" accessibilityLabel="Loading session" />
     <Text style={styles.body}>{auth.phase === 'registering' ? 'Creating your account…' : 'Opening PetalPal…'}</Text>
+    {auth.phase === 'registering' ? null : <WakingFlowerFacts />}
   </View>;
   const verification = auth.phase === 'verificationPending';
   const profile = auth.phase === 'profileRequired';
@@ -134,7 +138,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#eff4e9' },
-  loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three },
+  loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },
   page: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.four },
   card: { width: '100%', maxWidth: 440, backgroundColor: '#fbfcf6', borderRadius: 24,
     padding: Spacing.four, gap: Spacing.three, borderWidth: 1, borderColor: '#c8d6c1' },
