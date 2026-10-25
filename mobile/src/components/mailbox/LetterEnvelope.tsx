@@ -495,9 +495,11 @@ export const BotanicalPostageStamp = memo(function BotanicalPostageStamp({
         <View style={styles.postmarkWaveLine1} />
         <View style={styles.postmarkWaveLine2} />
       </View>
-      <Text style={[styles.postmarkCity, { color: tone.inkSecondary }]}>
-        {date}
-      </Text>
+      {date ? (
+        <Text style={[styles.postmarkCity, { color: tone.inkSecondary }]}>
+          {date}
+        </Text>
+      ) : null}
     </View>
   );
 });
@@ -648,9 +650,11 @@ export const LetterEnvelope = memo(function LetterEnvelope({
               >
                 {letter.sender === 'A Note from Your Garden' ? 'Your Garden' : letter.sender}
               </Text>
-              <Text style={[styles.previewDate, { color: tone.inkSecondary }]} numberOfLines={1}>
-                {letter.date.includes(',') ? letter.date.split(',')[0].trim() : letter.date}
-              </Text>
+              {letter.date ? (
+                <Text style={[styles.previewDate, { color: tone.inkSecondary }]} numberOfLines={1}>
+                  {letter.date.includes(',') ? letter.date.split(',')[0].trim() : letter.date}
+                </Text>
+              ) : null}
             </View>
             <View style={styles.previewTitleRow}>
               <Text
@@ -852,9 +856,11 @@ export const LetterEnvelope = memo(function LetterEnvelope({
               >
                 ❧ {letter.sender}
               </Text>
-              <Text style={[styles.peekingDate, { color: tone.inkSecondary }]}>
-                ✿ {letter.date}
-              </Text>
+              {letter.date ? (
+                <Text style={[styles.peekingDate, { color: tone.inkSecondary }]}>
+                  ✿ {letter.date}
+                </Text>
+              ) : null}
             </View>
 
             <Text

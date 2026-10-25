@@ -3,7 +3,7 @@ import { hitsTreehouse } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
 import { hitsMoonBed } from './fairy/moonDestination';
 import { hitsSwing } from './fairy/swingDestination';
-import { hitsFairySprite, pickTapLine, RECENT_TAP_LINES, zhHans } from './fairy/tapLines';
+import { AMBIENT_LINES, AMBIENT_TIMING, ambientDelay, pickTapLine, RECENT_TAP_LINES, tapActivity, zhHans } from './fairy/tapLines';
 import type { FairyState } from './fairy/FairyNavigation';
 import { constrainGardenCamera, zoomGardenAt, GARDEN_WORLD_BOUNDS } from './rendering/gardenWorldBounds';
 import GardenFairy, { type FairyHandle } from './fairy/GardenFairy';
@@ -346,12 +346,12 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const fairyInTreehouse = fairyState === 'insideTreehouse';
   const [fairyDebug, setFairyDebug] = useState(false);
   const [fairyStatus, setFairyStatus] = useState("Tap dry ground to move");
-  // Tapping PPL while she rests shows one line above her for a few seconds.
-  const [tapBubble, setTapBubble] = useState<{ key: number; text: string } | null>(null);
-  const tapBubblePoint = useSharedValue({ x: 0, y: 0 });
-  const recentTapLines = useRef<string[]>([]);
-  const tapBubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (tapBubbleTimer.current) clearTimeout(tapBubbleTimer.current); }, []);
+  // Now and then, while she rests, PPL says a line that fits what she is doing (not on a tap).
+  const [fairyBubble, setFairyBubble] = useState<{ key: number; text: string } | null>(null);
+  const fairyBubblePoint = useSharedValue({ x: 0, y: 0 });
+  const recentFairyLines = useRef<string[]>([]);
+  const fairyBubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (fairyBubbleTimer.current) clearTimeout(fairyBubbleTimer.current); }, []);
   const handledParamRef = useRef<string | null>(null);
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
@@ -598,21 +598,32 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     top: baseY + cameraY.value + (treehousePlacement.y + 690 * treehousePlacement.scale) * fit * cameraZoom.value - 120,
     width: 200,
   }));
-  const tapBubbleStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + tapBubblePoint.value.x * fit * cameraZoom.value - 110,
-    top: baseY + cameraY.value + (tapBubblePoint.value.y - 150) * fit * cameraZoom.value - 64,
+  const fairyBubbleStyle = useAnimatedStyle(() => ({
+    left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 110,
+    top: baseY + cameraY.value + (fairyBubblePoint.value.y - 150) * fit * cameraZoom.value - 64,
     width: 220,
   }));
-  const showTapBubble = useCallback((state: FairyState, at: { x: number; y: number }) => {
-    const line = pickTapLine(state, locale, recentTapLines.current);
-    if (!line) return false;
-    recentTapLines.current = [line.id, ...recentTapLines.current].slice(0, RECENT_TAP_LINES);
-    tapBubblePoint.value = { x: at.x, y: at.y };
-    setTapBubble(previous => ({ key: (previous?.key ?? 0) + 1, text: line.text }));
-    if (tapBubbleTimer.current) clearTimeout(tapBubbleTimer.current);
-    tapBubbleTimer.current = setTimeout(() => setTapBubble(null), 3500);
-    return true;
-  }, [locale, tapBubblePoint]);
+  const sayFairyLine = useCallback((state: FairyState, at: { x: number; y: number }) => {
+    const line = pickTapLine(state, locale, recentFairyLines.current, Math.random, AMBIENT_LINES);
+    if (!line) return;
+    recentFairyLines.current = [line.id, ...recentFairyLines.current].slice(0, RECENT_TAP_LINES);
+    fairyBubblePoint.value = { x: at.x, y: at.y };
+    setFairyBubble(previous => ({ key: (previous?.key ?? 0) + 1, text: line.text }));
+    if (fairyBubbleTimer.current) clearTimeout(fairyBubbleTimer.current);
+    fairyBubbleTimer.current = setTimeout(() => setFairyBubble(null), AMBIENT_TIMING.showMs);
+  }, [locale, fairyBubblePoint]);
+  // A new activity clears the old line and restarts the wait; she is quiet while travelling,
+  // hidden indoors, or while the Garden is in the background.
+  useEffect(() => {
+    setFairyBubble(null);
+    if (!enableFairyWalk || readOnly || !worldActive || !tapActivity(fairyState)) return;
+    let timer = setTimeout(function speak() {
+      const at = fairyRef.current?.getPosition();
+      if (at) sayFairyLine(fairyStateRef.current, at);
+      timer = setTimeout(speak, ambientDelay(false));
+    }, ambientDelay(true));
+    return () => clearTimeout(timer);
+  }, [enableFairyWalk, readOnly, worldActive, fairyState, sayFairyLine]);
   const focusCoords = useCallback((worldX: number, worldY: number, targetZoom = 1.8) => {
     if (viewport.width === 0 || viewport.height === 0 || fit <= 0) return;
     cameraZoom.value = targetZoom;
@@ -959,15 +970,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (enableFairyWalk && fairyRef.current?.isMailboxBusy()) return;
       if (enableFairyWalk) noteFairyUser();
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
-      if (enableFairyWalk) {
-        // Seated, she is drawn by the swing, tea set or moon bed, so their areas stand for her.
-        const here = { x: worldX, y: worldY }, state = fairyStateRef.current, at = fairyRef.current?.getPosition();
-        const onFairy = state === 'sittingOnSwing' ? hitsSwing(here, swingPlacement)
-          : state === 'seatedAtTea' || state === 'drinkingTea' ? hitsTeaArea(here, teaSetPlacement)
-          : state === 'sleepingOnMoonBed' ? hitsMoonBed(here, moonBedPlacement)
-          : state === 'idle' && hitsFairySprite(here, at);
-        if (onFairy && at && showTapBubble(state, at)) return;
-      }
       if (enableFairyWalk && hitsMailbox({x:worldX,y:worldY},treehousePlacement)) {
         fairyRef.current?.visitMailbox();
         return;
@@ -997,7 +999,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         if (accepted && Platform.OS === 'web') canvasRef.current?.redraw();
       }
     }
-  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement, showTapBubble]);
+  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement]);
 
   const startMaskPos = useRef({ localX: 0, localY: 0 });
 
@@ -1594,11 +1596,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           <View style={styles.treehouseHintTail} />
         </Animated.View>
       )}
-      {enableFairyWalk && !readOnly && activeMode === 'normal' && !selectedFlower && tapBubble && (
-        <Animated.View key={tapBubble.key} testID="fairy-tap-bubble" pointerEvents="none" accessibilityLiveRegion="polite"
-          style={[{ position: 'absolute', alignItems: 'center', zIndex: 25 }, tapBubbleStyle]}>
+      {enableFairyWalk && !readOnly && activeMode === 'normal' && !selectedFlower && fairyBubble && (
+        <Animated.View key={fairyBubble.key} testID="fairy-bubble" pointerEvents="none" accessibilityLiveRegion="polite"
+          style={[{ position: 'absolute', alignItems: 'center', zIndex: 25 }, fairyBubbleStyle]}>
           <View style={styles.treehouseHint}>
-            <Text style={styles.treehouseHintText}>{tapBubble.text}</Text>
+            <Text style={styles.treehouseHintText}>{fairyBubble.text}</Text>
           </View>
           <View style={styles.treehouseHintTail} />
         </Animated.View>

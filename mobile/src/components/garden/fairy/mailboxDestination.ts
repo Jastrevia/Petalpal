@@ -13,9 +13,18 @@ export const mailboxPresentAnchor=world(1050,1010);
 export const mailboxExitAnchor=mailboxPresentAnchor;
 export const MAILBOX_TIMING={retrieveMs:1400,turnMs:1100,unfoldMs:1000,holdMs:800} as const;
 
-export function hitsMailbox(p:Point,placement={x:TREEHOUSE_MAP_X,y:TREEHOUSE_MAP_Y,scale:TREEHOUSE_MAP_SCALE}){
+function mailboxDistance(p:Point,placement:{x:number;y:number;scale:number},grow={x:1,y:1}){
   const x=(p.x-placement.x)/placement.scale,y=(p.y-placement.y)/placement.scale;
+  return ((x-988)/(68*grow.x))**2+((y-802)/(118*grow.y))**2;
+}
+export function hitsMailbox(p:Point,placement={x:TREEHOUSE_MAP_X,y:TREEHOUSE_MAP_Y,scale:TREEHOUSE_MAP_SCALE}){
   // Follow the roof, letter box and post, not the nearby doorway or canopy.
   // Evaluate this specific landmark before the broad treehouse hit region.
-  return ((x-988)/68)**2+((y-802)/118)**2<=1;
+  return mailboxDistance(p,placement)<=1;
+}
+// A ring around the mailbox that the treehouse never claims, so a finger landing just beside
+// it does not send PPL indoors. Wider than tall: the bottom stair below the post stays the treehouse's.
+export const MAILBOX_MARGIN={x:1.35,y:1.15} as const;
+export function nearMailbox(p:Point,placement={x:TREEHOUSE_MAP_X,y:TREEHOUSE_MAP_Y,scale:TREEHOUSE_MAP_SCALE}){
+  return mailboxDistance(p,placement,MAILBOX_MARGIN)<=1;
 }

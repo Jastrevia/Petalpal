@@ -3,7 +3,7 @@ import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
 
 const load = loadPlantingModules();
-const { TAP_LINES, RECENT_TAP_LINES, tapActivity, hitsFairySprite, pickTapLine, zhHans } = load('../fairy/tapLines');
+const { TAP_LINES, AMBIENT_LINES, AMBIENT_TIMING, ambientDelay, RECENT_TAP_LINES, tapActivity, pickTapLine, zhHans } = load('../fairy/tapLines');
 const ACTIVITY_OF = { SWINGING: 'sittingOnSwing', SLEEPING: 'sleepingOnMoonBed', TEA_TIME: 'seatedAtTea', IDLE: 'idle' };
 
 test('only resting states answer a tap', () => {
@@ -53,10 +53,15 @@ test('her activity lines weigh three times a general line', () => {
   assert.equal(pickTapLine('idle', 'en', [], () => 0.76, lines).id, 'b');
 });
 
-test('the tap target covers her sprite above the foot pivot only', () => {
-  const at = { x: 1000, y: 800 };
-  assert.ok(hitsFairySprite({ x: 1000, y: 730 }, at));
-  assert.ok(!hitsFairySprite({ x: 1000, y: 600 }, at));
-  assert.ok(!hitsFairySprite({ x: 1100, y: 760 }, at));
-  assert.ok(!hitsFairySprite({ x: 1000, y: 760 }, null));
+test('unprompted lines skip the ones that only answer a tap', () => {
+  const ids = new Set(AMBIENT_LINES.map(line => line.id));
+  assert.ok(!ids.has('idle-gen-5') && !ids.has('sleeping-gen-4'));
+  assert.equal(AMBIENT_LINES.length, TAP_LINES.length - 2);
+});
+
+test('she speaks a little after settling, then only now and then', () => {
+  assert.equal(ambientDelay(true, () => 0), AMBIENT_TIMING.settleMs[0]);
+  assert.equal(ambientDelay(true, () => 1), AMBIENT_TIMING.settleMs[1]);
+  assert.equal(ambientDelay(false, () => 0), AMBIENT_TIMING.gapMs[0]);
+  assert.ok(AMBIENT_TIMING.gapMs[0] > AMBIENT_TIMING.settleMs[1]);
 });

@@ -1,9 +1,8 @@
 import bank from './tapLines.json';
 import type { FairyState } from './FairyNavigation';
-import type { Point } from './walkNetwork';
 
-// What PPL says when the owner taps her. Lines are bundled and picked on the device,
-// so a tap answers instantly and never calls a model. scripts/generate-fairy-tap-lines.mjs
+// What PPL says: now and then on her own in the Garden, and when tapped in Our Bond. Lines are
+// bundled and picked on the device, so nothing calls a model. scripts/generate-fairy-tap-lines.mjs
 // adds reviewed lines to tapLines.json offline.
 export type TapActivity = 'SWINGING' | 'SLEEPING' | 'TEA_TIME' | 'IDLE';
 export type TapLine = { id: string; activity: TapActivity | 'ANY'; source: string; en: string; zh: string };
@@ -16,7 +15,7 @@ export const RECENT_TAP_LINES = 5;
 export const zhHans = (locale?: string | null) =>
   /^zh(?:-|$)/i.test(locale || '') && !/(?:^|-)(hant|tw|hk|mo)(?:-|$)/i.test(locale || '');
 
-// Only resting states answer; while she travels a tap keeps redirecting her.
+// Only resting states speak; while she travels she is quiet.
 export function tapActivity(state: FairyState): TapActivity | null {
   if (state === 'sittingOnSwing') return 'SWINGING';
   if (state === 'sleepingOnMoonBed') return 'SLEEPING';
@@ -25,11 +24,16 @@ export function tapActivity(state: FairyState): TapActivity | null {
   return null;
 }
 
-// The walking sprite is drawn 102×139 world units above her foot pivot (GardenFairy Frame).
-export function hitsFairySprite(p: Point, at: Point | null | undefined) {
-  if (!at) return false;
-  const dx = p.x - at.x, dy = p.y - at.y;
-  return dx >= -70 && dx <= 56 && dy >= -151 && dy <= 12;
+// Lines that only read as an answer to a tap (being tickled, being woken); never unprompted.
+const TAP_ONLY = new Set(['idle-gen-5', 'sleeping-gen-4']);
+export const AMBIENT_LINES = TAP_LINES.filter(line => !TAP_ONLY.has(line.id));
+
+// In the Garden she speaks up by herself: a little while after settling into something,
+// then only occasionally while she stays. Each line shows for a few seconds.
+export const AMBIENT_TIMING = { settleMs: [6_000, 14_000], gapMs: [45_000, 90_000], showMs: 4_500 } as const;
+export function ambientDelay(settling: boolean, random: () => number = Math.random) {
+  const [min, max] = settling ? AMBIENT_TIMING.settleMs : AMBIENT_TIMING.gapMs;
+  return Math.round(min + random() * (max - min));
 }
 
 // Lines for her activity weigh more than general ones; the last few shown are skipped

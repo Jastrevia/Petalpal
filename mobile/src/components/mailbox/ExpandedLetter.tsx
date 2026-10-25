@@ -270,9 +270,11 @@ export const ExpandedLetter = memo(function ExpandedLetter({
 
             {/* Right: Italic date above a vintage stamp with round postmark */}
             <View style={styles.stampHeaderGroup}>
-              <Text style={[styles.letterheadDate, { color: tone.inkSecondary }]}>
-                {letter.date}
-              </Text>
+              {letter.date ? (
+                <Text style={[styles.letterheadDate, { color: tone.inkSecondary }]}>
+                  {letter.date}
+                </Text>
+              ) : null}
               <View style={styles.stampPostmarkCluster}>
                 <View style={styles.postageStampMini}>
                   <Image

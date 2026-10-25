@@ -12,7 +12,7 @@ test('real Cloudflare runtime serves the actual Expo export, routes, artwork and
   });
   t.after(() => worker.stop());
   const get = (path, options) => worker.fetch(path, options);
-  for (const path of ['/', '/journal', '/garden-history', '/bookhouse', '/reflection', '/garden-test',
+  for (const path of ['/', '/journal', '/garden-history', '/bookhouse', '/mailbox', '/reflection', '/garden-test',
     '/feature/daily', '/feature/fairy', '/feature/friends', '/feature/settings', '/visit/synthetic-owner']) {
     for (const method of ['GET', 'HEAD']) {
       const r = await get(path, { method });

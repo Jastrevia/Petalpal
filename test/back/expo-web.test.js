@@ -12,7 +12,7 @@ test('Expo shell paths expose only HTML; API, write and preview paths retain aut
   await new Promise(r => listener.once('listening', r));
   t.after(async () => { await new Promise(r => listener.close(r)); process.env.NODE_ENV = previous; });
   const base = `http://127.0.0.1:${listener.address().port}`;
-  for (const path of ['/', '/journal', '/garden-history', '/bookhouse', '/reflection', '/garden-test', '/feature/fairy', '/feature/friends', '/feature/settings', '/visit/fixture-owner']) {
+  for (const path of ['/', '/journal', '/garden-history', '/bookhouse', '/mailbox', '/reflection', '/garden-test', '/feature/fairy', '/feature/friends', '/feature/settings', '/visit/fixture-owner']) {
     for (const method of ['GET', 'HEAD']) {
       const r = await fetch(base + path, { method });
       assert.equal(r.status, 200, path);

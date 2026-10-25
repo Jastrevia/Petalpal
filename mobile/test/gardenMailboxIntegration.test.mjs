@@ -187,8 +187,8 @@ runTest('Suite 5', 'MailboxPage implements handleBackToGarden with graceful fall
     "handleBackToGarden must call router.back() when history exists"
   );
   assert.ok(
-    mailboxPageSource.includes("router.replace('/garden-test')"),
-    "handleBackToGarden must fall back to router.replace('/garden-test')"
+    mailboxPageSource.includes("router.replace(__DEV__ ? '/garden-test' : '/')"),
+    "handleBackToGarden must fall back to the Garden: /garden-test in previews, / when released"
   );
 });
 

@@ -97,3 +97,9 @@ export const MOCK_LETTERS: Letter[] = [
     estimatedHeight: 520,
   },
 ];
+
+// Released builds show only PetalPal's own letters, undated, so no tester mistakes a
+// sample friend letter or its sample date for real mail. Previews keep the full set.
+export const RELEASE_LETTERS: Letter[] = MOCK_LETTERS
+  .filter((letter) => letter.category !== 'friend')
+  .map((letter) => ({ ...letter, date: '' }));

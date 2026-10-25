@@ -86,7 +86,7 @@ export const LetterSummaryCard = memo(function LetterSummaryCard({
               <Text style={styles.senderText} numberOfLines={1}>
                 {letter.sender}
               </Text>
-              <Text style={styles.dateText}>{letter.date}</Text>
+              {letter.date ? <Text style={styles.dateText}>{letter.date}</Text> : null}
             </View>
 
             {/* Subject */}
