@@ -39,7 +39,7 @@
         "dotenv": "^17.4.2",
         "express": "^5.2.1",
         "express-rate-limit": "^8.7.0",
-        "firebase-admin": "^14.3.0",
+        "firebase-admin": "^14.5.0",
         "natural": "^8.1.1",
         "pg": "^8.22.0",
         "prisma": "^7.8.0",
@@ -47,5 +47,8 @@
         "socket.io-client": "^4.8.3",
         "swagger-ui-express": "^5.0.1",
         "yaml": "^2.9.0"
+    },
+    "overrides": {
+        "sharp": "^0.35.5"
     }
 }
