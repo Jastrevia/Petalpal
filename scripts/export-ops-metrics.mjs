@@ -29,7 +29,12 @@ export const QUERIES = {
     FROM "AiInteractionMetadata" GROUP BY 1, 2, 3`,
   aiJobs: `SELECT ${day('"createdAt"')} AS "date", "jobType"::text AS "jobType", "status"::text AS "status",
     count(*)::int AS "jobs", round(avg("attemptCount")::numeric, 2)::float AS "avgAttempts"
-    FROM "AIJob" GROUP BY 1, 2, 3`
+    FROM "AIJob" GROUP BY 1, 2, 3`,
+  // Failed jobs by the allowlisted code the worker stores in lastError ("AI job failed: CODE").
+  // Only codes matching [A-Z0-9_] leave the database; rows from before codes were stored read UNRECORDED.
+  aiJobFailures: `SELECT ${day('"createdAt"')} AS "date", "jobType"::text AS "jobType",
+    coalesce(substring("lastError" from '^AI job failed: ([A-Z0-9_]+)$'), 'UNRECORDED') AS "code", count(*)::int AS "jobs"
+    FROM "AIJob" WHERE "status"::text = 'FAILED' GROUP BY 1, 2, 3`
 };
 
 const byDate = (a, b) => a.date.localeCompare(b.date);
@@ -75,7 +80,8 @@ export const FILES = {
   "daily_activity.csv": ["date", "newUsers", "events", "activeUsers", "flowers"],
   "ai_gateway_daily.csv": ["date", "action", "provider", "model", "calls", "inputTokens", "outputTokens", "estCostUsd"],
   "ai_calls_daily.csv": ["date", "task", "provider", "calls", "failures", "avgLatencyMs", "inputTokens", "outputTokens"],
-  "ai_jobs_daily.csv": ["date", "jobType", "status", "jobs", "avgAttempts"]
+  "ai_jobs_daily.csv": ["date", "jobType", "status", "jobs", "avgAttempts"],
+  "ai_job_failures_daily.csv": ["date", "jobType", "code", "jobs"]
 };
 
 // query(sql) → rows. Returns { fileName: csvText }.
@@ -86,7 +92,8 @@ export async function exportOpsMetrics(query) {
     "daily_activity.csv": dailyActivity(rows),
     "ai_gateway_daily.csv": gatewayDaily(rows.gatewayUsage),
     "ai_calls_daily.csv": keyed(rows.aiCalls),
-    "ai_jobs_daily.csv": keyed(rows.aiJobs)
+    "ai_jobs_daily.csv": keyed(rows.aiJobs),
+    "ai_job_failures_daily.csv": keyed(rows.aiJobFailures)
   };
   return Object.fromEntries(Object.entries(tables).map(([file, table]) => [file, toCsv(table, FILES[file])]));
 }

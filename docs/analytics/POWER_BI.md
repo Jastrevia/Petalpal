@@ -23,6 +23,7 @@ opens a `READ ONLY` transaction, runs `GROUP BY day` queries and writes four CSV
 | `ai_gateway_daily.csv` | date, action, provider, model, calls, inputTokens, outputTokens, estCostUsd |
 | `ai_calls_daily.csv` | date, task, provider, calls, failures, avgLatencyMs, inputTokens, outputTokens |
 | `ai_jobs_daily.csv` | date, jobType, status, jobs, avgAttempts |
+| `ai_job_failures_daily.csv` | date, jobType, code, jobs — FAILED jobs by the allowlisted code stored in `lastError`; jobs that failed before codes were stored read `UNRECORDED`. Load it directly in Power BI; the pandas step does not reshape it |
 
 `estCostUsd` = tokens × the reviewed rates in `lib/ai-gateway-config.js` (cache tokens counted as input).
 It estimates provider cost; the cost gate's reserved liability (`AI_GATEWAY_USD_RESERVED`) is higher by design.
