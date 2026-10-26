@@ -23,9 +23,9 @@ function user(uid = 'alice', verified = true) {
     getIdToken: async () => `synthetic-token-${uid}` };
 }
 function setup(initial = null, apiOrigin = '') {
-  const hooks = hookHarness(); const requests = [], emails = [], tokens = [], writes = [];
+  const hooks = hookHarness(); const requests = [], emails = [], tokens = [], writes = [], resets = [];
   const auth = { currentUser: initial, authStateReady: async () => {} };
-  let changed, handler, emailError, registrationError, loginError, signOutError, storageError;
+  let changed, handler, emailError, registrationError, loginError, signOutError, storageError, resetError;
   let needsProfile = false;
   const instrument = (value) => {
     if (!value || value.instrumented) return value;
@@ -44,6 +44,7 @@ function setup(initial = null, apiOrigin = '') {
       const value = user(email.split('@')[0], false); emit(value); return { user: value };
     },
     sendEmailVerification: async (value) => { emails.push(value.uid); if (emailError) throw emailError; },
+    sendPasswordResetEmail: async (_auth, email) => { if (resetError) throw resetError; resets.push(email); },
     signOut: async () => { if (signOutError) throw signOutError; emit(null); },
   };
   const items = new Map();
@@ -70,10 +71,10 @@ function setup(initial = null, apiOrigin = '') {
   });
   const provider = load('../../../services/auth');
   hooks.mount(() => provider.AuthProvider({ children: 'app' }).props.value);
-  return { hooks, auth, requests, emails, tokens, writes, items, emit, load,
+  return { hooks, auth, requests, emails, tokens, writes, items, emit, load, resets,
     api: load('../../../services/api'), storage: load('plantingPersistence'),
     setHandler: (value) => { handler = value; }, setNeedsProfile: () => { needsProfile = true; },
-    setLoginError: (value) => { loginError = value; },
+    setLoginError: (value) => { loginError = value; }, setResetError: (value) => { resetError = value; },
     setEmailError: (value) => { emailError = value; }, setRegistrationError: (value) => { registrationError = value; },
     setStorageError: value => { storageError = value; },
     setSignOutError: (value) => { signOutError = value; },
@@ -149,7 +150,7 @@ test('Phase 1 registration validates confirmation/minimum before Firebase and se
   assert.deepEqual(s.emails, ['new']); assert.equal(s.requests.length, 0); assert.deepEqual(s.writes, []);
 });
 test('Phase 1 registration errors are readable and create no backend session', async () => {
-  for (const code of ['auth/email-already-in-use', 'auth/internal-error', undefined]) {
+  for (const code of ['auth/internal-error', undefined]) {
     const s = setup(); const state = await s.ready();
     s.setRegistrationError(Object.assign(new Error('EMAIL_EXISTS private@example.test provider diagnostic'), { code }));
     await state.register('known@example.test', 'synthetic password', 'synthetic password');
@@ -368,6 +369,44 @@ test('DELTA-P2-2 cleanup failure closes auth and API; retry erases retained owne
   assert.equal(state.session.user.id, 'owner-bob'); assert.equal(s.items.size, 0);
 });
 
+test('an email from an earlier version is told to sign in or reset, never shown provider details', async () => {
+  const s = setup(); const state = await s.ready();
+  s.setRegistrationError(Object.assign(new Error('EMAIL_EXISTS private@example.test provider diagnostic'), { code: 'auth/email-already-in-use' }));
+  await state.register('known@example.test', 'synthetic password', 'synthetic password');
+  const result = await s.hooks.flush();
+  assert.equal(result.phase, 'signedOut');
+  assert.equal(result.error, 'This email already has a PetalPal account. Sign in instead, or tap “Forgot password?” to set a new one.');
+  assert.equal(s.auth.currentUser, null); assert.equal(s.requests.length, 0); assert.equal(s.emails.length, 0);
+});
+test('Forgot password sends a Firebase reset email with the same reply for every address', async () => {
+  const s = setup(); let state = await s.ready();
+  await state.resetPassword('  '); state = await s.hooks.flush();
+  assert.equal(state.error, 'Enter your email address first.'); assert.deepEqual(s.resets, []);
+  for (const email of ['known@example.test', 'unknown@example.test']) {
+    await state.resetPassword(` ${email} `); state = await s.hooks.flush();
+    assert.equal(state.error, '');
+    assert.equal(state.message, `If ${email} has a PetalPal account, a link to set a new password is on its way. Check your inbox and spam folder.`);
+  }
+  assert.deepEqual(s.resets, ['known@example.test', 'unknown@example.test']);
+  assert.equal(state.phase, 'signedOut'); assert.equal(s.requests.length, 0); assert.equal(s.auth.currentUser, null);
+  s.setResetError(Object.assign(new Error('private provider throttle'), { code: 'auth/too-many-requests' }));
+  await state.resetPassword('known@example.test'); state = await s.hooks.flush();
+  assert.equal(state.error, 'Too many attempts. Please wait before trying again.'); assert.equal(state.message, '');
+});
+test('PetalPal refusals show their reason; server failures keep the general message', async () => {
+  for (const [status, body, expected] of [
+    [403, { error: 'Account deletion is pending or complete', code: 'ACCOUNT_DELETED' }, 'Account deletion is pending or complete'],
+    [429, { error: 'Too many requests. Try again later.' }, 'Too many requests. Try again later.'],
+    [500, { error: 'Unable to create PetalPal session' }, 'We couldn’t connect to your account. Please try again.'],
+    [503, { error: 'synthetic outage' }, 'We couldn’t connect to your account. Please try again.'],
+  ]) {
+    const s = setup(user());
+    s.setHandler(async (path) => path === '/auth/session' ? response(body, status) : response({ ok: true }));
+    const state = await s.ready();
+    assert.equal(state.phase, 'signedOut'); assert.equal(state.session, null);
+    assert.equal(state.error, expected, String(status));
+  }
+});
 test('Account enumeration: unknown, wrong-password and disabled login share safe feedback', async () => {
   const errors = [];
   for (const [email, code] of [['unknown@example.test', 'auth/user-not-found'], ['alice@example.test', 'auth/wrong-password'], ['alice@example.test', 'auth/invalid-credential'], ['disabled@example.test', 'auth/user-disabled']]) {

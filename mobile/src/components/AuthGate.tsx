@@ -76,6 +76,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         setInvitationSignIn(true);
         try { await auth.login(address, secret); } finally { setInvitationSignIn(false); }
       }}
+      onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<PrivacyLinks />} />;
   }
   if (auth.loading) return <View style={styles.loading}>
