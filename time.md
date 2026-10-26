@@ -245,6 +245,14 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   conditional upsert on PGlite, 4 concurrent reserves → 2 granted) and the `two Flowers a day` test in
   [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (third Event saved
   without a Flower; deleting a Flower does not free the day).
+- **Bookhouse month books** ([mobile/src/services/bookhouse.ts](mobile/src/services/bookhouse.ts)
+  `openableMonths`): a month book opens when it holds a private Journal, keyed by the Journal's
+  `localDate` (the linked check-in's date, else `createdAt` in `User.timezone`, server side). The
+  current month by the **device clock** is always open as well, and opens on today's page with a
+  "Write today's journal" action. Near a month boundary, when the device and account zones differ,
+  the open "current" month can be the neighbouring one for a few hours; a Journal saved then still
+  lands in its account-zone month. **VERIFIED:** [mobile/test/bookhouse.test.mjs](mobile/test/bookhouse.test.mjs)
+  (empty history, a December 31 → January 1 device clock).
 
 ## 6. Production vs TEST
 

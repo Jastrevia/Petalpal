@@ -10,6 +10,11 @@ export interface JournalCheckIn {
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function daysInMonth(year: number, month: number) { return new Date(Date.UTC(year, month, 0)).getUTCDate(); }
 export function monthKey(year: number, month: number) { return `${year}-${String(month).padStart(2, '0')}`; }
+// A month opens once it holds a private journal. The current month (device clock) is always
+// open, so its book can be read and written in before its first journal.
+export function openableMonths(entries: JournalCheckIn[], now = new Date()) {
+  return new Set([monthKey(now.getFullYear(), now.getMonth() + 1), ...entries.filter(e => e.journal).map(e => e.localDate.slice(0, 7))]);
+}
 export function journalYears(entries: JournalCheckIn[]) {
   return [...new Set([2026, 2027, 2028, 2029, 2030, ...entries.filter(e => e.journal).map(e => Number(e.localDate.slice(0, 4)))])].sort((a, b) => a - b);
 }

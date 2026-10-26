@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
 const load = loadPlantingModules();
-const { daysInMonth, monthKey, journalYears } = load('../../../services/bookhouse');
+const { daysInMonth, monthKey, journalYears, openableMonths } = load('../../../services/bookhouse');
 test('Bookhouse calendar handles leap years and year boundaries without timezone conversion', () => {
   assert.equal(daysInMonth(2028, 2), 29);
   assert.equal(daysInMonth(2027, 2), 28);
@@ -13,6 +13,14 @@ test('Bookhouse calendar handles leap years and year boundaries without timezone
 });
 test('shelves preserve older real journals and do not add rows for empty check-ins', () => {
   assert.deepEqual(Array.from(journalYears([{ localDate: '2024-01-01', journal: { content: 'private' } }, { localDate: '2023-01-01', journal: null }])), [2024, 2026, 2027, 2028, 2029, 2030]);
+});
+test('the current month book always opens; other months need a saved private journal', () => {
+  const entries = [{ localDate: '2026-09-12', journal: { content: 'private' } }, { localDate: '2026-08-02', journal: null }];
+  assert.deepEqual([...openableMonths(entries, new Date(2026, 9, 26, 12))].sort(), ['2026-09', '2026-10']);
+  assert.deepEqual([...openableMonths([], new Date(2026, 9, 26, 12))], ['2026-10']);
+  // The device clock decides the current month, across a year boundary too.
+  assert.deepEqual([...openableMonths([], new Date(2026, 11, 31, 23, 59))], ['2026-12']);
+  assert.deepEqual([...openableMonths([], new Date(2027, 0, 1, 0, 1))], ['2027-01']);
 });
 test('private Journal uses only the authenticated standalone Journal contract, never Events or AI', async () => {
   const calls = [];
