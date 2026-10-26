@@ -14,7 +14,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { boundCamera, focusCamera, zoomCamera, type ShelfCamera } from '../components/bookhouse/shelfCamera';
 import { EngravedYear, ShelfMotif } from '../components/bookhouse/EngravedYear';
 import { useAuth } from '../services/auth';
-import { daysInMonth, journalYears, MONTHS, monthKey, readJournals, savePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
+import { daysInMonth, journalYears, MONTHS, monthKey, openableMonths, readJournals, savePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
 import { readEvent } from '../services/events';
 import { loadGardenPlacements } from '../components/garden/planting/gardenHydration';
 import { loadFlowerSource } from '../components/garden/planting/flowerDetailApi';
@@ -91,6 +91,9 @@ export default function Bookhouse() {
   useFocusEffect(useCallback(() => { void reload(); return () => { requestVersion.current++; journalRequest.current?.abort(); }; }, [reload]));
   const years = useMemo(() => journalYears(entries), [entries]);
   const available = useMemo(() => new Set(entries.filter(e => e.journal).map(e => e.localDate.slice(0, 7))), [entries]);
+  const openable = useMemo(() => openableMonths(entries), [entries]);
+  const today = new Date();
+  const isToday = (year: number, selected: number, n: number) => year === today.getFullYear() && selected === today.getMonth() + 1 && n === today.getDate();
   const zoom = Math.max(1.35, 980 / sceneWidth);
   const overviewHeight = sceneHeight;
   const shelfHeight = height - insets.top - insets.bottom;
@@ -159,13 +162,14 @@ export default function Bookhouse() {
     return () => element?.removeEventListener('wheel', wheel);
   }, [focusedYear, sceneWidth, shelfHeight, overviewHeight]);
   const openMonth = (year: number, selected: number) => {
-    if (!available.has(monthKey(year, selected))) return;
+    if (!openable.has(monthKey(year, selected))) return;
     setMonth({ year, month: selected });
     setFocusedYear(null);
     applyCamera(homeCamera);
     sceneScroll.current?.scrollTo({ y: sceneWidth * DESK_Y - 24, animated: !reducedMotion });
     const first = entries.filter(e => e.journal && e.localDate.startsWith(monthKey(year, selected))).map(e => Number(e.localDate.slice(8, 10))).sort((a,b) => a-b)[0];
-    setDay(first || 1); opening.setValue(0);
+    // A month without journals yet (the current one) opens on today's page.
+    setDay(first || (isToday(year, selected, today.getDate()) ? today.getDate() : 1)); opening.setValue(0);
     Animated.timing(opening, { toValue: 1, duration: reducedMotion ? 0 : 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   };
   const dayEntries = month ? entries.filter(e => e.journal && e.localDate === `${monthKey(month.year, month.month)}-${String(day).padStart(2, '0')}`) : [];
@@ -190,7 +194,7 @@ export default function Bookhouse() {
                 </Pressable>
                 <View style={{ position: 'absolute', left: sceneWidth * .195, bottom: 0, width: sceneWidth * .622, height: rowStep * .85, flexDirection: 'row', alignItems: 'flex-end' }}>
                   {MONTHS.map((label, i) => {
-                    const canOpen = available.has(monthKey(year, i + 1));
+                    const canOpen = openable.has(monthKey(year, i + 1));
                     const bookHeight = rowStep * (.70 + ((i * 7 + index * 3) % 5) * .033);
                     const bookWidth = sceneWidth * (.046 + ((i + index) % 3) * .0045);
                     const bookX = sceneWidth * .195 + Array.from({ length: i }, (_, n) => sceneWidth * (.046 + ((n + index) % 3) * .0045)).reduce((a, b) => a + b, 0);
@@ -204,7 +208,7 @@ export default function Bookhouse() {
                         <BookhouseArt index={(i + index * 2) % 12} width={bookWidth} height={bookHeight} />
                         <Text style={{ position: 'absolute', top: bookHeight * .22, alignSelf: 'center', color: '#3B3525', backgroundColor: '#F7E4BEED', paddingHorizontal: 1,
                           fontFamily: serif, fontSize: sceneWidth * .018, borderRadius: 1 }}>{label}</Text>
-                        {canOpen && <View style={{ position: 'absolute', bottom: 0, right: bookWidth * .18, height: 8, width: 3, backgroundColor: '#DAB478' }} />}
+                        {available.has(monthKey(year, i + 1)) && <View style={{ position: 'absolute', bottom: 0, right: bookWidth * .18, height: 8, width: 3, backgroundColor: '#DAB478' }} />}
                       </Pressable>
                     </Animated.View>;
                   })}
@@ -247,13 +251,18 @@ export default function Bookhouse() {
                 {!selectedEntry?.journal && <View style={s.pageHeader}><Text style={s.bookCaption}>Private journal</Text><Text style={s.bookCaption}>{month ? `${MONTHS[month.month - 1]} ${day}` : ''}</Text></View>}
                 {loading ? <ActivityIndicator color="#725332" /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={reload} style={s.smallButton}><Text>Retry journals</Text></Pressable></> :
                   selectedEntry?.journal ? null :
+                  month && isToday(month.year, month.month, day) ? <View style={{ marginTop: 20, gap: 8, alignItems: 'flex-start' }}>
+                    <Text style={[s.body, { color: '#725C42' }]}>Nothing written today yet.</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => setEditor(true)} style={s.smallButton}>
+                      <Text style={[s.body, { color: '#5B3F26', textDecorationLine: 'underline' }]}>Write today’s journal  →</Text></Pressable>
+                  </View> :
                   <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.'}</Text>}
               </View>
             </View>
             {!loading && !error && selectedEntry?.journal && <JournalPages night={lit} key={selectedEntry.id} text={selectedEntry.journal.content} textStyle={pageTextStyle} onIntroChange={setIntroVisible} bookWidth={pageSize.width} bookHeight={pageSize.height} inset={compactBook ? 8 : 24} date={month ? `${MONTHS[month.month - 1]} ${day}` : ''} />}
             {month && <View style={s.tabs}>{MONTHS.map((label, i) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Read ${label} ${month.year}`}
-              disabled={!available.has(monthKey(month.year, i + 1))} accessibilityState={{ selected: month.month === i + 1, disabled: !available.has(monthKey(month.year, i + 1)) }}
-              onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: available.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{label}</Text></Pressable>)}</View>}
+              disabled={!openable.has(monthKey(month.year, i + 1))} accessibilityState={{ selected: month.month === i + 1, disabled: !openable.has(monthKey(month.year, i + 1)) }}
+              onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: openable.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{label}</Text></Pressable>)}</View>}
           </Animated.View>
           </View>
           <View style={{ height: bookHeight - coverBaseline }} />

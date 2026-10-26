@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
 test('Reflection discovers metadata then reads the selected report through existing authenticated GET', async () => {
@@ -89,4 +90,14 @@ test('Create last month POSTs an empty body to the Monthly trigger and words out
   assert.equal(service.weeklyTriggerOutcome(ready).message, 'Last week’s reflection is ready.', 'Weekly wording is unchanged');
   assert.equal(service.lastClosedMonthKey(new Date(2026, 9, 26)), '2026-09');
   assert.equal(service.lastClosedMonthKey(new Date(2027, 0, 1, 0, 5)), '2026-12');
+});
+
+test('a reflection finishing in the background never switches the book the owner opened', () => {
+  const source = fs.readFileSync(new URL('../src/app/reflection.tsx', import.meta.url), 'utf8');
+  const effect = source.match(/const created = openPeriod \?[^\n]*\n\s*if \(created\) \{([^}]*)\}/);
+  assert.ok(effect, 'the created-period effect exists');
+  assert.doesNotMatch(effect[1], /setType/);
+  assert.match(effect[1], /show\(created\)/);
+  // Each book still writes its own last closed period, one at a time.
+  assert.match(source, /if \(loading \|\| listError \|\| creating \|\| autoCreated\.current\[type\]\) return;/);
 });

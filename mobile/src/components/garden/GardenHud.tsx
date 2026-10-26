@@ -84,7 +84,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       </Text>
     </Pressable>;
   };
-  return <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+  return <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.layer]}>
     <View testID="main-navigation" style={[styles.bottomBar, {
       width: Math.min(phone ? 460 : Math.max(380, Math.min(460, width * .36)), width - insets.left - insets.right - 40),
       bottom: insets.bottom + (phone ? 8 : 24), padding: phone ? 3 : 4, gap: phone ? 3 : 5,
@@ -112,6 +112,10 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   </View>;
 }
 const styles = StyleSheet.create({
+  // Web gives every view z-index 0, so the Garden's own overlays (her speech bubble and treehouse
+  // hint at 25, zoom and fairy buttons at 30) would otherwise cover the navigation when the camera
+  // brings them to the bottom. The layer itself lets taps through (box-none).
+  layer: { zIndex: 40 },
   bottomBar: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', padding: 5, gap: 4,
     borderRadius: 26, backgroundColor: '#FAF5E8F5', borderWidth: 1, borderColor: '#D4BD85',
     boxShadow: '0 3px 12px #163D4020' },

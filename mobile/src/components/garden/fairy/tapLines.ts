@@ -28,12 +28,14 @@ export function tapActivity(state: FairyState): TapActivity | null {
 const TAP_ONLY = new Set(['idle-gen-5', 'sleeping-gen-4']);
 export const AMBIENT_LINES = TAP_LINES.filter(line => !TAP_ONLY.has(line.id));
 
-// In the Garden she speaks up by herself: a little while after settling into something,
-// then only occasionally while she stays. Each line shows for a few seconds.
-export const AMBIENT_TIMING = { settleMs: [6_000, 14_000], gapMs: [45_000, 90_000], showMs: 4_500 } as const;
-export function ambientDelay(settling: boolean, random: () => number = Math.random) {
-  const [min, max] = settling ? AMBIENT_TIMING.settleMs : AMBIENT_TIMING.gapMs;
-  return Math.round(min + random() * (max - min));
+// In the Garden she speaks up by herself only now and then, so a line still feels like a small
+// surprise: sometimes a little while after settling into something, otherwise rarely while she
+// stays, and never twice within a few minutes however often she moves. Each line shows for a few seconds.
+export const AMBIENT_TIMING = { settleChance: 0.3, settleMs: [20_000, 45_000], gapMs: [240_000, 480_000],
+  cooldownMs: 300_000, showMs: 5_000 } as const;
+export function ambientDelay(settling: boolean, random: () => number = Math.random, sinceLastMs = Infinity) {
+  const [min, max] = settling && random() < AMBIENT_TIMING.settleChance ? AMBIENT_TIMING.settleMs : AMBIENT_TIMING.gapMs;
+  return Math.max(Math.round(min + random() * (max - min)), AMBIENT_TIMING.cooldownMs - sinceLastMs);
 }
 
 // Lines for her activity weigh more than general ones; the last few shown are skipped

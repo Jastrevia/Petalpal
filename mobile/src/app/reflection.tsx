@@ -71,6 +71,8 @@ export default function Reflection() {
   }
   useEffect(() => { void load(); return () => listAbort.current?.abort(); }, []);
 
+  // Back to the Garden already underneath; replacing would mount a second Garden each visit.
+  const leave = () => router.canGoBack() ? router.back() : router.dismissTo('/');
   const pages = reports.filter(report => report.type === type).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
   const found = pages.findIndex(report => report.id === pageId[type]);
   const index = found >= 0 ? found : pages.length - 1;
@@ -107,9 +109,11 @@ export default function Reflection() {
     if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
     autoCreated.current[type] = true; void createLast(type);
   }, [type, loading, listError, reports, creating]);
+  // A finished reflection opens on its own book's page, but never switches books: the owner may
+  // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {
     const created = openPeriod ? reports.find(report => report.type === openPeriod.type && report.periodKey === openPeriod.periodKey) : undefined;
-    if (created) { setOpenPeriod(null); setType(created.type); show(created); }
+    if (created) { setOpenPeriod(null); show(created); }
   }, [reports, openPeriod]);
 
   // Read the open page; quietly prefetch its neighbours so a turn can show both faces.
@@ -262,7 +266,7 @@ export default function Reflection() {
           {shown === 'Summary' && (() => {
             const short = shortWeekly(detail);
             if (short) return <ShortWeeklyReport short={short} interactive={interactive}
-              onWrite={() => router.replace({ pathname: '/', params: { feature: 'events' } })} />;
+              onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
             const text = detail.summary || detail.narrativeSections?.map(item => item.claim).join('\n\n') || 'No written reflection is available for this saved report.';
             return <Text selectable={interactive} style={s.body}><Text style={[s.initial, { color: accent }]}>{text.slice(0, 1)}</Text>{text.slice(1)}</Text>;
           })()}
@@ -315,7 +319,7 @@ export default function Reflection() {
         <Image source={interiorDay} style={camera} />
         <Animated.Image source={interiorNight} style={[camera, { opacity: lighting }]} />
       </View>
-      <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={[s.back, compact ? { top: 10, left: 10, paddingVertical: 8, paddingHorizontal: 11 } : { top: artHeight * .055, left: sceneWidth * .115 }]}><Text style={[s.ink, compact && { fontSize: 14 }]}>←  Back to Garden</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={leave} style={[s.back, compact ? { top: 10, left: 10, paddingVertical: 8, paddingHorizontal: 11 } : { top: artHeight * .055, left: sceneWidth * .115 }]}><Text style={[s.ink, compact && { fontSize: 14 }]}>←  Back to Garden</Text></Pressable>
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel="Lantern — night lighting" accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint="Turn the lantern on for night, or off for day" onPress={() => setNightOverride(!night)} hitSlop={6}
         style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
       {!compact && (['weekly', 'monthly'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: type === item }} aria-selected={type === item} accessibilityLabel={`${title(item)} reflections`} disabled={!!turning} onPress={() => setType(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>

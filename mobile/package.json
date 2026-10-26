@@ -51,7 +51,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node ./test/plantingSystem.test.mjs && node ./test/plantingMaskRefinement.test.mjs && node ./test/flowerDetail.test.mjs && node ./test/flowerMoodEffects.test.mjs && node ./test/mailboxSystem.test.mjs && node ./test/fairyMoments.test.mjs && node --test ./test/fairySchedule.test.mjs && node --test ./test/fairyTapLines.test.mjs && node ./test/flowerSpeciesSize.test.mjs && node ./test/petalCards.test.mjs && node --test ./test/profileAvatars.test.mjs",
+    "test": "node ./test/plantingSystem.test.mjs && node ./test/plantingMaskRefinement.test.mjs && node ./test/flowerDetail.test.mjs && node ./test/flowerMoodEffects.test.mjs && node ./test/mailboxSystem.test.mjs && node ./test/fairyMoments.test.mjs && node --test ./test/fairySchedule.test.mjs && node --test ./test/fairyTapLines.test.mjs && node --test ./test/gardenHudLayer.test.mjs && node ./test/flowerSpeciesSize.test.mjs && node ./test/petalCards.test.mjs && node --test ./test/profileAvatars.test.mjs",
     "test:integration": "node --test test/applicationIntegration.test.mjs",
     "build:web": "expo export --platform web"
   },
