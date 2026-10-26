@@ -1,5 +1,5 @@
 import { hitsMailbox } from './fairy/mailboxDestination';
-import { hitsTreehouse } from './fairy/treehouseDestination';
+import { hitsTreehouse, treehouseTap } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
 import { hitsMoonBed } from './fairy/moonDestination';
 import { hitsSwing } from './fairy/swingDestination';
@@ -324,6 +324,19 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const fairyStateRef = useRef<FairyState>('idle'); fairyStateRef.current = fairyState;
   // Her own day (server schedule), for owners the server enables; a user's tap holds it off a minute.
   const noteFairyUser = useFairySchedule(fairyRef, enableFairyWalk && !readOnly);
+  // Tapping the treehouse sends her straight in, and the Bookhouse opens once she is inside.
+  const bookhouseOnEntry = useRef(false);
+  const tapTreehouse = useRef(() => {});
+  tapTreehouse.current = () => {
+    const fairy = fairyRef.current, bookhouse = !readOnly ? onOpenBookhouse : undefined;
+    const action = treehouseTap(fairyStateRef.current, Boolean(bookhouse));
+    if (action === 'callOut') fairy?.returnFromTreehouse();
+    else if (action === 'openBookhouse') bookhouse?.();
+    else if (action === 'openOnEntry') bookhouseOnEntry.current = true;
+    else if (fairy?.visitTreehouse()) bookhouseOnEntry.current = Boolean(bookhouse);
+    // She cannot get there right now (on her way out, or busy at the mailbox): the door still opens.
+    else bookhouse?.();
+  };
 
   const mailboxPhase: MailboxInteractionPhase = useMemo(() => {
     if (fairyState === 'movingToMailbox' || fairyState === 'flyingToMailbox') return 'walking';
@@ -971,18 +984,14 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       }
       // Placement and flower details own taps before any Fairy destination.
       if (enableFairyWalk && fairyRef.current?.isMailboxBusy()) return;
-      if (enableFairyWalk) noteFairyUser();
+      if (enableFairyWalk) { noteFairyUser(); bookhouseOnEntry.current = false; }
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
       if (enableFairyWalk && hitsMailbox({x:worldX,y:worldY},treehousePlacement)) {
         fairyRef.current?.visitMailbox();
         return;
       }
       if (enableFairyWalk && hitsTreehouse({x:worldX,y:worldY},treehousePlacement)) {
-        if (fairyStateRef.current === 'insideTreehouse' || fairyStateRef.current === 'enteringTreehouse') {
-          fairyRef.current?.returnFromTreehouse();
-        } else {
-          fairyRef.current?.visitTreehouse();
-        }
+        tapTreehouse.current();
         return;
       }
       if (enableFairyWalk && hitsSwing({x:worldX,y:worldY}, swingPlacement)) {
@@ -1494,6 +1503,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               onTreehouseExited?.();
             }} onTreehouseEntered={() => {
               onTreehouseEntered?.();
+              if (bookhouseOnEntry.current) { bookhouseOnEntry.current = false; onOpenBookhouse?.(); }
             }} pixelsPerUnit={()=>fit*cameraZoom.value} onStateChange={setFairyState} ref={fairyRef} debug={fairyDebug} onStatus={setFairyStatus}
               active={worldActive && perf.Land && perf.Infrastructure && infrastructureEnabled && activeMode === 'normal' && !selectedFlower && previewMode}
               blocked={isGardenGroundBlocked} />
@@ -1584,7 +1594,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <Animated.View style={[{ position: 'absolute' }, treehouseEntryStyle]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Enter Treehouse Bookhouse"
             accessibilityHint="Open your private journals and flower history" onPress={() => {
-              if (enableFairyWalk) fairyRef.current?.visitTreehouse(); else onOpenBookhouse();
+              if (enableFairyWalk) { noteFairyUser(); tapTreehouse.current(); } else onOpenBookhouse();
             }}
             style={({ pressed }) => ({ flex: 1, borderRadius: 28, backgroundColor: pressed ? '#FFF4DC22' : 'transparent' })} />
         </Animated.View>
@@ -1609,19 +1619,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         </Animated.View>
       )}
       {enableFairyWalk && !readOnly && activeMode === 'normal' && !selectedFlower &&
-        (fairyState === 'insideTreehouse' || fairyState === 'exitingTreehouse' || fairyState === 'mailboxTransition') && (
+        fairyState === 'mailboxTransition' && (
         <View testID="fairy-interaction-controls" style={{position:'absolute',right:16,bottom:110,gap:8,zIndex:30}}>
-          {fairyState === 'mailboxTransition' ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Return from mailbox" style={styles.fairyAction}
-              onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
-          ) : <>
-            {fairyState === 'insideTreehouse' && onOpenBookhouse && <Pressable accessibilityRole="button"
-              accessibilityLabel="Open Bookhouse" style={styles.fairyAction} onPress={onOpenBookhouse}><Text style={styles.fairyActionText}>Open Bookhouse</Text></Pressable>}
-            <Pressable accessibilityRole="button" accessibilityLabel="Return from treehouse" style={styles.fairyAction}
-              disabled={fairyState === 'exitingTreehouse'} onPress={() => fairyRef.current?.returnFromTreehouse()}>
-              <Text style={styles.fairyActionText}>{fairyState === 'exitingTreehouse' ? 'Returning to Garden…' : 'Return from treehouse'}</Text>
-            </Pressable>
-          </>}
+          <Pressable accessibilityRole="button" accessibilityLabel="Return from mailbox" style={styles.fairyAction}
+            onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
         </View>
       )}
       {children}

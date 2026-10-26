@@ -239,6 +239,8 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     // …and earns closeness with her (services/fairyCloseness.ts), counted like the hold.
     interactions: 0, noteFairyInteraction: () => { context.interactions++; },
     fairyRef: { current: { isMailboxBusy: () => false, getPosition: () => ({ x: 100, y: 120 }), move: () => { calls.push('move'); return true; } } },
+    // The treehouse decision itself is treehouseTap (fairySchedule.test.mjs); a new tap clears a pending Bookhouse.
+    bookhouseOnEntry: { current: false }, tapTreehouse: { current: () => context.fairyRef.current.visitTreehouse() },
   };
   for (const [hit, action] of [['hitsMailbox','visitMailbox'],['hitsTreehouse','visitTreehouse'],['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => false; context.fairyRef.current[action] = () => calls.push(action);
@@ -263,5 +265,6 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     context.fairyStateRef.current = state; context[hit] = () => true; expect([action]); context[hit] = () => false;
   }
   context.fairyStateRef.current = 'idle';
+  context.bookhouseOnEntry.current = true; expect(['move', 'redraw']); assert.equal(context.bookhouseOnEntry.current, false);
   context.readOnly = true; expect([]);
 });

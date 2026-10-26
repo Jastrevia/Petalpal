@@ -8,7 +8,7 @@ const { scheduleAction, scheduleRest, wanderTarget, wanderPause, USER_HOLD_MS, R
 const { FairyNavigation } = load('../fairy/FairyNavigation');
 const { WALK_NETWORK, WALK_START, distance } = load('../fairy/walkNetwork');
 const { mailboxApproachAnchor } = load('../fairy/mailboxDestination');
-const { treehouseInteriorAnchor } = load('../fairy/treehouseDestination');
+const { treehouseInteriorAnchor, treehouseTap } = load('../fairy/treehouseDestination');
 
 const plain = value => JSON.parse(JSON.stringify(value)); // VM-realm objects
 const base = { navState: 'idle', position: WALK_START, mailboxStand: mailboxApproachAnchor, placed: true, now: 1_000_000,
@@ -110,4 +110,17 @@ test('on her own she only ever stands on dry ground: never the pond stepping sto
   }
   const source = fs.readFileSync(new URL('../src/components/garden/fairy/useFairySchedule.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /wanderTarget\(WALK_NETWORK\.nodes/, 'the schedule never picks from the unfiltered network');
+});
+
+test('a tap on the treehouse takes her straight in and opens the Bookhouse, with no extra step', () => {
+  for (const state of ['idle', 'walking', 'sittingOnSwing', 'drinkingTea', 'flyingToTreehouse']) assert.equal(treehouseTap(state, true), 'enter');
+  assert.equal(treehouseTap('enteringTreehouse', true), 'openOnEntry');
+  assert.equal(treehouseTap('insideTreehouse', true), 'openBookhouse');
+  // Without a Bookhouse (a friend's Garden, previews) the tap still sends her in or calls her out.
+  assert.equal(treehouseTap('idle', false), 'enter');
+  assert.equal(treehouseTap('insideTreehouse', false), 'callOut');
+  assert.equal(treehouseTap('enteringTreehouse', false), 'callOut');
+  const scene = fs.readFileSync(new URL('../src/components/garden/GardenScene.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(scene, /accessibilityLabel="Open Bookhouse"|accessibilityLabel="Return from treehouse"/);
+  assert.match(scene, /onTreehouseEntered=\{\(\) => \{[^}]*if \(bookhouseOnEntry\.current\) \{ bookhouseOnEntry\.current = false; onOpenBookhouse\?\.\(\); \}/);
 });
