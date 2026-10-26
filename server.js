@@ -6,6 +6,7 @@ import { COMMUNITY_VERSION, assertSocialContent, requireCommunityAcceptance, ins
 import { installSocialSafety } from "./lib/social-safety.js";
 import { requireSocialPair, hiddenSocialIds, filterSocialPayload } from "./lib/garden-access.js";
 import { isWebShellRequest } from "./lib/web-shell.js";
+import { requestTiming, requestTimingEnabled } from "./lib/request-timing.js";
 import { parseJournalPage, journalPageCursor } from "./lib/journal-pagination.js";
 import { updateAiConsent } from "./lib/ai-consent.js";
 import { validateJournalCover } from './lib/journal-cover.js';
@@ -170,6 +171,7 @@ app.use((req, res, next) => {
   res.set("X-Request-ID", req.requestId);
   next();
 });
+if (requestTimingEnabled()) app.use(requestTiming());
 
 app.set("trust proxy", trustProxySetting());
 let emotionClassifier = classifyEmotion;

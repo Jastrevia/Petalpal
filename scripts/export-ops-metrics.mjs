@@ -29,7 +29,23 @@ export const QUERIES = {
     FROM "AiInteractionMetadata" GROUP BY 1, 2, 3`,
   aiJobs: `SELECT ${day('"createdAt"')} AS "date", "jobType"::text AS "jobType", "status"::text AS "status",
     count(*)::int AS "jobs", round(avg("attemptCount")::numeric, 2)::float AS "avgAttempts"
-    FROM "AIJob" GROUP BY 1, 2, 3`
+    FROM "AIJob" GROUP BY 1, 2, 3`,
+  // Every AI call is reserved by lib/ai-cost-gate.js first, Workers AI included: action, provider, calls.
+  aiReservations: `SELECT ${day('"createdAt"')} AS "date", "actionCode" AS "action", "targetClass" AS "provider",
+    coalesce(sum(CASE WHEN "reasonCode" ~ '^[0-9]+$' THEN "reasonCode"::int ELSE 0 END), 0)::int AS "calls",
+    count(DISTINCT "actorUserId")::int AS "users"
+    FROM "AuditEvent" WHERE "eventType" = 'AI_COST_RESERVED' GROUP BY 1, 2, 3`,
+  // Lifetime totals and recent active owners (Events in the last 7 / 30 days at export time).
+  totals: `SELECT (SELECT count(*) FROM "User")::int AS "users",
+    (SELECT count(DISTINCT "ownerId") FROM "Event")::int AS "usersWithEvents",
+    (SELECT count(*) FROM "Event")::int AS "events", (SELECT count(*) FROM "Flower")::int AS "flowers",
+    (SELECT count(DISTINCT "ownerId") FROM "Event" WHERE "occurredAt" >= now() - interval '7 days')::int AS "activeUsers7d",
+    (SELECT count(DISTINCT "ownerId") FROM "Event" WHERE "occurredAt" >= now() - interval '30 days')::int AS "activeUsers30d"`,
+  // Failed jobs by the allowlisted code the worker stores in lastError ("AI job failed: CODE").
+  // Only codes matching [A-Z0-9_] leave the database; rows from before codes were stored read UNRECORDED.
+  aiJobFailures: `SELECT ${day('"createdAt"')} AS "date", "jobType"::text AS "jobType",
+    coalesce(substring("lastError" from '^AI job failed: ([A-Z0-9_]+)$'), 'UNRECORDED') AS "code", count(*)::int AS "jobs"
+    FROM "AIJob" WHERE "status"::text = 'FAILED' GROUP BY 1, 2, 3`
 };
 
 const byDate = (a, b) => a.date.localeCompare(b.date);
@@ -75,7 +91,10 @@ export const FILES = {
   "daily_activity.csv": ["date", "newUsers", "events", "activeUsers", "flowers"],
   "ai_gateway_daily.csv": ["date", "action", "provider", "model", "calls", "inputTokens", "outputTokens", "estCostUsd"],
   "ai_calls_daily.csv": ["date", "task", "provider", "calls", "failures", "avgLatencyMs", "inputTokens", "outputTokens"],
-  "ai_jobs_daily.csv": ["date", "jobType", "status", "jobs", "avgAttempts"]
+  "ai_jobs_daily.csv": ["date", "jobType", "status", "jobs", "avgAttempts"],
+  "ai_job_failures_daily.csv": ["date", "jobType", "code", "jobs"],
+  "ai_reservations_daily.csv": ["date", "action", "provider", "calls", "users"],
+  "ops_totals.csv": ["metric", "value"]
 };
 
 // query(sql) → rows. Returns { fileName: csvText }.
@@ -86,7 +105,10 @@ export async function exportOpsMetrics(query) {
     "daily_activity.csv": dailyActivity(rows),
     "ai_gateway_daily.csv": gatewayDaily(rows.gatewayUsage),
     "ai_calls_daily.csv": keyed(rows.aiCalls),
-    "ai_jobs_daily.csv": keyed(rows.aiJobs)
+    "ai_jobs_daily.csv": keyed(rows.aiJobs),
+    "ai_job_failures_daily.csv": keyed(rows.aiJobFailures),
+    "ai_reservations_daily.csv": keyed(rows.aiReservations),
+    "ops_totals.csv": Object.entries(rows.totals[0] ?? {}).map(([metric, value]) => ({ metric, value }))
   };
   return Object.fromEntries(Object.entries(tables).map(([file, table]) => [file, toCsv(table, FILES[file])]));
 }

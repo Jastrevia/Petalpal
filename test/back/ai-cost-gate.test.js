@@ -162,7 +162,7 @@ test("worker failure persistence, result and logs never expose provider details"
   } });
   const result = await worker.executeClaimed(job);
   assert.equal(result.succeeded, false); assert.equal(result.error.code, "AI_JOB_FAILED");
-  assert.equal(recorded.message, "AI job failed"); assert.equal(JSON.stringify(logs).includes("private"), false);
+  assert.equal(recorded.message, "AI job failed: AI_JOB_FAILED"); assert.equal(JSON.stringify(logs).includes("private"), false);
   assert.equal(result.error.message.includes("private"), false);
 });
 

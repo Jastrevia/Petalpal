@@ -14,7 +14,8 @@ async function fixture(t) {
       "targetClass" varchar(64), "targetSafeId" varchar(128), "actionCode" varchar(64), "reasonCode" varchar(64));
     CREATE TABLE "AiInteractionMetadata" ("id" text PRIMARY KEY, "userId" text, "task" text, "provider" text, "latencyMs" int,
       "inputTokens" int, "outputTokens" int, "success" boolean, "createdAt" timestamp(3) NOT NULL);
-    CREATE TABLE "AIJob" ("id" text PRIMARY KEY, "ownerId" text, "jobType" text, "status" text, "attemptCount" int, "createdAt" timestamp(3) NOT NULL);
+    CREATE TABLE "AIJob" ("id" text PRIMARY KEY, "ownerId" text, "jobType" text, "status" text, "attemptCount" int, "createdAt" timestamp(3) NOT NULL,
+      "lastError" text);
     INSERT INTO "User" VALUES ('alice','alice@example.invalid','2026-10-01 08:00'), ('bob','bob@example.invalid','2026-10-02 23:59');
     INSERT INTO "Event" VALUES ('e1','alice','private journal text','2026-10-02 10:00'), ('e2','alice','more private text','2026-10-02 22:00'),
       ('e3','bob','bob private text','2026-10-02 23:30'), ('e4','alice','next day','2026-10-03 00:01');
@@ -23,11 +24,19 @@ async function fixture(t) {
       ('r1:usage','2026-10-02 10:00','AI_GATEWAY_USAGE','alice','ANTHROPIC','claude-haiku-5-5','EVENT_EMOTION','1000:200:0'),
       ('r2:usage','2026-10-02 11:00','AI_GATEWAY_USAGE','bob','ANTHROPIC','claude-haiku-5-5','EVENT_EMOTION','500:100:0'),
       ('r3:usage','2026-10-03 09:00','AI_GATEWAY_USAGE','alice','ANTHROPIC','claude-sonnet-5-5','WEEKLY_REPORT','6000:900:0'),
-      ('r1:usd','2026-10-02 10:00','AI_GATEWAY_USD_RESERVED','alice','ANTHROPIC',NULL,'EVENT_EMOTION','999999');
+      ('r1:usd','2026-10-02 10:00','AI_GATEWAY_USD_RESERVED','alice','ANTHROPIC',NULL,'EVENT_EMOTION','999999'),
+      ('c1','2026-10-02 10:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c2','2026-10-02 11:00','AI_COST_RESERVED','bob','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c3','2026-10-02 12:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c4','2026-10-03 09:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'WEEKLY_REPORT','2');
     INSERT INTO "AiInteractionMetadata" VALUES ('m1','alice','EMBEDDING','CLOUDFLARE',400,300,0,true,'2026-10-02 10:00'),
       ('m2','bob','EMBEDDING','CLOUDFLARE',600,200,0,false,'2026-10-02 12:00');
-    INSERT INTO "AIJob" VALUES ('j1','alice','EMBEDDING_GENERATION','SUCCEEDED',1,'2026-10-02 10:00'),
-      ('j2','bob','EMBEDDING_GENERATION','FAILED',3,'2026-10-02 12:00'), ('j3','alice','EMBEDDING_GENERATION','SUCCEEDED',2,'2026-10-02 13:00');
+    INSERT INTO "AIJob" VALUES ('j1','alice','EMBEDDING_GENERATION','SUCCEEDED',1,'2026-10-02 10:00',NULL),
+      ('j2','bob','EMBEDDING_GENERATION','FAILED',3,'2026-10-02 12:00','AI job failed'),
+      ('j3','alice','EMBEDDING_GENERATION','SUCCEEDED',2,'2026-10-02 13:00',NULL),
+      ('j4','alice','WEEKLY_REPORT','FAILED',1,'2026-10-03 09:00','AI job failed: REPORT_NARRATIVE_TIMEOUT'),
+      ('j5','bob','WEEKLY_REPORT','FAILED',1,'2026-10-03 10:00','AI job failed: REPORT_NARRATIVE_TIMEOUT'),
+      ('j6','bob','WEEKLY_REPORT','FAILED',1,'2026-10-03 11:00','private provider detail for bob');
   `);
   return async sql => (await pg.query(sql)).rows;
 }
@@ -46,7 +55,15 @@ test("exports per-UTC-day aggregates for activity, Claude cost, other AI calls a
     "2026-10-03,WEEKLY_REPORT,ANTHROPIC,claude-sonnet-5-5,1,6000,900,0.021", ""].join("\n"));
   assert.equal(files["ai_calls_daily.csv"].split("\n")[1], "2026-10-02,EMBEDDING,CLOUDFLARE,2,1,500,500,0");
   assert.deepEqual(files["ai_jobs_daily.csv"].trim().split("\n").slice(1),
-    ["2026-10-02,EMBEDDING_GENERATION,FAILED,1,3", "2026-10-02,EMBEDDING_GENERATION,SUCCEEDED,2,1.5"]);
+    ["2026-10-02,EMBEDDING_GENERATION,FAILED,1,3", "2026-10-02,EMBEDDING_GENERATION,SUCCEEDED,2,1.5", "2026-10-03,WEEKLY_REPORT,FAILED,3,1"]);
+  assert.deepEqual(files["ai_reservations_daily.csv"].trim().split("\n"), ["date,action,provider,calls,users",
+    "2026-10-02,EVENT_EMOTION,CLOUDFLARE_WORKERS_AI,3,2", "2026-10-03,WEEKLY_REPORT,CLOUDFLARE_WORKERS_AI,2,1"]);
+  const totals = Object.fromEntries(files["ops_totals.csv"].trim().split("\n").slice(1).map(line => line.split(",")));
+  assert.deepEqual({ ...totals, activeUsers7d: undefined, activeUsers30d: undefined },
+    { users: "2", usersWithEvents: "2", events: "4", flowers: "2", activeUsers7d: undefined, activeUsers30d: undefined });
+  // Stored codes are counted; legacy and free-text lastError values never leave the database.
+  assert.deepEqual(files["ai_job_failures_daily.csv"].trim().split("\n"), ["date,jobType,code,jobs",
+    "2026-10-02,EMBEDDING_GENERATION,UNRECORDED,1", "2026-10-03,WEEKLY_REPORT,REPORT_NARRATIVE_TIMEOUT,2", "2026-10-03,WEEKLY_REPORT,UNRECORDED,1"]);
 });
 
 test("no user ids, emails or written text reach any exported file", async t => {
