@@ -6,9 +6,9 @@ import { COMMUNITY_VERSION, assertSocialContent, requireCommunityAcceptance, ins
 import { installSocialSafety } from "./lib/social-safety.js";
 import { requireSocialPair, hiddenSocialIds, filterSocialPayload } from "./lib/garden-access.js";
 import { isWebShellRequest } from "./lib/web-shell.js";
-import { CircuitBreaker } from "./lib/circuit-breaker.js";
 import { parseJournalPage, journalPageCursor } from "./lib/journal-pagination.js";
 import { updateAiConsent } from "./lib/ai-consent.js";
+import { CircuitBreaker } from "./lib/circuit-breaker.js";
 import { validateJournalCover } from './lib/journal-cover.js';
 import "dotenv/config";
 import express from "express";
