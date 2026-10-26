@@ -69,3 +69,24 @@ test('Weekly reflections are named by week of month and the last closed week is 
   assert.equal(service.weekLabel('2026-03-30').title, 'March · Week 5');
   assert.equal(service.weekLabel('not-a-date').title, 'not-a-date');
 });
+
+test('Create last month POSTs an empty body to the Monthly trigger and words outcomes by month', async () => {
+  const calls = [];
+  const ready = { periodKey: '2026-09', execution: 'COMPLETED', job: { status: 'SUCCEEDED' },
+    report: { id: 'monthly-3', periodKey: '2026-09', narrativeStatus: 'GENERATED' } };
+  const load = loadPlantingModules(undefined, undefined, undefined, false, { fetch: async (url, options) => {
+    calls.push({ url, options }); return { ok: true, status: 200, json: async () => ready };
+  } });
+  load('../../../services/api').configureApi({ apiBaseUrl: 'http://localhost:3107', getAccessToken: async () => 'test-token' });
+  const service = load('../../../services/reflections');
+  assert.deepEqual(await service.createLastMonthReflection(), ready);
+  assert.equal(calls[0].url, 'http://localhost:3107/ai/reports/monthly/trigger');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.body, '{}', 'the server chooses the last closed month');
+  assert.equal(service.weeklyTriggerOutcome(ready, undefined, 'month').message, 'Last month’s reflection is ready.');
+  assert.equal(service.weeklyTriggerOutcome({ ...ready, report: null }, undefined, 'month').message,
+    'Last month didn’t have enough moments for a written reflection.');
+  assert.equal(service.weeklyTriggerOutcome(ready).message, 'Last week’s reflection is ready.', 'Weekly wording is unchanged');
+  assert.equal(service.lastClosedMonthKey(new Date(2026, 9, 26)), '2026-09');
+  assert.equal(service.lastClosedMonthKey(new Date(2027, 0, 1, 0, 5)), '2026-12');
+});

@@ -80,6 +80,8 @@ import {
 } from "./lib/ai-jobs.js";
 import {
   localDateForInstant,
+  monthlyPeriodFor,
+  previousMonthlyPeriod,
   previousWeeklyPeriod,
   reportPeriodStatus,
   weeklyPeriodForLocalDate
@@ -2490,6 +2492,94 @@ app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
       code: error?.meta?.driverAdapterError?.cause?.originalCode || error?.meta?.code || error?.code
     });
     return res.status(500).json({ error: "Failed to trigger Weekly report" });
+  }
+});
+
+// Monthly mirrors the Weekly trigger: one MONTHLY_REPORT job per owner and closed month,
+// no automatic retry. Without a body it targets the previous month in the account timezone.
+app.post("/ai/reports/monthly/trigger", aiRateLimit, async (req, res) => {
+  if (Object.keys(req.body).some((field) => field !== "month") || Object.keys(req.query).length > 0) {
+    return res.status(400).json({ error: "Monthly report ownership and job type are fixed by this endpoint" });
+  }
+
+  try {
+    const ownerId = req.auth.userId;
+    const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { timezone: true } });
+    if (!owner) return res.status(403).json({ error: "Authenticated PetalPal owner was not found" });
+
+    const now = new Date();
+    let period;
+    try {
+      if (req.body.month === undefined) {
+        const [year, month] = localDateForInstant(now, owner.timezone).split("-").map(Number);
+        period = previousMonthlyPeriod({ year, month, timezone: owner.timezone });
+      } else {
+        const match = /^(\d{4})-(\d{2})$/.exec(String(req.body.month));
+        if (!match) throw new Error("month must be YYYY-MM");
+        period = monthlyPeriodFor({ year: Number(match[1]), month: Number(match[2]), timezone: owner.timezone });
+      }
+      reportPeriodStatus(period.periodEndUtc, now);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const job = await prisma.$transaction(async (tx) => {
+      await requireLockedMemoryConsent(tx, req.auth);
+      return new PrismaAiJobRepository(prisma).enqueue({
+        identity: req.auth,
+        jobType: AI_JOB_TYPES.MONTHLY_REPORT,
+        resourceId: period.periodKey,
+        processingVersion: REPORT_NARRATIVE_GENERATION_VERSION,
+        maxAttempts: 1,
+        transaction: tx
+      });
+    });
+    const stored = () => Promise.all([
+      prisma.aiJob.findFirst({
+        where: { id: job.id, ownerId, jobType: AI_JOB_TYPES.MONTHLY_REPORT },
+        select: { id: true, status: true, attemptCount: true, completedAt: true }
+      }),
+      prisma.monthlyReport.findUnique({
+        where: { ownerId_periodKey: { ownerId, periodKey: period.periodKey } },
+        select: { id: true, periodKey: true, narrativeStatus: true, generationVersion: true }
+      })
+    ]);
+    if (aiJobDispatchAllowed(job)) {
+      let dispatched = false;
+      try {
+        dispatched = (await aiJobDispatcher(job)).dispatched;
+      } catch {
+        console.warn("AI job dispatch deferred", { jobId: job.id });
+      }
+      const [storedJob, report] = await stored();
+      return res.status(storedJob?.status === "SUCCEEDED" ? 200 : 202).json({
+        periodKey: period.periodKey, job: storedJob, report,
+        execution: storedJob?.status === "SUCCEEDED" ? "ALREADY_FINALIZED" : dispatched ? "QUEUED" : "PENDING_DISPATCH"
+      });
+    }
+    const execution = await weeklyReportWorkerFactory().runJob({
+      jobId: job.id, ownerId, jobType: AI_JOB_TYPES.MONTHLY_REPORT, now: new Date()
+    });
+    const [storedJob, report] = await stored();
+    const payload = {
+      periodKey: period.periodKey, job: storedJob, report,
+      execution: execution.claimed ? (execution.succeeded ? "COMPLETED" : "FAILED") : "ALREADY_RUNNING_OR_FINALIZED"
+    };
+    if (execution.claimed && !execution.succeeded) {
+      if (["AI_QUOTA_EXCEEDED", "AI_INFERENCE_ALREADY_RESERVED", "AI_BUDGET_UNAVAILABLE"].includes(execution.error?.code)) {
+        return res.status(aiCostHttpStatus(execution.error.code)).json({ ...payload, errorCode: execution.error.code });
+      }
+      return res.status(502).json({ ...payload, errorCode: execution.error?.code || "MONTHLY_REPORT_JOB_FAILED" });
+    }
+    if (storedJob?.status === "FAILED") return res.status(502).json({ ...payload, errorCode: "MONTHLY_REPORT_JOB_FAILED" });
+    return res.status(storedJob?.status === "SUCCEEDED" ? 200 : 202).json(payload);
+  } catch (error) {
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI memory processing is not currently authorized" });
+    logServerError("POST /ai/reports/monthly/trigger error", {
+      name: error?.name,
+      code: error?.meta?.driverAdapterError?.cause?.originalCode || error?.meta?.code || error?.code
+    });
+    return res.status(500).json({ error: "Failed to trigger Monthly report" });
   }
 });
 

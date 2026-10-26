@@ -34,12 +34,20 @@ export const readReflection = (report: SavedReport, signal?: AbortSignal) =>
 // so an open week is never targeted. One job per owner and week: repeat presses are safe.
 export const createLastWeekReflection = (signal?: AbortSignal) =>
   apiRequest<WeeklyTriggerResult>('/ai/reports/weekly/trigger', 'POST', {}, { signal });
+// Same contract for Monthly: the server picks the most recent closed month, one job per month.
+export const createLastMonthReflection = (signal?: AbortSignal) =>
+  apiRequest<WeeklyTriggerResult>('/ai/reports/monthly/trigger', 'POST', {}, { signal });
 
 // Weekly periodKey is the local Monday (YYYY-MM-DD) of a Monday-Sunday week.
 export function lastClosedWeekKey(now = new Date()) {
   const offset = (now.getDay() + 6) % 7;
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset - 7);
   return [monday.getFullYear(), monday.getMonth() + 1, monday.getDate()].map((n, i) => String(n).padStart(i ? 2 : 4, '0')).join('-');
+}
+// Monthly periodKey is the previous calendar month (YYYY-MM).
+export function lastClosedMonthKey(now = new Date()) {
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}`;
 }
 // "October · Week 2" (the Monday's week of its month) and "Oct 12 – 18" for a Weekly periodKey.
 export function weekLabel(periodKey: string) {
@@ -56,21 +64,22 @@ export function weekLabel(periodKey: string) {
 export type WeeklyTriggerOutcome = {
   kind: 'ready' | 'empty' | 'pending' | 'consent' | 'paused' | 'failed'; message: string; periodKey?: string;
 };
-export function weeklyTriggerOutcome(result?: WeeklyTriggerResult, error?: unknown): WeeklyTriggerOutcome {
+export function weeklyTriggerOutcome(result?: WeeklyTriggerResult, error?: unknown, period: 'week' | 'month' = 'week'): WeeklyTriggerOutcome {
+  const last = `Last ${period}’s reflection`;
   if (error) {
     const status = error instanceof ApiError ? error.status : 0;
     if (status === 403) return { kind: 'consent', message: 'Turn on AI memory in your privacy settings to create reflections.' };
     if ([409, 429, 503].includes(status)) return { kind: 'paused', message: 'Reflections are taking a short break. Please try again later.' };
-    if (status === 502) return { kind: 'failed', message: 'Last week’s reflection couldn’t be written.' };
+    if (status === 502) return { kind: 'failed', message: `${last} couldn’t be written.` };
     const message = (error as { message?: unknown }).message;
-    return { kind: 'failed', message: typeof message === 'string' && message ? message : 'Unable to create last week’s reflection.' };
+    return { kind: 'failed', message: typeof message === 'string' && message ? message : `Unable to create last ${period}’s reflection.` };
   }
   const periodKey = result?.periodKey;
-  if (result?.report?.narrativeStatus === 'GENERATED') return { kind: 'ready', message: 'Last week’s reflection is ready.', periodKey };
+  if (result?.report?.narrativeStatus === 'GENERATED') return { kind: 'ready', message: `${last} is ready.`, periodKey };
   if (result?.job?.status === 'SUCCEEDED') {
-    return { kind: 'empty', message: 'Last week didn’t have enough moments for a written reflection.', periodKey };
+    return { kind: 'empty', message: `Last ${period} didn’t have enough moments for a written reflection.`, periodKey };
   }
-  return { kind: 'pending', message: 'Last week’s reflection is being written. Check back in a few minutes.', periodKey };
+  return { kind: 'pending', message: `${last} is being written. Check back in a few minutes.`, periodKey };
 }
 
 // Short Weekly report (backend contract weekly-short-v1). Only a report whose every

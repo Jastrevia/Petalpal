@@ -138,9 +138,15 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   next month's 1st in the account timezone (`monthlyPeriodFor`); `periodKey`
   `YYYY-MM`; same `reportPeriodStatus` closed-period rule.
 - **Monthly generation:** the worker can build and persist Monthly reports
-  (`buildMonthlyInput`, Opus path disabled by default). **No production route
-  or scheduler creates `MONTHLY_REPORT` jobs**; they are created only by tests
-  and owner-run scripts.
+  (`buildMonthlyInput`, Opus path disabled by default). Jobs are created by the
+  authenticated `POST /ai/reports/monthly/trigger`, which mirrors the Weekly
+  trigger: without a body it targets the **previous** month relative to the
+  current local date (`previousMonthlyPeriod`); `{ "month": "YYYY-MM" }` targets
+  that month; an open month returns **400** before any consent check or job;
+  one `MONTHLY_REPORT` job per (owner, periodKey, version) with
+  `maxAttempts: 1`. The Mobile Monthly book calls it once per visit when last
+  month's reflection is missing. No scheduler creates Monthly jobs.
+  TESTED BEHAVIOR: [test/back/monthly-trigger.route.test.js](test/back/monthly-trigger.route.test.js).
 - **Yearly:** `YearlyReport` exists as a data model only. There is no Yearly
   period helper, generation path or trigger.
 
@@ -288,8 +294,8 @@ capability exists. Treat those variables as inert.
   runner executes memory jobs.
 - **Weekly/Monthly scheduling:** NOT SUPPORTED anywhere. The cron only
   re-dispatches existing jobs. Weekly jobs are created only by the
-  authenticated `POST /ai/reports/weekly/trigger`, which no Web/Mobile screen
-  calls; Monthly jobs have no route at all.
+  authenticated `POST /ai/reports/weekly/trigger` and Monthly jobs only by
+  `POST /ai/reports/monthly/trigger` (§4).
 
 ## 7. Developer time simulation — PROPOSED (not implemented)
 
@@ -373,7 +379,7 @@ test tooling must, in the same change:
 
 - No supported way to change `User.timezone` after signup.
 - Zones without a local midnight on some dates make `localMidnightToUtc` throw.
-- No production path creates Monthly jobs; Yearly generation does not exist.
+- Monthly jobs are created only on request (§4), never on a schedule; Yearly generation does not exist.
 - No Weekly scheduler; the trigger is API-only (no Web/Mobile caller).
 - Hosted TEST cannot run memory or report jobs automatically.
 - The trigger's empty-body default (previous week) can silently consume an
