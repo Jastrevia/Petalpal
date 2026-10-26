@@ -9,6 +9,7 @@ import { isWebShellRequest } from "./lib/web-shell.js";
 import { requestTiming, requestTimingEnabled } from "./lib/request-timing.js";
 import { parseJournalPage, journalPageCursor } from "./lib/journal-pagination.js";
 import { updateAiConsent } from "./lib/ai-consent.js";
+import { CircuitBreaker } from "./lib/circuit-breaker.js";
 import { validateJournalCover } from './lib/journal-cover.js';
 import "dotenv/config";
 import express from "express";
@@ -178,6 +179,11 @@ if (requestTimingEnabled()) app.use(requestTiming());
 app.set("trust proxy", trustProxySetting());
 let emotionClassifier = classifyEmotion;
 let eventEmotionClassifier = classifyEventSecondaryEmotions;
+const newEventEmotionBreaker = () => new CircuitBreaker({
+  failureThreshold: Number(process.env.AI_CIRCUIT_FAILURE_THRESHOLD) || 5,
+  cooldownMs: Number(process.env.AI_CIRCUIT_COOLDOWN_MS) || 30_000
+});
+let eventEmotionBreaker = newEventEmotionBreaker();
 const aiCostGate = new PrismaAiCostGate(prisma);
 let firebaseUserDeleter = deleteFirebaseUser;
 const createDefaultWeeklyReportWorker = () => createProductionAiWorker({
@@ -197,6 +203,7 @@ export function setEmotionClassifierForTests(classifier) {
 
 export function setEventEmotionClassifierForTests(classifier) {
   eventEmotionClassifier = classifier || classifyEventSecondaryEmotions;
+  eventEmotionBreaker = newEventEmotionBreaker();
 }
 
 export function setFirebaseUserDeleterForTests(deleter) {
@@ -2100,6 +2107,11 @@ async function eventEmotionResult({ userId, eventId, text, primaryGardenMood, ai
   if (!primaryGardenMood || !eventSecondaryEmotionEnabled()) return withEmotionLabDiagnostics(
     { status: "SKIPPED", labels: [], latencyMs: 0, fallbackReason: "FEATURE_DISABLED" }, includeDiagnostics,
     { attempted: false, status: "SKIPPED", fallbackReason: "FEATURE_DISABLED" });
+  // While Workers AI keeps failing, skip the call (and its cost reservation); the Event
+  // keeps the user's Primary and a deterministic Flower, as on any other AI failure.
+  if (!eventEmotionBreaker.allow()) return withEmotionLabDiagnostics(
+    { status: "SKIPPED", labels: [], latencyMs: 0, fallbackReason: "CIRCUIT_OPEN" }, includeDiagnostics,
+    { attempted: false, status: "SKIPPED", fallbackReason: "CIRCUIT_OPEN" });
   let result;
   let inferenceStarted = false;
   let processingEpoch = null;
@@ -2111,6 +2123,7 @@ async function eventEmotionResult({ userId, eventId, text, primaryGardenMood, ai
     inferenceStarted = true;
     result = await eventEmotionClassifier({ userId, eventId, text, primaryGardenMood,
       ...(includeDiagnostics ? { includeDiagnostics: true } : {}) });
+    if (result?.status === "SUCCESS" || result?.status === "FAILED") eventEmotionBreaker.record(result.status === "SUCCESS");
     await aiCostGate.checkProcessingConsent({ identity: { userId }, consentUpdatedAt: reservation.consentUpdatedAt });
   } catch (error) {
     return withEmotionLabDiagnostics(
