@@ -59,9 +59,23 @@ test('unprompted lines skip the ones that only answer a tap', () => {
   assert.equal(AMBIENT_LINES.length, TAP_LINES.length - 2);
 });
 
-test('she speaks a little after settling, then only now and then', () => {
-  assert.equal(ambientDelay(true, () => 0), AMBIENT_TIMING.settleMs[0]);
-  assert.equal(ambientDelay(true, () => 1), AMBIENT_TIMING.settleMs[1]);
+test('she sometimes speaks a little after settling, otherwise only rarely', () => {
+  const rolls = values => { let i = 0; return () => values[i++]; };
+  // A settle line only on a lucky roll; otherwise she waits as long as while staying.
+  assert.equal(ambientDelay(true, rolls([0, 0])), AMBIENT_TIMING.settleMs[0]);
+  assert.equal(ambientDelay(true, rolls([0, 1])), AMBIENT_TIMING.settleMs[1]);
+  assert.equal(ambientDelay(true, rolls([AMBIENT_TIMING.settleChance, 0])), AMBIENT_TIMING.gapMs[0]);
   assert.equal(ambientDelay(false, () => 0), AMBIENT_TIMING.gapMs[0]);
-  assert.ok(AMBIENT_TIMING.gapMs[0] > AMBIENT_TIMING.settleMs[1]);
+  assert.ok(AMBIENT_TIMING.settleChance <= 0.35);
+  assert.ok(AMBIENT_TIMING.gapMs[0] >= 4 * 60_000 && AMBIENT_TIMING.gapMs[0] > AMBIENT_TIMING.settleMs[1]);
+});
+
+test('moving around never makes her speak again within the cooldown', () => {
+  const { cooldownMs, settleMs } = AMBIENT_TIMING;
+  assert.ok(cooldownMs >= 5 * 60_000);
+  // She just spoke and settles somewhere new: the next line waits out the rest of the cooldown.
+  assert.equal(ambientDelay(true, () => 0, 10_000), cooldownMs - 10_000);
+  assert.equal(ambientDelay(false, () => 0, cooldownMs - 1_000), AMBIENT_TIMING.gapMs[0]);
+  // First line of a visit: no cooldown to wait out.
+  assert.equal(ambientDelay(true, () => 0), settleMs[0]);
 });

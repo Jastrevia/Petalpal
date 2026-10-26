@@ -350,6 +350,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [fairyBubble, setFairyBubble] = useState<{ key: number; text: string } | null>(null);
   const fairyBubblePoint = useSharedValue({ x: 0, y: 0 });
   const recentFairyLines = useRef<string[]>([]);
+  // When she last spoke, so moving between activities never shortens the quiet between lines.
+  const fairyLineAt = useRef(-Infinity);
   const fairyBubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (fairyBubbleTimer.current) clearTimeout(fairyBubbleTimer.current); }, []);
   const handledParamRef = useRef<string | null>(null);
@@ -611,6 +613,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     setFairyBubble(previous => ({ key: (previous?.key ?? 0) + 1, text: line.text }));
     if (fairyBubbleTimer.current) clearTimeout(fairyBubbleTimer.current);
     fairyBubbleTimer.current = setTimeout(() => setFairyBubble(null), AMBIENT_TIMING.showMs);
+    fairyLineAt.current = Date.now();
   }, [locale, fairyBubblePoint]);
   // A new activity clears the old line and restarts the wait; she is quiet while travelling,
   // hidden indoors, or while the Garden is in the background.
@@ -620,8 +623,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     let timer = setTimeout(function speak() {
       const at = fairyRef.current?.getPosition();
       if (at) sayFairyLine(fairyStateRef.current, at);
-      timer = setTimeout(speak, ambientDelay(false));
-    }, ambientDelay(true));
+      timer = setTimeout(speak, ambientDelay(false, Math.random, Date.now() - fairyLineAt.current));
+    }, ambientDelay(true, Math.random, Date.now() - fairyLineAt.current));
     return () => clearTimeout(timer);
   }, [enableFairyWalk, readOnly, worldActive, fairyState, sayFairyLine]);
   const focusCoords = useCallback((worldX: number, worldY: number, targetZoom = 1.8) => {
