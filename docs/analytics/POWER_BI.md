@@ -23,6 +23,8 @@ opens a `READ ONLY` transaction, runs `GROUP BY day` queries and writes four CSV
 | `ai_gateway_daily.csv` | date, action, provider, model, calls, inputTokens, outputTokens, estCostUsd |
 | `ai_calls_daily.csv` | date, task, provider, calls, failures, avgLatencyMs, inputTokens, outputTokens |
 | `ai_jobs_daily.csv` | date, jobType, status, jobs, avgAttempts |
+| `ai_reservations_daily.csv` | date, action, provider, calls, users — every AI call reserved by the cost gate (`AI_COST_RESERVED`), Workers AI included. Claude calls also appear in `ai_gateway_daily.csv` with tokens and cost; Workers AI has call counts only |
+| `ops_totals.csv` | metric, value — lifetime users, users with Events, Events, Flowers, and owners with an Event in the 7 / 30 days before the export ran |
 | `ai_job_failures_daily.csv` | date, jobType, code, jobs — FAILED jobs by the allowlisted code stored in `lastError`; jobs that failed before codes were stored read `UNRECORDED`. Load it directly in Power BI; the pandas step does not reshape it |
 
 `estCostUsd` = tokens × the reviewed rates in `lib/ai-gateway-config.js` (cache tokens counted as input).
@@ -76,3 +78,11 @@ Claude Cost by Model = SUM ( AiCostByModel[estCostUsd] )
    - Slicer: `Calendar[monthName]`.
 
 Refresh: rerun steps 1–2, then replace the CSVs (service) or Refresh (Desktop).
+
+## API latency
+
+In production the backend writes one line per API request:
+`{"msg":"http_request","method":"POST","route":"/events","status":201,"ms":84}`
+(route pattern only, no ids or URL; `REQUEST_TIMING_LOG=0` turns it off, `=1` turns it on elsewhere).
+Search the Render logs for `http_request`, save the results to a file, then run
+`node scripts/latency-summary.mjs < render-logs.txt` for count, p50 and p95 per route.

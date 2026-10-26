@@ -24,7 +24,11 @@ async function fixture(t) {
       ('r1:usage','2026-10-02 10:00','AI_GATEWAY_USAGE','alice','ANTHROPIC','claude-haiku-5-5','EVENT_EMOTION','1000:200:0'),
       ('r2:usage','2026-10-02 11:00','AI_GATEWAY_USAGE','bob','ANTHROPIC','claude-haiku-5-5','EVENT_EMOTION','500:100:0'),
       ('r3:usage','2026-10-03 09:00','AI_GATEWAY_USAGE','alice','ANTHROPIC','claude-sonnet-5-5','WEEKLY_REPORT','6000:900:0'),
-      ('r1:usd','2026-10-02 10:00','AI_GATEWAY_USD_RESERVED','alice','ANTHROPIC',NULL,'EVENT_EMOTION','999999');
+      ('r1:usd','2026-10-02 10:00','AI_GATEWAY_USD_RESERVED','alice','ANTHROPIC',NULL,'EVENT_EMOTION','999999'),
+      ('c1','2026-10-02 10:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c2','2026-10-02 11:00','AI_COST_RESERVED','bob','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c3','2026-10-02 12:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
+      ('c4','2026-10-03 09:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'WEEKLY_REPORT','2');
     INSERT INTO "AiInteractionMetadata" VALUES ('m1','alice','EMBEDDING','CLOUDFLARE',400,300,0,true,'2026-10-02 10:00'),
       ('m2','bob','EMBEDDING','CLOUDFLARE',600,200,0,false,'2026-10-02 12:00');
     INSERT INTO "AIJob" VALUES ('j1','alice','EMBEDDING_GENERATION','SUCCEEDED',1,'2026-10-02 10:00',NULL),
@@ -52,6 +56,11 @@ test("exports per-UTC-day aggregates for activity, Claude cost, other AI calls a
   assert.equal(files["ai_calls_daily.csv"].split("\n")[1], "2026-10-02,EMBEDDING,CLOUDFLARE,2,1,500,500,0");
   assert.deepEqual(files["ai_jobs_daily.csv"].trim().split("\n").slice(1),
     ["2026-10-02,EMBEDDING_GENERATION,FAILED,1,3", "2026-10-02,EMBEDDING_GENERATION,SUCCEEDED,2,1.5", "2026-10-03,WEEKLY_REPORT,FAILED,3,1"]);
+  assert.deepEqual(files["ai_reservations_daily.csv"].trim().split("\n"), ["date,action,provider,calls,users",
+    "2026-10-02,EVENT_EMOTION,CLOUDFLARE_WORKERS_AI,3,2", "2026-10-03,WEEKLY_REPORT,CLOUDFLARE_WORKERS_AI,2,1"]);
+  const totals = Object.fromEntries(files["ops_totals.csv"].trim().split("\n").slice(1).map(line => line.split(",")));
+  assert.deepEqual({ ...totals, activeUsers7d: undefined, activeUsers30d: undefined },
+    { users: "2", usersWithEvents: "2", events: "4", flowers: "2", activeUsers7d: undefined, activeUsers30d: undefined });
   // Stored codes are counted; legacy and free-text lastError values never leave the database.
   assert.deepEqual(files["ai_job_failures_daily.csv"].trim().split("\n"), ["date,jobType,code,jobs",
     "2026-10-02,EMBEDDING_GENERATION,UNRECORDED,1", "2026-10-03,WEEKLY_REPORT,REPORT_NARRATIVE_TIMEOUT,2", "2026-10-03,WEEKLY_REPORT,UNRECORDED,1"]);
