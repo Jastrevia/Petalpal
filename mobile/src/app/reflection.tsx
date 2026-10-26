@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWorldTime } from '../components/garden/world-time';
-import { createLastWeekReflection, lastClosedWeekKey, listReflections, readReflection, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport } from '../services/reflections';
+import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport } from '../services/reflections';
 import { ShortWeeklyReport } from '../components/features/ShortWeeklyReport';
 
 const title = (type: ReportType) => type === 'weekly' ? 'Weekly' : 'Monthly';
@@ -79,33 +79,37 @@ export default function Reflection() {
 
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
-  const [openPeriod, setOpenPeriod] = useState<string | null>(null);
+  const [creatingType, setCreatingType] = useState<ReportType | null>(null);
+  const [openPeriod, setOpenPeriod] = useState<{ type: ReportType; periodKey: string } | null>(null);
   const createAbort = useRef<AbortController | null>(null);
   useEffect(() => () => createAbort.current?.abort(), []);
-  async function createLastWeek() {
+  async function createLast(kind: ReportType) {
     if (creating) return;
     const controller = new AbortController(); createAbort.current = controller;
-    setCreating(true); setNotice('');
+    setCreating(true); setCreatingType(kind); setNotice('');
+    const create = kind === 'weekly' ? createLastWeekReflection : createLastMonthReflection;
+    const period = kind === 'weekly' ? 'week' : 'month';
     let outcome;
-    try { outcome = weeklyTriggerOutcome(await createLastWeekReflection(controller.signal)); }
-    catch (error) { outcome = weeklyTriggerOutcome(undefined, error); }
+    try { outcome = weeklyTriggerOutcome(await create(controller.signal), undefined, period); }
+    catch (error) { outcome = weeklyTriggerOutcome(undefined, error, period); }
     if (controller.signal.aborted) return;
     setCreating(false); setNotice(outcome.kind === 'ready' ? '' : outcome.message);
     if ((outcome.kind === 'ready' || outcome.kind === 'empty') && outcome.periodKey) {
-      setOpenPeriod(outcome.periodKey); await load();
+      setOpenPeriod({ type: kind, periodKey: outcome.periodKey }); await load();
     }
   }
-  // Opening the Weekly book writes last week's reflection once per visit when it is missing.
-  // The server still picks the period and keeps one job per week, so this never repeats a charge.
-  const autoCreated = useRef(false);
+  // Opening a book writes its last closed period's reflection once per visit when it is missing.
+  // The server still picks the period and keeps one job per period, so this never repeats a charge.
+  const autoCreated = useRef<Record<ReportType, boolean>>({ weekly: false, monthly: false });
   useEffect(() => {
-    if (type !== 'weekly' || loading || listError || autoCreated.current) return;
-    if (reports.some(report => report.type === 'weekly' && report.periodKey === lastClosedWeekKey())) return;
-    autoCreated.current = true; void createLastWeek();
-  }, [type, loading, listError, reports]);
+    if (loading || listError || creating || autoCreated.current[type]) return;
+    const lastKey = type === 'weekly' ? lastClosedWeekKey() : lastClosedMonthKey();
+    if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
+    autoCreated.current[type] = true; void createLast(type);
+  }, [type, loading, listError, reports, creating]);
   useEffect(() => {
-    const created = openPeriod ? reports.find(report => report.type === 'weekly' && report.periodKey === openPeriod) : undefined;
-    if (created) { setOpenPeriod(null); setType('weekly'); show(created); }
+    const created = openPeriod ? reports.find(report => report.type === openPeriod.type && report.periodKey === openPeriod.periodKey) : undefined;
+    if (created) { setOpenPeriod(null); setType(created.type); show(created); }
   }, [reports, openPeriod]);
 
   // Read the open page; quietly prefetch its neighbours so a turn can show both faces.
@@ -233,9 +237,9 @@ export default function Reflection() {
         ? <><Text style={s.eyebrow}>{weekLabel(report.periodKey).title.toUpperCase()}</Text>
           {!!weekLabel(report.periodKey).range && <Text style={s.range}>{weekLabel(report.periodKey).range}{report.status === 'PARTIAL' ? ' · In progress' : ''}</Text>}</>
         : <Text style={s.range}>{heading(report)}{report.status === 'PARTIAL' ? ' · In progress' : ''}</Text>)}
-      {interactive && type === 'weekly' && (creating || !!notice) && <View testID="reflection-create-status" accessibilityLiveRegion="polite" style={s.status}>
+      {interactive && creatingType === type && (creating || !!notice) && <View testID="reflection-create-status" accessibilityLiveRegion="polite" style={s.status}>
         {creating && <ActivityIndicator size="small" color="#8B6C44" accessible={false} />}
-        <Text style={s.statusText}>{creating ? 'Writing last week’s reflection…' : notice}</Text>
+        <Text style={s.statusText}>{creating ? `Writing last ${type === 'weekly' ? 'week' : 'month'}’s reflection…` : notice}</Text>
       </View>}
       <View accessible={false} style={s.ornament}><View style={s.goldLine} /><Text style={s.fleuron}>❦</Text><View style={s.goldLine} /></View>
       {compact && detail && <View style={s.textTabs}>{(['Summary', 'Topics', 'Patterns'] as const).map(item => <Pressable key={item} accessibilityRole="tab"

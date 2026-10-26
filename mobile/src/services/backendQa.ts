@@ -8,7 +8,7 @@ export const BACKEND_QA_FEATURES = [
   ['Friend Requests', 'PREVIEW'], ['Visit Friend Garden', 'PREVIEW'],
   ['Support / Flower interaction', 'REAL'], ['Realtime updates', 'PREVIEW'],
   ['Fairy / Memory', 'PREVIEW'], ['Weekly', 'PREVIEW'],
-  ['Monthly', 'MISSING BACKEND CONTRACT'],
+  ['Monthly', 'PREVIEW'],
 ] as const;
 
 export interface BackendQaSummary {
