@@ -109,9 +109,11 @@ export default function Reflection() {
     if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
     autoCreated.current[type] = true; void createLast(type);
   }, [type, loading, listError, reports, creating]);
+  // A finished reflection opens on its own book's page, but never switches books: the owner may
+  // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {
     const created = openPeriod ? reports.find(report => report.type === openPeriod.type && report.periodKey === openPeriod.periodKey) : undefined;
-    if (created) { setOpenPeriod(null); setType(created.type); show(created); }
+    if (created) { setOpenPeriod(null); show(created); }
   }, [reports, openPeriod]);
 
   // Read the open page; quietly prefetch its neighbours so a turn can show both faces.
