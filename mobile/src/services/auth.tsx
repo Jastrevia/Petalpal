@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification,
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail,
   signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { apiBaseUrl, apiRequest, configureApi } from './api';
 import { firebaseAuth } from './firebase';
 import { loadSessionExperience, type SessionExperience, type SessionUser } from './sessionExperience';
-import { authErrorMessage, profileError, registrationError, type ProfileInput } from './auth/registrationValidation';
+import { authErrorMessage, PASSWORD_RESET_SENT, profileError, registrationError, type ProfileInput } from './auth/registrationValidation';
 import { scopeFlowerPlacements, setNativeSecurityExpectedOwner } from '../components/garden/planting/plantingPersistence';
 import { recordNativeLogoutWitness } from './nativeSecurityLogoutWitness';
 import type { FlowerSession } from '../components/garden/planting/flowerDetailApi';
@@ -24,6 +24,8 @@ interface AuthState extends AuthSnapshot {
   needsProfile: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, confirmation: string) => Promise<void>;
+  /** Firebase emails a link to set a new password; the reply never says whether the email has an account. */
+  resetPassword: (email: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   checkVerification: () => Promise<void>;
   completeProfile: (profile: ProfileInput | string) => Promise<void>;
@@ -194,6 +196,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) { if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
   }
+  async function resetPassword(email: string) {
+    const address = email.trim();
+    if (!address) { setState((current) => ({ ...current, error: 'Enter your email address first.', message: '' })); return; }
+    setState((current) => ({ ...current, error: '', message: '' }));
+    try {
+      await sendPasswordResetEmail(firebaseAuth(), address);
+      setState((current) => ({ ...current, error: '', message: PASSWORD_RESET_SENT(address) }));
+    } catch (error) { setState((current) => ({ ...current, error: authErrorMessage(error), message: '' })); }
+  }
   async function verification(resend: boolean) {
     if (state.phase !== 'verificationPending') return;
     const user = firebaseAuth().currentUser;
@@ -218,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = { ...state,
     loading: state.phase === 'initializing' || state.phase === 'registering',
     needsProfile: state.phase === 'profileRequired',
-    login, register, resendVerification: () => verification(true), checkVerification: () => verification(false),
+    login, register, resetPassword, resendVerification: () => verification(true), checkVerification: () => verification(false),
     completeProfile: async (input) => {
       if (state.phase !== 'profileRequired' || state.identity?.uid !== firebaseAuth().currentUser?.uid) return;
       const profile = typeof input === 'string' ? { name: input } : input;

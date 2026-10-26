@@ -1,5 +1,25 @@
 # PetalPal Security
 
+## Sign-in recovery and readable auth errors, 2026-10-26
+
+Owner-reported: accounts from the earliest version could neither sign in (forgotten password) nor
+sign up again (Firebase `EMAIL_EXISTS` shown as the generic "We couldn't connect" message), and the
+live sign-in page had no working password reset (the link was a preview placeholder).
+
+- **Password reset (new, client only):** "Forgot password?" on the live sign-in page calls Firebase
+  `sendPasswordResetEmail`. The reply is identical for every address ("If … has a PetalPal account,
+  a link … is on its way"), so the app adds no enumeration signal; with production Email Enumeration
+  Protection enabled (user-observed 2026-10-08) Firebase's reset response is also non-disclosing.
+- **Sign-up `auth/email-already-in-use` now says the email has an account** (owner decision). This
+  does not widen exposure: as recorded under *P1 Account Enumeration — signup follow-up* below,
+  Firebase already returns `EMAIL_EXISTS` to any direct sign-up call, so the masked UI message hid
+  nothing from an attacker while locking out returning users. Login failures keep one shared message.
+- **Backend 4xx reasons are shown** (e.g. verify email, deletion pending, rate limited); 5xx and
+  gateway failures keep the general message. Provider diagnostics are still never shown.
+- Account Enumeration stays **PARTIAL**; canonical counts unchanged. No backend, provider setting or
+  deployment change. Evidence: `mobile/test/authSession.test.mjs` 36/36 PASS, mobile typecheck PASS,
+  synthetic Expo web check (reset request sent; duplicate sign-up message shown).
+
 ## Fairy Moments captions — default OFF, 2026-10-20
 
 New gateway action `FAIRY_MOMENT` (Haiku 5.5, [lib/haiku-fairy-moment.js](lib/haiku-fairy-moment.js)) writes the

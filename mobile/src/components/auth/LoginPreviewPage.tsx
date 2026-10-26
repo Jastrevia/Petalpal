@@ -209,6 +209,8 @@ export interface LoginPreviewPageProps {
   /** Real email/password sign-in from AuthGate. Without it the page stays the DEV-only simulation. */
   onSignIn?: (email: string, password: string) => Promise<void>;
   onCreateAccount?: () => void;
+  /** Real Firebase password-reset email for the address in the field. */
+  onForgotPassword?: (email: string) => Promise<void>;
   authError?: string;
   authMessage?: string;
   /** Shown at the end of the invitation card (Terms, Privacy and support links). */
@@ -223,6 +225,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   onEntranceReset,
   onSignIn,
   onCreateAccount,
+  onForgotPassword,
   authError,
   authMessage,
   footer,
@@ -385,15 +388,23 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
     setBannerNotice({type:'info',title:'Preview only',message:'Authentication is not connected. No credentials were sent. Use the explicitly labeled DEV control to preview the entrance.'});
   }, [validateForm, onSignIn, signingIn, email, password]);
 
-  // Forgot password handler
-  const handleForgotPassword = useCallback(() => {
+  // Forgot password: a real reset email when AuthGate provides it, otherwise the preview notice.
+  const [sendingReset, setSendingReset] = useState(false);
+  const handleForgotPassword = useCallback(async () => {
+    if (onForgotPassword) {
+      if (sendingReset) return;
+      if (!email.trim()) { setEmailError('Enter your email above, then tap Forgot password'); return; }
+      setEmailError(null); setBannerNotice(null); setDismissedAuth(null); setSendingReset(true);
+      try { await onForgotPassword(email.trim()); } finally { setSendingReset(false); }
+      return;
+    }
     setBannerNotice({
       type: 'info',
       title: 'Password Whispers',
       message:
         'Password recovery instructions will be softly delivered to your garden email once connected to the mail service.',
     });
-  }, []);
+  }, [onForgotPassword, sendingReset, email]);
 
   // Social login handlers
   const handleAppleSignIn = useCallback(() => {
@@ -757,11 +768,11 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
 
                 {/* Secondary Action: Create Account Footer */}
                 <View style={styles.footerRow}>
-                  {!live && <Pressable
+                  {(!live || onForgotPassword) && <Pressable
                     hitSlop={8}
                     accessibilityRole="button"
-                    disabled={isSubmitting}
-                    onPress={handleForgotPassword}
+                    disabled={isSubmitting || sendingReset}
+                    onPress={() => void handleForgotPassword()}
                     style={({ pressed }) => [
                       styles.linkPressable,
                       pressed && styles.linkPressed,
