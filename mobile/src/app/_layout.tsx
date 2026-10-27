@@ -53,7 +53,7 @@ function TabLayout() {
           <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="mailbox" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="journal" options={{ title: 'Events / Flowers' }} />
-          <Stack.Screen name="garden-history" options={{ title: 'Garden history' }} />
+          <Stack.Screen name="garden-history" options={{ title: 'Garden history', headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="feature/[feature]" options={{ title: 'PetalPal' }} />
           <Stack.Screen name="visit/[ownerId]" options={{ title: 'Friend Garden', headerShown: false }} />
           <Stack.Screen name="garden-test" options={{ title: 'Garden preview' }} />
