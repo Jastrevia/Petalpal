@@ -28,11 +28,11 @@ const COPY = {
     skipped: 'AI analysis is off, so only your chosen mood is used. You can turn AI on in Me.', noEmotions: 'No other feelings stood out.',
     show: 'Show this Event to friends', showHint: 'Friends who visit your Garden can read what you wrote on this flower.', hiddenHint: 'Only you can read what you wrote. Friends see just the flower.',
     satisfied: 'Happy with it? Plant your flower in the Garden.',
-    plant: 'Plant', plantWithout: 'Plant without analysis',
+    plant: 'Plant', plantWithout: 'Plant without analysis', plantNote: 'with the AI analysis', withoutNote: 'keeps only your mood',
     plantHelp: 'Plants this flower with its AI emotion analysis. When you tap the flower later, you can read the feelings AI found.',
     withoutHelp: 'Plants the same flower but leaves the AI analysis out, if it did not feel right. The flower keeps only the mood you chose.',
     voice: 'Voice input', voiceHint: 'Record up to three minutes, then review the transcript before saving', recording: (t: string) => `Recording ${t} / 3:00`,
-    transcribing: 'Transcribing…', preparing: 'Preparing microphone…', done: 'Done', cancel: 'Cancel', help: 'What does this mean?',
+    transcribing: 'Transcribing…', preparing: 'Preparing microphone…', done: 'Done', cancel: 'Cancel', help: "What's the difference?",
   },
   'zh-Hans': {
     intro: '什么是事件？', introText: '写下今天的一件小事，选一个它带给你的心情。PetalPal 会保存它，AI 会读一读里面的情绪，然后为你的花园长出一朵花。',
@@ -45,24 +45,23 @@ const COPY = {
     skipped: 'AI 分析已关闭，所以只用你选的心情。可以在「我」里打开 AI。', noEmotions: '没有发现其他明显的情绪。',
     show: '把这件事展示给朋友', showHint: '来逛花园的朋友能在这朵花上读到你写的内容。', hiddenHint: '只有你能读到写的内容，朋友只能看到花。',
     satisfied: '满意的话，就把花种进花园吧。',
-    plant: '种下', plantWithout: '不带分析种下',
+    plant: '种下', plantWithout: '不带分析种下', plantNote: '保留 AI 分析', withoutNote: '只保留你选的心情',
     plantHelp: '连同 AI 情绪分析一起种下这朵花。以后点这朵花，可以看到 AI 读到的情绪。',
     withoutHelp: '种下同一朵花，但不保留 AI 分析（比如你觉得分析不准）。这朵花只保留你自己选的心情。',
     voice: '语音输入', voiceHint: '最多录三分钟，保存前可以先看一遍转出来的文字', recording: (t: string) => `正在录音 ${t} / 3:00`,
-    transcribing: '正在转文字…', preparing: '正在准备麦克风…', done: '完成', cancel: '取消', help: '这是什么意思？',
+    transcribing: '正在转文字…', preparing: '正在准备麦克风…', done: '完成', cancel: '取消', help: '两种有什么区别？',
   },
 };
 
-export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void; onGardenChanged?: () => void }) {
+export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { onClose: () => void; onGardenChanged?: () => void; introOpen?: boolean }) {
   const { theme } = usePanelTheme();
   const styles = createStyles(theme);
   const locale = useAppLocale(), copy = COPY[locale];
   const moodLabel = (mood: PrimaryMood) => locale === 'zh-Hans' ? MOODS_ZH[mood] : mood.replace('_BLOOM', '').toLowerCase();
   const journal = useEventJournal(onGardenChanged);
   const voice = useEventVoiceInput(journal.content, journal.setContent, journal.busy);
-  const [introOpen, setIntroOpen] = useState(false);
   const [showToFriends, setShowToFriends] = useState(false);
-  const [help, setHelp] = useState<'plant' | 'without' | null>(null);
+  const [help, setHelp] = useState(false);
   const saved = journal.result;
   const flower = saved ? journal.flowers[0] : undefined;
   const status = saved?.event.emotionStatus;
@@ -75,10 +74,10 @@ export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void;
     onClose(); journal.placeFlower(flower);
   }
   return <View style={styles.body}>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: introOpen }} onPress={() => setIntroOpen(!introOpen)} style={styles.intro}>
-      <Text style={styles.introTitle}>ⓘ {copy.intro}</Text>
-      {introOpen ? <Text style={styles.text}>{copy.introText}</Text> : null}
-    </Pressable>
+    {introOpen ? <View accessibilityLiveRegion="polite" style={styles.intro}>
+      <Text style={styles.introTitle}>{copy.intro}</Text>
+      <Text style={styles.text}>{copy.introText}</Text>
+    </View> : null}
     <EmotionalSafetyNote text={journal.content} />
 
     <Text style={styles.sectionTitle}>{copy.what} <Text accessibilityLabel={copy.required} style={styles.required}>*</Text></Text>
@@ -160,44 +159,43 @@ export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void;
             trackColor={{ false: '#B9B39C', true: '#5AA4AB' }} />
         </View>
         <Text style={styles.satisfied}>{copy.satisfied}</Text>
+        {/* Two equal choices side by side; one ? under both explains the difference. */}
         <View style={styles.plantRow}>
-          <View style={{ flex: 1 }}>
-            <EventAction title={copy.plant} onPress={() => void plant(false)} />
-            <HelpDot label={copy.help} active={help === 'plant'} onPress={() => setHelp(help === 'plant' ? null : 'plant')} styles={styles} corner />
-          </View>
-          <View style={styles.withoutWrap}>
-            <Pressable accessibilityRole="button" accessibilityLabel={copy.plantWithout} onPress={() => void plant(true)}
-              style={({ pressed }) => [styles.without, pressed && ui.pressed]}>
-              <Text style={styles.withoutText}>{copy.plantWithout}</Text>
-            </Pressable>
-            <HelpDot label={copy.help} active={help === 'without'} onPress={() => setHelp(help === 'without' ? null : 'without')} styles={styles} />
-          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.plant} onPress={() => void plant(false)}
+            style={({ pressed }) => [styles.choice, styles.choicePrimary, pressed && ui.pressed]}>
+            <Text style={styles.choiceTitle}>🌱 {copy.plant}</Text>
+            <Text style={styles.choiceNote}>{copy.plantNote}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.plantWithout} onPress={() => void plant(true)}
+            style={({ pressed }) => [styles.choice, styles.choiceSecondary, pressed && ui.pressed]}>
+            <Text style={[styles.choiceTitle, { color: '#2F5D52' }]}>{copy.plantWithout}</Text>
+            <Text style={[styles.choiceNote, { color: '#5E7A6E' }]}>{copy.withoutNote}</Text>
+          </Pressable>
         </View>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: help }} hitSlop={8} onPress={() => setHelp(!help)} style={styles.helpLink}>
+          <View style={[styles.helpDot, help && styles.helpDotActive]}><Text style={[styles.helpDotText, help && { color: '#FFF9E9' }]}>?</Text></View>
+          <Text style={styles.helpLinkText}>{copy.help}</Text>
+        </Pressable>
         {help ? <View accessibilityLiveRegion="polite" style={styles.helpBubble}>
-          <Text style={styles.helpTitle}>{help === 'plant' ? copy.plant : copy.plantWithout}</Text>
-          <Text style={styles.helpText}>{help === 'plant' ? copy.plantHelp : copy.withoutHelp}</Text>
+          <Text style={styles.helpTitle}>🌱 {copy.plant}</Text>
+          <Text style={styles.helpText}>{copy.plantHelp}</Text>
+          <Text style={[styles.helpTitle, { marginTop: 6 }]}>{copy.plantWithout}</Text>
+          <Text style={styles.helpText}>{copy.withoutHelp}</Text>
         </View> : null}
       </> : null}
-      <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(null); }} />
+      <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} />
     </> : null}
   </View>;
 }
 
-// A small drawn eye: open when friends can read the Event, closed (lid line) when they cannot.
+// A small drawn eye: open when friends can read the Event, crossed out when they cannot.
 function Eye({ open, color }: { open: boolean; color: string }) {
-  return <View accessible={false} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-    {open ? <View style={{ width: 24, height: 14, borderRadius: 12, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
+  return <View accessible={false} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', opacity: open ? 1 : .7 }}>
+    <View style={{ width: 24, height: 14, borderRadius: 12, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
-    </View> : <View style={{ width: 24, height: 12, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, borderBottomWidth: 2, borderLeftWidth: 2, borderRightWidth: 2, borderTopWidth: 0, borderColor: color, marginTop: -6 }} />}
+    </View>
+    {!open ? <View style={{ position: 'absolute', width: 28, height: 2, borderRadius: 1, backgroundColor: color, transform: [{ rotate: '-35deg' }] }} /> : null}
   </View>;
-}
-function HelpDot({ label, active, onPress, styles, corner = false }: {
-  label: string; active: boolean; onPress: () => void; styles: ReturnType<typeof createStyles>; corner?: boolean;
-}) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ expanded: active }} hitSlop={8} onPress={onPress}
-    style={[styles.helpDot, corner && styles.helpDotCorner, active && styles.helpDotActive]}>
-    <Text style={[styles.helpDotText, active && { color: '#FFF9E9' }]}>?</Text>
-  </Pressable>;
 }
 function EventAction({ title, onPress, disabled = false, secondary = false }: {
   title: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
@@ -220,7 +218,7 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   sectionTitle: { fontFamily: 'serif', fontWeight: '600', fontSize: 19, color: theme.text },
   required: { color: '#C0634F', fontSize: 18 },
   intro: { gap: 8, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
-  introTitle: { fontFamily: 'serif', fontSize: 15, color: theme.text },
+  introTitle: { fontFamily: 'serif', fontWeight: '700', fontSize: 15, color: theme.text },
   notice: { padding: 14, gap: 8, borderRadius: 16, backgroundColor: theme.surface },
   card: { borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: theme.gold, backgroundColor: theme.surface,
     boxShadow: `inset 0 0 0 2px ${theme.inset}, 0 2px 4px #69552318` },
@@ -247,14 +245,16 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   selectedText: { fontWeight: '700' },
   shareRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   satisfied: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 14, color: theme.muted },
-  plantRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  withoutWrap: { width: 92, height: 92 },
-  without: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center', padding: 8,
-    borderWidth: 2, borderColor: '#C4A868', backgroundColor: '#ECF0E3' },
-  withoutText: { fontFamily: 'serif', fontSize: 13, lineHeight: 16, textAlign: 'center', color: '#385F52' },
-  helpDot: { position: 'absolute', right: -4, top: -4, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  plantRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
+  choice: { flex: 1, minHeight: 72, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 10 },
+  choicePrimary: { backgroundColor: '#246E70', borderColor: '#C4A868', boxShadow: 'inset 0 0 0 2px #99BBA3, 0 2px 5px #4E472626' },
+  choiceSecondary: { backgroundColor: '#ECF0E3', borderColor: '#C4A868', boxShadow: 'inset 0 0 0 2px #FFFDF0, 0 2px 5px #4E472618' },
+  choiceTitle: { fontFamily: 'serif', fontSize: 18, lineHeight: 22, color: '#FFF9E9', textAlign: 'center' },
+  choiceNote: { fontSize: 12, lineHeight: 16, color: '#D7E8DC', textAlign: 'center' },
+  helpLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'center', paddingVertical: 2 },
+  helpLinkText: { fontFamily: 'serif', fontSize: 14, color: theme.muted, textDecorationLine: 'underline' },
+  helpDot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#C4A868', backgroundColor: '#FFF9E9' },
-  helpDotCorner: { right: 6, top: -8 },
   helpDotActive: { backgroundColor: '#246E70' },
   helpDotText: { fontSize: 13, fontWeight: '700', color: '#246E70' },
   helpBubble: { gap: 4, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#C4A868', backgroundColor: '#FFF9E9' },

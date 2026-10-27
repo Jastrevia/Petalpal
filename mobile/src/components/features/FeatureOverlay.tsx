@@ -31,10 +31,10 @@ export const FEATURE_LABELS: Record<AppLocale, Record<string, string>> = {
 const OVERLAY_COPY = {
   en: { close: 'Close', account: 'Your account', accountText: 'Your Events and flowers are saved to your account.', accountNote: 'Signing out keeps your saved Garden safe.',
     ai: 'AI & privacy', language: 'Language', background: 'Background', light: 'Light background', signOut: 'Sign out', signingOut: 'Signing out…',
-    signOutFailed: 'Unable to sign out. Please try again.', none: 'No actions are available here yet.', account404: 'PetalPal account' },
+    signOutFailed: 'Unable to sign out. Please try again.', eventsIntro: 'What is an Event?', none: 'No actions are available here yet.', account404: 'PetalPal account' },
   'zh-Hans': { close: '关闭', account: '你的账号', accountText: '你的事件和花都保存在账号里。', accountNote: '退出登录后，你的花园会安全保存。',
     ai: 'AI 与隐私', language: '语言', background: '背景', light: '浅色背景', signOut: '退出登录', signingOut: '正在退出…',
-    signOutFailed: '退出失败，请再试一次。', none: '这里暂时还没有可以操作的内容。', account404: 'PetalPal 账号' },
+    signOutFailed: '退出失败，请再试一次。', eventsIntro: '什么是事件？', none: '这里暂时还没有可以操作的内容。', account404: 'PetalPal 账号' },
 };
 const messagesZh: Record<string, [string, string]> = {
   daily: ['每天开一朵花', '每日签到正在接入中。你已经种下的花会一直留在花园里。'],
@@ -60,9 +60,11 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [addingFriend, setAddingFriend] = useState(false);
+  // The ⓘ beside the Events title unfolds what an Event is.
+  const [eventsIntro, setEventsIntro] = useState(false);
   const locale = useAppLocale();
   const closeLabel = OVERLAY_COPY[locale].close;
-  useEffect(() => { setAddingFriend(false); }, [feature?.id]);
+  useEffect(() => { setAddingFriend(false); setEventsIntro(false); }, [feature?.id]);
   if (!feature) return null;
   const title = FEATURE_LABELS[locale][feature.id] ?? feature.label;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -75,7 +77,14 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
         <View style={[styles.header, feature.id === 'events' && styles.eventsHeader]}>
           {feature.id === 'events' ? <EventIllustration index={0} size={width > 600 ? 82 : 52} /> : <View style={styles.icon}><SymbolView name={feature.icon} size={25} tintColor={colors.ink} /></View>}
           <View style={styles.heading}>
-            <Text accessibilityRole="header" style={[ui.title, { color: theme.text }, feature.id === 'events' && styles.eventsTitle]}>{title}</Text>
+            <View style={styles.titleRow}>
+              <Text accessibilityRole="header" style={[ui.title, { color: theme.text }, feature.id === 'events' && styles.eventsTitle]}>{title}</Text>
+              {feature.id === 'events' ? <Pressable accessibilityRole="button" accessibilityLabel={OVERLAY_COPY[locale].eventsIntro}
+                accessibilityState={{ expanded: eventsIntro }} hitSlop={10} onPress={() => setEventsIntro(open => !open)}
+                style={({ pressed }) => [styles.info, eventsIntro && styles.infoOpen, pressed && ui.pressed]}>
+                <Text style={[styles.infoText, eventsIntro && { color: '#1E4F4C' }]}>i</Text>
+              </Pressable> : null}
+            </View>
             {feature.id === 'events' || feature.id === 'profile' || feature.id === 'settings' ? null : <StatusChip status={feature.status} />}
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
@@ -85,7 +94,7 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
         </View>
         </> : null}
         <ScrollView style={[styles.scroll, feature.id === 'events' && styles.eventsScroll]} contentContainerStyle={[styles.content, feature.id === 'events' && styles.eventsContent]} keyboardShouldPersistTaps="handled">
-          <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings}
+          <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings} eventsIntro={eventsIntro}
             addingFriend={addingFriend} onAddFriend={() => setAddingFriend(true)} onCloseAddFriend={() => setAddingFriend(false)} />
         </ScrollView>
         {feature.id === 'friends' ? <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
@@ -97,8 +106,8 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   </Modal>;
 }
 
-function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, addingFriend, onAddFriend, onCloseAddFriend }: {
-  feature: Feature; onClose: () => void; onGardenChanged?: () => void; onOpenSettings?: () => void;
+function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eventsIntro = false, addingFriend, onAddFriend, onCloseAddFriend }: {
+  feature: Feature; onClose: () => void; onGardenChanged?: () => void; onOpenSettings?: () => void; eventsIntro?: boolean;
   addingFriend?: boolean; onAddFriend?: () => void; onCloseAddFriend?: () => void;
 }) {
   const { theme, light, loading, error: themeError, setLight } = usePanelTheme();
@@ -108,7 +117,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, add
   const [error, setError] = useState('');
   const locale = useAppLocale();
   const copy = OVERLAY_COPY[locale];
-  if (feature.id === 'events') return <EventsPanel onClose={onClose} onGardenChanged={onGardenChanged} />;
+  if (feature.id === 'events') return <EventsPanel onClose={onClose} onGardenChanged={onGardenChanged} introOpen={eventsIntro} />;
   if (feature.id === 'friends') return <FriendsPanel key={session?.user.id} addingFriend={addingFriend}
     onAddFriend={onAddFriend} onCloseAddFriend={onCloseAddFriend} onClose={onClose} />;
   // Me: the profile and every setting on one page (no separate Settings step).
@@ -222,6 +231,10 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderBottomWidth: 1, borderColor: colors.line },
   icon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealWash },
   heading: { flex: 1, gap: 8 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  info: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D9C48F', marginTop: 2 },
+  infoOpen: { backgroundColor: '#E8D7A8' },
+  infoText: { fontFamily: 'Georgia', fontStyle: 'italic', fontWeight: '700', fontSize: 11, lineHeight: 13, color: '#F2E3B8' },
   close: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purpleWash },
   closeText: { fontSize: 28, lineHeight: 32, color: theme.text },
   scroll: { flexShrink: 1 }, content: { padding: 20 },
