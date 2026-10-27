@@ -90,7 +90,8 @@ test('integrated scene retains one cached Canvas, current app contracts and came
   assert.ok(source.includes("import Canvas from './GardenCanvas'"));
   assert.equal(source.includes('GardenCanvasPlane'),false);
   assert.ok(source.includes('session={props.session} backendMode={props.backendMode}'));
-  assert.ok(source.includes('if (readOnly || fit <= 0) return;'));
+  // A friend's Garden (readOnly) opens flowers only; nothing else follows a read-only tap.
+  assert.ok(source.includes('if (fit <= 0) return;') && source.includes('if (readOnly) return;'));
   assert.ok(source.includes('showCalendar && !readOnly'));
   assert.ok(source.includes('(screenX - baseX - currentCamX) / (fit * currentZoom)'));
   assert.ok(source.indexOf('hitsMailbox({x:worldX,y:worldY}')<source.indexOf('hitsTreehouse({x:worldX,y:worldY}'));
