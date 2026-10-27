@@ -97,6 +97,8 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
+import MailboxGlow from './MailboxGlow';
+import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
 import GardenLand09InterfaceLayer from './GardenLand09InterfaceLayer';
 import GardenInfrastructureLayer from './GardenInfrastructureLayer';
@@ -498,6 +500,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [topWaterAssemblyEnabled, setTopWaterAssemblyEnabled] = useState(true);
   const [topWaterMotionMode, setTopWaterMotionMode] = useState<TopWaterMotionMode>('animate');
 
+  const unreadMail = useUnreadMail();
   const surfaceFlow = useWaterTopFlow(worldActive && perf.Water && perf.WaterAnimation, waterRipplesVisible && perf.WaterAnimation);
 
   // This scene's own load progress; a friend's Garden keeps a separate one.
@@ -1500,6 +1503,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
             {/* Ground and entrance slabs belong below the walking fairy. */}
             {infrastructureEnabled && showLandmarks && <GardenRoadApproachLayer />}
+            {enableFairyWalk && !readOnly && showLandmarks && <MailboxGlow placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
             <GardenFairy motionClock={fairySeconds} onMailboxOpened={() => {

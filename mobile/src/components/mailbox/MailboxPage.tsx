@@ -14,17 +14,10 @@ import { FloatingLetterStack } from './FloatingLetterStack';
 import { FloatingPetalsOverlay } from './FloatingPetalsOverlay';
 import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 import { MagicLevitationAura } from './MagicLevitationAura';
-import { MOCK_LETTERS, RELEASE_LETTERS } from './mockLetters';
+import { isLetterRead, MAILBOX_LETTERS as LETTERS, markLetterRead } from './mailboxReadState';
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
 
 const BACKGROUND_IMAGE = require('../../../assets/mailbox/mailbox_bg_clean.jpg');
-const LETTERS = __DEV__ ? MOCK_LETTERS : RELEASE_LETTERS;
-
-// Module-level mock session persistence for read letters during navigation and remounts.
-// (Persists read state across component unmounts/remounts until full backend integration)
-const sessionReadLetterIds = new Set<string>(
-  LETTERS.filter((l) => l.read).map((l) => l.id)
-);
 
 export const MailboxPage = memo(function MailboxPage() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -37,7 +30,7 @@ export const MailboxPage = memo(function MailboxPage() {
   const [letters, setLetters] = useState<Letter[]>(() =>
     LETTERS.map((letter) => ({
       ...letter,
-      read: sessionReadLetterIds.has(letter.id),
+      read: isLetterRead(letter.id),
     }))
   );
   const [selectedLetterId, setSelectedLetterId] = useState<string>(LETTERS[Math.min(1, LETTERS.length - 1)].id);
@@ -56,7 +49,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   // Mark letter as read deterministically upon successful physical opening
   const markLetterAsRead = useCallback((id: string) => {
-    sessionReadLetterIds.add(id);
+    markLetterRead(id);
     setLetters((prev) =>
       prev.map((letter) => (letter.id === id ? { ...letter, read: true } : letter))
     );
