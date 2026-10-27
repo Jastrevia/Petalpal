@@ -25,6 +25,20 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Local preview with a fake sign-in (PetalPal)
+
+See the real app in your browser without a production account, keys or a backend:
+
+```bash
+npm install
+npm run web:local
+```
+
+Open http://localhost:8081 and sign in with `preview@example.invalid` / `preview-only`. Everything you
+see is fake data from `scripts/web-local/fixtures.js`; nothing is sent to Firebase, the PetalPal servers
+or real people, and AI features, writes and reflections are not available. Edits to the app reload
+live. The first load takes about a minute. Stop with Ctrl+C.
+
 ## Get a fresh project
 
 When you're ready, run:
