@@ -90,8 +90,8 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
           // Her runtime is fetched as the Garden opens; if that failed (the API still waking),
           // ask again so Fairy Moments joins the card when the answer arrives.
           if (!runtime) void refreshFairyRuntime();
-          if (moments.enabled || closeness.on) { setEntryOpen(true); setEntryOpens(count => count + 1); }
-          else onFocusFairy?.();
+          // Fairy Moments always has a tile (locked until available), so the card always opens.
+          setEntryOpen(true); setEntryOpens(count => count + 1);
         } else setOpenFeature(feature.id === 'garden' ? undefined : feature.id);
       }}
       style={({ pressed }) => [styles.bottomItem,

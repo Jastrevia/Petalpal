@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import type { ClosenessSummary } from '../../services/fairyCloseness';
+import { fairyRuntimeBlock, refreshFairyRuntime } from '../../services/fairyRuntime';
 
 const HEART = require('@/assets/fairy-entry/bond-heart.webp');
 const BOOK = require('@/assets/fairy-entry/moments-book.webp');
@@ -8,10 +9,20 @@ const BOOK = require('@/assets/fairy-entry/moments-book.webp');
 const COPY = {
   en: { heading: 'A little world, just for the two of you.', close: 'Close', bond: 'Our Bond', checkIn: ', check in today',
     moments: 'Fairy Moments', newMoments: ', new posts',
-    bondSoon: (s: ClosenessSummary | null) => s ? `Lv ${s.level} · ${s.title}. The full Our Bond page is coming soon.` : 'Our Bond is coming soon.' },
+    bondSoon: (s: ClosenessSummary | null) => s ? `Lv ${s.level} · ${s.title}. The full Our Bond page is coming soon.` : 'Our Bond is coming soon.',
+    locked: 'Fairy Moments are still locked',
+    onboarding: 'PPL starts sharing her little moments once she settles into your Garden. Plant your first flower to unlock them.',
+    unavailable: 'Her Moments couldn’t open just now. Please try again in a moment.',
+    bondLine: (s: ClosenessSummary) => `Our Bond Lv ${s.level} · ${s.title}${s.level < 3 ? '. At Lv 3 she’ll also write posts just for you (coming soon).' : '.'}`,
+    retry: 'Try again', back: 'Back' },
   'zh-Hans': { heading: '这里，有属于我们的一片小小的世界。', close: '关闭', bond: '亲密度', checkIn: '，今天还没签到',
     moments: '朋友圈', newMoments: '，有新动态',
-    bondSoon: (s: ClosenessSummary | null) => s ? `Lv ${s.level} · ${s.title}。完整的亲密度页面马上就来。` : '亲密度页面马上就来。' },
+    bondSoon: (s: ClosenessSummary | null) => s ? `Lv ${s.level} · ${s.title}。完整的亲密度页面马上就来。` : '亲密度页面马上就来。',
+    locked: '朋友圈还未解锁',
+    onboarding: '小花仙在你的花园安顿下来后，才会开始分享她的日常。种下第一朵花，就能解锁朋友圈。',
+    unavailable: '朋友圈暂时打不开，请稍后再试。',
+    bondLine: (s: ClosenessSummary) => `亲密度 Lv ${s.level} · ${s.title}${s.level < 3 ? '。达到 Lv 3 后，她还会写只给你的动态（即将开放）。' : '。'}`,
+    retry: '再试一次', back: '返回' },
 };
 
 // What the Fairy icon opens: her two rooms, closeness (Our Bond · 亲密度) and her Moments
@@ -24,21 +35,45 @@ export function FairyEntryCard({ visible, locale, closeness, closenessOn, moment
 }) {
   const copy = COPY[locale];
   const [note, setNote] = useState('');
+  // Fairy Moments always has a tile. Until the server serves them (no first flower yet, or the
+  // request failed) the tile opens this locked view instead of her feed.
+  const [locked, setLocked] = useState(false), [retrying, setRetrying] = useState(false);
   const bondDot = Boolean(closeness && !closeness.checkIn.checkedInToday);
-  const close = () => { setNote(''); onClose(); };
+  const close = () => { setNote(''); setLocked(false); onClose(); };
+  async function retry() {
+    setRetrying(true);
+    const runtime = await refreshFairyRuntime();
+    setRetrying(false);
+    if (runtime?.moments) { setLocked(false); onOpenMoments(); }
+  }
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={close} statusBarTranslucent>
     <Pressable accessibilityLabel={copy.close} onPress={close} style={styles.backdrop}>
       <Pressable accessibilityViewIsModal onPress={() => undefined} style={styles.frame}>
         {/* English leads; Chinese is the quieter second line, only for zh-Hans owners. */}
         <Text style={styles.heading}>{COPY.en.heading}</Text>
         {locale === 'zh-Hans' ? <Text style={styles.subheading}>{COPY['zh-Hans'].heading}</Text> : null}
-        <View style={styles.row}>
+        {locked ? <View style={styles.locked}>
+          <View style={styles.lockedArt}>
+            <Image source={BOOK} style={[styles.art, styles.dim]} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text style={styles.lock}>🔒</Text>
+          </View>
+          <Text accessibilityRole="header" style={styles.lockedTitle}>{copy.locked}</Text>
+          <Text accessibilityLiveRegion="polite" style={styles.note}>{fairyRuntimeBlock() === 'onboarding' ? copy.onboarding : copy.unavailable}</Text>
+          {closeness ? <Text style={styles.bondLine}>{copy.bondLine(closeness)}</Text> : null}
+          <View style={styles.lockedActions}>
+            {fairyRuntimeBlock() === 'onboarding' ? null : <Pressable accessibilityRole="button" disabled={retrying} onPress={() => void retry()}
+              style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{retrying ? '…' : copy.retry}</Text></Pressable>}
+            <Pressable accessibilityRole="button" onPress={() => setLocked(false)}
+              style={({ pressed }) => [styles.button, styles.quiet, pressed && styles.pressed]}><Text style={styles.quietText}>{copy.back}</Text></Pressable>
+          </View>
+        </View> : <View style={styles.row}>
           {closenessOn ? <Tile image={HEART} en="Our Bond" zh={locale === 'zh-Hans' ? '亲密度' : undefined} dot={bondDot}
             label={copy.bond + (bondDot ? copy.checkIn : '')}
             onPress={() => { if (onOpenBond) onOpenBond(); else setNote(copy.bondSoon(closeness)); }} /> : null}
-          {momentsOn ? <Tile image={BOOK} en="Fairy Moments" zh={locale === 'zh-Hans' ? '朋友圈' : undefined} dot={momentsUnread}
-            label={copy.moments + (momentsUnread ? copy.newMoments : '')} onPress={() => { setNote(''); onOpenMoments(); }} /> : null}
-        </View>
+          <Tile image={BOOK} en="Fairy Moments" zh={locale === 'zh-Hans' ? '朋友圈' : undefined} dot={momentsOn && momentsUnread}
+            label={copy.moments + (momentsOn && momentsUnread ? copy.newMoments : '')}
+            onPress={() => { setNote(''); if (momentsOn) onOpenMoments(); else { setLocked(true); if (fairyRuntimeBlock() !== 'onboarding') void retry(); } }} />
+        </View>}
         {note ? <Text accessibilityLiveRegion="polite" style={styles.note}>{note}</Text> : null}
       </Pressable>
     </Pressable>
@@ -77,4 +112,16 @@ const styles = StyleSheet.create({
   zh: { fontFamily: 'serif', fontSize: 13, color: INK },
   dot: { position: 'absolute', top: 8, right: 8, width: 14, height: 14, borderRadius: 7, backgroundColor: '#E2554B', borderWidth: 2, borderColor: '#FBE3D6' },
   note: { fontFamily: 'serif', fontSize: 13, lineHeight: 19, color: '#F3EBD3', textAlign: 'center' },
+  locked: { alignItems: 'center', gap: 10, paddingHorizontal: 6 },
+  lockedArt: { width: 132, height: 120, borderRadius: 18, padding: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F7F0E3', borderWidth: 2, borderColor: '#D8C38A' },
+  dim: { opacity: 0.45 },
+  lock: { position: 'absolute', fontSize: 30 },
+  lockedTitle: { fontFamily: 'serif', fontSize: 18, color: '#F3EBD3', textAlign: 'center' },
+  bondLine: { fontFamily: 'serif', fontSize: 12, lineHeight: 18, color: '#D8CDA9', textAlign: 'center' },
+  lockedActions: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  button: { minWidth: 96, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, alignItems: 'center', backgroundColor: '#F3EBD3' },
+  buttonText: { fontFamily: 'serif', fontSize: 14, color: INK },
+  quiet: { backgroundColor: 'transparent', borderWidth: 1, borderColor: GOLD },
+  quietText: { fontFamily: 'serif', fontSize: 14, color: '#F3EBD3' },
 });

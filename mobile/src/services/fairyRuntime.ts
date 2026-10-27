@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { apiRequest } from './api';
+import { ApiError, apiRequest } from './api';
 
 // The Fairy's server-side day (GET /api/fairy/runtime), shared by the Garden and the Moments
 // dot so both read one request. It refreshes when the Garden opens, when the app returns to the
@@ -14,6 +14,11 @@ export interface FairyRuntime {
 
 let current: FairyRuntime | null = null;
 let fetchedAt = 0;
+// Why the last request failed: 'onboarding' until the owner plants a first flower (the server
+// answers 409 and her day has not started), otherwise 'unavailable' (offline, API waking).
+export type FairyRuntimeBlock = 'onboarding' | 'unavailable' | null;
+let blocked: FairyRuntimeBlock = null;
+export const fairyRuntimeBlock = () => blocked;
 let inflight: Promise<FairyRuntime | null> | null = null;
 const listeners = new Set<(runtime: FairyRuntime | null) => void>();
 const publish = () => listeners.forEach(listener => listener(current));
@@ -21,8 +26,11 @@ const publish = () => listeners.forEach(listener => listener(current));
 // Any failure (offline, onboarding unfinished) keeps the last answer and reports null.
 export function refreshFairyRuntime(): Promise<FairyRuntime | null> {
   inflight ??= apiRequest<FairyRuntime>('/api/fairy/runtime').then(runtime => {
-    current = runtime; fetchedAt = Date.now(); publish(); return runtime;
-  }).catch(() => null).finally(() => { inflight = null; });
+    current = runtime; blocked = null; fetchedAt = Date.now(); publish(); return runtime;
+  }).catch(error => {
+    blocked = error instanceof ApiError && error.status === 409 ? 'onboarding' : 'unavailable';
+    publish(); return null;
+  }).finally(() => { inflight = null; });
   return inflight;
 }
 
