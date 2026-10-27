@@ -9,6 +9,8 @@ import { groundRoute } from './groundNavigation';
 import { SWING_EXIT } from './swingDestination';
 import { createAerialFlight, sampleFlight, smooth, SWING_FLIGHT_APPROACH, SWING_FLIGHT_SEAT } from './swingFlight';
 export const WALK_SPEED=.110; // world units per millisecond; shared with renderer
+// Flying is how she crosses the Garden; owner feedback 2026-10-26: was .18 and felt slow.
+export const FLIGHT_SPEED=.30, MIN_FLIGHT_MS=700;
 
 export const WALK_HEIGHT_MULTIPLIER=4;
 export type MovementDecision={target:Point;visualHeight:number;distanceToTarget:number;pathDistance:number|null;pathEvaluated:boolean;sameLocalPathSection:boolean;walkReachable:boolean|null;mode:'WALK'|'FLY'|'INVALID';reason:string};
@@ -134,7 +136,7 @@ export class FairyNavigation {
     if(fly&&!flight)return false; // No unsafe straight-line fallback.
     this.estimatedWalkMs=points?length(points)/WALK_SPEED:Infinity;this.flightStartLift=this.lift;this.position={...start};this.mailboxTarget=mailbox;this.mailboxElapsedMs=0;this.swingTarget=swing;this.moonTarget=moon;this.teaTarget=tea;this.treehouseTarget=treehouse;this.treehouseEntryProgress=0;this.treehouseDepth=0;this.treehouseScale=1;this.seatedTime=0;
     this.target=points?.at(-1)??requested;this.flightTime=0;this.flightProgress=0;
-    if(flight){this.flight=flight;this.remaining=[];this.duration=Math.max(1000,length(flight)/.18);this.state=mailbox?'flyingToMailbox':treehouse?'flyingToTreehouse':tea?'flyingToTea':moon?'flyingToMoonBed':swing?'flyingToSwing':'flying';}
+    if(flight){this.flight=flight;this.remaining=[];this.duration=Math.max(MIN_FLIGHT_MS,length(flight)/FLIGHT_SPEED);this.state=mailbox?'flyingToMailbox':treehouse?'flyingToTreehouse':tea?'flyingToTea':moon?'flyingToMoonBed':swing?'flyingToSwing':'flying';}
     else {this.remaining=points!.slice(1);this.lift=0;this.state=this.remaining.length?(mailbox?'movingToMailbox':'walking'):'idle';if(!this.remaining.length&&(swing||moon||tea||treehouse||mailbox))this.align();else if(!this.remaining.length)this.target=null;}
     return true;
   }
