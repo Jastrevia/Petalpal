@@ -399,12 +399,12 @@ test('Friends sidebar opens the native panel, deep links reuse it, and Return to
     assert.ok(bar);
     assert.equal(featureNodes(hud).some(node => node.props?.testID?.startsWith('desktop-navigation')), false);
     if (bar) assert.deepEqual(featureNodes(bar).filter(node => node.type === 'Pressable').map(node => node.props.testID),
-      ['hud-garden', 'hud-events', 'hud-friends', 'hud-fairy', 'hud-profile']);
-    for (const id of ['garden', 'events', 'friends', 'profile']) {
+      ['hud-events', 'hud-friends', 'hud-fairy', 'hud-profile']);
+    for (const id of ['events', 'friends', 'profile']) {
       featureNodes(hud).find(node => node.props?.testID === `hud-${id}`).props.onPress();
       hud = await hooks.flush();
       const current = featureNodes(hud).find(node => node.type?.name === 'FeatureOverlay');
-      assert.equal(current.props.feature?.id, id === 'garden' ? undefined : id);
+      assert.equal(current.props.feature?.id, id);
     }
   }
   featureNodes(hud).find(node => node.type?.name === 'FeatureOverlay').props.onOpenSettings();
@@ -658,7 +658,7 @@ test('panel background defaults dark, persists per account, reloads light and ro
   assert.equal((await mount('owner').state()).light, false);
 });
 
-test('Event microphone follows both themes without affecting Save Event', () => {
+test('Event microphone follows both themes without affecting Save & Analyze', () => {
   const { load: themeLoad } = setup(async () => response({}));
   const { PANEL_THEMES } = themeLoad('../../features/PanelTheme');
   for (const theme of Object.values(PANEL_THEMES)) {
@@ -688,10 +688,10 @@ test('Event microphone follows both themes without affecting Save Event', () => 
     microphone().props.onPress(); assert.equal(voices, 1); assert.equal(saves, 0);
     assert.equal(journal.content, 'A little moment'); assert.equal(journal.mood, 'SUNNY_BLOOM');
     nodes = render();
-    const save = nodes.find(node => node.props?.title === 'Save Event');
+    const save = nodes.find(node => node.props?.title === 'Save & Analyze');
     assert.equal(save.props.disabled, false); save.props.onPress(); assert.equal(saves, 1);
     voice.active = true; nodes = render();
-    assert.equal(nodes.find(node => node.props?.title === 'Save Event').props.disabled, true);
+    assert.equal(nodes.find(node => node.props?.title === 'Save & Analyze').props.disabled, true);
     journal.busy = true; nodes = render();
     assert.equal(microphone().props.disabled, true);
     assert.equal(voices, 1); assert.equal(saves, 1);

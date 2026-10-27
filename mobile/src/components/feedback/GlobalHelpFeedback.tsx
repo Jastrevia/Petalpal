@@ -18,7 +18,8 @@
  */
 
 import { usePathname } from 'expo-router';
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { onOpenHelpFeedback } from './helpFeedbackBus';
 import {
   Image,
   Platform,
@@ -73,6 +74,11 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<HelpFeedbackView>('menu');
   const [comingSoonNotice, setComingSoonNotice] = useState<string | null>(null);
+  const draft = useRef(hasDraft); draft.current = hasDraft;
+  useEffect(() => {
+    const open = () => { setIsOpen(true); setCurrentView(draft.current ? 'feedback_form' : 'menu'); setComingSoonNotice(null); };
+    return onOpenHelpFeedback(open);
+  }, []);
 
   // Check route visibility
   const isVisible = isHelpFeedbackVisibleOnRoute(pathname);
@@ -153,8 +159,8 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
       ]}
       pointerEvents="box-none"
     >
-      {/* ── TOP-RIGHT TRIGGER BUTTON ── */}
-      <Pressable
+      {/* While open, the pill stays as the card's handle and closes it. */}
+      {isOpen ?       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Help and feedback"
         accessibilityState={{ expanded: isOpen }}
@@ -172,7 +178,7 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
         </Text>
         {/* Subtle dot indicator when draft has text */}
         {hasDraft && !isOpen && <View style={styles.draftIndicatorDot} />}
-      </Pressable>
+      </Pressable> : null}
 
       {/* ── FLOATING PAPER PANEL ── */}
       {isOpen && (

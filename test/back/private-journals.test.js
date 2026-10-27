@@ -95,6 +95,22 @@ test('private Journal routes isolate persistence and preserve historical shelf e
     assert.equal((await response.json()).content, content.trim());
   }
   assert.deepEqual(forbidden, []);
+  // Fixing a saved journal: owner only, same rules as writing one, nothing else touched.
+  const edit = (content, path = 'owner/journals/journal-0', token = true) => fetch(`http://127.0.0.1:${server.address().port}/users/${path}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer test-token' } : {}) },
+    body: JSON.stringify(content === undefined ? {} : { content })
+  });
+  assert.equal((await edit('Fixed', 'owner/journals/journal-0', false)).status, 401);
+  assert.equal((await edit('Fixed', 'other/journals/journal-0')).status, 403);
+  assert.equal((await edit('Fixed', 'owner/journals/missing')).status, 404);
+  for (const content of ['', '  ', 12, null]) assert.equal((await edit(content)).status, 400);
+  assert.equal((await edit('x'.repeat(2001))).status, 413);
+  assert.equal((await edit('你这个傻逼')).status, 422);
+  const fixed = await edit('  Typed entry, fixed.  ');
+  assert.equal(fixed.status, 200);
+  assert.deepEqual(await fixed.json(), { id: 'journal-0', content: 'Typed entry, fixed.' });
+  assert.equal(saved[0].content, 'Typed entry, fixed.');
+  assert.deepEqual(forbidden, []);
   const photoRequest = (method, coverImage, path = 'owner/journals/journal-0') => fetch(`http://127.0.0.1:${server.address().port}/users/${path}/cover`, {
     method, headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
     ...(method === 'PUT' ? { body: JSON.stringify({ coverImage }) } : {})

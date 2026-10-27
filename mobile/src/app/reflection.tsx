@@ -2,6 +2,7 @@ import { EmotionalSafetyNote } from '../components/features/EmotionalSafetyNote'
 import { AiOutputReport } from '../components/features/AiPrivacySettings';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWorldTime } from '../components/garden/world-time';
 import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport } from '../services/reflections';
@@ -73,6 +74,7 @@ export default function Reflection() {
 
   // Back to the Garden already underneath; replacing would mount a second Garden each visit.
   const leave = () => router.canGoBack() ? router.back() : router.dismissTo('/');
+  const insets = useSafeAreaInsets();
   const pages = reports.filter(report => report.type === type).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
   const found = pages.findIndex(report => report.id === pageId[type]);
   const index = found >= 0 ? found : pages.length - 1;
@@ -321,7 +323,8 @@ export default function Reflection() {
         <Image source={interiorDay} style={camera} />
         <Animated.Image source={interiorNight} style={[camera, { opacity: lighting }]} />
       </View>
-      <Pressable accessibilityRole="button" onPress={leave} style={[s.back, compact ? { top: 10, left: 10, paddingVertical: 8, paddingHorizontal: 11 } : { top: artHeight * .055, left: sceneWidth * .115 }]}><Text style={[s.ink, compact && { fontSize: 14 }]}>←  Back to Garden</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Close Reflections" onPress={leave} hitSlop={6}
+        style={[s.back, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel="Lantern — night lighting" accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint="Turn the lantern on for night, or off for day" onPress={() => setNightOverride(!night)} hitSlop={6}
         style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
       {!compact && (['weekly', 'monthly'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: type === item }} aria-selected={type === item} accessibilityLabel={`${title(item)} reflections`} disabled={!!turning} onPress={() => setType(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>
@@ -398,7 +401,9 @@ export default function Reflection() {
   </ScrollView>;
 }
 const s = StyleSheet.create({
-  back: { position: 'absolute', top: 24, left: 24, padding: 13, borderRadius: 4, backgroundColor: '#F3E7CCD9' },
+  back: { position: 'absolute', zIndex: 20, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F3E7CCE6', borderWidth: 1, borderColor: '#BFA36D' },
+  closeText: { fontSize: 20, color: '#4A3622' },
   pages: { position: 'absolute', borderRadius: 12 },
   sectionHeading: { fontFamily: 'Georgia', fontSize: 18, color: '#654D30', marginTop: 8, marginBottom: 12 },
   pattern: { fontFamily: 'Georgia', fontSize: 15, lineHeight: 23, color: '#556040', marginBottom: 8 },

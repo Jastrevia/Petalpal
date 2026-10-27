@@ -20,8 +20,29 @@ import { UserAvatar } from '../avatars/UserAvatar';
 import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
 import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
+import { useAppLocale, type AppLocale } from '../../services/locale';
 
 type Feature = typeof GARDEN_FEATURES[number];
+// Panel names in the app language (the catalog keeps the English ids).
+export const FEATURE_LABELS: Record<AppLocale, Record<string, string>> = {
+  en: { garden: 'Garden', events: 'Events', friends: 'Friends', fairy: 'Fairy', profile: 'Me', settings: 'Me', daily: 'Daily', visit: 'Visit', weekly: 'Weekly', monthly: 'Monthly' },
+  'zh-Hans': { garden: '花园', events: '事件', friends: '朋友', fairy: '小花仙', profile: '我', settings: '我', daily: '每日', visit: '拜访', weekly: '周报', monthly: '月报' },
+};
+const OVERLAY_COPY = {
+  en: { close: 'Close', account: 'Your account', accountText: 'Your Events and flowers are saved to your account.', accountNote: 'Signing out keeps your saved Garden safe.',
+    ai: 'AI & privacy', language: 'Language', background: 'Background', light: 'Light background', signOut: 'Sign out', signingOut: 'Signing out…',
+    signOutFailed: 'Unable to sign out. Please try again.', none: 'No actions are available here yet.', account404: 'PetalPal account' },
+  'zh-Hans': { close: '关闭', account: '你的账号', accountText: '你的事件和花都保存在账号里。', accountNote: '退出登录后，你的花园会安全保存。',
+    ai: 'AI 与隐私', language: '语言', background: '背景', light: '浅色背景', signOut: '退出登录', signingOut: '正在退出…',
+    signOutFailed: '退出失败，请再试一次。', none: '这里暂时还没有可以操作的内容。', account404: 'PetalPal 账号' },
+};
+const messagesZh: Record<string, [string, string]> = {
+  daily: ['每天开一朵花', '每日签到正在接入中。你已经种下的花会一直留在花园里。'],
+  visit: ['一起去走走', '花园拜访正在接入中。你可以先照顾自己的花园。'],
+  fairy: ['花园里的小伙伴', '小花仙的功能正在接入中。她会一直待在你的花园里。'],
+  weekly: ['温柔回看这一周', '周报正在接入中。先继续记录生活里的小事吧。'],
+  monthly: ['一个月的小花', '月报暂时还不能用。你保存的事件都还在花园里。'],
+};
 const messages: Record<string, [string, string]> = {
   daily: ['A moment for your daily bloom', 'Daily check-ins are being connected. Your existing flowers stay in your Garden.'],
   visit: ['A little journey, together', 'Garden visits are being connected. You can keep tending your own Garden for now.'],
@@ -39,21 +60,25 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [addingFriend, setAddingFriend] = useState(false);
+  const locale = useAppLocale();
+  const closeLabel = OVERLAY_COPY[locale].close;
   useEffect(() => { setAddingFriend(false); }, [feature?.id]);
   if (!feature) return null;
+  const title = FEATURE_LABELS[locale][feature.id] ?? feature.label;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-      <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
-      <View accessibilityViewIsModal accessibilityLabel={`${feature.label} panel`}
+      {/* A tap anywhere around the panel closes it, like the × does. */}
+      <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={[StyleSheet.absoluteFill, styles.backdrop]} />
+      <View accessibilityViewIsModal accessibilityLabel={title}
         style={[styles.panel, feature.id === 'friends' && styles.friendsPanel, feature.id === 'events' && styles.eventsPanel, feature.id === 'friends' && light && styles.friendsLightPanel, { width: Math.min(feature.id === 'events' ? 680 : 440, width - 24), maxHeight: Math.max(180, height - insets.top - insets.bottom - 24) }]}>
         {feature.id !== 'friends' ? <><View style={styles.accent}><View style={[styles.tealAccent, feature.id === 'events' && styles.eventsAccent]} /><View style={[styles.purpleAccent, feature.id === 'events' && styles.eventsGold]} /></View>
         <View style={[styles.header, feature.id === 'events' && styles.eventsHeader]}>
           {feature.id === 'events' ? <EventIllustration index={0} size={width > 600 ? 82 : 52} /> : <View style={styles.icon}><SymbolView name={feature.icon} size={25} tintColor={colors.ink} /></View>}
           <View style={styles.heading}>
-            <Text accessibilityRole="header" style={[ui.title, { color: theme.text }, feature.id === 'events' && styles.eventsTitle]}>{feature.label}</Text>
-            <StatusChip status={feature.status} />
+            <Text accessibilityRole="header" style={[ui.title, { color: theme.text }, feature.id === 'events' && styles.eventsTitle]}>{title}</Text>
+            {feature.id === 'events' || feature.id === 'profile' || feature.id === 'settings' ? null : <StatusChip status={feature.status} />}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Close ${feature.label}`} onPress={onClose}
+          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
             style={({ pressed }) => [styles.close, feature.id === 'events' && styles.eventsClose, pressed && ui.pressed]}>
             <Text style={[styles.closeText, feature.id === 'events' && { color: '#FFF6DF' }]}>×</Text>
           </Pressable>
@@ -63,15 +88,10 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
           <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings}
             addingFriend={addingFriend} onAddFriend={() => setAddingFriend(true)} onCloseAddFriend={() => setAddingFriend(false)} />
         </ScrollView>
-        <View style={[styles.footer, feature.id === 'friends' && styles.friendsFooter, feature.id === 'events' && styles.eventsFooter, feature.id === 'friends' && light && styles.eventsFooter]}>
-          <View style={styles.footerIcon}><SymbolView name={{ ios: 'leaf.fill', android: 'local_florist', web: 'local_florist' }} size={23} tintColor={colors.ink} /></View>
-          <View style={{ flex: 1 }}>{(feature.id === 'friends' || feature.id === 'events')
-            ? <Pressable accessibilityRole="button" accessibilityLabel="Return to Garden" onPress={onClose}
-                style={({ pressed }) => [styles.friendsReturn, pressed && ui.pressed]}>
-                <Text style={styles.friendsReturnText}>Return to Garden  ›</Text>
-              </Pressable>
-            : <FeatureActionButton title="Return to Garden" onPress={onClose} />}</View>
-        </View>
+        {feature.id === 'friends' ? <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
+          style={({ pressed }) => [styles.close, styles.floatingClose, pressed && ui.pressed]}>
+          <Text style={styles.closeText}>×</Text>
+        </Pressable> : null}
       </View>
     </KeyboardAvoidingView>
   </Modal>;
@@ -86,48 +106,46 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, add
   const { session, logout } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const locale = useAppLocale();
+  const copy = OVERLAY_COPY[locale];
   if (feature.id === 'events') return <EventsPanel onClose={onClose} onGardenChanged={onGardenChanged} />;
   if (feature.id === 'friends') return <FriendsPanel key={session?.user.id} addingFriend={addingFriend}
     onAddFriend={onAddFriend} onCloseAddFriend={onCloseAddFriend} onClose={onClose} />;
+  // Me: the profile and every setting on one page (no separate Settings step).
   if (feature.id === 'profile' || feature.id === 'settings') return <View style={ui.body}>
     <ProfileHero theme={theme} />
-    {feature.id === 'profile' ? <FeatureSection title="Your Garden profile">
-      <Text style={[ui.text, { color: theme.text }]}>Tap your avatar to choose a new one from the avatar library. Name editing will be connected later.</Text>
-      <Text style={[ui.caption, { color: theme.muted }]}>Synced from your account</Text>
-      {onOpenSettings ? <FeatureActionButton title="Settings" onPress={onOpenSettings} /> : null}
-    </FeatureSection> : <>
-      <FeatureSection title="Your account">
-        <Text style={[ui.text, { color: theme.text }]}>Your Events and flowers are saved to your account.</Text>
-        <Text style={[ui.caption, { color: theme.muted }]}>Signing out keeps your saved Garden safe.</Text>
-      </FeatureSection>
-      <FeatureSection title="AI & privacy">
-        <AiPrivacySettings key={session?.user.id} />
-      </FeatureSection>
-      <FeatureSection title="Report language">
-        <ReportLanguageSettings key={session?.user.id} />
-      </FeatureSection>
-      <FeatureSection title="Background">
-        <View style={ui.row}>
-          <Text style={[ui.text, { color: theme.text, flex: 1 }]}>Light background</Text>
-          <Switch accessibilityLabel="Light background" value={light} disabled={loading}
-            onValueChange={value => void setLight(value)} trackColor={{ false: '#64776E', true: '#5AA4AB' }} />
-        </View>
-        {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
-      </FeatureSection>
-      <PrivacyAndSupport />
-      <CommunityGuidelines />
-      <GardenPrivacySettings key={session?.user.id} />
-      <DeleteAccountSettings key={`delete-${session?.user.id}`} />
-      {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
-      <FeatureActionButton title={busy ? 'Signing out…' : 'Sign out'} disabled={busy} onPress={async () => {
-        setBusy(true); setError('');
-        try { await logout(); onClose(); }
-        catch { setError('Unable to sign out. Please try again.'); }
-        finally { setBusy(false); }
-      }} />
-    </>}
+    <FeatureSection title={copy.language}>
+      <ReportLanguageSettings key={session?.user.id} />
+    </FeatureSection>
+    <FeatureSection title={copy.ai}>
+      <AiPrivacySettings key={session?.user.id} />
+    </FeatureSection>
+    <FeatureSection title={copy.background}>
+      <View style={ui.row}>
+        <Text style={[ui.text, { color: theme.text, flex: 1 }]}>{copy.light}</Text>
+        <Switch accessibilityLabel={copy.light} value={light} disabled={loading}
+          onValueChange={value => void setLight(value)} trackColor={{ false: '#64776E', true: '#5AA4AB' }} />
+      </View>
+      {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
+    </FeatureSection>
+    <GardenPrivacySettings key={session?.user.id} />
+    <FeatureSection title={copy.account}>
+      <Text style={[ui.text, { color: theme.text }]}>{copy.accountText}</Text>
+      <Text style={[ui.caption, { color: theme.muted }]}>{copy.accountNote}</Text>
+    </FeatureSection>
+    <PrivacyAndSupport />
+    <CommunityGuidelines />
+    <DeleteAccountSettings key={`delete-${session?.user.id}`} />
+    {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
+    <FeatureActionButton title={busy ? copy.signingOut : copy.signOut} disabled={busy} onPress={async () => {
+      setBusy(true); setError('');
+      try { await logout(); onClose(); }
+      catch { setError(copy.signOutFailed); }
+      finally { setBusy(false); }
+    }} />
   </View>;
-  const message = messages[feature.id] || ['A new corner of your Garden', 'This feature is not available yet.'];
+  const message = (locale === 'zh-Hans' ? messagesZh : messages)[feature.id]
+    || (locale === 'zh-Hans' ? ['花园里的新角落', '这个功能暂时还不能用。'] : ['A new corner of your Garden', 'This feature is not available yet.']);
   return <View style={styles.empty}>
     <View style={styles.orbit}>
       <View style={styles.orbitDot} />
@@ -135,7 +153,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, add
     </View>
     <Text style={[ui.title, { color: theme.text }, styles.center]}>{message[0]}</Text>
     <Text style={[ui.text, { color: theme.text }, styles.center]}>{message[1]}</Text>
-    <Text style={[ui.caption, { color: theme.text }, styles.center]}>No actions are available here yet.</Text>
+    <Text style={[ui.caption, { color: theme.text }, styles.center]}>{copy.none}</Text>
   </View>;
 }
 
@@ -174,7 +192,7 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
       <View style={styles.avatarEdit}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor={colors.ink} /></View>
       <View testID="profile-presence-dot" style={[styles.presenceDot, { backgroundColor: online ? '#7FB77E' : '#9AA79F' }]} />
     </Pressable>
-    <Text style={[ui.title, { color: theme.text }]}>{profile?.name || 'PetalPal account'}</Text>
+    <Text style={[ui.title, { color: theme.text }]}>{profile?.name || OVERLAY_COPY[locale].account404}</Text>
     <Text testID="profile-presence" style={[ui.caption, { color: online ? '#4F8A4E' : theme.muted }]}>{online ? '● ' : '○ '}{online ? copy.online : copy.offline}</Text>
     {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
       <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
@@ -192,12 +210,9 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   eventsAccent: { backgroundColor: '#528F83' }, eventsGold: { backgroundColor: '#528F83' },
   eventsScroll: { backgroundColor: theme.background },
   eventsContent: { padding: 16, paddingTop: 4 },
-  eventsFooter: { margin: 0, borderRadius: 24, backgroundColor: '#F6F3E5', borderWidth: 2, borderColor: '#D0B781', boxShadow: 'inset 0 0 0 3px #FFFFF5', padding: 6 },
   friendsLightPanel: { borderRadius: 32, borderColor: theme.gold, boxShadow: `inset 0 0 0 2px ${theme.inset}, 0 12px 30px #163D4050` },
   friendsPanel: { backgroundColor: theme.background, borderColor: '#C6A164', borderWidth: 2, borderRadius: 24, boxShadow: 'inset 0 0 0 4px #244E45, 0 14px 48px #001F2860' },
-  friendsReturn: { minHeight: 46, alignItems: 'center', justifyContent: 'center' },
-  friendsReturnText: { fontFamily: 'serif', fontSize: 20, color: '#193F39' },
-  friendsFooter: { backgroundColor: '#E9E4D0', borderWidth: 1, borderColor: '#CCA76B' },
+  floatingClose: { position: 'absolute', top: 12, right: 12, zIndex: 2, borderWidth: 1, borderColor: theme.gold },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 12 },
   backdrop: { backgroundColor: '#00000045' },
   panel: { flexShrink: 1, borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: '#5AA4AB70',
@@ -210,9 +225,6 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   close: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purpleWash },
   closeText: { fontSize: 28, lineHeight: 32, color: theme.text },
   scroll: { flexShrink: 1 }, content: { padding: 20 },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: 10, margin: 12, marginTop: 0,
-    padding: 10, borderRadius: 20, backgroundColor: colors.purpleWash },
-  footerIcon: { width: 40, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tealWash },
   empty: { alignItems: 'center', paddingVertical: 22, gap: 18 },
   center: { textAlign: 'center' },
   orbit: { width: 96, height: 96, borderRadius: 36, justifyContent: 'center', alignItems: 'center',

@@ -45,6 +45,10 @@ export async function readJournals(userId: string, signal?: AbortSignal): Promis
 export const savePrivateJournal = (userId: string, content: string) =>
   apiRequest<{ id: string; content: string }>(`/users/${encodeURIComponent(userId)}/journals`, 'POST', { content: content.trim() });
 
+// Fix a saved journal (owner only; same limits as writing one).
+export const updatePrivateJournal = (userId: string, journalId: string, content: string) =>
+  apiRequest<{ id: string; content: string }>(`/users/${encodeURIComponent(userId)}/journals/${encodeURIComponent(journalId)}`, 'PUT', { content: content.trim() });
+
 export const readJournalCover = (userId: string, journalId: string) =>
   apiRequest<{ coverImage: string | null }>(`/users/${encodeURIComponent(userId)}/journals/${encodeURIComponent(journalId)}/cover`);
 export const saveJournalCover = (userId: string, journalId: string, coverImage: string | null) =>

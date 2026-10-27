@@ -10,6 +10,7 @@ import GardenFairy, { type FairyHandle } from './fairy/GardenFairy';
 import { useFairySchedule } from './fairy/useFairySchedule';
 import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
+import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
 import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
@@ -1640,6 +1641,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       )}
       {children}
       {showCalendar && !readOnly && activeMode === 'normal' && !selectedFlower && <GardenCalendar onFocusFlower={focusCalendarFlower} />}
+      {showCalendar && !readOnly && <DailyCheckInIntro />}
       {showCalendar && <Animated.View pointerEvents="none" style={[{ position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#F5E8B3', backgroundColor: '#FFF2C518' }, calendarHighlightStyle]} />}
 
       {/* Floating button when in Preview Mode */}

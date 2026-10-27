@@ -65,9 +65,9 @@ export function useEventJournal(onGardenChanged?: () => void) {
           setResult((current) => current ? { ...current, event } : null); void refresh(); onGardenChanged?.(); return;
         }
       } catch (err) { if (!cancelled) setPollError((err as Error).message); }
-      if (!cancelled && ++attempts < 4) timer = setTimeout(poll, 15000);
+      if (!cancelled && ++attempts < 6) timer = setTimeout(poll, 6000);
     }
-    timer = setTimeout(poll, 10000);
+    timer = setTimeout(poll, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [result?.event.id, result?.event.emotionStatus, refresh, onGardenChanged]);
   function plant(flower: BackendFlower) {
@@ -88,8 +88,12 @@ export function useEventJournal(onGardenChanged?: () => void) {
       router.navigate({ pathname: '/', params: { mode: 'adjust', flowerId: flower.id } });
     } else plant(flower);
   }
+  // Back to an empty Event after one was saved (the saved one stays in the Garden).
+  function reset() {
+    pending.current = null; setResult(null); setContent(''); setMood(null); setError(''); setPollError('');
+  }
   const currentFlowers = result ? flowers.filter(flower => flower.sourceEventId === result.event.id) : [];
   const flowersLeft = today?.limit == null ? null : today.remaining;
   return { flowers: currentFlowers, flowersToday: today, flowersLeft, placements, content, setContent, mood, setMood, result, busy, loading,
-    error, pollError, refresh, saveEvent, refreshEventStatus, placeFlower };
+    error, pollError, refresh, saveEvent, refreshEventStatus, placeFlower, reset };
 }

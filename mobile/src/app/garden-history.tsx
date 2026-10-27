@@ -10,13 +10,13 @@ import { usePanelTheme } from '../components/features/PanelTheme';
 
 const COPY = {
   en: {
-    title: 'Garden history', subtitle: 'Who came by your Garden', back: 'Back to Garden', empty: 'No visitors yet. When friends drop by, you’ll see it here.',
+    title: 'Garden history', subtitle: 'Who came by your Garden', back: 'Close', empty: 'No visitors yet. When friends drop by, you’ll see it here.',
     error: 'Your Garden history could not load. Please try again.', retry: 'Try again', today: 'Today', yesterday: 'Yesterday', friend: 'A friend',
     action: (action: string) => ({ 'started visiting your garden': 'came to visit 🌸', 'left your garden': 'left your Garden',
       support: 'sent a flower some support 💗', message: 'left a message on a flower 💌' } as Record<string, string>)[action] ?? action,
   },
   'zh-Hans': {
-    title: '花园记录', subtitle: '谁来过你的花园', back: '回到花园', empty: '还没有人来过。朋友来逛时，会记录在这里。',
+    title: '花园记录', subtitle: '谁来过你的花园', back: '关闭', empty: '还没有人来过。朋友来逛时，会记录在这里。',
     error: '花园记录加载失败，请再试一次。', retry: '再试一次', today: '今天', yesterday: '昨天', friend: '一位朋友',
     action: (action: string) => ({ 'started visiting your garden': '来逛你的花园 🌸', 'left your garden': '离开了你的花园',
       support: '给你的花送来了支持 💗', message: '在你的花上留了言 💌' } as Record<string, string>)[action] ?? action,
@@ -64,12 +64,8 @@ export default function GardenHistoryScreen() {
     else groups.push({ day: label, items: [visit] });
   }
 
-  return <ScrollView style={{ backgroundColor: theme.background }}
+  return <View style={{ flex: 1, backgroundColor: theme.background }}><ScrollView style={{ backgroundColor: theme.background }}
     contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}>
-    <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/')}
-      style={({ pressed }) => [styles.back, { borderColor: theme.gold }, pressed && styles.pressed]}>
-      <Text style={[styles.backText, { color: theme.text }]}>‹ {copy.back}</Text>
-    </Pressable>
     <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.title}</Text>
     <Text style={[styles.subtitle, { color: theme.muted }]}>{copy.subtitle}</Text>
     {loading && !visits.length ? <ActivityIndicator accessibilityLabel={copy.title} color={theme.gold} /> : null}
@@ -96,12 +92,19 @@ export default function GardenHistoryScreen() {
         </View>)}
       </View>
     </View>)}
-  </ScrollView>;
+  </ScrollView>
+  {/* Fixed in the corner whatever is scrolled. */}
+  <Pressable accessibilityRole="button" accessibilityLabel={copy.back} onPress={() => router.dismissTo('/')} hitSlop={6}
+    style={({ pressed }) => [styles.close, { top: insets.top + 10, right: insets.right + 12, borderColor: theme.gold, backgroundColor: theme.surface }, pressed && styles.pressed]}>
+    <Text style={[styles.closeText, { color: theme.text }]}>✕</Text>
+  </Pressable></View>;
 }
 
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, gap: 12 },
   back: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
+  close: { position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  closeText: { fontSize: 20 },
   backText: { fontFamily: 'serif', fontSize: 15 },
   pressed: { opacity: 0.8 },
   title: { fontFamily: 'serif', fontSize: 30, fontWeight: '600', marginTop: 6 },

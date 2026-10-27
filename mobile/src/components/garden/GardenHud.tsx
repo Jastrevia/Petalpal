@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, Vi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GARDEN_FEATURES, gardenFeature } from '../../services/featureCatalog';
 import { usePanelTheme } from '../features/PanelTheme';
-import { FeatureOverlay } from '../features/FeatureOverlay';
+import { FEATURE_LABELS, FeatureOverlay } from '../features/FeatureOverlay';
 import { FEATURE_COLORS } from '../features/FeatureUI';
 import { SidebarIllustration } from './SidebarIllustration';
 import { usePlanting } from './planting/PlantingContext';
@@ -81,7 +81,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const navigationItem = (feature: typeof GARDEN_FEATURES[number]) => {
     const selected = openFeature === feature.id || (feature.id === 'profile' && openFeature === 'settings') || (feature.id === 'garden' && !openFeature);
     return <Pressable key={feature.id} accessibilityRole="button"
-      accessibilityLabel={`${feature.label}, ${feature.status}${feature.id === 'fairy' && fairyDot ? ', something new' : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
+      accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${feature.id === 'fairy' && fairyDot ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
       onFocus={() => setHighlightedFeature(feature.id)} onBlur={() => setHighlightedFeature(undefined)}
       onPress={() => {
@@ -102,7 +102,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         {feature.id === 'fairy' && fairyDot ? <View style={[styles.unread, { borderColor: theme.background }]} /> : null}
       </View>
       <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>
-        {feature.id === 'events' ? 'Events' : feature.id === 'profile' ? 'Me' : feature.label}
+        {FEATURE_LABELS[locale][feature.id] ?? feature.label}
       </Text>
     </Pressable>;
   };
@@ -112,14 +112,14 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       bottom: insets.bottom + (phone ? 8 : 24), padding: phone ? 3 : 4, gap: phone ? 3 : 5,
       borderRadius: phone ? 24 : 26, backgroundColor: theme.background, borderColor: theme.gold,
     }]}>
-      {GARDEN_FEATURES.filter(feature => ['garden', 'events', 'friends', 'fairy', 'profile'].includes(feature.id)).map(navigationItem)}
+      {GARDEN_FEATURES.filter(feature => ['events', 'friends', 'fairy', 'profile'].includes(feature.id)).map(navigationItem)}
     </View>
     <View style={[styles.info, { top: insets.top + 8, left: insets.left + 8, maxWidth: Math.max(100, width - insets.left - insets.right - 100) }]}>
       {isGardenLoading ? <ActivityIndicator accessibilityLabel="Loading Garden" size="small" color="#365b42" /> : null}
       {gardenError ? <><Text accessibilityRole="alert" style={styles.label}>{gardenError}</Text>
-        <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>Try again</Text></Pressable></> : null}
+        <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
       <Pressable accessibilityRole="button" onPress={() => router.push('/garden-history' as Href)}>
-        <Text style={styles.label}>Garden history</Text>
+        <Text style={styles.label}>{chinese ? '花园记录' : 'Garden history'}</Text>
       </Pressable>
     </View>
     {notice ? <Pressable key={notice.key} testID="visit-notice" accessibilityRole="alert" accessibilityLiveRegion="polite"

@@ -28,7 +28,11 @@
   const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png',
     createdAt: day(6) + 'T18:00:00.000Z', supportCount: 1, sourceType: 'EVENT', sourceEventId: 'fe1',
     supportState: { supportedToday: false, canSupport: true }, messages: [] };
-  let signedIn = false, blocked = false;
+  let signedIn = false, blocked = false, checkedInToday = false;
+  // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
+  const ownFlowers = [], events = new Map();
+  let consent = { aiProcessing: false, personalization: false, memoryEnabled: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
+  const EMOTIONS = { en: ['calm', 'grateful', 'a little tired'], zh: ['平静', '感激', '有点累'] };
   window.fetch = async (input, options = {}) => {
     const url = new URL(input instanceof Request ? input.url : input, location.href);
     const method = (options.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
@@ -61,9 +65,48 @@
       // Our Bond and today's petal card, so the calendar check-in and the petal ring can be tried.
       const localDate = new Date().toISOString().slice(0, 10);
       if (p === '/api/petal-cards/draw' && method === 'POST') { petalDrawn = { position: request.position, drawnAt: new Date().toISOString(), card: { id: 'major-01', name: 'The Magician', line: 'You already hold what you need.', text: 'A preview card: in the real app this is today\'s card from your deck.', disclaimer: 'For reflection only.' } }; return json({ created: true, locale: 'en', localDate, ...petalDrawn }); }
+      if (p === '/api/fairy/check-in' && method === 'POST') {
+        const created = !checkedInToday; checkedInToday = true;
+        return json({ created, checkIn: { localDate: day(0), streak: 4, graceUsed: false }, keepsakes: [], points: created ? 2 : 0 });
+      }
+      if (p === '/events' && method === 'POST') {
+        const id = 'e' + (events.size + 1), now = new Date().toISOString();
+        const event = { id, content: request.content, occurredAt: now, localDate: day(0), primaryGardenMood: request.primaryGardenMood,
+          secondaryEmotions: [], emotionStatus: consent.aiProcessing ? 'RUNNING' : 'SKIPPED', memoryProcessingAllowed: consent.memoryEnabled, readyAt: Date.now() + 4000 };
+        events.set(id, event);
+        const flower = { id: 'f' + id, userId: uid, sourceEventId: id, name: 'Lavender', speciesCode: 'LAVENDER', mood: request.primaryGardenMood,
+          img: 'lavender.png', createdAt: now, event: '', supportCount: 0, sourceEvent: { secondaryEmotions: [] } };
+        ownFlowers.unshift(flower);
+        return json({ event, flower, emotion: { status: event.emotionStatus, labels: [] }, memoryJob: null, dailyFlowers: { limit: 2, planted: ownFlowers.length, limitReached: false } }, 201, 900);
+      }
+      const eventRead = p.match(/^\/events\/(.+)$/);
+      if (eventRead && events.has(eventRead[1])) {
+        const event = events.get(eventRead[1]);
+        if (event.emotionStatus === 'RUNNING' && Date.now() >= event.readyAt) {
+          event.emotionStatus = 'SUCCESS';
+          event.secondaryEmotions = /[\u4e00-\u9fff]/.test(event.content) ? EMOTIONS.zh : EMOTIONS.en;
+          ownFlowers.forEach(flower => { if (flower.sourceEventId === event.id) flower.sourceEvent = { secondaryEmotions: event.secondaryEmotions }; });
+        }
+        return json(event);
+      }
+      if (p === `/users/${uid}/ai-consent` && method === 'PUT') {
+        consent = { ...consent, aiProcessing: !!request.aiProcessing, personalization: !!request.personalization, memoryEnabled: !!request.memoryEnabled, updatedAt: new Date().toISOString() };
+        return json(consent);
+      }
+      if (p === `/users/${uid}/profile` && method === 'PUT') { user.preferredLocale = request.preferredLocale; return json({ user }); }
+      const journalEdit = p.match(new RegExp(`^/users/${uid}/journals/([^/]+)$`));
+      if (journalEdit && method === 'PUT') {
+        const entry = journals.find(item => item.journal.id === journalEdit[1]);
+        if (!entry) return json({ error: 'Journal not found' }, 404);
+        entry.journal.content = String(request.content || '').trim();
+        return json({ id: entry.journal.id, content: entry.journal.content });
+      }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
-      if (p === `/users/${uid}/garden`) return json({ owner: { id: uid }, flowers: [], visitRecords: [
+      if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: ownFlowers.length, remaining: Math.max(0, 2 - ownFlowers.length) });
+      if (p === '/ai/disclosure') return json({ version: 'ai-2026-10-15', features: [{ feature: 'Event emotion labels', processor: 'Cloudflare Workers AI', configured: true }],
+        explanation: 'AI Processing permits sending Event text and selected mood for emotion suggestions.', retention: 'Processing may occur outside your country.' });
+      if (p === `/users/${uid}/garden`) return json({ owner: { id: uid }, flowers: ownFlowers, visitRecords: [
         { id: 'v3', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'message', createdAt: new Date(Date.now() - 20 * 60e3).toISOString() },
         { id: 'v2', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'support', createdAt: new Date(Date.now() - 22 * 60e3).toISOString() },
         { id: 'v1', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'started visiting your garden', createdAt: new Date(Date.now() - 25 * 60e3).toISOString() },
@@ -72,11 +115,11 @@
       if (p === `/users/${uid}/friends`) return json(blocked ? [] : [{ id: friend, name: 'Friend Preview', avatar: '🌼', allowGardenVisits: true, online: true }]);
       if (p === `/friends/requests/${uid}`) return json({ incoming: [], outgoing: [] });
       if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview' }] : [], nextCursor: null });
-      if (p === `/users/${uid}/ai-consent`) return json({ aiProcessing: false, personalization: false, memoryEnabled: false });
-      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null });
+      if (p === `/users/${uid}/ai-consent`) return json(consent);
+      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true });
       if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: 2, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
-        checkIn: { checkedInToday: true, streak: 3, cycleDay: 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
+        checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
         collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: 69, back: 'lilac', drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
