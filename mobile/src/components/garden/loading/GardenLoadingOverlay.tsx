@@ -6,7 +6,7 @@ import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
 // garden. It changes nothing about rendering or quality.
-export function GardenLoadingOverlay({ store }: { store: GardenLoadStore }) {
+export function GardenLoadingOverlay({ store, title = 'Growing your garden…' }: { store: GardenLoadStore; title?: string }) {
   const load = useGardenLoadState(store);
   const ready = load.water === 'ready' && load.landsLoaded >= load.landsTotal;
   const [elapsed, setElapsed] = useState(0);
@@ -30,26 +30,26 @@ export function GardenLoadingOverlay({ store }: { store: GardenLoadStore }) {
   const progress = `Water ${load.water === 'ready' ? '✓' : load.water === 'failed' ? '✕' : '…'} · Islands ${load.landsLoaded}/${load.landsTotal}`;
   const failures = load.failures.length ? `Couldn’t load: ${load.failures.join(', ')}` : null;
   const reload = Platform.OS === 'web' && typeof window !== 'undefined'
-    ? <Pressable accessibilityRole="button" onPress={() => window.location.reload()} style={styles.reload}>
-        <Text style={styles.reloadText}>Reload</Text></Pressable> : null;
-  if (elapsed >= 30_000) return <View pointerEvents="box-none" style={styles.bannerWrap} testID="garden-loading">
-    <View style={styles.banner}>
-      <Text style={styles.bannerText}>Garden still loading · {progress}</Text>
-      {failures ? <Text style={styles.bannerText}>{failures}</Text> : null}
+    ? <Pressable accessibilityRole="button" onPress={() => window.location.reload()} style={gardenLoadingStyles.reload}>
+        <Text style={gardenLoadingStyles.reloadText}>Reload</Text></Pressable> : null;
+  if (elapsed >= 30_000) return <View pointerEvents="box-none" style={gardenLoadingStyles.bannerWrap} testID="garden-loading">
+    <View style={gardenLoadingStyles.banner}>
+      <Text style={gardenLoadingStyles.bannerText}>Garden still loading · {progress}</Text>
+      {failures ? <Text style={gardenLoadingStyles.bannerText}>{failures}</Text> : null}
       {reload}
     </View>
   </View>;
-  return <View pointerEvents="box-none" style={styles.root} testID="garden-loading">
+  return <View pointerEvents="box-none" style={gardenLoadingStyles.root} testID="garden-loading">
     <ActivityIndicator color="#365b42" accessibilityLabel="Loading your garden" />
-    <Text accessibilityLiveRegion="polite" style={styles.title}>Growing your garden…</Text>
-    <Text style={styles.hint}>{progress}</Text>
-    {failures ? <Text style={styles.hint}>{failures}</Text> : null}
-    {elapsed >= 12_000 ? <Text style={styles.hint}>The first visit can take up to a minute on a slow connection.</Text> : null}
+    <Text accessibilityLiveRegion="polite" style={gardenLoadingStyles.title}>{title}</Text>
+    <Text style={gardenLoadingStyles.hint}>{progress}</Text>
+    {failures ? <Text style={gardenLoadingStyles.hint}>{failures}</Text> : null}
+    {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>The first visit can take up to a minute on a slow connection.</Text> : null}
     <WakingFlowerFacts delayMs={4000} showNote={false} />
   </View>;
 }
 
-const styles = StyleSheet.create({
+export const gardenLoadingStyles = StyleSheet.create({
   root: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 5, alignItems: 'center', justifyContent: 'center',
     gap: 10, padding: 24, backgroundColor: '#eef3e6' },
   title: { fontSize: 17, fontWeight: '600', color: '#365b42' },

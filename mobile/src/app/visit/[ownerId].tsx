@@ -6,10 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../services/auth';
 import { gardenVisitAccess, startGardenVisit, leaveGardenVisit } from '../../services/gardenVisits';
 import GardenScene from '../../components/garden/GardenScene';
+import { gardenLoadingStyles } from '../../components/garden/loading/GardenLoadingOverlay';
+import { WakingFlowerFacts } from '../../components/loading/WakingFlowerFacts';
 import { FEATURE_COLORS as colors, FeatureActionButton, ui } from '../../components/features/FeatureUI';
 
 export default function VisitGardenScreen() {
-  const { session } = useAuth();
+  const { session, experience } = useAuth();
+  const zh = experience?.user.preferredLocale === 'zh-Hans';
   const { ownerId } = useLocalSearchParams<{ ownerId: string }>();
   const viewerId = session?.user.id;
   const insets = useSafeAreaInsets();
@@ -38,18 +41,25 @@ export default function VisitGardenScreen() {
   const visiting = session && ready?.ownerId === ownerId && ready.viewerId === viewerId;
   return <GestureHandlerRootView style={styles.root}>
     {visiting ? <GardenScene key={`${viewerId}:${ownerId}`} session={session} gardenOwnerUserId={ownerId}
-      backendMode readOnly showDevControls={false} initialWaterfallVersion="v2" /> : null}
+      backendMode readOnly showDevControls={false} initialWaterfallVersion="v2" locale={experience?.user.preferredLocale} /> : null}
     {visiting ? <Pressable accessibilityRole="button" accessibilityLabel="Return to My Garden"
       accessibilityHint="Leave this friend's Garden and return to your own"
       testID="visitor-return-home" onPress={() => router.dismissTo('/')}
       style={({ pressed }) => [styles.home, { bottom: insets.bottom + 16, left: insets.left + 16 }, pressed && styles.homePressed]}>
       <Image source={require('../../../assets/friends/visitor-home-transparent.png')} style={styles.homeArtwork}
         resizeMode="contain" accessible={false} />
-    </Pressable> : <View style={[styles.status, { top: insets.top + 12 }]}>
-      {error ? <><Text accessibilityRole="alert" style={ui.text}>{error}</Text>
-        <FeatureActionButton secondary title="Retry Garden visit" onPress={() => setAttempt(value => value + 1)} /></>
-        : <ActivityIndicator accessibilityLabel="Opening friend Garden" color={colors.primary} />}
-      <FeatureActionButton title="Return to My Garden" onPress={() => router.dismissTo('/')} />
+    </Pressable> : <View style={[gardenLoadingStyles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+      {error ? <View style={styles.status}><Text accessibilityRole="alert" style={ui.text}>{error}</Text>
+        <FeatureActionButton secondary title="Retry Garden visit" onPress={() => setAttempt(value => value + 1)} /></View>
+        : <>
+          {/* Same look as loading your own Garden, flower cards included for slow connections. */}
+          <ActivityIndicator accessibilityLabel="Opening friend Garden" color="#365b42" />
+          <Text accessibilityLiveRegion="polite" style={gardenLoadingStyles.title}>{zh ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…'}</Text>
+          <WakingFlowerFacts delayMs={2500} showNote={false} />
+        </>}
+      <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/')} style={({ pressed }) => [styles.back, pressed && styles.homePressed]}>
+        <Text style={styles.backText}>{zh ? '回到我的花园' : 'Return to My Garden'}</Text>
+      </Pressable>
     </View>}
   </GestureHandlerRootView>;
 }
@@ -58,6 +68,7 @@ const styles = StyleSheet.create({
   home: { position: 'absolute', width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   homeArtwork: { width: 60, height: 60 },
   homePressed: { opacity: .8, transform: [{ scale: .96 }] },
-  status: { position: 'absolute', alignSelf: 'center', maxWidth: 300, padding: 12, gap: 8,
-    borderRadius: 18, backgroundColor: colors.paper },
+  status: { maxWidth: 300, padding: 12, gap: 8, borderRadius: 18, backgroundColor: colors.paper },
+  back: { marginTop: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#b9c8ad' },
+  backText: { fontSize: 14, color: '#365b42' },
 });

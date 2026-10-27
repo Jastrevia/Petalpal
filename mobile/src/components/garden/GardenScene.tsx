@@ -1566,7 +1566,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         </Canvas>
         </GestureDetector>
       )}
-      <GardenLoadingOverlay store={loadStore} />
+      <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
