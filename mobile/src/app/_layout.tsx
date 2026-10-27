@@ -64,6 +64,7 @@ function TabLayout() {
           {__DEV__ && <Stack.Screen name="player-preview" options={{ headerShown: false, animation: 'none' }} />}
           {__DEV__ && <Stack.Screen name="login-preview" options={{ headerShown: false, animation: 'none' }} />}
           {__DEV__ && <Stack.Screen name="fairy-loading-test" options={{ headerShown: false }} />}
+          {__DEV__ && <Stack.Screen name="reading-fairy-test" options={{ title: 'Reading companion preview' }} />}
         </Stack>
         </DevLoginEntranceHost>
       </ThemeProvider>
