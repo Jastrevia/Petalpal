@@ -169,11 +169,19 @@ export default function Bookhouse() {
     setFocusedYear(null);
     applyCamera(homeCamera);
     sceneScroll.current?.scrollTo({ y: sceneWidth * DESK_Y - 24, animated: !reducedMotion });
-    const first = entries.filter(e => e.journal && e.localDate.startsWith(monthKey(year, selected))).map(e => Number(e.localDate.slice(8, 10))).sort((a,b) => a-b)[0];
-    // A month without journals yet (the current one) opens on today's page.
-    setDay(first || (isToday(year, selected, today.getDate()) ? today.getDate() : 1)); opening.setValue(0);
+    const written = entries.filter(e => e.journal && e.localDate.startsWith(monthKey(year, selected))).map(e => Number(e.localDate.slice(8, 10)));
+    // This month opens on today's page (the owner's local date); an earlier month on its latest journal.
+    setDay(isToday(year, selected, today.getDate()) ? today.getDate() : written.length ? Math.max(...written) : 1); opening.setValue(0);
     Animated.timing(opening, { toValue: 1, duration: reducedMotion ? 0 : 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   };
+  // Days of the open month that hold a journal: dots in the day row and quick links above it.
+  const journalDays = month ? [...new Set(entries.filter(e => e.journal && e.localDate.startsWith(monthKey(month.year, month.month)))
+    .map(e => Number(e.localDate.slice(8, 10))))].sort((a, b) => a - b) : [];
+  const dayRow = useRef<ScrollView>(null);
+  // Keep the chosen day in view (today's 26 is off screen on a phone otherwise).
+  useEffect(() => {
+    if (month) dayRow.current?.scrollTo({ x: Math.max(0, (day - 1) * 46 - viewportWidth / 2 + 23), animated: !reducedMotion });
+  }, [month, day, viewportWidth, reducedMotion]);
   const dayEntries = month ? entries.filter(e => e.journal && e.localDate === `${monthKey(month.year, month.month)}-${String(day).padStart(2, '0')}`) : [];
   const selectedEntry = dayEntries[Math.min(entryIndex, Math.max(0, dayEntries.length - 1))];
   // The atlas window is one square cell cropped to 78% of its height.
@@ -278,8 +286,18 @@ export default function Bookhouse() {
           </Animated.View>
           </View>
           <View style={{ height: bookHeight - coverBaseline }} />
-          {month && <ScrollView horizontal style={{ flexGrow: 0, height: 54 }} showsHorizontalScrollIndicator contentContainerStyle={s.days}>{Array.from({ length: daysInMonth(month.year, month.month) }, (_, i) => i + 1).map(n =>
-            <Pressable key={n} accessibilityRole="button" accessibilityLabel={`Day ${n}`} accessibilityState={{ selected: day === n }} onPress={() => setDay(n)} style={[s.day, day === n && { backgroundColor: '#E9BDC7' }]}><Text style={[s.body, { color: day === n ? '#513B2A' : '#FFF1D6' }]}>{n}</Text></Pressable>)}</ScrollView>}
+          {month && <View style={s.writtenRow}>
+            <Text style={s.writtenLabel}>{journalDays.length ? '✎ You wrote on' : '✎ No journals this month yet'}</Text>
+            {journalDays.map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={`Read journal from ${MONTHS[month.month - 1]} ${n}`}
+              onPress={() => { setDay(n); setReader(false); }} style={[s.writtenChip, day === n && s.writtenChipOn]}>
+              <Text style={[s.writtenChipText, day === n && { color: '#513B2A' }]}>{MONTHS[month.month - 1]} {n}</Text></Pressable>)}
+          </View>}
+          {month && <ScrollView ref={dayRow} horizontal style={{ flexGrow: 0, height: 58 }} showsHorizontalScrollIndicator contentContainerStyle={s.days}>{Array.from({ length: daysInMonth(month.year, month.month) }, (_, i) => i + 1).map(n =>
+            <Pressable key={n} accessibilityRole="button" accessibilityLabel={`Day ${n}${journalDays.includes(n) ? ', has a journal' : ''}${isToday(month.year, month.month, n) ? ', today' : ''}`} accessibilityState={{ selected: day === n }} onPress={() => setDay(n)}
+              style={[s.day, isToday(month.year, month.month, n) && day !== n && s.today, day === n && { backgroundColor: '#E9BDC7' }]}>
+              <Text style={[s.body, { color: day === n ? '#513B2A' : '#FFF1D6' }]}>{n}</Text>
+              {journalDays.includes(n) ? <View style={[s.journalDot, day === n && { backgroundColor: '#8A5A3C' }]} /> : null}
+            </Pressable>)}</ScrollView>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
           <View style={s.actions}>
             <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => setEditor(true)} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
@@ -409,6 +427,13 @@ const s = StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', borderBottomWidth: 1, borderColor: '#CBB58E', paddingBottom: 10, marginBottom: 14 },
   title: { fontFamily: serif, fontSize: 18, color: '#345849' }, body: { fontFamily: serif, color: '#475448', fontSize: 15, lineHeight: 22 }, caption: { color: '#68745D', fontFamily: serif, fontSize: 12, lineHeight: 17 },
   tabs: { position: 'absolute', right: 0, top: '15%', bottom: '18%', width: 32 }, monthTab: { flex: 1, justifyContent: 'center', alignItems: 'center', borderTopRightRadius: 5, borderBottomRightRadius: 5, borderWidth: .5, borderColor: '#B99F79' }, tabText: { fontSize: 10, color: '#3C5046', fontFamily: serif },
+  writtenRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 4 },
+  writtenLabel: { fontFamily: serif, fontSize: 13, color: '#F3DFB6' },
+  writtenChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#DAB478', backgroundColor: '#5A3E28' },
+  writtenChipOn: { backgroundColor: '#E9BDC7', borderColor: '#E9BDC7' },
+  writtenChipText: { fontFamily: serif, fontSize: 13, color: '#FFF1D6' },
+  today: { borderWidth: 1, borderColor: '#E9BDC7' },
+  journalDot: { position: 'absolute', bottom: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: '#DAB478' },
   days: { gap: 2, paddingTop: 8 }, day: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 }, entry: { paddingBottom: 12, gap: 5 },
   actions: { flexDirection: 'row', gap: 12, marginTop: 14 }, action: { flex: 1, minHeight: 66, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#F9EDCF', borderWidth: 2, borderColor: '#C9A264', borderRadius: 16 }, actionText: { fontFamily: serif, color: '#3D6255', fontSize: 17 },
   back: { minHeight: 50, justifyContent: 'center', paddingHorizontal: 12 }, notice: { color: '#FFF3D8', backgroundColor: '#315E49', padding: 10, marginTop: 8, borderRadius: 8 },
