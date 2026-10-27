@@ -200,7 +200,7 @@ test('Events voice input: CSP failure is before API; blob correction preserves d
     try {
       const before = consentRequests.length;
       await page.getByRole('button', { name: 'Record', exact: true }).click();
-      await page.waitForFunction(() => /enable AI Processing/.test(document.querySelector('[role=alert]').textContent) &&
+      await page.waitForFunction(() => /AI Processing must be on/.test(document.querySelector('[role=alert]').textContent) &&
         document.querySelector('#phase').textContent === 'idle');
       assert.deepEqual(consentRequests.slice(before), [{ method: 'GET', authorized: true, owner: 'fixture-owner' }]);
       assert.equal(await page.evaluate(() => window.fixture.prepared), 0, 'no recorder may start without consent');
