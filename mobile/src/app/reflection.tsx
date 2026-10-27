@@ -167,8 +167,10 @@ export default function Reflection() {
   const wide = compact && width > height;
   const sceneWidth = Math.min(width, 1000);
   const artHeight = sceneWidth * 4 / 3;
-  // Phone: a short scenic header, then one page that fills the rest of the screen (content scrolls inside).
-  const bookTop = compact ? Math.min(artHeight * .3, 170, height * .22) : artHeight * .365;
+  // Phone: a scenic header, then one page that fills the rest of the screen (content scrolls inside).
+  // Upright phones keep the whole window and the lake outside it in view (the window ends at
+  // about 40% of the art); a phone on its side keeps the short header.
+  const bookTop = compact ? (wide ? Math.min(artHeight * .3, 170, height * .22) : Math.min(artHeight * .4, height * .36)) : artHeight * .365;
   const bookWidth = compact ? sceneWidth - 20 : sceneWidth * .80;
   const bookHeight = compact ? Math.max(320, height - bookTop - 12) : artHeight * .48;
   const bookLeft = compact ? 10 : sceneWidth * .17;

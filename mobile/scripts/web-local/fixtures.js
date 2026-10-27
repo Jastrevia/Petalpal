@@ -16,6 +16,7 @@
       exp: now + 3600, firebase: { sign_in_provider: 'password' } })}.synthetic`;
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
+  let petalDrawn = null;
   const journals = [[3, 'A slow morning with tea and the window open.'], [12, 'Walked home the long way.'], [35, 'Started a new notebook.']]
     .map(([offset, content], i) => ({ id: 'c' + i, localDate: day(offset), createdAt: day(offset) + 'T18:00:00.000Z',
       journal: { id: 'j' + i, content }, emotionResult: null, flower: null }));
@@ -56,15 +57,27 @@
       if (p === `/users/${friend}/flowers/ff1/support` && method === 'POST') { friendFlower.supportCount++; friendFlower.supportState = { supportedToday: true, canSupport: false }; return json(friendFlower); }
       if (p === `/users/${friend}/flowers/ff1/message` && method === 'POST') { friendFlower.messages.push({ id: 'm' + friendFlower.messages.length, text: request.text, userId: uid, authorUserId: uid, author: user.name }); return json(friendFlower); }
       if (p === `/users/me/blocks/${friend}`) { blocked = method === 'PUT'; return json({ success: true }); }
+      // Our Bond and today's petal card, so the calendar check-in and the petal ring can be tried.
+      const localDate = new Date().toISOString().slice(0, 10);
+      if (p === '/api/petal-cards/draw' && method === 'POST') { petalDrawn = { position: request.position, drawnAt: new Date().toISOString(), card: { id: 'major-01', name: 'The Magician', line: 'You already hold what you need.', text: 'A preview card: in the real app this is today\'s card from your deck.', disclaimer: 'For reflection only.' } }; return json({ created: true, locale: 'en', localDate, ...petalDrawn }); }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
-      if (p === `/users/${uid}/garden`) return json({ owner: { id: uid }, flowers: [] });
+      if (p === `/users/${uid}/garden`) return json({ owner: { id: uid }, flowers: [], visitRecords: [
+        { id: 'v3', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'message', createdAt: new Date(Date.now() - 20 * 60e3).toISOString() },
+        { id: 'v2', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'support', createdAt: new Date(Date.now() - 22 * 60e3).toISOString() },
+        { id: 'v1', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'started visiting your garden', createdAt: new Date(Date.now() - 25 * 60e3).toISOString() },
+        { id: 'v0', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'started visiting your garden', createdAt: new Date(Date.now() - 26 * 3600e3).toISOString() }] });
       if (p === `/users/${uid}/journals`) return json({ journals, nextCursor: null });
       if (p === `/users/${uid}/friends`) return json(blocked ? [] : [{ id: friend, name: 'Friend Preview', avatar: '🌼', allowGardenVisits: true, online: true }]);
       if (p === `/friends/requests/${uid}`) return json({ incoming: [], outgoing: [] });
       if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview' }] : [], nextCursor: null });
       if (p === `/users/${uid}/ai-consent`) return json({ aiProcessing: false, personalization: false, memoryEnabled: false });
       if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null });
+      if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: 2, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
+        nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
+        checkIn: { checkedInToday: true, streak: 3, cycleDay: 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
+        collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
+      if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: 69, back: 'lilac', drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });
       if (p === `/users/${friend}/flowers/ff1`) return json(friendFlower);

@@ -553,6 +553,8 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                 isReducedMotion={entrance.reduced}
                 cardWidth={cardLayout.width}
                 cardHeight={cardLayout.height}
+                spaceLeft={Math.max(0, (windowWidth - cardLayout.width) / 2)}
+                spaceRight={Math.max(0, (windowWidth - cardLayout.width) / 2)}
               />
 
               {/* LAYER C: Real Interactive Form UI */}

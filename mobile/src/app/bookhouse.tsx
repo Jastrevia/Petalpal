@@ -3,7 +3,8 @@ import { BookhouseEnvironment, SceneLighting, SCENE_ASPECT, DESK_Y } from '../co
 import { useWorldTime } from '../components/garden/world-time';
 import { JournalCover } from '../components/bookhouse/JournalCover';
 import { JournalPages } from '../components/bookhouse/JournalPages';
-import { usePanelTheme, type PanelTheme } from '../components/features/PanelTheme';
+import { ImmersivePaper, immersiveText } from '../components/bookhouse/ImmersivePaper';
+import { type PanelTheme } from '../components/features/PanelTheme';
 import { useEventVoiceInput } from '../hooks/useEventVoiceInput';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -62,6 +63,7 @@ export default function Bookhouse() {
   useEffect(() => { setEntryIndex(0); }, [month?.year, month?.month, day]);
   const [editor, setEditor] = useState(false);
   const [history, setHistory] = useState(false);
+  const [reader, setReader] = useState(false);
   const [pageSize, setPageSize] = useState({ width: 350, height: 260 });
   const [notice, setNotice] = useState('');
   const arrival = useRef(new Animated.Value(0)).current;
@@ -259,7 +261,17 @@ export default function Bookhouse() {
                   <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.'}</Text>}
               </View>
             </View>
-            {!loading && !error && selectedEntry?.journal && <JournalPages night={lit} key={selectedEntry.id} text={selectedEntry.journal.content} textStyle={pageTextStyle} onIntroChange={setIntroVisible} bookWidth={pageSize.width} bookHeight={pageSize.height} inset={compactBook ? 8 : 24} date={month ? `${MONTHS[month.month - 1]} ${day}` : ''} />}
+            {!loading && !error && selectedEntry?.journal && !compactBook && <JournalPages night={lit} key={selectedEntry.id} text={selectedEntry.journal.content} textStyle={pageTextStyle} onIntroChange={setIntroVisible} bookWidth={pageSize.width} bookHeight={pageSize.height} inset={24} date={month ? `${MONTHS[month.month - 1]} ${day}` : ''} />}
+            {/* Phones: the book is too small for pages, so tapping it lifts the journal onto one full-screen sheet. */}
+            {!loading && !error && selectedEntry?.journal && compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Open journal" accessibilityHint="Lifts the journal so you can read it full screen"
+              onPress={() => setReader(true)} style={[StyleSheet.absoluteFill, { left: '50%', paddingTop: bookHeight * .15, paddingBottom: bookHeight * .18, paddingRight: '12%', paddingLeft: 6, zIndex: 2 }]}>
+              <View style={s.pageHeader}><Text style={s.bookCaption}>{month ? `${MONTHS[month.month - 1]} ${day}` : ''}</Text></View>
+              <Text numberOfLines={6} style={[pageTextStyle, { opacity: .85 }]}>{selectedEntry.journal.content}</Text>
+              <Text style={[s.bookCaption, { marginTop: 'auto', color: '#7B5A36' }]}>Tap to open ⤢</Text>
+            </Pressable>}
+            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Read journal full screen" onPress={() => setReader(true)}
+              style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '13%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
+              <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Read in full ⤢</Text></Pressable>}
             {month && <View style={s.tabs}>{MONTHS.map((label, i) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Read ${label} ${month.year}`}
               disabled={!openable.has(monthKey(month.year, i + 1))} accessibilityState={{ selected: month.month === i + 1, disabled: !openable.has(monthKey(month.year, i + 1)) }}
               onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: openable.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{label}</Text></Pressable>)}</View>}
@@ -287,6 +299,7 @@ export default function Bookhouse() {
       </>}
     </View>}
     {editor && session && <JournalEditor userId={session.user.id} onClose={() => setEditor(false)} onSaved={async () => { setEditor(false); setNotice('Private journal saved.'); await reload(); }} />}
+    {reader && selectedEntry?.journal && <JournalReader text={selectedEntry.journal.content} night={lit} date={month ? `${MONTHS[month.month - 1]} ${day}, ${month.year}` : ''} onClose={() => setReader(false)} />}
     {history && session && <FlowerHistory userId={session.user.id} timezone={session.user.timezone || 'UTC'} onClose={() => setHistory(false)} />}
   </Animated.View></GestureHandlerRootView>;
 }
@@ -300,14 +313,11 @@ function Sheet({ title, onClose, children, theme }: { title: string; onClose: ()
     </View></View></Modal>;
 }
 function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: () => void; onSaved: () => Promise<void> }) {
-  const { light } = usePanelTheme();
-  const theme: PanelTheme = { background: light ? '#694124' : '#4C2F20', surface: '#EED8B3', input: '#F5E4C6', text: '#FFF0CE', muted: '#E0C39C', border: '#997343', gold: '#CBA164', frame: '#745135', inset: '#F8E9CC' };
   const [text, setText] = useState('');
-  const [paperSize, setPaperSize] = useState({ width: 0, height: 0 });
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const saving = useRef(false);
   const voice = useEventVoiceInput(text, setText, busy, 2000, 'journal');
-  const body = [s.body, { color: theme.text }];
-  const caption = [s.caption, { color: theme.muted }];
+  const paperBody = [s.body, { color: '#4B3A27' }];
+  const paperCaption = [s.caption, { color: '#7A6448' }];
   const save = async () => {
     if (saving.current || voice.active || !text.trim()) return;
     saving.current = true; setBusy(true); setError('');
@@ -315,34 +325,41 @@ function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: 
     catch (e) { setError(`${errorMessage(e)} If the connection was interrupted, check your shelf before saving again.`); }
     finally { saving.current = false; setBusy(false); }
   };
-  return <Sheet title="New Journal" theme={theme} onClose={() => { if (!busy) onClose(); }}>
-    <Text style={body}>Only for you. This journal is not sent to AI or saved as an Event memory.</Text>
-    <Text style={caption}>Saved privately for you.</Text>
-    <View onLayout={event => setPaperSize(event.nativeEvent.layout)}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: 8, backgroundColor: theme.input }]}>
-        <View style={{ position: 'absolute', left: -paperSize.width * 1.3, top: -paperSize.height * .14, opacity: .8 }}><BookhouseArt index={12} width={paperSize.width * 2.5} height={paperSize.height * 1.4} /></View>
+  // Written on the lifted page: one tall sheet with room to keep going.
+  return <ImmersivePaper title="New Journal ❧" subtitle="Only for you · not sent to AI or saved as an Event memory" closeLabel="Close New Journal"
+    onClose={() => { if (!busy) onClose(); }} footer={<>
+      {voice.active && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+        <Text accessibilityLiveRegion="polite" style={paperCaption}>{voice.phase === 'recording' ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…'}</Text>
+        {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel="Done recording" onPress={() => void voice.done()} style={s.smallButton}><Text style={paperBody}>Done</Text></Pressable>}
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel voice input" onPress={() => void voice.cancel()} style={s.smallButton}><Text style={paperBody}>Cancel</Text></Pressable>
+      </View>}
+      {!!voice.error && <Text accessibilityRole="alert" style={paperBody}>{voice.error}</Text>}
+      {!!voice.overflow && <Text selectable style={paperBody}>{voice.overflow}</Text>}
+      {!!error && <Text accessibilityRole="alert" style={paperBody}>{error}</Text>}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Text style={[paperCaption, { flex: 1 }]}>{text.length} / 2000 · saved privately for you</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Dictate private journal" accessibilityHint="Record up to three minutes, then review before saving"
+          disabled={busy || voice.active} accessibilityState={{ disabled: busy || voice.active }} onPress={() => void voice.start()}
+          style={{ width: 48, height: 48, opacity: busy || voice.active ? .5 : 1 }}>
+          <Image accessible={false} source={require('../../assets/events/microphone.png')} style={{ width: 48, height: 48 }} resizeMode="contain" />
+        </Pressable>
       </View>
-      <EmotionalSafetyNote text={text} />
-      <TextInput accessibilityLabel="Private journal" placeholder="A moment to keep…" placeholderTextColor="#927653" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy}
-        style={[s.input, { position: 'relative', zIndex: 1, minHeight: 260, padding: 22, paddingBottom: 76, fontFamily: serif, fontSize: 17, lineHeight: 26, color: '#584029', backgroundColor: 'transparent', borderColor: theme.gold, borderWidth: 2, borderRadius: 8, shadowColor: '#1B0E06', shadowOpacity: .35, shadowRadius: 4, shadowOffset: { width: 0, height: 4 } }]} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Dictate private journal" accessibilityHint="Record up to three minutes, then review before saving"
-        disabled={busy || voice.active} accessibilityState={{ disabled: busy || voice.active }} onPress={() => void voice.start()}
-        style={{ position: 'absolute', zIndex: 2, bottom: 8, right: 8, width: 56, height: 56, opacity: busy || voice.active ? .5 : 1 }}>
-        <Image accessible={false} source={require('../../assets/events/microphone.png')} style={{ width: 56, height: 56 }} resizeMode="contain" />
-      </Pressable>
-    </View>
-    <Text style={caption}>{text.length} / 2000</Text>
-    {voice.active && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-      <Text accessibilityLiveRegion="polite" style={caption}>{voice.phase === 'recording' ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…'}</Text>
-      {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel="Done recording" onPress={() => void voice.done()} style={s.smallButton}><Text style={body}>Done</Text></Pressable>}
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancel voice input" onPress={() => void voice.cancel()} style={s.smallButton}><Text style={body}>Cancel</Text></Pressable>
-    </View>}
-    {!!voice.error && <Text accessibilityRole="alert" style={body}>{voice.error}</Text>}
-    {!!voice.overflow && <Text selectable style={body}>{voice.overflow}</Text>}
-    {!!error && <Text accessibilityRole="alert" style={body}>{error}</Text>}
-    <Pressable accessibilityRole="button" accessibilityLabel="Save private journal" disabled={busy || voice.active || !text.trim()} onPress={save}
-      style={[s.save, { backgroundColor: '#E7C69B', borderWidth: 1, borderColor: theme.gold, opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { color: '#573A22', fontSize: 18 }]}>{busy ? 'Saving…' : 'Save private journal'}</Text></Pressable>
-  </Sheet>;
+      <Pressable accessibilityRole="button" accessibilityLabel="Save private journal" disabled={busy || voice.active || !text.trim()} onPress={save}
+        style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{busy ? 'Saving…' : 'Save private journal'}</Text></Pressable>
+    </>}>
+    <EmotionalSafetyNote text={text} />
+    <TextInput accessibilityLabel="Private journal" placeholder="A moment to keep…" placeholderTextColor="#A08562" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy} autoFocus
+      style={[immersiveText, { flex: 1, minHeight: 200, textAlignVertical: 'top', padding: 0, backgroundColor: 'transparent', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : {}) }]} />
+  </ImmersivePaper>;
+}
+
+// Reading a saved journal on the lifted page: the whole entry on one scrolling sheet.
+function JournalReader({ text, date, night, onClose }: { text: string; date: string; night?: boolean; onClose: () => void }) {
+  return <ImmersivePaper title={date || 'Private journal'} subtitle="Private journal" closeLabel="Close journal" night={night} onClose={onClose}>
+    <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator>
+      <Text selectable style={immersiveText}>{text}</Text>
+    </ScrollView>
+  </ImmersivePaper>;
 }
 
 function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone: string; onClose: () => void }) {

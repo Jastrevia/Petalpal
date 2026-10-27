@@ -66,6 +66,7 @@ same(first, second); same(calls, [['/api/fairy/runtime']]);
 reply = async () => { throw Object.assign(new Error('Complete onboarding'), { status: 409 }); };
 assert.equal(await runtime.refreshFairyRuntime(), null);
 same(runtime.peekFairyRuntime().currentState, 'TEA_TIME', 'a failed refresh keeps her last known day');
+same(runtime.fairyRuntimeBlock(), 'onboarding', 'a 409 means no first flower yet: Moments show the unlock hint');
 runtime.markFairyMomentsRead();
 same(runtime.peekFairyRuntime().moments, { unread: false });
 same(calls.length, 2);

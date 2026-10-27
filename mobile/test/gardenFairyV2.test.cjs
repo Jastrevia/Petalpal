@@ -126,7 +126,7 @@ test('shore and land passes reuse seven decoded images rather than decoding four
     vm.runInNewContext(source,{module,exports:module.exports,require:requireLocal,__DEV__:false});return module.exports;
   }
   const land=load(path.join(garden,'LandLayer.tsx'));
-  shared=land.GardenLandResources({children:null}).props.value;
+  shared=land.GardenLandResources({children:null,loadStore:{reportFailure(){},publishLandsLoaded(){}}}).props.value;
   const passes=['shore','land'].map(renderPass=>land.default({renderPass}).props.children.map(node=>node.type(node.props)));
   assert.equal(decoded.length,7);
   for(let i=0;i<7;i++)assert.equal(passes[0][i].props.images[0],passes[1][i].props.images[0]);

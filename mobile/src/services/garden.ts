@@ -46,3 +46,14 @@ export async function loadGarden(ownerId: string, viewerId: string): Promise<Gar
     };
   });
 }
+
+// Who came by the owner's Garden: the server keeps the latest 30 visit records with the
+// owner's full Garden. Only these display fields are kept.
+export interface GardenVisit { id: string; visitorId: string; visitorName: string; visitorAvatar?: string; action: string; createdAt: string }
+export async function loadGardenVisits(ownerId: string): Promise<GardenVisit[]> {
+  const data = await apiRequest<{ owner?: { id?: string }; visitRecords?: Partial<GardenVisit>[] }>(`/users/${encodeURIComponent(ownerId)}/garden`);
+  if (data.owner?.id !== ownerId) throw new Error('Unable to load this Garden. Try again.');
+  return (Array.isArray(data.visitRecords) ? data.visitRecords : [])
+    .filter((r): r is GardenVisit => typeof r?.id === 'string' && typeof r.action === 'string' && typeof r.createdAt === 'string')
+    .map(r => ({ id: r.id, visitorId: r.visitorId ?? '', visitorName: r.visitorName ?? '', visitorAvatar: r.visitorAvatar, action: r.action, createdAt: r.createdAt }));
+}

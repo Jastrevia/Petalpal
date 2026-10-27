@@ -19,6 +19,7 @@ import { AvatarPicker } from '../avatars/AvatarPicker';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
+import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
 
 type Feature = typeof GARDEN_FEATURES[number];
 const messages: Record<string, [string, string]> = {
@@ -140,9 +141,11 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, add
 
 const PROFILE_COPY = {
   en: { change: 'Change avatar', title: 'Choose your avatar', option: (n: number) => `Avatar ${n}`, close: 'Close',
-    failed: 'Your avatar was not saved. Please try again.', beta: 'Beta tester', betaHint: 'One of the first to grow a PetalPal garden' },
+    failed: 'Your avatar was not saved. Please try again.', beta: 'Beta tester', betaHint: 'One of the first to grow a PetalPal garden',
+    online: 'Online', offline: 'Offline' },
   'zh-Hans': { change: '更换头像', title: '选择你的头像', option: (n: number) => `头像 ${n}`, close: '关闭',
-    failed: '头像没有保存成功，请再试一次。', beta: '内测用户', betaHint: '最早种下 PetalPal 花园的人之一' },
+    failed: '头像没有保存成功，请再试一次。', beta: '内测用户', betaHint: '最早种下 PetalPal 花园的人之一',
+    online: '在线', offline: '离线' },
 };
 
 // Your avatar (tap to choose from the avatar library), name and time zone.
@@ -153,6 +156,9 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
   const locale = momentLocale(experience?.user.preferredLocale);
   const copy = PROFILE_COPY[locale];
   const [choosing, setChoosing] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
+  // Online is what friends see: this device's live connection to the owner's user room.
+  const [online, setOnline] = useState(userRealtimeConnected());
+  useEffect(() => subscribeUserRealtime({ connection: setOnline }), []);
   async function choose(avatar: string | null) {
     if (!avatar || saving) return;
     if (avatar === profile?.avatar) { setChoosing(false); return; }
@@ -166,8 +172,10 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
       onPress={() => { setError(''); setChoosing(true); }} style={({ pressed }) => [pressed && ui.pressed]}>
       <UserAvatar avatar={profile?.avatar} size={76} style={styles.avatar} fallback="○" />
       <View style={styles.avatarEdit}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor={colors.ink} /></View>
+      <View testID="profile-presence-dot" style={[styles.presenceDot, { backgroundColor: online ? '#7FB77E' : '#9AA79F' }]} />
     </Pressable>
     <Text style={[ui.title, { color: theme.text }]}>{profile?.name || 'PetalPal account'}</Text>
+    <Text testID="profile-presence" style={[ui.caption, { color: online ? '#4F8A4E' : theme.muted }]}>{online ? '● ' : '○ '}{online ? copy.online : copy.offline}</Text>
     {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
       <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
@@ -216,4 +224,5 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   avatar: { backgroundColor: colors.purpleWash, borderWidth: 2, borderColor: colors.secondary },
   avatarEdit: { position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13, alignItems: 'center',
     justifyContent: 'center', backgroundColor: colors.tealWash, borderWidth: 1, borderColor: colors.line },
+  presenceDot: { position: 'absolute', right: 2, top: 2, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: theme.background },
 });

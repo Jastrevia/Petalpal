@@ -704,7 +704,7 @@ test('FloatingLetterStack and MailboxPage coordinate deterministic read state ma
   );
   const pageSource = fs.readFileSync(pageFile, 'utf8');
   assert.ok(pageSource.includes('markLetterAsRead'), 'MailboxPage defines markLetterAsRead callback');
-  assert.ok(pageSource.includes('sessionReadLetterIds'), 'MailboxPage maintains sessionReadLetterIds for mock persistence');
+  assert.ok(pageSource.includes('markLetterRead(id)') && pageSource.includes('isLetterRead('), 'MailboxPage reads and records read state through mailboxReadState');
   assert.ok(pageSource.includes('setLetters'), 'MailboxPage has dynamic state setter for letters');
 });
 

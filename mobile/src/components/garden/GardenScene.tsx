@@ -32,7 +32,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GardenLoadingOverlay } from './loading/GardenLoadingOverlay';
-import { publishWater, reportGardenLoadFailure } from './loading/gardenReadiness';
+import { createGardenLoadStore } from './loading/gardenReadiness';
 import Canvas from './GardenCanvas';
 import PlantingRegionOverlay from './planting/PlantingRegionOverlay';
 import PlantingRegionCalibrationEditor, {
@@ -97,6 +97,9 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
+import MailboxGlow from './MailboxGlow';
+import { useGardenPausedByOverlay } from './gardenOverlayPause';
+import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
 import GardenLand09InterfaceLayer from './GardenLand09InterfaceLayer';
 import GardenInfrastructureLayer from './GardenInfrastructureLayer';
@@ -132,8 +135,6 @@ import {
 import { STATIC_LANDMARK_MAP_PLACEMENTS, type StaticLandmarkMapPlacement } from './staticLandmarkMapPlacements';
 import { TEA_SET_MAP_ROTATION, TEA_SET_MAP_SCALE, TEA_SET_MAP_X, TEA_SET_MAP_Y } from './teaSetMapPlacement';
 import { type WorldTimeOverride, useWorldTime } from './world-time';
-
-const reportWaterFailure = () => { publishWater('failed'); reportGardenLoadFailure('water'); };
 
 function cyclicWeight(phase: number, index: number, count: number): number {
   'worklet';
@@ -479,7 +480,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [gardenActive, setGardenActive] = useState(true);
   const canvasRef = useCanvasRef();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
-  const worldActive = gardenActive && foreground;
+  const overlayPaused = useGardenPausedByOverlay();
+  const worldActive = gardenActive && foreground && !overlayPaused;
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
@@ -500,10 +502,14 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [topWaterAssemblyEnabled, setTopWaterAssemblyEnabled] = useState(true);
   const [topWaterMotionMode, setTopWaterMotionMode] = useState<TopWaterMotionMode>('animate');
 
+  const unreadMail = useUnreadMail();
   const surfaceFlow = useWaterTopFlow(worldActive && perf.Water && perf.WaterAnimation, waterRipplesVisible && perf.WaterAnimation);
 
+  // This scene's own load progress; a friend's Garden keeps a separate one.
+  const [loadStore] = useState(createGardenLoadStore);
+  const reportWaterFailure = useCallback(() => { loadStore.publishWater('failed'); loadStore.reportFailure('water'); }, [loadStore]);
   const calmBaseImage = useImage(WATER_ASSETS.calmBase, reportWaterFailure);
-  useEffect(() => { publishWater(calmBaseImage ? 'ready' : 'loading'); }, [calmBaseImage]);
+  useEffect(() => { loadStore.publishWater(calmBaseImage ? 'ready' : 'loading'); }, [loadStore, calmBaseImage]);
 
 
   useFocusEffect(useCallback(() => {
@@ -1354,7 +1360,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {fit > 0 && (
         <GestureDetector gesture={cameraGesture}>
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
-          <GardenLandResources>
+          <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
@@ -1499,6 +1505,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
             {/* Ground and entrance slabs belong below the walking fairy. */}
             {infrastructureEnabled && showLandmarks && <GardenRoadApproachLayer />}
+            {/* Planted flowers & placement preview sit below the walking fairy, so PPL standing on a
+                stone among them is never covered by the bloom behind her. The arch, pavilion and tea
+                set (static-front pass) still draw above her. */}
+            <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
+            {enableFairyWalk && !readOnly && showLandmarks && <MailboxGlow placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
             <GardenFairy motionClock={fairySeconds} onMailboxOpened={() => {
@@ -1548,8 +1559,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 onDebugStatus={isDev && __DEV__ ? setTreehouseStatus : undefined}
               />
             )}
-            {/* Planted Flowers & Active Placement Preview Layer */}
-            <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {isDev && __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'impact' && (
               <WaterfallImpactOverlay placement={waterfallImpactPlacement} />
             )}
@@ -1565,7 +1574,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         </Canvas>
         </GestureDetector>
       )}
-      <GardenLoadingOverlay />
+      <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>

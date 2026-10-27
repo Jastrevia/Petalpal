@@ -66,6 +66,9 @@ export interface FairyLoadingProps {
   onFrameUpdate?: (frame: FairyLoadingFrame) => void;
   cardWidth?: number;
   cardHeight?: number;
+  /** Room on screen beside the card, left and right (px). Phones have almost none. */
+  spaceLeft?: number;
+  spaceRight?: number;
   debugMode?: boolean;
 }
 
@@ -160,6 +163,8 @@ export const FairyLoadingExperience = memo(function FairyLoadingExperience({
   onFrameUpdate,
   cardWidth = 420,
   cardHeight = 546,
+  spaceLeft = Infinity,
+  spaceRight = Infinity,
   debugMode = false,
 }: FairyLoadingProps) {
   // Clock state
@@ -354,6 +359,20 @@ export const FairyLoadingExperience = memo(function FairyLoadingExperience({
   // Tapping reach translation (in Pose 03)
   const tapOffset = frame.isTapping ? -frame.tapReach * 8 : 0;
 
+  // Narrow screens (phones): the card fills the width, so the poses anchored at or beyond its
+  // edges (sitting at the upper left, tapping at the lower right) fell off screen. Slide her
+  // sideways just enough to keep every visible pose whole; her size never changes.
+  const visibleBoxes = ([[p1Left, p1W, op0], [p2Left, p2W, op1], [p3Left, p3W, op2]] as const).filter(([, , op]) => op > 0.01);
+  let shiftX = 0;
+  if (visibleBoxes.length) {
+    const baseX = fairyCenterX + tapOffset;
+    const lo = -spaceLeft + 4, hi = cardWidth + spaceRight - 4;
+    const left = baseX + Math.min(...visibleBoxes.map(([l]) => l));
+    const right = baseX + Math.max(...visibleBoxes.map(([l, w]) => l + w));
+    if (right > hi) shiftX = hi - right;
+    if (left + shiftX < lo) shiftX = lo - left;
+  }
+
   // Subtle wing flutter scale
   const wingScale = 1 + frame.wingFlutter * 0.08;
 
@@ -380,7 +399,7 @@ export const FairyLoadingExperience = memo(function FairyLoadingExperience({
       <ContactSparkle
         scale={frame.sparkleScale}
         opacity={frame.sparkleOpacity}
-        x={sparkleAbsoluteX}
+        x={sparkleAbsoluteX + shiftX}
         y={sparkleAbsoluteY}
       />
 
@@ -390,7 +409,7 @@ export const FairyLoadingExperience = memo(function FairyLoadingExperience({
         style={[
           styles.fairyActorContainer,
           {
-            left: fairyCenterX + tapOffset,
+            left: fairyCenterX + tapOffset + shiftX,
             top: fairyCenterY + breathePixels,
             transform: [
               { rotate: `${frame.rotationDeg}deg` },
