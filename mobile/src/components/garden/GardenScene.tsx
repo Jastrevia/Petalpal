@@ -1505,6 +1505,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
             {/* Ground and entrance slabs belong below the walking fairy. */}
             {infrastructureEnabled && showLandmarks && <GardenRoadApproachLayer />}
+            {/* Planted flowers & placement preview sit below the walking fairy, so PPL standing on a
+                stone among them is never covered by the bloom behind her. The arch, pavilion and tea
+                set (static-front pass) still draw above her. */}
+            <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {enableFairyWalk && !readOnly && showLandmarks && <MailboxGlow placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
@@ -1555,8 +1559,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 onDebugStatus={isDev && __DEV__ ? setTreehouseStatus : undefined}
               />
             )}
-            {/* Planted Flowers & Active Placement Preview Layer */}
-            <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {isDev && __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'impact' && (
               <WaterfallImpactOverlay placement={waterfallImpactPlacement} />
             )}
