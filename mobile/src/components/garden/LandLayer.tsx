@@ -3,28 +3,28 @@ import { Group, Image, Rect, useImage } from '@shopify/react-native-skia';
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { SkImage } from '@shopify/react-native-skia';
 import GardenStaticPicture from './GardenStaticPicture';
-import { publishLandsLoaded, reportGardenLoadFailure } from './loading/gardenReadiness';
+import type { GardenLoadStore } from './loading/gardenReadiness';
 import { GARDEN_LANDS, type GardenLand, type GardenLandLayout } from './gardenMapLayout';
 import GardenShoreContact, { makeShoreCoverage } from './water/GardenShoreContact';
 
 // The shore and opaque passes share the same decoded artwork and GPU texture.
 // Keep loading in this owning scene root, outside cached static recordings.
-const LAND_ERRORS = GARDEN_LANDS.slice(0, 7).map(land => () => reportGardenLoadFailure(`island ${land.id}`));
 const LandImages = createContext<ReadonlyMap<unknown, SkImage | null> | null>(null);
-export function GardenLandResources({ children }: { children: ReactNode }) {
-  const central = useImage(GARDEN_LANDS[0].source, LAND_ERRORS[0]);
-  const upper = useImage(GARDEN_LANDS[1].source, LAND_ERRORS[1]);
-  const june = useImage(GARDEN_LANDS[2].source, LAND_ERRORS[2]);
-  const july = useImage(GARDEN_LANDS[3].source, LAND_ERRORS[3]);
-  const august = useImage(GARDEN_LANDS[4].source, LAND_ERRORS[4]);
-  const september = useImage(GARDEN_LANDS[5].source, LAND_ERRORS[5]);
-  const autumn = useImage(GARDEN_LANDS[6].source, LAND_ERRORS[6]);
+export function GardenLandResources({ children, loadStore }: { children: ReactNode; loadStore: GardenLoadStore }) {
+  const errors = useMemo(() => GARDEN_LANDS.slice(0, 7).map(land => () => loadStore.reportFailure(`island ${land.id}`)), [loadStore]);
+  const central = useImage(GARDEN_LANDS[0].source, errors[0]);
+  const upper = useImage(GARDEN_LANDS[1].source, errors[1]);
+  const june = useImage(GARDEN_LANDS[2].source, errors[2]);
+  const july = useImage(GARDEN_LANDS[3].source, errors[3]);
+  const august = useImage(GARDEN_LANDS[4].source, errors[4]);
+  const september = useImage(GARDEN_LANDS[5].source, errors[5]);
+  const autumn = useImage(GARDEN_LANDS[6].source, errors[6]);
   const images = useMemo(() => new Map(GARDEN_LANDS.slice(0, 7).map((land, index) =>
     [land.source, [central, upper, june, july, august, september, autumn][index]])),
   [central, upper, june, july, august, september, autumn]);
   const loaded = [central, upper, june, july, august, september, autumn].filter(Boolean).length;
-  useEffect(() => { publishLandsLoaded(loaded, 7); }, [loaded]);
-  useEffect(() => () => publishLandsLoaded(0, 7), []);
+  useEffect(() => { loadStore.publishLandsLoaded(loaded, 7); }, [loadStore, loaded]);
+  useEffect(() => () => loadStore.publishLandsLoaded(0, 7), [loadStore]);
   return <LandImages.Provider value={images}>{children}</LandImages.Provider>;
 }
 

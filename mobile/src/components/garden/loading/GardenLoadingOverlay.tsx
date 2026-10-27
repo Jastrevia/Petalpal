@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { reportGardenLoadFailure, useGardenLoadState } from './gardenReadiness';
+import { useGardenLoadState, type GardenLoadStore } from './gardenReadiness';
 import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
 
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
 // garden. It changes nothing about rendering or quality.
-export function GardenLoadingOverlay() {
-  const load = useGardenLoadState();
+export function GardenLoadingOverlay({ store }: { store: GardenLoadStore }) {
+  const load = useGardenLoadState(store);
   const ready = load.water === 'ready' && load.landsLoaded >= load.landsTotal;
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -21,11 +21,11 @@ export function GardenLoadingOverlay() {
     // Image downloads that fail reject without calling Skia's onError.
     const onRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason as { message?: unknown } | undefined;
-      reportGardenLoadFailure(`network: ${typeof reason?.message === 'string' ? reason.message : 'request failed'}`);
+      store.reportFailure(`network: ${typeof reason?.message === 'string' ? reason.message : 'request failed'}`);
     };
     window.addEventListener('unhandledrejection', onRejection);
     return () => window.removeEventListener('unhandledrejection', onRejection);
-  }, [ready]);
+  }, [ready, store]);
   if (ready) return null;
   const progress = `Water ${load.water === 'ready' ? '✓' : load.water === 'failed' ? '✕' : '…'} · Islands ${load.landsLoaded}/${load.landsTotal}`;
   const failures = load.failures.length ? `Couldn’t load: ${load.failures.join(', ')}` : null;

@@ -44,7 +44,6 @@ const STONE_REST_GAPS = [
   [1,4,8], [1,2,4,5], [2,5,9,12], [0,3,6,8],
   [1,5,9,12], [2,6,8], [1,4,6],
 ] as const;
-let cachedFloorSnapshot: any = null;
 
 function makeFloor() {
   // A raster snapshot is portable between the web view's graphics context and
@@ -155,17 +154,11 @@ half4 main(float2 p) {
   return stones.eval(p+waterRefraction(p,seconds)*mask);
 }
 `);
-function getFloorSnapshot() {
-  if (cachedFloorSnapshot && (cachedFloorSnapshot as any).ref && !(cachedFloorSnapshot as any).ref.isDeleted?.()) {
-    return cachedFloorSnapshot;
-  }
-  cachedFloorSnapshot = makeFloor();
-  return cachedFloorSnapshot;
-}
-
 function GardenSubmergedRocks({ flow }: { flow: WaterTopFlow }) {
-  // Retained draw nodes own the snapshot lifetime (including Strict Mode).
-  const floor = useMemo(getFloorSnapshot, []);
+  // Each Garden root owns its own snapshot. On web, an unmounting root deletes
+  // the images it drew, so a module-wide copy shared with a friend's Garden was
+  // deleted under the still-mounted home Garden when the visitor returned.
+  const floor = useMemo(makeFloor, []);
   const shore=useImage(require('./assets/garden-shore-distance.png'));
   const wet=useImage(require('./assets/water-surface-mask.png'));
   const uniforms=useDerivedValue(() => ({
