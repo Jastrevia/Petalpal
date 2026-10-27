@@ -277,6 +277,16 @@ test("friend removal revokes both directional garden subscriptions", async t => 
   assert.equal((await action(owner, "join-garden", "friend")).ok, false);
 });
 
+test("ending a friendship keeps each person's own Garden subscription", async t => {
+  const f = await fixture(t), owner = await f.socket("owner"), friend = await f.socket("friend");
+  assert.equal((await action(owner, "join-garden", "owner")).ok, true);
+  assert.equal((await action(friend, "join-garden", "owner")).ok, true);
+  assert.equal((await f.call("/friends/remove", "owner", { friendId: "friend" })).status, 200);
+  assert.equal((await action(friend, "move-avatar", move)).ok, false);
+  // No rejoin: the owner is still in their own Garden after the friend is gone.
+  assert.equal((await action(owner, "move-avatar", move)).ok, true);
+});
+
 test("paused authorized movement cannot publish after privacy revocation", async t => {
   const f = await fixture(t), owner = await f.socket("owner"), friend = await f.socket("friend");
   await action(owner, "join-garden", "owner"); await action(friend, "join-garden", "owner");
