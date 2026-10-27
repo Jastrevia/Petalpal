@@ -1,5 +1,19 @@
 # PetalPal Security
 
+## Friends online status, visit alerts and block revocation, 2026-10-26
+
+- **Online status (owner decision: no hide toggle).** `lib/presence.js` tracks, in memory, which
+  users have a socket in their own `user:` room; going offline waits 15 s. Only confirmed friends
+  learn it: `GET /users/:id/friends` (own user only) adds `online`, and `presenceChanged` is sent to
+  each friend's private `user:` room through the existing realtime authorization. Blocking or removing
+  a friend deletes the friendship first, so they stop receiving it. Single API instance assumed, like
+  active visitors. Evidence: `test/back/presence.test.js` 2/2; realtime test "friends are told when
+  someone comes online; outsiders are not".
+- **Visit alerts** reuse the existing `visitRecordAdded` user-room event; no new data is sent.
+- **Block/remove revocation** now keeps each person's own Garden subscription; the cross-Garden
+  revocation is unchanged ("friend removal revokes both directional garden subscriptions" still
+  passes; new test "ending a friendship keeps each person's own Garden subscription").
+
 ## Sign-in recovery and readable auth errors, 2026-10-26
 
 Owner-reported: accounts from the earliest version could neither sign in (forgotten password) nor

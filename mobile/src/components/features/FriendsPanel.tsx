@@ -10,6 +10,7 @@ import { loadFriends, loadFriendRequests, searchFriends, sendFriendRequest, resp
   removeFriend, type FriendUser, type FriendRequest, type FriendRequests } from '../../services/friends';
 import { FEATURE_COLORS as colors, FeatureActionButton, ui } from './FeatureUI';
 import { UserAvatar } from '../avatars/UserAvatar';
+import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
 
 export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onCloseAddFriend = () => {}, onClose = () => {} }: {
   addingFriend?: boolean; onAddFriend?: () => void; onCloseAddFriend?: () => void; onClose?: () => void;
@@ -28,6 +29,13 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
   const [message, setMessage] = useState('');
   const [removing, setRemoving] = useState<FriendUser | null>(null);
   const [filter, setFilter] = useState('');
+  // Live online/offline from the owner's user-room connection; the friends list gives the start.
+  const [live, setLive] = useState<Record<string, boolean>>({});
+  const [selfOnline, setSelfOnline] = useState(userRealtimeConnected());
+  useEffect(() => subscribeUserRealtime({
+    presence: ({ userId, online }) => setLive(current => ({ ...current, [userId]: online })),
+    connection: setSelfOnline,
+  }), []);
   const mounted = useRef(false);
   const locked = useRef(false);
   const scope = useRef({ ownerId });
@@ -109,11 +117,13 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
     onClose();
     router.push({ pathname: '/visit/[ownerId]', params: { ownerId: friend.id } });
   }
-  function identity(user?: FriendUser) {
+  function identity(user?: FriendUser, showPresence = false) {
+    const online = user ? live[user.id] ?? user.online === true : false;
     return <View style={styles.identity}>
-      <UserAvatar avatar={user?.avatar} size={44} style={styles.avatar} />
+      <View><UserAvatar avatar={user?.avatar} size={44} style={styles.avatar} />
+        {showPresence ? <View style={[styles.presenceDot, { backgroundColor: online ? '#7FB77E' : '#9AA79F', borderColor: theme.surface }]} /> : null}</View>
       <View style={styles.name}><Text style={styles.displayName}>{user?.displayName?.trim() || user?.name?.trim() || user?.accountId || user?.id || 'PetalPal user'}</Text>
-        <Text style={styles.caption}>{user?.accountId ? `@${user.accountId}` : 'No username set'}</Text>
+        <Text style={styles.caption}>{showPresence ? (online ? 'Online' : 'Offline') + ' · ' : ''}{user?.accountId ? `@${user.accountId}` : 'No username set'}</Text>
       </View>
     </View>;
   }
@@ -124,7 +134,8 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
       <View style={styles.heroIdentity}>
         <Image source={require('../../../assets/friends/fairies.png')} style={styles.fairies} resizeMode="cover" accessible={false} />
         <View style={styles.name}><Text accessibilityRole="header" style={styles.title}>Friends</Text>
-          <Text style={styles.subtitle}>GOOD FRIENDS{ '\n' }BRIGHTER GARDENS</Text></View>
+          <Text style={styles.subtitle}>GOOD FRIENDS{ '\n' }BRIGHTER GARDENS</Text>
+          <Text testID="self-presence" style={styles.caption}>{selfOnline ? '● You’re online' : '○ You’re offline'}</Text></View>
       </View>
       <View style={styles.topActions}>
         <View style={styles.topAction}>
@@ -189,7 +200,7 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
         return <View key={friend.id} testID={`friend-${friend.id}`} style={styles.listRow}>
           <Pressable style={styles.identity} accessibilityRole="button" accessibilityLabel={`Remove ${friend.name}`}
             disabled={!!busy} onLongPress={() => setRemoving(friend)} onPress={() => setRemoving(friend)}>
-            {identity(friend)}
+            {identity(friend, true)}
           </Pressable>
           <SafetyActions userId={friend.id} onBlocked={() => void refresh()} />
           <Pressable accessibilityRole="button" accessibilityLabel={`Visit ${friend.name}'s Garden`}
@@ -233,6 +244,7 @@ const createStyles = (theme: PanelTheme, light: boolean) => StyleSheet.create({
   section: { gap: 12, padding: 12, borderWidth: 1, borderColor: theme.border, borderRadius: light ? 20 : 16, backgroundColor: theme.surface },
   sectionTitle: { fontFamily: 'serif', fontSize: 20, color: theme.text, marginTop: 6 },
   caption: { fontSize: 12, lineHeight: 18, color: theme.muted },
+  presenceDot: { position: 'absolute', right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 10,
     borderWidth: 1, borderRadius: light ? 20 : 16, borderColor: light ? theme.gold : theme.border, backgroundColor: theme.surface, flexWrap: 'wrap' },
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 100 },

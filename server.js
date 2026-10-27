@@ -10,6 +10,7 @@ import { requestTiming, requestTimingEnabled } from "./lib/request-timing.js";
 import { parseJournalPage, journalPageCursor } from "./lib/journal-pagination.js";
 import { updateAiConsent } from "./lib/ai-consent.js";
 import { CircuitBreaker } from "./lib/circuit-breaker.js";
+import { createPresence } from "./lib/presence.js";
 import { validateJournalCover } from './lib/journal-cover.js';
 import "dotenv/config";
 import express from "express";
@@ -245,18 +246,33 @@ io.use(authenticateSocket);
 
 const realtime = createRealtimeSecurity({ io, db: prisma, authenticate: revalidateSocketIdentity, logger: logServerError });
 
+// Friends see each other online/offline (friends list + live "presenceChanged"). Only confirmed
+// friends are told; blocking or removing a friend deletes the friendship first.
+async function announcePresence(userId, online) {
+  try {
+    const friendships = await prisma.friendship.findMany({ where: { userId }, select: { friendId: true }, take: 500 });
+    for (const { friendId } of friendships) realtime.to(`user:${friendId}`).emit("presenceChanged", { userId, online });
+  } catch (error) { logServerError("Presence announcement error", error); }
+}
+const newPresence = () => createPresence({ onChange: (userId, online) => { void announcePresence(userId, online); } });
+let presence = newPresence();
+export function resetPresenceForTests() { presence = newPresence(); }
+
 io.on("connection", (socket) => {
   if (!realtime.connection(socket)) return;
   socket.on("join-user", (payload, ack) => realtime.run(socket, payload, ack, async (_payload, version) => {
     const normalizedUserId = String(socket.data.currentUserId);
     await socket.join(`user:${normalizedUserId}`);
     if (!realtime.current(socket, version)) { await socket.leave(`user:${normalizedUserId}`); return false; }
+    presence.join(normalizedUserId, socket.id);
     return true;
   }));
   socket.on("leave-user", (payload, ack) => realtime.run(socket, payload, ack, async () => {
     await socket.leave(`user:${socket.data.currentUserId}`);
+    presence.leave(String(socket.data.currentUserId), socket.id);
     return true;
   }));
+  socket.on("disconnect", () => presence.leave(String(socket.data.currentUserId), socket.id));
   socket.on("join-garden", (payload, ack) => realtime.run(socket, payload, ack, async (gardenOwnerId, version) => {
     const sequence = (socket.data.gardenJoinSequence || 0) + 1;
     socket.data.gardenJoinSequence = sequence;
@@ -959,7 +975,8 @@ app.get("/users/:userId/friends", async (req, res) => {
     });
 
     const hidden = await hiddenSocialIds(prisma, req.auth.userId);
-    res.json(friendships.map((item) => item.friend).filter(user => !hidden.has(user.id)));
+    res.json(friendships.map((item) => ({ ...item.friend, online: presence.isOnline(item.friend.id) }))
+      .filter(user => !hidden.has(user.id)));
   } catch (err) {
     logServerError("GET /users/:userId/friends error", err);
     res.status(500).json({ error: "Failed to get friends" });

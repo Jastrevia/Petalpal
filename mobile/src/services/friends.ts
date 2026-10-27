@@ -1,6 +1,8 @@
 import { apiRequest } from './api';
 
-export interface FriendUser { id: string; name: string; displayName?: string; avatar?: string; accountId?: string | null; allowGardenVisits?: boolean }
+export interface FriendUser { id: string; name: string; displayName?: string; avatar?: string; accountId?: string | null; allowGardenVisits?: boolean;
+  /** Friends list only: whether this friend has PetalPal open right now. */
+  online?: boolean }
 export interface FriendRequest {
   id: string; senderId: string; receiverId: string; status: string;
   sender?: FriendUser; receiver?: FriendUser;
