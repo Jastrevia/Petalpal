@@ -37,7 +37,8 @@
     if (url.origin === location.origin) return nativeFetch(input, options);
     if (url.origin === 'https://identitytoolkit.googleapis.com') {
       if (url.pathname === '/v1/accounts:signInWithPassword') {
-        if (request.email !== email || request.password !== password) return json({ error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } }, 400);
+        // Like Firebase, the email ignores case and stray spaces (phones capitalise the first letter).
+        if (String(request.email || '').trim().toLowerCase() !== email || String(request.password || '').trim() !== password) return json({ error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } }, 400);
         signedIn = true;
         return json({ localId: uid, email, displayName: user.name, registered: true, idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600' });
       }
