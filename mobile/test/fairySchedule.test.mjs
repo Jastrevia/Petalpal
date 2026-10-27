@@ -124,3 +124,12 @@ test('a tap on the treehouse takes her straight in and opens the Bookhouse, with
   assert.doesNotMatch(scene, /accessibilityLabel="Open Bookhouse"|accessibilityLabel="Return from treehouse"/);
   assert.match(scene, /onTreehouseEntered=\{\(\) => \{[^}]*if \(bookhouseOnEntry\.current\) \{ bookhouseOnEntry\.current = false; onOpenBookhouse\?\.\(\); \}/);
 });
+
+test('she flies across the Garden quickly (owner feedback: flights felt slow)', () => {
+  const { FLIGHT_SPEED, MIN_FLIGHT_MS } = load('../fairy/FairyNavigation');
+  assert.ok(FLIGHT_SPEED >= 0.3 && MIN_FLIGHT_MS <= 700);
+  const fairy = new FairyNavigation();
+  assert.equal(fairy.move({ x: 0, y: 0 }, () => false, true), true);
+  assert.equal(fairy.state, 'flyingToSwing');
+  assert.ok(fairy.duration <= Math.max(MIN_FLIGHT_MS, fairy.flight.reduce((sum, p, i, all) => i ? sum + distance(all[i - 1], p) : 0, 0) / FLIGHT_SPEED) + 1);
+});

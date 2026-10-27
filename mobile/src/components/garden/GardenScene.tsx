@@ -933,7 +933,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   );
 
   const handleGardenTap = useCallback((screenX: number, screenY: number) => {
-    if (readOnly || fit <= 0) return;
+    // A friend's Garden (readOnly) still opens its flowers, so visitors can support them and leave
+    // a message; planting, calibration and the Fairy stay with the owner.
+    if (fit <= 0) return;
     if (selectedFlower) return;
     const currentZoom = cameraZoom.value;
     const currentCamX = cameraX.value;
@@ -941,7 +943,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     const worldX = (screenX - baseX - currentCamX) / (fit * currentZoom);
     const worldY = (screenY - baseY - currentCamY) / (fit * currentZoom);
 
-    if (__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions') {
+    if (__DEV__ && !readOnly && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions') {
       if (calSubMode === 'mask-paint') {
         return;
       }
@@ -963,7 +965,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
     if(perfFixtureRef.current)return;
     if (activeModeRef.current !== 'normal') {
-      updatePreview(worldX, worldY);
+      if (!readOnly) updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;
       let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitProductionFlower(currentPlacements,worldX,worldY):null;
@@ -982,6 +984,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         openFlowerDetail(hitFlower);
         return;
       }
+      if (readOnly) return;
       // Placement and flower details own taps before any Fairy destination.
       if (enableFairyWalk && fairyRef.current?.isMailboxBusy()) return;
       if (enableFairyWalk) { noteFairyUser(); bookhouseOnEntry.current = false; }
@@ -1220,7 +1223,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         cameraY.value = next.y;
       });
     const tap = Gesture.Tap()
-      .enabled(!(enableFairyWalk && Platform.OS === 'web'))
+      .enabled(!((enableFairyWalk || readOnly) && Platform.OS === 'web'))
       .maxDuration(250)
       .runOnJS(true)
       .onEnd((event) => {
@@ -1241,7 +1244,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     }
     return Gesture.Simultaneous(effectivePan, pinch, tap);
   }, [baseX, baseY, fit, cameraX, cameraY, cameraZoom, focalWorldX, focalWorldY,
-    viewport.width, viewport.height, startX, startY, startZoom, handleGardenTap, enableFairyWalk, previewMode, calibrationMode, calSubMode, calDragMode, paintInteractionMode, maskPan, paintPan, moveMaskPan]);
+    viewport.width, viewport.height, startX, startY, startZoom, handleGardenTap, enableFairyWalk, readOnly, previewMode, calibrationMode, calSubMode, calDragMode, paintInteractionMode, maskPan, paintPan, moveMaskPan]);
   const resetView = useCallback(() => {
     const minimum = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom;
     cameraZoom.value = minimum;
@@ -1312,7 +1315,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       // Web Fairy taps should not expire with the shared camera gesture's
       // 250ms timer. Only canvas presses qualify; controls, drags and pinches do not.
       onPointerDown={(event) => {
-        if (!enableFairyWalk || Platform.OS !== 'web') return;
+        // A friend's Garden (readOnly) uses the same path for opening flowers.
+        if (!(enableFairyWalk || readOnly) || Platform.OS !== 'web') return;
         const e = event.nativeEvent;
         fairyPress.current = e.isPrimary && e.button === 0 &&
           (event.target as unknown as { tagName?: string }).tagName === 'CANVAS'
@@ -1575,7 +1579,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {!readOnly && fixtureParents===null&&<PlantingPlacementControls />}
 
       {/* Flower Detail Modal */}
-      {!readOnly && fixtureParents===null && <FlowerDetailModal />}
+      {fixtureParents===null && <FlowerDetailModal />}
 
       {!readOnly && onOpenReflection && activeMode === 'normal' && !selectedFlower && (
         <Animated.View style={[{ position: 'absolute' }, pavilionEntryStyle]}>

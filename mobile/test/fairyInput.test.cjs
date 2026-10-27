@@ -24,9 +24,9 @@ function expression(name) {
   }
   visit(scene); assert.ok(result, name); return result;
 }
-function inputHarness(webFairy = true) {
+function inputHarness(webFairy = true, readOnly = false) {
   const calls = [], press = { current: null };
-  const context = { enableFairyWalk: webFairy, Platform: { OS: 'web' }, fairyPress: press,
+  const context = { enableFairyWalk: webFairy, readOnly, Platform: { OS: 'web' }, fairyPress: press,
     handleGardenTap: (x, y) => calls.push([x, y]), handlePointerMove() {}, fairyDebug: false };
   const handlers = Object.fromEntries(['onPointerDown', 'onPointerUp', 'onPointerMove', 'onPointerCancel'].map(name =>
     [name, vm.runInNewContext(compile(`(${expression(name)})`), context)]));
@@ -62,6 +62,10 @@ test('controls, right clicks, cancelled presses, drags and multi-touch never sel
   const garden = inputHarness(false);
   garden.handlers.onPointerDown(canvas); garden.handlers.onPointerUp(canvas);
   assert.equal(garden.calls.length, 0, 'Ordinary Garden retains its existing gesture handler');
+  // A friend's Garden opens flowers through the same canvas press on web.
+  const visit = inputHarness(false, true);
+  visit.handlers.onPointerDown(canvas); visit.handlers.onPointerUp(canvas);
+  assert.equal(visit.calls.length, 1);
 });
 test('measured paving destinations accept first try while lawns, water and narrow-path constraints remain intact', () => {
   const world = (x, y) => ({ x: (x - 202.6666667) / .3644444444, y: (y - 64) / .3644444444 });
@@ -267,4 +271,7 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   context.fairyStateRef.current = 'idle';
   context.bookhouseOnEntry.current = true; expect(['move', 'redraw']); assert.equal(context.bookhouseOnEntry.current, false);
   context.readOnly = true; expect([]);
+  // A friend's Garden still opens its flowers (support and messages), never planting or the Fairy.
+  context.hitProductionFlower = () => ({ id: 'synthetic-flower' }); expect(['detail'], false);
+  context.hitProductionFlower = () => null; context.activeModeRef.current = 'plant'; expect([]);
 });

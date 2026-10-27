@@ -15,6 +15,9 @@ import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
 import { momentLocale } from '../moments/momentFormat';
+import { startUserRealtime, stopUserRealtime, subscribeUserRealtime, visitNotice } from '../../services/userRealtime';
+import { UserAvatar } from '../avatars/UserAvatar';
+import { zhHans } from './fairy/tapLines';
 
 // One navigation model; only its sizing changes with the viewport.
 export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) {
@@ -40,8 +43,27 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const [entryOpen, setEntryOpen] = useState(false);
   const [bondOpen, setBondOpen] = useState(false);
   const closeness = useClosenessSummary(entryOpens);
-  const { experience } = useAuth();
+  const { experience, session } = useAuth();
   const locale = momentLocale(experience?.user.preferredLocale);
+  // Being in the app keeps the owner online for friends; visits to their Garden pop up briefly.
+  const ownerId = session?.user.id;
+  const chinese = zhHans(experience?.user.preferredLocale);
+  const [notice, setNotice] = useState<{ key: number; text: string; avatar?: string } | null>(null);
+  useEffect(() => {
+    if (!ownerId) return;
+    startUserRealtime(ownerId);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeUserRealtime({ visit: (record, gardenOwnerId) => {
+      if (gardenOwnerId !== ownerId || !record.visitorId || record.visitorId === ownerId) return;
+      const text = visitNotice(record, chinese);
+      if (!text) return;
+      setNotice(previous => ({ key: (previous?.key ?? 0) + 1, text, avatar: record.visitorAvatar }));
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setNotice(null), 5000);
+    } });
+    return () => { unsubscribe(); if (timer) clearTimeout(timer); };
+  }, [ownerId, chinese]);
+  useEffect(() => () => stopUserRealtime(), []);
   const bondWaiting = Boolean(closeness.summary && !closeness.summary.checkIn.checkedInToday);
   const fairyDot = moments.unread || bondWaiting;
   useEffect(() => {
@@ -100,6 +122,11 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         <Text style={styles.label}>Garden history</Text>
       </Pressable>
     </View>
+    {notice ? <Pressable key={notice.key} testID="visit-notice" accessibilityRole="alert" accessibilityLiveRegion="polite"
+      onPress={() => setNotice(null)} style={[styles.notice, { top: insets.top + 60, backgroundColor: theme.background, borderColor: theme.gold }]}>
+      <UserAvatar avatar={notice.avatar} size={30} />
+      <Text style={[styles.noticeText, { color: theme.text }]}>{notice.text}</Text>
+    </Pressable> : null}
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}
       momentsOn={moments.enabled} momentsUnread={moments.unread} onClose={() => setEntryOpen(false)}
       onOpenMoments={() => { setEntryOpen(false); setMomentsOpen(true); markFairyMomentsRead(); }}
@@ -125,6 +152,9 @@ const styles = StyleSheet.create({
   label: { color: FEATURE_COLORS.ink, fontSize: 10, fontWeight: '600', textAlign: 'center' },
   pressed: { opacity: .7, transform: [{ scale: .96 }] },
   unread: { position: 'absolute', top: 0, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, backgroundColor: '#E5735F' },
+  notice: { position: 'absolute', alignSelf: 'center', maxWidth: 340, flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 9, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, boxShadow: '0 3px 12px #163D4030' },
+  noticeText: { fontFamily: 'serif', fontSize: 14, lineHeight: 19, flexShrink: 1 },
   info: { position: 'absolute', alignSelf: 'center', gap: 5, maxWidth: 220,
     borderRadius: 14, padding: 8, backgroundColor: '#fffaf0e8' },
 });

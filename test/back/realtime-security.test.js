@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { io as connectSocket } from "socket.io-client";
 import prisma from "../../lib/prisma.js";
 import { setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
-import { server, setFirebaseUserDeleterForTests } from "../../server.js";
+import { resetPresenceForTests, server, setFirebaseUserDeleterForTests } from "../../server.js";
 import { createSocketBudget, SOCKET_MAX_PACKET_BYTES } from "../../lib/socket-security.js";
 
 async function fixture(t) {
@@ -47,6 +47,8 @@ async function fixture(t) {
     return { count };
   }
   stub(prisma.friendship, "deleteMany", async args => deleteFriendships(state.friends, args));
+  stub(prisma.friendship, "findMany", async ({ where }) => [...state.friends].map(key => key.split(":"))
+    .filter(([userId]) => userId === where.userId).map(([, friendId]) => ({ friendId })));
   stub(prisma.garden, "findUnique", async () => null);
   stub(prisma.auditEvent, "create", async () => ({ id: "synthetic-audit" }));
   stub(prisma, "$transaction", async (callback, options) => {
@@ -277,6 +279,16 @@ test("friend removal revokes both directional garden subscriptions", async t => 
   assert.equal((await action(owner, "join-garden", "friend")).ok, false);
 });
 
+test("ending a friendship keeps each person's own Garden subscription", async t => {
+  const f = await fixture(t), owner = await f.socket("owner"), friend = await f.socket("friend");
+  assert.equal((await action(owner, "join-garden", "owner")).ok, true);
+  assert.equal((await action(friend, "join-garden", "owner")).ok, true);
+  assert.equal((await f.call("/friends/remove", "owner", { friendId: "friend" })).status, 200);
+  assert.equal((await action(friend, "move-avatar", move)).ok, false);
+  // No rejoin: the owner is still in their own Garden after the friend is gone.
+  assert.equal((await action(owner, "move-avatar", move)).ok, true);
+});
+
 test("paused authorized movement cannot publish after privacy revocation", async t => {
   const f = await fixture(t), owner = await f.socket("owner"), friend = await f.socket("friend");
   await action(owner, "join-garden", "owner"); await action(friend, "join-garden", "owner");
@@ -335,4 +347,18 @@ test("a stale concurrent join cannot remove the latest same-garden subscription"
   assert.equal((await action(friend, "join-garden", "owner")).ok, true);
   release(); assert.equal((await older).ok, false);
   assert.equal((await action(friend, "move-avatar", move)).ok, true);
+});
+
+test("friends are told when someone comes online; outsiders are not", async t => {
+  const f = await fixture(t); resetPresenceForTests();
+  const friend = await f.socket("friend"), outsider = await f.socket("outsider");
+  assert.equal((await action(friend, "join-user", "friend")).ok, true);
+  assert.equal((await action(outsider, "join-user", "outsider")).ok, true);
+  const seen = [], leaked = [];
+  friend.on("presenceChanged", data => seen.push(data)); outsider.on("presenceChanged", data => leaked.push(data));
+  const owner = await f.socket("owner");
+  assert.equal((await action(owner, "join-user", "owner")).ok, true);
+  await delay(100);
+  assert.deepEqual(seen, [{ userId: "owner", online: true }]);
+  assert.deepEqual(leaked, []);
 });
