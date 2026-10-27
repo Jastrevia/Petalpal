@@ -16,9 +16,12 @@ const mobile = path.resolve(here, '../..');
 const fixtures = path.join(here, 'fixtures.js');
 
 // A fresh Metro cache: a shared one can serve another checkout's code or API address.
-const expo = spawn('npx', ['expo', 'start', '--port', String(EXPO_PORT)], {
-  cwd: mobile, stdio: ['ignore', 'inherit', 'inherit'],
-  env: { ...process.env, TMPDIR: mkdtempSync(path.join(tmpdir(), 'petalpal-web-local-')), EXPO_NO_TELEMETRY: '1',
+// Windows reads TEMP/TMP instead of TMPDIR, and npx there is npx.cmd, which needs a shell.
+const cache = mkdtempSync(path.join(tmpdir(), 'petalpal-web-local-'));
+const windows = process.platform === 'win32';
+const expo = spawn(windows ? 'npx.cmd' : 'npx', ['expo', 'start', '--port', String(EXPO_PORT)], {
+  cwd: mobile, stdio: ['ignore', 'inherit', 'inherit'], shell: windows,
+  env: { ...process.env, TMPDIR: cache, TEMP: cache, TMP: cache, EXPO_NO_TELEMETRY: '1',
     EXPO_PUBLIC_API_BASE_URL: 'https://api.synthetic.invalid',
     EXPO_PUBLIC_FIREBASE_API_KEY: 'synthetic-public-build-fixture', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'fixture.invalid',
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'petalpal-synthetic', EXPO_PUBLIC_FIREBASE_APP_ID: 'synthetic-public-app' },
