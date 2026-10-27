@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View,
-  useWindowDimensions } from 'react-native';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { drawPetalCard, type PetalCardFace, type PetalToday } from '../../services/petalCardDraw';
 import { PETAL_CARD_ART } from './petalCardArt';
+import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
 
 const BACKS = {
   lilac: require('@/assets/petal-card-backs/lilac.webp'),
@@ -19,7 +22,6 @@ const COPY = {
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
-const wrap = (a: number) => mod(a + 180, 360) - 180;
 
 // The petal ring (design: the owner's loop ring): a few card places on a tilted ring with the
 // whole of today's deck flowing through them. One step brings the next card to the front, a
@@ -36,8 +38,11 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
     return { cw, ch: Math.round(cw * 1.55), r, n, step: 360 / n };
   }, [vw, vh]);
   const deckSize = today?.deckSize ?? 69;
-  const [angle, setAngle] = useState(0);
-  const motion = useRef({ angle: 0, velocity: 0, dragging: false, start: 0, last: 0, lastT: 0 });
+  usePauseGardenWhile(visible);
+  // The ring turns on the UI thread: each card reads the shared angle in its own animated style,
+  // so spinning never re-renders the deck. React only hears when a new card reaches the front.
+  const angle = useSharedValue(0), velocity = useSharedValue(0), dragging = useSharedValue(false), lastX = useSharedValue(0);
+  const [front, setFront] = useState(0);
   const [phase, setPhase] = useState<'spin' | 'drawing' | 'chosen' | 'revealed'>('spin');
   const [face, setFace] = useState<PetalCardFace | null>(null);
   const [chosenNo, setChosenNo] = useState(0);
@@ -53,47 +58,48 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
       lift.setValue(1); flip.setValue(1);
     } else {
       setFace(null); setPhase('spin');
-      motion.current.angle = 0; motion.current.velocity = -1.4; setAngle(0);
+      angle.value = 0; velocity.value = -1.4; setFront(0);
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Inertia and snapping, one frame at a time while spinning.
+  // Inertia and snapping, frame-rate independent, only while the ring is open and spinning.
+  const step = size.step;
+  const spinning = useFrameCallback(info => {
+    if (dragging.value) return;
+    const k = Math.min(4, (info.timeSincePreviousFrame ?? 16) / 16);
+    if (Math.abs(velocity.value) > 0.03) { angle.value += velocity.value * k; velocity.value *= Math.pow(0.955, k); }
+    else {
+      const target = Math.round(angle.value / step) * step;
+      velocity.value = 0;
+      if (Math.abs(target - angle.value) > 0.01) angle.value += (target - angle.value) * Math.min(1, 0.14 * k);
+    }
+  }, false);
   useEffect(() => {
-    if (!visible || phase !== 'spin') return;
-    let frame = 0;
-    const tick = () => {
-      const m = motion.current;
-      if (!m.dragging) {
-        if (Math.abs(m.velocity) > 0.03) { m.angle += m.velocity; m.velocity *= 0.955; }
-        else { const target = Math.round(m.angle / size.step) * size.step; m.angle += (target - m.angle) * 0.14; m.velocity = 0; }
-      }
-      setAngle(m.angle);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [visible, phase, size.step]);
+    spinning.setActive(visible && phase === 'spin');
+    return () => spinning.setActive(false);
+  }, [visible, phase, spinning]);
+  useAnimatedReaction(() => Math.round(-angle.value / step), (next, previous) => {
+    if (next !== previous) runOnJS(setFront)(next);
+  }, [step]);
 
-  const pan = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
-    onPanResponderGrant: (_, g) => { const m = motion.current; m.dragging = true; m.velocity = 0; m.start = m.angle; m.last = g.dx; m.lastT = Date.now(); },
-    onPanResponderMove: (_, g) => {
-      const m = motion.current, now = Date.now();
-      const turn = (g.dx - m.last) * (180 / (Math.PI * size.r));
-      m.angle += turn; m.velocity = turn / Math.max(1, (now - m.lastT) / 16); m.last = g.dx; m.lastT = now;
-    },
-    onPanResponderRelease: () => { motion.current.dragging = false; },
-    onPanResponderTerminate: () => { motion.current.dragging = false; },
-  }), [size.r]);
+  const degPerPx = 180 / (Math.PI * size.r);
+  // A drag ends with a release over some card; that release must not count as choosing it.
+  const lastDrag = useRef(0);
+  const noteDrag = () => { lastDrag.current = Date.now(); };
+  const ringActive = phase === 'spin' || phase === 'drawing';
+  const pan = useMemo(() => Gesture.Pan().enabled(ringActive).activeOffsetX([-6, 6]).failOffsetY([-14, 14])
+    .onBegin(() => { dragging.value = true; velocity.value = 0; lastX.value = 0; })
+    .onStart(() => { runOnJS(noteDrag)(); })
+    .onUpdate(e => { angle.value += (e.translationX - lastX.value) * degPerPx; lastX.value = e.translationX; })
+    .onEnd(e => { velocity.value = (e.velocityX / 60) * degPerPx; runOnJS(noteDrag)(); })
+    .onFinalize(() => { dragging.value = false; }), [ringActive, degPerPx, angle, velocity, dragging, lastX]);
 
-  const position = -angle / size.step;
-  const front = Math.round(position);
-  const placeOf = (i: number) => i + size.n * Math.round((position - i) / size.n);
+  const placeOf = (i: number) => i + size.n * Math.round((front - i) / size.n);
   const frontNo = mod(front, deckSize) + 1;
 
   async function choose(place: number) {
-    if (phase !== 'spin') return;
-    if (place !== front) { motion.current.angle = -place * size.step; motion.current.velocity = 0; return; }
+    if (phase !== 'spin' || Date.now() - lastDrag.current < 350) return;
+    if (place !== front) { velocity.value = 0; angle.value = -place * size.step; return; }
     setPhase('drawing'); setError('');
     try {
       const result = await drawPetalCard(mod(place, deckSize));
@@ -115,7 +121,8 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const frontFace = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const turn = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '90deg', '0deg'] });
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-    <View style={styles.sky} {...(showRing ? pan.panHandlers : {})}>
+    <GestureHandlerRootView style={{ flex: 1 }}><GestureDetector gesture={pan}>
+    <View style={styles.sky}>
       {STARS.map(([x, y, s], i) => <View key={i} pointerEvents="none" style={[styles.star, { left: `${x}%`, top: `${y}%`, width: s, height: s }]} />)}
       <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
         <Text style={styles.closeText}>×</Text>
@@ -132,18 +139,9 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
 
       {showRing ? <View style={[styles.ringCenter, { top: vh * 0.47 }]}>
         {Array.from({ length: size.n }, (_, i) => {
-          const deg = i * size.step + angle, rad = (deg * Math.PI) / 180;
-          const z = size.r * Math.cos(rad), x = size.r * Math.sin(rad);
-          const s = P / (P - z), facing = (Math.cos(rad) + 1) / 2;
-          const place = placeOf(i), isFront = place === front;
-          return <Pressable key={i} onPress={() => void choose(place)} accessibilityRole="button"
-            accessibilityLabel={`${copy.no} ${mod(place, deckSize) + 1}`}
-            style={{ position: 'absolute', left: -size.cw / 2, top: -size.ch / 2, width: size.cw, zIndex: Math.round(facing * 100),
-              opacity: 0.3 + 0.7 * facing,
-              transform: [{ translateX: x * s }, { translateY: z * tilt * s }, { perspective: 900 }, { rotateY: `${wrap(deg)}deg` }, { scale: s }] }}>
-            <Image source={back} style={[{ width: size.cw, height: size.ch, borderRadius: size.cw * 0.07 }, isFront && styles.glow]} />
-            <Text style={[styles.no, { fontSize: size.cw * 0.15 }]}>{mod(place, deckSize) + 1}</Text>
-          </Pressable>;
+          const place = placeOf(i);
+          return <RingCard key={i} index={i} place={place} number={mod(place, deckSize) + 1} isFront={place === front}
+            angle={angle} size={size} perspective={P} tilt={tilt} back={back} label={`${copy.no} ${mod(place, deckSize) + 1}`} onChoose={choose} />;
         })}
       </View> : null}
 
@@ -176,8 +174,33 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         </Pressable>
       </ScrollView> : null}
     </View>
+    </GestureDetector></GestureHandlerRootView>
   </Modal>;
 }
+
+// One card on the ring. Its place on the tilted circle is computed on the UI thread from the
+// shared angle; it re-renders only when its number, glow or size change.
+const RingCard = memo(function RingCard({ index, place, number, isFront, angle, size, perspective, tilt, back, label, onChoose }: {
+  index: number; place: number; number: number; isFront: boolean; angle: SharedValue<number>;
+  size: { cw: number; ch: number; r: number; step: number }; perspective: number; tilt: number;
+  back: ImageSourcePropType; label: string; onChoose: (place: number) => void;
+}) {
+  const { cw, ch, r, step } = size;
+  const style = useAnimatedStyle(() => {
+    const deg = index * step + angle.value, rad = (deg * Math.PI) / 180;
+    const z = r * Math.cos(rad), x = r * Math.sin(rad);
+    const s = perspective / (perspective - z), facing = (Math.cos(rad) + 1) / 2;
+    const turned = (((deg + 180) % 360) + 360) % 360 - 180;
+    return { zIndex: Math.round(facing * 100), opacity: 0.3 + 0.7 * facing,
+      transform: [{ translateX: x * s }, { translateY: z * tilt * s }, { perspective: 900 }, { rotateY: `${turned}deg` }, { scale: s }] };
+  }, [index, step, r, perspective, tilt]);
+  return <Reanimated.View style={[{ position: 'absolute', left: -cw / 2, top: -ch / 2, width: cw }, style]}>
+    <Pressable onPress={() => onChoose(place)} accessibilityRole="button" accessibilityLabel={label}>
+      <Image source={back} style={[{ width: cw, height: ch, borderRadius: cw * 0.07 }, isFront && styles.glow]} />
+      <Text style={[styles.no, { fontSize: cw * 0.15 }]}>{number}</Text>
+    </Pressable>
+  </Reanimated.View>;
+});
 
 // A fixed scatter of faint stars over the night background.
 const STARS: [number, number, number][] = Array.from({ length: 36 }, (_, i) => [((i * 37) % 97) + 1.5, ((i * 53) % 89) + 4, i % 5 === 0 ? 3 : 2]);

@@ -98,6 +98,7 @@ import {
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
 import MailboxGlow from './MailboxGlow';
+import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
 import GardenLand09InterfaceLayer from './GardenLand09InterfaceLayer';
@@ -479,7 +480,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [gardenActive, setGardenActive] = useState(true);
   const canvasRef = useCanvasRef();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
-  const worldActive = gardenActive && foreground;
+  const overlayPaused = useGardenPausedByOverlay();
+  const worldActive = gardenActive && foreground && !overlayPaused;
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
