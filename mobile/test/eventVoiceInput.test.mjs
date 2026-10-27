@@ -7,7 +7,7 @@ import { hookHarness } from './flowerDetail.test.mjs';
 const source = ts.transpileModule(fs.readFileSync(new URL('../src/hooks/useEventVoiceInput.ts', import.meta.url), 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
-function harness({ permission = async () => ({ granted: true }), transcribe = async () => 'spoken words', maxLength = 4000, inputName = 'Event' } = {}) {
+function harness({ permission = async () => ({ granted: true }), transcribe = async () => 'spoken words', maxLength = 4000, inputName = 'Event', aiProcessing = true, os = 'ios' } = {}) {
   const hooks = hookHarness(); let content = 'Typed'; let tick, background, now = 0;
   const calls = { requests: 0, deleted: [], records: 0 };
   const recorder = { uri: 'file:///temporary.m4a', recording: false,
@@ -15,7 +15,8 @@ function harness({ permission = async () => ({ granted: true }), transcribe = as
     getStatus() { return { isRecording: this.recording }; }, stop: async () => { recorder.recording = false; } };
   const deps = {
     react: hooks.react,
-    'react-native': { Platform: { OS: 'ios' }, AppState: { addEventListener: (_, fn) => { background = fn; return { remove() {} }; } } },
+    '../services/api': { apiRequest: async path => { assert.equal(path, '/users/owner/ai-consent'); return { aiProcessing }; } },
+    'react-native': { Platform: { OS: os }, AppState: { addEventListener: (_, fn) => { background = fn; return { remove() {} }; } } },
     'expo-audio': { useAudioRecorder: () => recorder, RecordingPresets: { HIGH_QUALITY: {} },
       AudioModule: { requestRecordingPermissionsAsync: permission }, setAudioModeAsync: async () => {} },
     '../services/auth': { useAuth: () => ({ session: { user: { id: 'owner' } } }) },
@@ -75,4 +76,15 @@ test('Journal dictation preserves draft, limits to 2000, and retains overflow', 
   assert.equal(h.content(), 'x'.repeat(1998) + '\ne');
   assert.equal(h.voice().overflow, 'xtra words');
   assert.match(h.voice().error, /journal reached 2000/);
+});
+test('voice explains AI Processing and browsers that cannot record, before asking for the microphone', async () => {
+  let asked = 0;
+  const off = harness({ aiProcessing: false, permission: async () => { asked++; return { granted: true }; } });
+  await off.voice().start(); await off.flush();
+  assert.match(off.voice().error, /AI Processing must be on\. Turn it on in Me → Settings → AI & privacy/);
+  assert.equal(asked, 0); assert.equal(off.voice().active, false); assert.equal(off.content(), 'Typed');
+  const inApp = harness({ os: 'web' });
+  await inApp.voice().start(); await inApp.flush();
+  assert.match(inApp.voice().error, /This browser can’t record audio\. Open PetalPal in Safari or Chrome/);
+  assert.equal(inApp.calls.records, 0);
 });

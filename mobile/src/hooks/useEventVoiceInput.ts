@@ -96,8 +96,13 @@ export function useEventVoiceInput(content: string, setContent: (text: string) =
     const id = ++operation.current;
     setCurrentPhase('preparing'); setError(''); setOverflow(''); setSeconds(0);
     try {
+      // In-app browsers (WeChat, some social apps) cannot record audio at all.
+      if (Platform.OS === 'web' && (typeof MediaRecorder === 'undefined' || typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia)) {
+        throw new Error(`This browser can’t record audio. Open PetalPal in Safari or Chrome to speak, or type your ${inputName}.`);
+      }
       const consent = await apiRequest<{aiProcessing:boolean}>(`/users/${session.user.id}/ai-consent`);
-      if (!consent.aiProcessing) throw new Error('Voice input sends your recording to Cloudflare Workers AI. Read the AI disclosure and enable AI Processing in Settings first, or type instead.');
+      // New accounts start with AI off, so this is the usual reason voice "doesn't work" for them.
+      if (!consent.aiProcessing) throw new Error(`Voice input uses AI (Cloudflare Workers AI) to turn speech into text, so AI Processing must be on. Turn it on in Me → Settings → AI & privacy, then tap the microphone again. You can also type your ${inputName}.`);
       if (id !== operation.current) return;
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (id !== operation.current) return;
