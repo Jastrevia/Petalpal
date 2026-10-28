@@ -315,7 +315,7 @@ export default function Reflection() {
   const atStart = index <= 0, atEnd = index >= pages.length - 1;
   const leafSize = { left: compact ? 0 : pageWidth, width: pageWidth, height: area.height };
 
-  return <ScrollView style={{ flex: 1, backgroundColor: '#35271D' }} contentContainerStyle={{ minHeight: height, alignItems: 'center' }}>
+  return <View style={{ flex: 1, backgroundColor: '#35271D' }}><ScrollView style={{ flex: 1, backgroundColor: '#35271D' }} contentContainerStyle={{ minHeight: height, alignItems: 'center' }}>
     <View style={{ width: sceneWidth, height: sceneHeight, overflow: 'hidden' }} testID="reflection-scene">
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={require('../../assets/reflection/lake-day-v2.png')} style={lakeCamera} />
@@ -323,8 +323,6 @@ export default function Reflection() {
         <Image source={interiorDay} style={camera} />
         <Animated.Image source={interiorNight} style={[camera, { opacity: lighting }]} />
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close Reflections" onPress={leave} hitSlop={6}
-        style={[s.back, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel="Lantern — night lighting" accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint="Turn the lantern on for night, or off for day" onPress={() => setNightOverride(!night)} hitSlop={6}
         style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
       {!compact && (['weekly', 'monthly'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: type === item }} aria-selected={type === item} accessibilityLabel={`${title(item)} reflections`} disabled={!!turning} onPress={() => setType(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>
@@ -398,7 +396,10 @@ export default function Reflection() {
         </View>}
       </View>
     </View>
-  </ScrollView>;
+  </ScrollView>
+  {/* Outside the ScrollView: × stays in the corner however far the page is scrolled. */}
+  <Pressable accessibilityRole="button" accessibilityLabel="Close Reflections" onPress={leave} hitSlop={6}
+    style={[s.back, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable></View>;
 }
 const s = StyleSheet.create({
   back: { position: 'absolute', zIndex: 20, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
