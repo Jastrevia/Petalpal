@@ -99,7 +99,7 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
-import PigeonCourier from './PigeonCourier';
+import Letterwing from './Letterwing';
 import GardenCritters from './critters/GardenCritters';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
@@ -1510,7 +1510,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 set (static-front pass) still draw above her. */}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
-            {enableFairyWalk && !readOnly && showLandmarks && <PigeonCourier placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
+            {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
             <GardenFairy motionClock={fairySeconds} onMailboxOpened={() => {
