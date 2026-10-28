@@ -48,7 +48,7 @@ test('at most two visitors, never the same one twice at once', () => {
   assert.equal(active.length, 2);
 });
 
-test('a visit fades in, travels its whole path in its rhythm, and fades out', () => {
+test('a visitor fades in, travels its whole path in its rhythm, and stays in sight', () => {
   for (const id of visits.CRITTER_IDS) {
     let visit = null;
     for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 1, now: 100, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed) });
@@ -56,7 +56,7 @@ test('a visit fades in, travels its whole path in its rhythm, and fades out', ()
     const end = plain(visits.visitPose(visit, 100 + visit.duration));
     assert.equal(start.opacity, 0, `${id} starts invisible`);
     assert.equal(mid.opacity, 1, `${id} is fully visible mid-visit`);
-    assert.ok(end.opacity < 1e-9, `${id} ends invisible`);
+    assert.equal(end.opacity, 1, `${id} does not fade out: it stays`);
     const length = visits.pathLength(visit.path), burst = visit.rhythm.cycle * visit.rhythm.moving * visit.speed;
     const gone = visits.visitDistance(visit, 100 + visit.duration);
     assert.ok(gone <= length + 1e-6 && gone >= length - (burst || 1e-6) - 1e-6, `${id} ends on its path, at most one burst short of the end`);
@@ -78,8 +78,8 @@ test('rhythms: steady flyers glide, the rabbit moves in hops', () => {
 });
 
 test('distance along the path grows with travel and stops at the end', () => {
-  const visit = { key: 1, id: 'puppy', path: [{ x: 0, y: 0 }, { x: 300, y: 0 }], start: 10, duration: 0, speed: 62, rhythm: visits.RHYTHMS.puppy };
-  visit.duration = visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, visit.rhythm) + visits.FADE_SECONDS * 2;
+  const visit = { key: 1, id: 'puppy', path: [{ x: 0, y: 0 }, { x: 300, y: 0 }], start: 10, duration: 0, speed: 62, rhythm: visits.RHYTHMS.puppy, lead: visits.FADE_SECONDS, fadeIn: true, walked: 0 };
+  visit.duration = visits.FADE_SECONDS + visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, visit.rhythm);
   assert.equal(visits.visitDistance(visit, 10), 0);
   let previous = 0;
   for (let s = 10; s <= 10 + visit.duration; s += 0.1) {
@@ -93,11 +93,43 @@ test('distance along the path grows with travel and stops at the end', () => {
 test('every rabbit pause lands on a whole hop, so its painted frames show it sitting', () => {
   const hop = visits.burstLength('rabbit'), rhythm = visits.RHYTHMS.rabbit;
   assert.ok(Math.abs(hop - 75.7) < 1, 'one hop covers the ground its painted hop does');
-  const visit = { key: 1, id: 'rabbit', path: [{ x: 0, y: 0 }, { x: 1000, y: 0 }], start: 0, duration: 0, speed: visits.CRITTERS.rabbit.speed, rhythm };
-  visit.duration = visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, rhythm) + visits.FADE_SECONDS * 2;
-  for (let burst = 1; burst * rhythm.cycle < visit.duration - visits.FADE_SECONDS * 2; burst++) {
+  const visit = { key: 1, id: 'rabbit', path: [{ x: 0, y: 0 }, { x: 1000, y: 0 }], start: 0, duration: 0, speed: visits.CRITTERS.rabbit.speed, rhythm, lead: visits.FADE_SECONDS, fadeIn: true, walked: 0 };
+  visit.duration = visits.FADE_SECONDS + visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, rhythm);
+  for (let burst = 1; burst * rhythm.cycle < visit.duration - visits.FADE_SECONDS; burst++) {
     // Mid-pause, after this burst.
     const d = visits.visitDistance(visit, visits.FADE_SECONDS + (burst - 0.25) * rhythm.cycle);
     assert.ok(Math.abs(d - burst * hop) < 1e-6, `pause ${burst} at ${d.toFixed(2)}, not ${(burst * hop).toFixed(2)}`);
   }
+});
+
+test('visitors stay: each leg rests where the last one stopped, then sets off on dry paths', () => {
+  const walkable = new Set(edges.map(edge => `${Math.min(edge.a, edge.b)}-${Math.max(edge.a, edge.b)}`));
+  for (const id of visits.CRITTER_IDS) {
+    let visit = null;
+    for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 7, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed) });
+    const random = seeded(99);
+    for (let leg = 0; leg < 12; leg++) {
+      const end = visit.start + visit.duration, stop = plain(visits.visitPose(visit, end));
+      const walked = visit.walked + visits.visitDistance(visit, end);
+      const next = visits.planNextLeg({ visit, now: end + 0.1, network: WALK_NETWORK, edges, points, random });
+      assert.ok(next, `${id} finds a way on after leg ${leg}`);
+      const rest = plain(visits.visitPose(next, end + 0.1)), [low, high] = visits.REST[id];
+      assert.ok(Math.hypot(rest.x - stop.x, rest.y - stop.y) < 1e-6, `${id} leg ${leg + 1} starts where leg ${leg} stopped`);
+      assert.equal(rest.opacity, 1, `${id} does not fade between legs`);
+      assert.equal(next.key, visit.key, 'the same visitor');
+      assert.ok(next.lead >= low && next.lead <= high, `${id} rests ${next.lead.toFixed(2)} s`);
+      assert.ok(Math.abs(next.walked - walked) < 1e-6, `${id} strides carry on from the ground already covered`);
+      if (visits.CRITTERS[id].kind === 'walker') {
+        // After the stretch to the node ahead, only dry path segments.
+        const nodes = next.path.map(point => WALK_NETWORK.nodes.indexOf(point));
+        for (let i = 2; i < nodes.length; i++) assert.ok(walkable.has(`${Math.min(nodes[i - 1], nodes[i])}-${Math.max(nodes[i - 1], nodes[i])}`), `${id} leg ${leg + 1} keeps to dry paths`);
+        assert.ok(nodes[1] >= 0 && nodes.slice(1).every(n => n >= 0), `${id} heads for path points`);
+      }
+      visit = next;
+    }
+  }
+});
+
+test('visitors go home only after the Garden has been away a good while', () => {
+  assert.ok(visits.AWAY_SECONDS >= 5 * 60);
 });

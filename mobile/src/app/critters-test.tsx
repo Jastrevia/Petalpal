@@ -33,7 +33,8 @@ export default function CrittersTestScreen() {
     const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
     const spec = CRITTERS[id], rhythm = RHYTHMS[id];
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
-    return { key: round, id, path, start, duration: travelSeconds(length / spec.speed, rhythm) + FADE_SECONDS * 2, speed: spec.speed, rhythm };
+    return { key: round, id, path, start, duration: FADE_SECONDS + travelSeconds(length / spec.speed, rhythm), speed: spec.speed, rhythm,
+      lead: FADE_SECONDS, fadeIn: true, walked: 0 };
   }, [id, round, start]);
   // Rounds run on the preview clock, so slow motion stretches them too.
   useEffect(() => {

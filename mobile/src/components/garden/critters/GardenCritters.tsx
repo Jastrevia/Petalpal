@@ -5,7 +5,7 @@ import { isGardenGroundBlocked } from '../fairy/gardenGround';
 import { safeSegment, WALK_NETWORK } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  burstLength, CRITTERS, nextGap, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
+  AWAY_SECONDS, burstLength, CRITTERS, nextGap, planNextLeg, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
 } from './critterVisits';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
@@ -31,38 +31,48 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 
-// Schedules the visits: one now and then, at most two at once, only while the Garden is active.
+// Schedules the visitors: one now and then until two are here, only while the Garden is active.
+// They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have gone.
 export default memo(function GardenCritters({ clock, active }: { clock: SharedValue<number>; active: boolean }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
+  const awaySince = useRef<number | null>(null);
   useEffect(() => {
-    if (!active) return;
+    if (!active) { awaySince.current = Date.now(); return; }
+    const left = awaySince.current !== null && Date.now() - awaySince.current >= AWAY_SECONDS * 1000;
+    awaySince.current = null;
+    if (left) { visitsRef.current = []; setVisits([]); }
     let timer: ReturnType<typeof setTimeout>;
     const arrive = () => {
       const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
         network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random });
-      if (visit) {
-        setVisits(current => [...current, visit]);
-        setTimeout(() => setVisits(current => current.filter(item => item.key !== visit.key)), (visit.duration + 0.5) * 1000);
-      }
+      if (visit) setVisits(current => [...current, visit]);
       timer = setTimeout(arrive, nextGap(Math.random) * 1000);
     };
     // The first visitor comes a few seconds after the Garden opens.
-    timer = setTimeout(arrive, 4000 + Math.random() * 6000);
-    return () => clearTimeout(timer);
+    timer = setTimeout(arrive, visitsRef.current.length ? nextGap(Math.random) * 1000 : 4000 + Math.random() * 6000);
+    // A visitor whose leg is over rests and sets off again (checked often, so the bluebird,
+    // which does not rest, flies straight on).
+    const legs = setInterval(() => {
+      const now = clock.value;
+      if (!visitsRef.current.some(visit => now >= visit.start + visit.duration)) return;
+      setVisits(current => current.map(visit => (now < visit.start + visit.duration ? visit
+        : planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random }) ?? visit)));
+    }, 150);
+    return () => { clearTimeout(timer); clearInterval(legs); };
   }, [active, clock]);
   // Development only: window.__gardenCritters.spawn('rabbit') brings one now; .visits lists them.
   useEffect(() => {
     if (!__DEV__ || typeof window === 'undefined') return;
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
       visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1) })),
+      clear: () => setVisits([]),
       spawn: (id: CritterId) => {
         for (let attempt = 0; attempt < 40; attempt++) {
           const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random });
           if (visit?.id === id) {
             setVisits(current => [...current, visit]);
-            setTimeout(() => setVisits(current => current.filter(item => item.key !== visit.key)), (visit.duration + 0.5) * 1000);
             return true;
           }
         }
@@ -83,8 +93,9 @@ export function Critter({ visit, clock, zoom = 1 }: { visit: Visit; clock: Share
   </Group>;
 }
 
-// A walker in painted frames: which frame shows is set by how far it has come, so each stride
-// covers the same ground however the pace changes; standing still, it holds its frame.
+// A walker in painted frames: which frame shows is set by how far it has come (over all its legs),
+// so each stride covers the same ground however the pace changes; standing still, it holds its
+// frame and carries on from it.
 function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number }) {
   const spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
@@ -96,7 +107,7 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
       { translateX: -w / 2 }, { translateY: -frames.ground }];
   }, [visit, scale, w, frames]);
   const frame = useDerivedValue(() => {
-    const along = reduced ? 0 : visitDistance(visit, clock.value) / frames.loop;
+    const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / frames.loop;
     return Math.floor((along - Math.floor(along)) * frames.count) % frames.count;
   }, [visit, frames, reduced]);
   const shadow = useDerivedValue(() => {
