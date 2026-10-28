@@ -1,34 +1,33 @@
-import { BlurMask, ColorMatrix, Group, Image, ImageShader, Oval, Rect, Shader, useImage, Vertices, type SkImage } from '@shopify/react-native-skia';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
+import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
+import { memo, useEffect, useRef, useState } from 'react';
+import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
 import { isGardenGroundBlocked } from '../fairy/gardenGround';
 import { safeSegment, WALK_NETWORK } from '../fairy/walkNetwork';
-import { wingbeat, wingbeatEffect } from '../wingbeat';
+import SheetFrame from '../SheetFrame';
 import {
-  CRITTERS, nextGap, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
+  burstLength, CRITTERS, nextGap, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
 } from './critterVisits';
-import { rabbitPose, WALKER_MESHES } from './gaits';
-import { posePoints, type Layer } from './rig';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
-// walkers are skinned meshes on a skeleton (rig.ts, gaits.ts); the flyers are single paintings.
-// A painted walk: frames of one stride in a grid (scripts/critters/video-frames.py), `w` × `h`
-// each, `ground` the row the paws stand on, `loop` the world units walked over all of them.
-type Frames = { columns: number; count: number; ground: number; loop: number };
-const ART: Record<CritterId, { source: number; legs?: number; frames?: Frames; w: number; h: number }> = {
+// walkers and the bluebird move in painted frames; the butterfly is a single painting.
+// A painted motion: frames in a grid (scripts/critters/video-frames.py), `w` × `h` each. A
+// walk: `ground` the row the paws stand on, `loop` the world units walked over all its frames.
+// A flight: `fps`, played in time.
+type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number };
+const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
-  bluebird: { source: require('@/assets/garden/critters/bluebird.webp'), w: 448, h: 448 },
-  // Walkers: the body and the near legs, cut from one painting (scripts/critters/cut-parts.py).
-  rabbit: { source: require('@/assets/garden/critters/rabbit-body.webp'), legs: require('@/assets/garden/critters/rabbit-legs.webp'), w: 512, h: 491 },
+  // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
+  bluebird: { source: require('@/assets/garden/critters/bluebird-fly.webp'), frames: { columns: 6, count: 26, ground: 0, loop: 0, fps: 12 }, w: 251, h: 240 },
+  // The rabbit hops in painted frames: two hops of a generated hopping clip, so `loop` is two of
+  // its bursts and every pause lands on a sitting frame.
+  rabbit: { source: require('@/assets/garden/critters/rabbit-hop.webp'), frames: { columns: 6, count: 26, ground: 257, loop: 2 * burstLength('rabbit') }, w: 360, h: 260 },
   // The puppy and the hedgehog walk in painted frames: one stride of a generated walking clip
   // (scripts/critters/video-frames.py), every pose painted whole. `loop` is the ground their
   // planted paws cover in that stride, so they do not skid.
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
   puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
 };
-export const WALKER_ART = { rabbit: ART.rabbit };
-
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 
@@ -76,12 +75,11 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
 
 export function Critter({ visit, clock, zoom = 1 }: { visit: Visit; clock: SharedValue<number>; zoom?: number }) {
   const art = ART[visit.id];
-  const image = useImage(art.source), legs = useImage(art.legs ?? null);
-  const rigged = Boolean(art.legs);
-  if (!image || (rigged && !legs)) return null;
+  const image = useImage(art.source);
+  if (!image) return null;
   return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
-    {art.frames ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
-      : rigged ? <Walker visit={visit} clock={clock} body={image} legs={legs!} /> : <Flyer visit={visit} clock={clock} image={image} />}
+    {art.frames && CRITTERS[visit.id].kind === 'walker' ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
+      : <Flyer visit={visit} clock={clock} image={image} />}
   </Group>;
 }
 
@@ -101,10 +99,6 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     const along = reduced ? 0 : visitDistance(visit, clock.value) / frames.loop;
     return Math.floor((along - Math.floor(along)) * frames.count) % frames.count;
   }, [visit, frames, reduced]);
-  const x = useDerivedValue(() => -(frame.value % frames.columns) * w, [frames, w]);
-  const y = useDerivedValue(() => -Math.floor(frame.value / frames.columns) * h, [frames, h]);
-  const rows = Math.ceil(frames.count / frames.columns);
-  const clip = useMemo(() => ({ x: 0, y: 0, width: w, height: h }), [w, h]);
   const shadow = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
     return [{ translateX: pose.x }, { translateY: pose.y }];
@@ -115,60 +109,10 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
         <BlurMask blur={3} style="normal" />
       </Oval>
     </Group>
-    <Group transform={transform} clip={clip}>
-      <Image image={sheet} x={x} y={y} width={w * frames.columns} height={h * rows} fit="fill" />
-    </Group>
-  </Group>;
-}
-
-// The rabbit on its skeleton: the hop sets where each paw is, the legs bend to reach.
-function Walker({ visit, clock, body, legs }: { visit: Visit; clock: SharedValue<number>; body: SkImage; legs: SkImage }) {
-  const mesh = WALKER_MESHES.rabbit, spec = CRITTERS[visit.id];
-  const reduced = useReducedMotion();
-  const scale = spec.size / Math.max(mesh.w, mesh.h);
-  // One hop per burst for the rabbit: its length in world units.
-  const hop = visit.speed * visit.rhythm.cycle * visit.rhythm.moving;
-  const layers = useDerivedValue(() => {
-    const t = clock.value, here = visitDistance(visit, t);
-    return posePoints(mesh, rabbitPose(reduced ? 0 : (here / hop) % 1, hop / scale, t));
-  }, [visit, reduced, scale, hop]);
-  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity, [visit]);
-  const transform = useDerivedValue(() => {
-    const pose = visitPose(visit, clock.value);
-    // Painted facing right: face the way it goes. Paws stand on the path point.
-    return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: (pose.dx < 0 ? -1 : 1) * scale }, { scaleY: scale },
-      { translateX: -mesh.w / 2 }, { translateY: -mesh.ground }];
-  }, [visit, scale]);
-  const shadow = useDerivedValue(() => {
-    const pose = visitPose(visit, clock.value);
-    // The shadow shrinks as it leaves the ground.
-    const air = Math.sin(Math.PI * Math.max(0, Math.min(1, ((visitDistance(visit, clock.value) / hop) % 1 - 0.14) / 0.66)));
-    return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: 1 - air * 0.25 }, { scaleY: 1 - air * 0.25 }];
-  }, [visit, hop]);
-  const rect = useMemo(() => ({ x: 0, y: 0, width: mesh.w, height: mesh.h }), [mesh]);
-  return <Group opacity={opacity}>
-    <Group transform={shadow}>
-      <Oval x={-spec.size * 0.4} y={-spec.size * 0.07} width={spec.size * 0.8} height={spec.size * 0.14} color="rgba(30, 44, 26, 0.22)">
-        <BlurMask blur={3} style="normal" />
-      </Oval>
-    </Group>
     <Group transform={transform}>
-      {mesh.layers.map((layer, l) => <MeshLayer key={l} layers={layers} index={l} layer={layer} image={layer.texture === 'body' ? body : legs} rect={rect} />)}
+      <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />
     </Group>
   </Group>;
-}
-
-export function MeshLayer({ layers, index, layer, image, rect }: {
-  layers: DerivedValue<{ x: number; y: number }[][]> | { value: { x: number; y: number }[][] }; index: number; layer: Layer;
-  image: SkImage; rect: { x: number; y: number; width: number; height: number };
-}) {
-  const vertices = useDerivedValue(() => layers.value[index], [index, layers]);
-  const k = layer.shade;
-  return <Vertices vertices={vertices} textures={layer.textures} indices={layer.indices}>
-    <ImageShader image={image} rect={rect} fit="fill" />
-    {/* A far leg, in the body's shade. */}
-    {k < 1 ? <ColorMatrix matrix={[k, 0, 0, 0, 0, 0, k, 0, 0, 0, 0, 0, k * 1.02, 0, 0, 0, 0, 0, 1, 0]} /> : null}
-  </Vertices>;
 }
 
 function Flyer({ visit, clock, image }: { visit: Visit; clock: SharedValue<number>; image: SkImage }) {
@@ -186,31 +130,22 @@ function Flyer({ visit, clock, image }: { visit: Visit; clock: SharedValue<numbe
       sx *= reduced ? 1 : 0.28 + 0.72 * Math.abs(Math.cos(t * Math.PI / 0.24));
       x += Math.sin(t * 2.3) * 9; y += Math.cos(t * 1.7) * 6;
     } else {
-      // Side view, painted facing right: face the way it goes.
+      // Side view, painted facing right: face the way it goes, tilted a little to climb or dive.
+      // The painted wingbeats carry their own lift and fall.
       const facing = pose.dx < 0 ? -1 : 1;
       sx *= facing;
-      y += Math.sin(t * Math.PI * 2 / 0.3) * 2;
       rotate = Math.max(-0.25, Math.min(0.25, Math.atan2(pose.dy, Math.abs(pose.dx)) * 0.5)) * facing;
     }
     return [{ translateX: x }, { translateY: y }, { rotate }, { scaleX: sx }, { scaleY: scale },
       { translateX: -art.w / 2 }, { translateY: -art.h / 2 }];
   }, [visit, scale, reduced]);
-  // The bluebird's wing roots (a–b) and head in its painting (wingbeat.ts); literal so the
-  // worklet carries them.
-  const uniforms = useDerivedValue(() => ({ flap: reduced ? 0 : wingbeat(clock.value, 0.3), a: [210, 205], b: [350, 145], head: [305, 142, 50] }), [reduced]);
+  const frames = art.frames;
+  const frame = useDerivedValue(() => (frames?.fps && !reduced ? Math.floor(clock.value * frames.fps) % frames.count : 0), [frames, reduced]);
   return <Group opacity={opacity}>
     <Group transform={transform}>
-      {visit.id === 'bluebird' && wingbeatEffect ? <BirdWithWingbeat image={image} w={art.w} h={art.h} uniforms={uniforms} />
+      {frames ? <SheetFrame sheet={image} frame={frame} columns={frames.columns} count={frames.count} w={art.w} h={art.h} />
         : <Image image={image} x={0} y={0} width={art.w} height={art.h} fit="fill" />}
     </Group>
   </Group>;
 }
 
-function BirdWithWingbeat({ image, w, h, uniforms }: { image: SkImage; w: number; h: number; uniforms: DerivedValue<{ flap: number; a: number[]; b: number[]; head: number[] }> }) {
-  const rect = useMemo(() => ({ x: 0, y: 0, width: w, height: h }), [w, h]);
-  return <Rect x={0} y={0} width={w} height={h}>
-    <Shader source={wingbeatEffect!} uniforms={uniforms as never}>
-      <ImageShader image={image} rect={rect} fit="fill" tx="decal" ty="decal" />
-    </Shader>
-  </Rect>;
-}

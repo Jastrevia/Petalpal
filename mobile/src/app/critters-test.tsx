@@ -1,29 +1,22 @@
-import { Canvas, Circle, Group, Image, Line, Rect, useImage, vec } from '@shopify/react-native-skia';
+import { Canvas, Rect } from '@shopify/react-native-skia';
 import { Redirect } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
-import { Critter, MeshLayer, WALKER_ART } from '@/components/garden/critters/GardenCritters';
+import { Critter } from '@/components/garden/critters/GardenCritters';
 import { CRITTER_IDS, CRITTERS, RHYTHMS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Visit } from '@/components/garden/critters/critterVisits';
-import { rabbitPose, WALKER_MESHES } from '@/components/garden/critters/gaits';
-import { posePoints, type Pose } from '@/components/garden/critters/rig';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
-// painting and motion can be judged up close; for the rabbit (on a skeleton), a strip of stills
-// through one hop and its skeleton. Not part of production navigation.
+// painting and motion can be judged up close. Not part of production navigation.
 const WIDTH = 360, HEIGHT = 260;
-// The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn.
-const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : 2.4);
-const FRAMES = 8;
-function stillPose(k: number): Pose {
-  return rabbitPose(k / FRAMES, 320, 0);
-}
+// The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn; the rabbit's
+// hops are a body length each, so it needs room for a few.
+const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2 : 2.4);
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
   const [slow, setSlow] = useState(false);
-  const [bones, setBones] = useState(false);
   const seconds = useSharedValue(0);
   const rate = useSharedValue(1);
   useEffect(() => { rate.value = slow ? 0.25 : 1; }, [slow, rate]);
@@ -64,41 +57,8 @@ export default function CrittersTestScreen() {
       style={[styles.button, id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View>
     <View style={styles.row}>
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
-      <Pressable onPress={() => setBones(value => !value)} style={[styles.button, bones && styles.selected]}><Text style={styles.label}>skeleton</Text></Pressable>
     </View>
-    {id === 'rabbit' ? <Filmstrip bones={bones} /> : null}
   </ScrollView>;
-}
-
-// One hop in stills, left to right; the first is the painting at rest when
-// `bones` is on, with its joints drawn over it.
-function Filmstrip({ bones }: { bones: boolean }) {
-  const image = useImage(WALKER_ART.rabbit.source), legs = useImage(WALKER_ART.rabbit.legs);
-  const mesh = WALKER_MESHES.rabbit;
-  const cellW = 300, s = cellW / mesh.w, cellH = mesh.h * s + 8;
-  const frames = useMemo(() => Array.from({ length: FRAMES }, (_, k) => posePoints(mesh, stillPose(k))), [mesh]);
-  const rect = { x: 0, y: 0, width: mesh.w, height: mesh.h };
-  if (!image || !legs) return null;
-  const columns = 2, rows = Math.ceil((FRAMES + (bones ? 1 : 0)) / columns);
-  return <Canvas style={{ width: cellW * columns, height: cellH * rows, backgroundColor: '#5C7F45', borderRadius: 12 }}>
-    {bones ? <Group transform={[{ scale: s }]}>
-      <Image image={image} x={0} y={0} width={mesh.w} height={mesh.h} fit="fill" />
-      <Image image={legs} x={0} y={0} width={mesh.w} height={mesh.h} fit="fill" />
-      {mesh.legs.map((leg, i) => <Group key={i}>
-        {[0, 1, 2].map(k => <Line key={k} p1={vec(leg.joints[k * 2], leg.joints[k * 2 + 1])} p2={vec(leg.joints[k * 2 + 2], leg.joints[k * 2 + 3])} color="#FFE066" strokeWidth={4} />)}
-        {[0, 1, 2, 3].map(k => <Circle key={k} cx={leg.joints[k * 2]} cy={leg.joints[k * 2 + 1]} r={7} color={k === 0 ? '#FF6B6B' : '#FFE066'} />)}
-      </Group>)}
-      {Object.entries(mesh.parts).map(([name, bone]) => <Circle key={name} cx={mesh.pivotX[bone]} cy={mesh.pivotY[bone]} r={9} color="#7AD7FF" />)}
-      <Line p1={vec(0, mesh.ground)} p2={vec(mesh.w, mesh.ground)} color="#FFFFFF88" strokeWidth={2} />
-    </Group> : null}
-    {frames.map((points, k) => {
-      const cell = k + (bones ? 1 : 0);
-      return <Group key={k} transform={[{ translateX: (cell % columns) * cellW }, { translateY: Math.floor(cell / columns) * cellH }, { scale: s }]}>
-        <Line p1={vec(0, mesh.ground)} p2={vec(mesh.w, mesh.ground)} color="#FFFFFF44" strokeWidth={2} />
-        {mesh.layers.map((layer, l) => <MeshLayer key={l} layers={{ value: points }} index={l} layer={layer} image={layer.texture === 'body' ? image : legs} rect={rect} />)}
-      </Group>;
-    })}
-  </Canvas>;
 }
 
 const styles = StyleSheet.create({

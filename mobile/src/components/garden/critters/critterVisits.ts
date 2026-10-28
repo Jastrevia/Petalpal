@@ -19,7 +19,8 @@ export type CritterSpec = {
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
-  rabbit: { id: 'rabbit', kind: 'walker', size: 84, speed: 60, altitude: [0, 0] },
+  // The rabbit's pace matches its painted hops: 75.7 units (about a body length) each 0.55 s burst.
+  rabbit: { id: 'rabbit', kind: 'walker', size: 104, speed: 138, altitude: [0, 0] },
   // The hedgehog's pace matches its painted steps: 30.2 units each 1.08 s.
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
   // The puppy's pace matches its painted stride: 41.9 units each 1.42 s.
@@ -39,6 +40,8 @@ export const RHYTHMS: Readonly<Record<CritterId, Rhythm>> = {
   butterfly: { cycle: 0, moving: 1 }, bluebird: { cycle: 0, moving: 1 },
   rabbit: { cycle: 1.1, moving: 0.5 }, hedgehog: { cycle: 4, moving: 0.65 }, puppy: { cycle: 7, moving: 0.8 },
 };
+// World units covered in one burst (the rabbit: one hop).
+export const burstLength = (id: CritterId) => CRITTERS[id].speed * RHYTHMS[id].cycle * RHYTHMS[id].moving;
 export type Visit = { key: number; id: CritterId; path: Point[]; start: number; duration: number; speed: number; rhythm: Rhythm };
 
 const pick = <T,>(items: readonly T[], random: () => number) => items[Math.min(items.length - 1, Math.floor(random() * items.length))];

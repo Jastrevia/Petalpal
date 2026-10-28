@@ -90,53 +90,14 @@ test('distance along the path grows with travel and stops at the end', () => {
   assert.ok(end <= 300 && end > 300 - 62 * 7 * 0.8, 'stops on the path, short of the end by less than one burst');
 });
 
-const gaits = load('../critters/gaits'), rig = load('../critters/rig');
-
-test('the rabbit at rest is its painting, point for point', () => {
-  for (const id of ['rabbit']) {
-    const mesh = gaits.WALKER_MESHES[id];
-    const rest = { lift: 0, pitch: 0, paws: gaits.WALKER_REST_PAWS[id], tilts: mesh.legs.map(() => 0), turns: {} };
-    const layers = rig.posePoints(mesh, rest);
-    layers.forEach((points, l) => points.forEach((p, i) => {
-      assert.ok(Math.abs(p.x - mesh.layers[l].rest[i * 2]) < 1e-6 && Math.abs(p.y - mesh.layers[l].rest[i * 2 + 1]) < 1e-6, `${id} layer ${l} point ${i}`);
-    }));
-  }
-});
-
-// Where each leg's paw really is for a pose (its chain run with the solved turns, in the body's
-// frame) against where the gait put it.
-function pawMisses(mesh, pose) {
-  const turns = rig.boneTurns(mesh, pose);
-  const c = Math.cos(-pose.pitch), s = Math.sin(-pose.pitch), bx = mesh.body[0], by = mesh.body[1];
-  return mesh.legs.map((leg, i) => {
-    const wx = pose.paws[i * 2] - bx, wy = pose.paws[i * 2 + 1] - pose.lift - by;
-    const tx = bx + wx * c - wy * s, ty = by + wx * s + wy * c;
-    let x = leg.joints[0], y = leg.joints[1], a = 0;
-    for (let k = 0; k < 3; k++) { a += turns[leg.bones[k]]; x += leg.lengths[k] * Math.cos(leg.rest[k] + a); y += leg.lengths[k] * Math.sin(leg.rest[k] + a); }
-    return Math.hypot(x - tx, y - ty);
-  });
-}
-
-test('paws on the ground are where the gait puts them (no hovering paws)', () => {
-  const walkers = [
-    ['rabbit', d => gaits.rabbitPose(d / 200, 200, 0), 200, i => (i === 0 ? gaits.WALKER_MESHES.rabbit.ground : gaits.WALKER_MESHES.rabbit.legs[i].joints[7])],
-  ];
-  for (const [id, poseAt, span, ground] of walkers) {
-    const mesh = gaits.WALKER_MESHES[id];
-    for (let d = 0; d < span; d += 2) {
-      const pose = poseAt(d), misses = pawMisses(mesh, pose);
-      misses.forEach((miss, i) => {
-        if (Math.abs(pose.paws[i * 2 + 1] - ground(i)) < 0.01) assert.ok(miss < 5, `${id} leg ${i} misses its spot by ${miss.toFixed(1)} px at ${d}`);
-      });
-    }
-  }
-});
-
-test('the rabbit\'s hind feet keep their place while it pushes off', () => {
-  const S = 200, toe = gaits.WALKER_MESHES.rabbit.legs[0].joints[6];
-  for (let u = 0; u < 0.42; u += 0.01) {
-    // Painting x plus the distance hopped so far: its spot on the ground.
-    const pose = gaits.rabbitPose(u, S, 0);
-    assert.ok(Math.abs(pose.paws[0] + u * S - toe) < 1e-6, `hind toes slid at ${u.toFixed(2)}`);
+test('every rabbit pause lands on a whole hop, so its painted frames show it sitting', () => {
+  const hop = visits.burstLength('rabbit'), rhythm = visits.RHYTHMS.rabbit;
+  assert.ok(Math.abs(hop - 75.7) < 1, 'one hop covers the ground its painted hop does');
+  const visit = { key: 1, id: 'rabbit', path: [{ x: 0, y: 0 }, { x: 1000, y: 0 }], start: 0, duration: 0, speed: visits.CRITTERS.rabbit.speed, rhythm };
+  visit.duration = visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, rhythm) + visits.FADE_SECONDS * 2;
+  for (let burst = 1; burst * rhythm.cycle < visit.duration - visits.FADE_SECONDS * 2; burst++) {
+    // Mid-pause, after this burst.
+    const d = visits.visitDistance(visit, visits.FADE_SECONDS + (burst - 0.25) * rhythm.cycle);
+    assert.ok(Math.abs(d - burst * hop) < 1e-6, `pause ${burst} at ${d.toFixed(2)}, not ${(burst * hop).toFixed(2)}`);
   }
 });
