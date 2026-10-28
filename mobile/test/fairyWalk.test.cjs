@@ -4,7 +4,7 @@ const ts=require('typescript');
 const source=path.join(__dirname,'../src/components/garden/fairy/walkNetwork.ts');
 const compiled=ts.transpileModule(fs.readFileSync(source,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
 const mod=new Module(source);mod._compile(compiled,source);
-const {WALK_NETWORK:net,WALK_START,route,advance,nearest,distance,walkFrame,V2_DURATIONS}=mod.exports;
+const {WALK_NETWORK:net,WALK_START,route,advance,nearest,distance,walkFrame,WALK_LOOP_MS,WALK_FRAMES,WALK_IDLE}=mod.exports;
 let count=0;const check=(name,fn)=>{fn();count++;console.log('PASS',name);};
 check('All authored nodes are connected from the valid initial foot position',()=>{
  assert.ok(nearest(WALK_START,net,.001));
@@ -36,11 +36,14 @@ check('Closed segments cannot be crossed, including a large elapsed-time step',(
  const blocked=p=>distance(p,WALK_START)<5;assert.equal(route(WALK_START,net.nodes[5],blocked),null);
  const stopped=advance(WALK_START,[net.nodes[1]],1000,blocked);assert.deepEqual(stopped.point,WALK_START);assert.equal(stopped.remaining.length,0);
 });
-check('V2 order, cadence, looping and neutral idle are fixed',()=>{
- let t=0;for(let i=0;i<8;i++){assert.equal(walkFrame(t,true),i);t+=V2_DURATIONS[i];}
- assert.equal(t,1120);assert.equal(walkFrame(t,true),0);assert.equal(walkFrame(777,false),3);
+check('Painted stride: order, cadence, looping and the standing painting at rest are fixed',()=>{
+ assert.equal(WALK_FRAMES,25);assert.ok(Math.abs(WALK_LOOP_MS-2083.33)<.01);
+ for(let i=0;i<WALK_FRAMES;i++)assert.equal(walkFrame(i*WALK_LOOP_MS/WALK_FRAMES+1,true),i);
+ assert.equal(walkFrame(WALK_LOOP_MS,true),0);assert.equal(walkFrame(777,false),WALK_IDLE);
  const layer=fs.readFileSync(path.join(path.dirname(source),'GardenFairy.tsx'),'utf8');
- assert.equal((layer.match(/walk-v2\/walk_0[1-8]\.png/g)||[]).length,8);
+ // Standing is her original painting; walking only the painted stride sheet, no other set.
+ assert.equal((layer.match(/walk-v2\/walk_0[1-8]\.png/g)||[]).length,1);
+ assert.ok(layer.includes('walk-v2/walk_04.png')&&layer.includes('walk-video-v1/walk.webp'));
  assert.ok(!/walk-v[34]/.test(layer));
 });
 console.log(`${count} fairy movement checks passed`);

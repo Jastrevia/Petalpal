@@ -109,6 +109,8 @@ export function advance(position:Point,remaining:Point[],amount:number,blocked:(
   }
   return {point,remaining:rest,moved};
 }
-export const V2_DURATIONS=[150,160,130,120,150,160,130,120];
-export function walkFrame(elapsed:number,moving:boolean){if(!moving)return 3;let t=elapsed%1120;
-  for(let i=0;i<8;i++){if(t<V2_DURATIONS[i])return i;t-=V2_DURATIONS[i];}return 0;}
+// Walking: one painted stride (walk-video-v1/walk.webp: 25 frames over 2.08 s, cut from a
+// walking clip made from walk_04); standing still: walk_04 itself (WALK_IDLE).
+export const WALK_LOOP_MS=50/24*1000, WALK_FRAMES=25, WALK_IDLE=-1;
+export function walkFrame(elapsed:number,moving:boolean){if(!moving)return WALK_IDLE;
+  return Math.floor((elapsed%WALK_LOOP_MS)/WALK_LOOP_MS*WALK_FRAMES)%WALK_FRAMES;}
