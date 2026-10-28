@@ -37,7 +37,7 @@ check('Closed segments cannot be crossed, including a large elapsed-time step',(
  const stopped=advance(WALK_START,[net.nodes[1]],1000,blocked);assert.deepEqual(stopped.point,WALK_START);assert.equal(stopped.remaining.length,0);
 });
 check('Painted stride: order, cadence, looping and the standing painting at rest are fixed',()=>{
- assert.equal(WALK_FRAMES,25);assert.ok(Math.abs(WALK_LOOP_MS-2083.33)<.01);
+ assert.equal(WALK_FRAMES,25);assert.equal(WALK_LOOP_MS,1000);
  for(let i=0;i<WALK_FRAMES;i++)assert.equal(walkFrame(i*WALK_LOOP_MS/WALK_FRAMES+1,true),i);
  assert.equal(walkFrame(WALK_LOOP_MS,true),0);assert.equal(walkFrame(777,false),WALK_IDLE);
  const layer=fs.readFileSync(path.join(path.dirname(source),'GardenFairy.tsx'),'utf8');
