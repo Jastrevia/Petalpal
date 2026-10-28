@@ -21,6 +21,7 @@ export const BOND_COPY = {
     withPpl: 'With PPL', tapHint: 'Tap PPL to hear more', tapPpl: 'PPL', reached: 'Reached', levelLocked: 'Locked',
     toNext: (points: number, level: number) => `${points} more to Lv ${level}`, maxed: 'Highest level reached',
     daysTogether: 'Days together', keepsakes: 'Keepsakes',
+    chipDays: (n: number) => `${n} ${n === 1 ? 'day' : 'days'} together`, chipKeepsakes: (n: number) => `${n} ${n === 1 ? 'keepsake' : 'keepsakes'}`,
     checkInWaiting: "Today's check-in is waiting in the calendar", checkedIn: 'Checked in today',
     today: "Today's progress", done: 'Done', points: (n: number) => `+${n} closeness`,
     sources: {
@@ -57,6 +58,7 @@ export const BOND_COPY = {
     withPpl: '与小花仙 PPL', tapHint: '轻点 PPL，听她多说几句', tapPpl: '小花仙 PPL', reached: '已达成', levelLocked: '未解锁',
     toNext: (points: number, level: number) => `还差 ${points} 点升到 Lv ${level}`, maxed: '已经是最高等级',
     daysTogether: '陪伴天数', keepsakes: '信物数量',
+    chipDays: (n: number) => `陪伴 ${n} 天`, chipKeepsakes: (n: number) => `信物 ${n} 个`,
     checkInWaiting: '今天还没签到，去日历签到吧', checkedIn: '今天已签到',
     today: '今日进度', done: '已完成', points: (n: number) => `+${n} 亲密度`,
     sources: {
