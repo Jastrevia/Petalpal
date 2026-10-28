@@ -14,7 +14,9 @@ import { CRITTER_IDS, CRITTERS, RHYTHMS, travelSeconds, visitPose, FADE_SECONDS,
 const WIDTH = 360, HEIGHT = 260;
 // The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn; the rabbit's
 // hops are a body length each, so it needs room for a few.
-const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2 : 2.4);
+const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2 : id === 'silktail' ? 1.3 : 2.4);
+// The visitors plus the Silktail Fox spirit (not a random visitor; shown resting first, then walking).
+const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'silktail'];
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
@@ -35,8 +37,9 @@ export default function CrittersTestScreen() {
     const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
     const spec = CRITTERS[id], rhythm = RHYTHMS[id];
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
-    return { key: round, id, path, start, duration: FADE_SECONDS + travelSeconds(length / spec.speed, rhythm), speed: spec.speed, rhythm,
-      lead: FADE_SECONDS, fadeIn: true, walked: 0 };
+    const lead = id === 'silktail' ? 10 : FADE_SECONDS;
+    return { key: round, id, path, start, duration: lead + travelSeconds(length / spec.speed, rhythm), speed: spec.speed, rhythm,
+      lead, fadeIn: id !== 'silktail', walked: 0 };
   }, [id, round, start]);
   // Rounds run on the preview clock, so slow motion stretches them too.
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function CrittersTestScreen() {
       <Critter key={id} visit={visit} clock={seconds} zoom={zoomFor(id)} />
     </Canvas>}
     <Text testID="critter-debug" style={styles.label}>{debug}</Text>
-    <View style={styles.row}>{CRITTER_IDS.map(item => <Pressable key={item} onPress={() => { setOtter(false); setId(item); }}
+    <View style={styles.row}>{PREVIEW_IDS.map(item => <Pressable key={item} onPress={() => { setOtter(false); setId(item); }}
       style={[styles.button, !otter && id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}
       <Pressable onPress={() => { setOtter(true); setStart(seconds.value); }} style={[styles.button, otter && styles.selected]}><Text style={styles.label}>otter (night)</Text></Pressable></View>
     <View style={styles.row}>

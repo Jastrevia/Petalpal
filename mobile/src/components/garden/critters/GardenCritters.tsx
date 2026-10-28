@@ -13,8 +13,9 @@ import {
 // walkers and the bluebird move in painted frames; the butterfly is a single painting.
 // A painted motion: frames in a grid (scripts/critters/video-frames.py), `w` × `h` each. A
 // walk: `ground` the row the paws stand on, `loop` the world units walked over all its frames.
-// A flight: `fps`, played in time.
-type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number };
+// A flight: `fps`, played in time. `rest`: frames of settling down (same cells), played while it
+// rests between legs, and backwards to get up again.
+type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number; rest?: { source: number; count: number } };
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -27,7 +28,12 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // planted paws cover in that stride, so they do not skid.
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
   puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
+  // The Silktail Fox spirit: a generated walking clip (several strides), and between legs it sits
+  // down to rest (a generated settling clip) and gets up again.
+  silktail: { source: require('@/assets/garden/spirits/silktail-walk.webp'), w: 237, h: 180,
+    frames: { columns: 8, count: 62, ground: 176, loop: 131.8, rest: { source: require('@/assets/garden/spirits/silktail-rest.webp'), count: 41 } } },
 };
+const REST_FPS = 12;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 
@@ -110,6 +116,20 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / frames.loop;
     return Math.floor((along - Math.floor(along)) * frames.count) % frames.count;
   }, [visit, frames, reduced]);
+  // Resting between legs (with a rest sheet): settling down, sitting, then getting up again.
+  const restSheet = useImage(frames.rest?.source ?? null);
+  const restFrame = useDerivedValue(() => {
+    const rest = frames.rest, e = clock.value - visit.start;
+    if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
+    if (reduced) return rest.count - 1;
+    const settle = rest.count / REST_FPS;
+    if (e < settle) return Math.floor(e * REST_FPS);
+    if (e > visit.lead - settle) return Math.max(0, Math.floor((visit.lead - e) * REST_FPS));
+    return rest.count - 1;
+  }, [visit, frames, reduced]);
+  const walkOpacity = useDerivedValue(() => (restFrame.value < 0 ? 1 : 0), [restFrame]);
+  const restOpacity = useDerivedValue(() => (restFrame.value < 0 ? 0 : 1), [restFrame]);
+  const restCell = useDerivedValue(() => Math.max(0, restFrame.value), [restFrame]);
   const shadow = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
     return [{ translateX: pose.x }, { translateY: pose.y }];
@@ -121,7 +141,8 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
       </Oval>
     </Group>
     <Group transform={transform}>
-      <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />
+      <Group opacity={walkOpacity}><SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} /></Group>
+      {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
     </Group>
   </Group>;
 }

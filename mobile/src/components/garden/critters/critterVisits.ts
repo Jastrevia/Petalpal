@@ -6,7 +6,9 @@
 // path points high above them, so nobody ever stands in the pond.
 import { distance, type Network, type Point } from '../fairy/walkNetwork';
 
-export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy';
+// `silktail`, the Silktail Fox spirit, walks like the others but is not a random visitor: it comes
+// for a Journal milestone (when exactly is still to be designed), so it is left out of CRITTER_IDS.
+export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail';
 export type CritterKind = 'flyer' | 'walker';
 export type CritterSpec = {
   id: CritterId; kind: CritterKind;
@@ -26,8 +28,10 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
   // The puppy's pace matches its painted stride: 41.9 units each 1.42 s.
   puppy: { id: 'puppy', kind: 'walker', size: 100, speed: 30, altitude: [0, 0] },
+  // The fox's pace matches its painted walk: 131.8 units each 5.17 s.
+  silktail: { id: 'silktail', kind: 'walker', size: 130, speed: 25.5, altitude: [0, 0] },
 };
-export const CRITTER_IDS = Object.keys(CRITTERS) as CritterId[];
+export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail');
 export const MAX_VISITORS = 2;
 // Seconds between one visitor arriving and the next.
 export const VISIT_GAP: [number, number] = [10, 35];
@@ -36,7 +40,7 @@ export const FADE_SECONDS = 0.8;
 export const AWAY_SECONDS = 10 * 60;
 // Seconds a visitor rests where a leg ended before the next one (the bluebird flies on).
 export const REST: Readonly<Record<CritterId, [number, number]>> = {
-  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10],
+  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10], silktail: [8, 16],
 };
 
 // How a visitor moves: in bursts of `moving` (fraction) of every `cycle` seconds, still otherwise
@@ -46,6 +50,7 @@ export type Rhythm = { cycle: number; moving: number };
 export const RHYTHMS: Readonly<Record<CritterId, Rhythm>> = {
   butterfly: { cycle: 0, moving: 1 }, bluebird: { cycle: 0, moving: 1 },
   rabbit: { cycle: 1.1, moving: 0.5 }, hedgehog: { cycle: 4, moving: 0.65 }, puppy: { cycle: 7, moving: 0.8 },
+  silktail: { cycle: 0, moving: 1 },
 };
 // World units covered in one burst (the rabbit: one hop).
 export const burstLength = (id: CritterId) => CRITTERS[id].speed * RHYTHMS[id].cycle * RHYTHMS[id].moving;
