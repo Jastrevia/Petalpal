@@ -35,9 +35,11 @@ async function tappable(page, locator) {
   if (cx < 0 || cy < 0 || cx > view.width || cy > view.height) return { ok: false, why: `outside the screen at ${Math.round(cx)},${Math.round(cy)}` };
   const hit = await locator.evaluate((element, [x, y]) => {
     const top = document.elementFromPoint(x, y);
-    return !!top && (element === top || element.contains(top));
+    if (top && (element === top || element.contains(top))) return null;
+    const label = top?.closest('[aria-label],[data-testid]');
+    return top ? `${top.tagName.toLowerCase()} ${label?.getAttribute('data-testid') || label?.getAttribute('aria-label') || ''}`.trim() : 'nothing';
   }, [cx, cy]);
-  return hit ? { ok: true } : { ok: false, why: 'covered by something else' };
+  return hit === null ? { ok: true } : { ok: false, why: `covered by ${hit}` };
 }
 
 async function fps(page, ms = 3000) {
