@@ -28,7 +28,34 @@ import {
 } from 'react-native';
 import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
 import { useFeedbackDraft } from './FeedbackDraftContext';
-import { getFeedbackTransport } from './feedbackService';
+import { FEEDBACK_EMAIL, getFeedbackTransport } from './feedbackService';
+import { useAppLocale } from '../../services/locale';
+
+// The form in the app language (one language per screen).
+const FORM_COPY = {
+  en: { title: 'Send Feedback', subtitle: 'Your thoughts help our garden grow.', back: '‹ Back', close: 'Close',
+    category: 'Category', subject: 'Subject (optional)', subjectHint: "What's on your mind?", message: 'Message',
+    messageHint: "Tell us what happened, what you'd love to see, or anything you'd like us to know...", chars: (n: number) => `${n} chars`,
+    screenshot: 'Screenshot (optional)', attach: 'Attach image', another: 'Add another', email: 'Your email (optional)',
+    emailHint: 'your.email@example.com (optional)', emailHelp: "Only used if you'd like our garden team to follow up.",
+    send: 'Send Feedback', sending: 'Sending...', discard: 'Discard draft', discardAsk: 'Discard this draft?', discardYes: 'Yes, discard', keep: 'Keep draft',
+    needMessage: 'Please enter a message before sending.', badEmail: 'Please enter a valid email address or leave it blank.',
+    tooBig: 'Image attachment must be smaller than 5 MB.', failed: 'Something went wrong while recording feedback.',
+    emailOpened: `Your email app opened with your feedback to ${FEEDBACK_EMAIL}. Press Send there to deliver it. Your draft stays here until you discard it.`,
+    viaEmail: `Sent by email to ${FEEDBACK_EMAIL}. To add a screenshot, attach it in your email app.`,
+    categories: { bug: 'Bug Report', feature: 'Feature Suggestion', general: 'General Feedback', ai_concern: 'AI Response Concern', other: 'Other' } as Record<string, string> },
+  'zh-Hans': { title: '发送反馈', subtitle: '你的想法会让花园长得更好。', back: '‹ 返回', close: '关闭',
+    category: '类别', subject: '主题（选填）', subjectHint: '想说点什么？', message: '内容',
+    messageHint: '告诉我们发生了什么、你希望看到什么，或任何想让我们知道的事…', chars: (n: number) => `${n} 字`,
+    screenshot: '截图（选填）', attach: '添加图片', another: '再加一张', email: '你的邮箱（选填）',
+    emailHint: 'your.email@example.com（选填）', emailHelp: '只在你希望我们回复时使用。',
+    send: '发送反馈', sending: '正在发送…', discard: '丢弃草稿', discardAsk: '确定丢弃这份草稿吗？', discardYes: '丢弃', keep: '保留草稿',
+    needMessage: '请先写好内容再发送。', badEmail: '请填写有效的邮箱，或者留空。',
+    tooBig: '图片需要小于 5 MB。', failed: '发送反馈时出了点问题。',
+    emailOpened: `已打开你的邮件应用，内容已经写好，收件人是 ${FEEDBACK_EMAIL}。在邮件里点「发送」就能送到我们这里。草稿会一直保留，直到你丢弃它。`,
+    viaEmail: `反馈会通过邮件发到 ${FEEDBACK_EMAIL}。如果要附截图，请在邮件应用里添加。`,
+    categories: { bug: '问题报告', feature: '功能建议', general: '一般反馈', ai_concern: 'AI 回复的问题', other: '其他' } as Record<string, string> },
+};
 import {
   FEEDBACK_CATEGORIES,
   FeedbackCategory,
@@ -47,6 +74,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
   currentRoute,
 }: SendFeedbackFormProps) {
   const { draft, updateDraft, clearDraft, hasDraft } = useFeedbackDraft();
+  const copy = FORM_COPY[useAppLocale()];
   const [submissionStatus, setSubmissionStatus] =
     useState<SubmissionStatus>('idle');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -107,7 +135,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
 
     // Check size limit (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setValidationError('Image attachment must be smaller than 5 MB.');
+      setValidationError(copy.tooBig);
       return;
     }
 
@@ -149,12 +177,12 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
   const handleSubmit = async () => {
     // 1. Validation
     if (!draft.message || draft.message.trim().length === 0) {
-      setValidationError('Please enter a message before sending.');
+      setValidationError(copy.needMessage);
       return;
     }
 
     if (draft.email.trim() && !isValidEmail(draft.email)) {
-      setValidationError('Please enter a valid email address or leave it blank.');
+      setValidationError(copy.badEmail);
       return;
     }
 
@@ -179,7 +207,11 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
 
       const result = await transport.submitFeedback(payload);
 
-      if (result.isRealTransport) {
+      if (result.message === 'EMAIL_OPENED') {
+        // The email app has it; it reaches us when they press Send there, so keep the draft.
+        setSubmissionStatus('idle');
+        setSubmissionNotice(copy.emailOpened);
+      } else if (result.isRealTransport) {
         // Real backend succeeded
         setSubmissionStatus('success');
         setSubmissionNotice(
@@ -200,7 +232,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
     } catch (err: any) {
       setSubmissionStatus('error');
       setValidationError(
-        err?.message || 'Something went wrong while recording feedback.'
+        err?.message || copy.failed
       );
     }
   };
@@ -227,7 +259,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back to Help menu"
+          accessibilityLabel={copy.back}
           onPress={onBack}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={({ pressed, hovered }: any) => [
@@ -236,19 +268,17 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
             hovered && styles.backButtonHovered,
           ]}
         >
-          <Text style={styles.backButtonText}>‹ Back</Text>
+          <Text style={styles.backButtonText}>{copy.back}</Text>
         </Pressable>
 
         <View style={styles.headerTitleColumn}>
-          <Text style={styles.headerTitle}>Send Feedback</Text>
-          <Text style={styles.headerSubtitle}>
-            Your thoughts help our garden grow.
-          </Text>
+          <Text style={styles.headerTitle}>{copy.title}</Text>
+          <Text style={styles.headerSubtitle}>{copy.subtitle}</Text>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close"
+          accessibilityLabel={copy.close}
           onPress={onClose}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={({ pressed, hovered }: any) => [
@@ -280,7 +310,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
 
         {/* ── FIELD A: FEEDBACK TYPE CATEGORY SELECTOR ── */}
         <View style={styles.fieldSection}>
-          <Text style={styles.fieldLabel}>Category</Text>
+          <Text style={styles.fieldLabel}>{copy.category}</Text>
           <View style={styles.categoryPillsContainer}>
             {FEEDBACK_CATEGORIES.map((cat) => {
               const isSelected = draft.category === cat.id;
@@ -288,7 +318,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
                 <Pressable
                   key={cat.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Category: ${cat.label}`}
+                  accessibilityLabel={copy.categories[cat.id] ?? cat.label}
                   accessibilityState={{ selected: isSelected }}
                   onPress={() => handleCategorySelect(cat.id)}
                   style={({ pressed, hovered }: any) => [
@@ -305,7 +335,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
                       isSelected && styles.categoryLabelActive,
                     ]}
                   >
-                    {cat.label}
+                    {copy.categories[cat.id] ?? cat.label}
                   </Text>
                 </Pressable>
               );
@@ -315,12 +345,12 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
 
         {/* ── FIELD B: SUBJECT (OPTIONAL) ── */}
         <View style={styles.fieldSection}>
-          <Text style={styles.fieldLabel}>Subject (optional)</Text>
+          <Text style={styles.fieldLabel}>{copy.subject}</Text>
           <TextInput
-            accessibilityLabel="Feedback subject"
+            accessibilityLabel={copy.subject}
             value={draft.subject}
             onChangeText={handleSubjectChange}
-            placeholder="What's on your mind?"
+            placeholder={copy.subjectHint}
             placeholderTextColor="#9A8C9E"
             maxLength={120}
             style={styles.textInput}
@@ -331,19 +361,19 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
         <View style={styles.fieldSection}>
           <View style={styles.labelWithCounterRow}>
             <Text style={styles.fieldLabel}>
-              Message <Text style={styles.requiredStar}>*</Text>
+              {copy.message} <Text style={styles.requiredStar}>*</Text>
             </Text>
             {draft.message.length > 0 && (
               <Text style={styles.charCountText}>
-                {draft.message.length} chars
+                {copy.chars(draft.message.length)}
               </Text>
             )}
           </View>
           <TextInput
-            accessibilityLabel="Feedback message"
+            accessibilityLabel={copy.message}
             value={draft.message}
             onChangeText={handleMessageChange}
-            placeholder="Tell us what happened, what you'd love to see, or anything you'd like us to know..."
+            placeholder={copy.messageHint}
             placeholderTextColor="#9A8C9E"
             multiline={true}
             numberOfLines={5}
@@ -352,13 +382,13 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
           />
         </View>
 
-        {/* ── FIELD D: SCREENSHOT ATTACHMENTS (OPTIONAL) ── */}
-        <View style={styles.fieldSection}>
+        {/* ── FIELD D: SCREENSHOT ATTACHMENTS (OPTIONAL) ── only when the transport can carry images */}
+        {transport.supportsAttachments === false ? null : <View style={styles.fieldSection}>
           <View style={styles.attachmentHeaderRow}>
-            <Text style={styles.fieldLabel}>Screenshot (optional)</Text>
+            <Text style={styles.fieldLabel}>{copy.screenshot}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Attach screenshot"
+              accessibilityLabel={copy.attach}
               onPress={handleAttachmentClick}
               style={({ pressed, hovered }: any) => [
                 styles.attachButton,
@@ -369,8 +399,8 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
               <Text style={styles.attachButtonIcon}>📎</Text>
               <Text style={styles.attachButtonText}>
                 {draft.attachments.length > 0
-                  ? 'Add another'
-                  : 'Attach image'}
+                  ? copy.another
+                  : copy.attach}
               </Text>
             </Pressable>
           </View>
@@ -404,25 +434,24 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
               ))}
             </View>
           )}
-        </View>
+        </View>}
 
         {/* ── FIELD E: REPLY EMAIL (OPTIONAL) ── */}
         <View style={styles.fieldSection}>
-          <Text style={styles.fieldLabel}>Your email (optional)</Text>
+          <Text style={styles.fieldLabel}>{copy.email}</Text>
           <TextInput
-            accessibilityLabel="Reply email"
+            accessibilityLabel={copy.email}
             value={draft.email}
             onChangeText={handleEmailChange}
-            placeholder="your.email@example.com (optional)"
+            placeholder={copy.emailHint}
             placeholderTextColor="#9A8C9E"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.textInput}
           />
-          <Text style={styles.fieldHelperText}>
-            Only used if you'd like our garden team to follow up.
-          </Text>
+          <Text style={styles.fieldHelperText}>{copy.emailHelp}</Text>
+          {transport.supportsAttachments === false ? <Text style={styles.fieldHelperText}>{copy.viaEmail}</Text> : null}
         </View>
 
         {/* ── VALIDATION & STATUS NOTICES ── */}
@@ -442,7 +471,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
         <View style={styles.actionsSection}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Send Feedback"
+            accessibilityLabel={copy.send}
             disabled={!canSubmit}
             onPress={handleSubmit}
             style={({ pressed, hovered }: any) => [
@@ -455,12 +484,12 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
             {submissionStatus === 'sending' ? (
               <View style={styles.sendingRow}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={styles.submitButtonText}>Sending...</Text>
+                <Text style={styles.submitButtonText}>{copy.sending}</Text>
               </View>
             ) : (
               <View style={styles.sendingRow}>
                 <Text style={styles.submitButtonIcon}>✿</Text>
-                <Text style={styles.submitButtonText}>Send Feedback</Text>
+                <Text style={styles.submitButtonText}>{copy.send}</Text>
               </View>
             )}
           </Pressable>
@@ -471,7 +500,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
               {showDiscardConfirm ? (
                 <View style={styles.discardConfirmBox}>
                   <Text style={styles.discardConfirmText}>
-                    Discard this draft?
+                    {copy.discardAsk}
                   </Text>
                   <View style={styles.discardConfirmButtons}>
                     <Pressable
@@ -479,25 +508,25 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
                       onPress={handleDiscardDraft}
                       style={styles.discardConfirmYesBtn}
                     >
-                      <Text style={styles.discardConfirmYesText}>Yes, discard</Text>
+                      <Text style={styles.discardConfirmYesText}>{copy.discardYes}</Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => setShowDiscardConfirm(false)}
                       style={styles.discardConfirmNoBtn}
                     >
-                      <Text style={styles.discardConfirmNoText}>Keep draft</Text>
+                      <Text style={styles.discardConfirmNoText}>{copy.keep}</Text>
                     </Pressable>
                   </View>
                 </View>
               ) : (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Discard draft"
+                  accessibilityLabel={copy.discard}
                   onPress={() => setShowDiscardConfirm(true)}
                   style={styles.discardDraftButton}
                 >
-                  <Text style={styles.discardDraftText}>Discard draft</Text>
+                  <Text style={styles.discardDraftText}>{copy.discard}</Text>
                 </Pressable>
               )}
             </View>

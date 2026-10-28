@@ -147,6 +147,7 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
 
 
@@ -1597,6 +1598,24 @@ app.post("/users/:userId/journals",
   res.status(201).json(journal);
 });
 
+// Fix a saved journal: same rules as writing one. Only the owner's own journal changes.
+app.put("/users/:userId/journals/:journalId",
+  (req, res, next) => { if (requireOwnUser(req, res, req.params.userId)) next(); },
+  allowBodyFields(["content"]), async (req, res) => {
+  const content = req.body?.content;
+  if (typeof content !== "string" || !content.trim()) {
+    return res.status(400).json({ error: "Write something before saving your journal" });
+  }
+  if (content.length > 2000) return res.status(413).json({ error: "Journal must be 2000 characters or fewer" });
+  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error)); throw error; }
+  const updated = await prisma.journal.updateMany({
+    where: { id: req.params.journalId, userId: req.auth.userId },
+    data: { content: content.trim() }
+  });
+  if (!updated.count) return res.status(404).json({ error: "Journal not found" });
+  res.json({ id: req.params.journalId, content: content.trim() });
+});
+
 app.get("/users/:userId/journals/:journalId/cover", async (req, res) => {
   if (!requireOwnUser(req, res, req.params.userId)) return;
   const journal = await prisma.journal.findFirst({
@@ -1807,7 +1826,8 @@ app.get("/api/fairy/runtime", async (req, res) => {
         persisted,
         reconciled.transition
       );
-      if (!momentsEnabled) return response;
+      // Every owner's Garden follows her day now (she walks, takes tea, swings, sleeps); Moments stay on the list.
+      if (!momentsEnabled) return { ...response, gardenSchedule: true };
       await recordFairyMoments(tx, {
         userId: req.auth.userId,
         userFairyId: activeFairy.id,
@@ -3254,6 +3274,23 @@ app.get("/users/:userId/flowers/:flowerId", requireSocialGardenAccess, async (re
     if (sendSocialError(res, error)) return;
     logServerError("GET /users/:userId/flowers/:flowerId error", error);
     res.status(500).json({ error: "Failed to get flower details" });
+  }
+});
+
+// Plants the owner's flower at its Garden spot, once. There is no move: another spot is a 409.
+app.post("/users/:userId/flowers/:flowerId/placement", async (req, res) => {
+  try {
+    if (!requireOwnUser(req, res, req.params.userId)) return;
+    const result = await plantFlowerOnce(prisma, {
+      userId: req.auth.userId, flowerId: req.params.flowerId, body: req.body
+    });
+    res.status(result.created ? 201 : 200).json(result.placement);
+  } catch (error) {
+    if (error instanceof FlowerPlacementError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    logServerError("POST /users/:userId/flowers/:flowerId/placement error", error);
+    res.status(500).json({ error: "Failed to plant flower" });
   }
 });
 

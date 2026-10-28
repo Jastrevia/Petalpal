@@ -149,11 +149,11 @@ test("Fairy Moments routes", async (t) => {
     return { status: response.status, body: await response.json() };
   };
 
-  await t.test("off unless the owner is listed: runtime unchanged, routes 404", async () => {
+  await t.test("off unless the owner is listed: no Moments, routes 404", async () => {
     const runtime = await call("/api/fairy/runtime");
     assert.equal(runtime.status, 200);
     assert.equal("moments" in runtime.body, false);
-    assert.equal("gardenSchedule" in runtime.body, false, "the Garden keeps its old Fairy for unlisted owners");
+    assert.equal(runtime.body.gardenSchedule, true, "every Garden follows her day, listed or not");
     assert.equal(state.moments.length, 0);
     assert.equal((await call("/api/fairy/moments")).status, 404);
     assert.equal((await call("/api/fairy/moments/moment-1/like", "POST", { liked: true })).status, 404);

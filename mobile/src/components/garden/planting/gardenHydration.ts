@@ -1,5 +1,5 @@
 import { plantingRecord } from '../../../services/events';
-import { loadGarden, type GardenFlower } from '../../../services/garden';
+import { loadGarden, plantFlowerSpot, type GardenFlower } from '../../../services/garden';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from './plantingPersistence';
 import { getApprovedMonthCentroid, isFootprintInApprovedMonthMaskWorld } from './approvedPlantingMasks';
 import { MONTH_REGION_METAS } from './plantingRegionData';
@@ -39,6 +39,10 @@ export function hydrateGardenPlacements(flowers: readonly GardenFlower[], local:
   return [...flowers].sort((a, b) => a.id.localeCompare(b.id)).map(flower => {
     if (flower.userId !== ownerId) throw new Error('This flower belongs to another Garden.');
     const canonical = gardenPlantingRecord(flower, timezone);
+    // The server's planted spot is the truth, for the owner and for visiting friends.
+    if (typeof flower.worldX === 'number' && typeof flower.worldY === 'number') return { ...canonical,
+      worldX: flower.worldX, worldY: flower.worldY, landId: flower.regionId || MONTH_REGION_METAS[canonical.month].landId,
+      placementOrigin: 'SERVER' };
     const localPlacement = localById.get(flower.id);
     if (localPlacement) return { ...canonical, worldX: localPlacement.worldX, worldY: localPlacement.worldY,
       landId: localPlacement.landId, scale: localPlacement.scale ?? canonical.scale, rotation: localPlacement.rotation ?? canonical.rotation,
@@ -55,5 +59,16 @@ export async function loadGardenPlacements(ownerId: string, viewerId: string, ti
   const [flowers, local] = await Promise.all([
     loadGarden(ownerId, viewerId), ownerId === viewerId ? loadFlowerPlacements() : Promise.resolve([]),
   ]);
-  return hydrateGardenPlacements(flowers, local, ownerId, viewerId, timezone);
+  const records = hydrateGardenPlacements(flowers, local, ownerId, viewerId, timezone);
+  // Spots planted before the server kept them live only on this device: save each once.
+  // A refused spot (e.g. too close under the cluster spacing) stays on this device only.
+  for (const record of records) {
+    if (ownerId !== viewerId || record.placementOrigin !== 'LOCAL') continue;
+    try {
+      await plantFlowerSpot(ownerId, record.flowerId, { worldX: record.worldX, worldY: record.worldY,
+        landId: MONTH_REGION_METAS[record.month].landId });
+      record.placementOrigin = 'SERVER'; record.landId = MONTH_REGION_METAS[record.month].landId;
+    } catch { /* Keep showing the device spot; the next load tries again. */ }
+  }
+  return records;
 }

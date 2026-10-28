@@ -309,14 +309,14 @@ export const MailboxPage = memo(function MailboxPage() {
         <View style={styles.topHeader}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back to Garden"
+            accessibilityLabel="Close Mailbox"
             onPress={handleBackToGarden}
             style={({ pressed }) => [
               styles.backButton,
               pressed && styles.buttonPressed,
             ]}
           >
-            <Text style={styles.backButtonText}>← Garden</Text>
+            <Text style={styles.backButtonText}>✕</Text>
           </Pressable>
 
           <View style={styles.brandTitleContainer}>

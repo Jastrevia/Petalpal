@@ -232,3 +232,37 @@ test('Garden hydration canonical historical detail never borrows sample Journal 
   assert.equal(detail.name, 'Canonical Rose'); assert.equal(detail.mood, 'FIRE_BLOOM');
   assert.equal(detail.memory, '');
 });
+test('the server keeps planted spots: its spot wins, and a device-only spot is saved there once', async () => {
+  const posts = [];
+  let rows = [flower('server', { worldX: 1200, worldY: 560, regionId: 'Land09' }), flower('device'), flower('unplanted')];
+  const { garden, hydration } = setup(async (url, init = {}) => {
+    if (init.method === 'POST') {
+      const body = JSON.parse(init.body); posts.push([url, body]);
+      const row = rows.find(item => url.includes(`/flowers/${item.id}/`));
+      if (row.worldX != null && (row.worldX !== body.worldX || row.worldY !== body.worldY)) {
+        return response({ error: 'This flower is already planted. Its spot can’t change.', code: 'PLACEMENT_LOCKED' }, 409);
+      }
+      rows = rows.map(row => url.includes(`/flowers/${row.id}/`) ? { ...row, ...body, regionId: body.landId } : row);
+      return response({ flowerId: 'device', ...body }, 201);
+    }
+    return response({ owner: { id: 'alice' }, flowers: rows });
+  });
+  const flowers = await garden.loadGarden('alice', 'alice');
+  // A stale device cache can never move a flower the server already placed.
+  const cached = [{ flowerId: 'server', ownerUserId: 'alice', worldX: 5, worldY: 5 },
+    { flowerId: 'device', ownerUserId: 'alice', worldX: 1100, worldY: 900 }];
+  const records = hydration.hydrateGardenPlacements(flowers, cached, 'alice', 'alice', 'UTC');
+  const byId = id => records.find(record => record.flowerId === id);
+  assert.deepEqual([byId('server').worldX, byId('server').worldY, byId('server').landId, byId('server').placementOrigin], [1200, 560, 'Land09', 'SERVER']);
+  assert.equal(byId('device').placementOrigin, 'LOCAL');
+  assert.equal(byId('unplanted').placementOrigin, 'FALLBACK');
+  // A visiting friend sees the owner's real spot, never their own device cache.
+  const visit = hydration.hydrateGardenPlacements(flowers, cached, 'alice', 'bob', 'UTC');
+  assert.equal(visit.find(record => record.flowerId === 'server').worldX, 1200);
+  assert.equal(visit.find(record => record.flowerId === 'device').placementOrigin, 'FALLBACK');
+  assert.deepEqual(posts, []);
+  await garden.plantFlowerSpot('alice', 'device', { worldX: 1100, worldY: 900, landId: 'Land09' });
+  assert.deepEqual(plain(posts), [['/users/alice/flowers/device/placement', { worldX: 1100, worldY: 900, landId: 'Land09' }]]);
+  // Moving it later is refused by the server.
+  await assert.rejects(garden.plantFlowerSpot('alice', 'device', { worldX: 1, worldY: 2, landId: 'Land09' }), /can’t change/);
+});

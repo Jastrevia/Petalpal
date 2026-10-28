@@ -10,6 +10,7 @@ import GardenFairy, { type FairyHandle } from './fairy/GardenFairy';
 import { useFairySchedule } from './fairy/useFairySchedule';
 import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
+import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
 import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
@@ -69,7 +70,8 @@ import {
   undoMaskEdit,
 } from './planting/plantingMaskRefinement';
 import PlantedFlowerLayer from './planting/PlantedFlowerLayer';
-import { USE_MONTHLY_GARDEN_GROWTH_V1_1, gardenSpecies, hitProductionFlower } from './planting/productionGrowth';
+import { USE_MONTHLY_GARDEN_GROWTH_V1_1 } from './planting/productionGrowth';
+import { hasClusterArt, hitCluster } from './planting/flowerClusters';
 import PlantingPlacementControls from './planting/PlantingPlacementControls';
 import FlowerDetailModal from './planting/FlowerDetailModal';
 import {
@@ -279,7 +281,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     showDevHitboxes,
     showPlacementDebug,
     startPlanting,
-    startAdjusting,
     updatePreview,
     confirmPlacement,
     cancelPlacement,
@@ -293,7 +294,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     setShowPlacementDebug,
   } = planting;
 
-  const unresolvedGardenArt = useMemo(() => [...new Set(placements.filter(p => !gardenSpecies(p))
+  const unresolvedGardenArt = useMemo(() => [...new Set(placements.filter(p => !hasClusterArt(p.speciesCode, p.flowerName))
     .map(p => p.speciesCode || p.flowerName || 'UNKNOWN'))], [placements]);
 
   const activeModeRef = useRef(activeMode);
@@ -717,15 +718,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       const c = getApprovedMonthCentroid(monthNum);
       focusCoords(c.x, c.y);
       setPreviewMode(true);
-    } else if (searchParams.mode === 'adjust') {
+    } else if (searchParams.mode === 'focus') {
+      // A planted flower never moves; this only brings it into view.
       const flower = placements.find((p) => p.flowerId === searchParams.flowerId || p.id === searchParams.flowerId);
-      if (flower) {
-        startAdjusting(flower);
-        focusCoords(flower.worldX, flower.worldY);
-        setPreviewMode(true);
-      }
+      if (flower) focusCoords(flower.worldX, flower.worldY);
+      else handledParamRef.current = ''; // Try again once the Garden has loaded it.
     }
-  }, [readOnly, searchParams, placements, startPlanting, startAdjusting, focusCoords, focusCalMonth]);
+  }, [readOnly, searchParams, placements, startPlanting, focusCoords, focusCalMonth]);
 
   const handleCalibrationNudge = useCallback((field: keyof MonthRegionCalibration, delta: number) => {
     setPlantingCalibrationMap((prev) => {
@@ -974,7 +973,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (!readOnly) updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;
-      let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitProductionFlower(currentPlacements,worldX,worldY):null;
+      let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitCluster(currentPlacements,worldX,worldY):null;
       for (let i = currentPlacements.length - 1; !useMonthlyGrowth && i >= 0; i--) {
         const p = currentPlacements[i];
         const def = getFlowerPlacementDefinition(p.flowerName);
@@ -1640,6 +1639,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       )}
       {children}
       {showCalendar && !readOnly && activeMode === 'normal' && !selectedFlower && <GardenCalendar onFocusFlower={focusCalendarFlower} />}
+      {showCalendar && !readOnly && <DailyCheckInIntro />}
       {showCalendar && <Animated.View pointerEvents="none" style={[{ position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#F5E8B3', backgroundColor: '#FFF2C518' }, calendarHighlightStyle]} />}
 
       {/* Floating button when in Preview Mode */}

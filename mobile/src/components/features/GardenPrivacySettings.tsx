@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Switch, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { loadGardenPrivacy, saveGardenPrivacy } from '../../services/gardenVisits';
+import { useAppLocale } from '../../services/locale';
 import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, ui } from './FeatureUI';
 
 export function GardenPrivacySettings() {
   const { theme } = usePanelTheme();
   const { session } = useAuth();
   const ownerId = session?.user.id;
+  const zh = useAppLocale() === 'zh-Hans';
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -34,15 +36,15 @@ export function GardenPrivacySettings() {
     return () => { current.active = false; };
   }, [current, update]);
 
-  return <FeatureSection title="Garden Privacy">
+  return <FeatureSection title={zh ? '花园隐私' : 'Garden Privacy'}>
     <View style={ui.row}>
-      <Text style={[ui.text, { flex: 1 }]}>Allow friends to visit my garden</Text>
-      <Switch accessibilityLabel="Allow friends to visit my garden" value={allowed === true}
+      <Text style={[ui.text, { flex: 1 }]}>{zh ? '允许朋友来逛我的花园' : 'Allow friends to visit my garden'}</Text>
+      <Switch accessibilityLabel={zh ? '允许朋友来逛我的花园' : 'Allow friends to visit my garden'} value={allowed === true}
         disabled={!ownerId || allowed === null || busy} onValueChange={value => void update(value)}
         trackColor={{ true: colors.primary }} />
     </View>
-    {busy ? <ActivityIndicator accessibilityLabel="Saving Garden privacy" color={colors.primary} /> : null}
+    {busy ? <ActivityIndicator accessibilityLabel={zh ? '正在保存' : 'Saving Garden privacy'} color={colors.primary} /> : null}
     {error ? <><Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text>
-      <FeatureActionButton secondary title="Reload Garden privacy" disabled={busy} onPress={() => void update()} /></> : null}
+      <FeatureActionButton secondary title={zh ? '重新加载' : 'Reload Garden privacy'} disabled={busy} onPress={() => void update()} /></> : null}
   </FeatureSection>;
 }

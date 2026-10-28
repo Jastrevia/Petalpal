@@ -12,6 +12,8 @@ export interface BackendFlower {
   mood: string; img: string; createdAt: string; event?: string; meaning?: string;
   supportCount: number; colorAccent?: string; visualEffect?: string;
   sourceEvent?: { secondaryEmotions: string[] };
+  /** Garden spot, set once when the owner plants it (null until then). regionId is its land. */
+  worldX?: number | null; worldY?: number | null; regionId?: string | null;
 }
 export interface EventResponse {
   event: BackendEvent; flower: BackendFlower | null;

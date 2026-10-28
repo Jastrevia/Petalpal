@@ -63,11 +63,6 @@ export function LegacyPlantedFlowerLayer({ depthPass = 'all' }: { depthPass?: Fl
       {/* 1. Committed Planted Flowers */}
       {sortedPlacements.map((flower) => {
         if (!flowerInDepthPass(flower.month, depthPass)) return null;
-        // If this flower is actively being adjusted, hide it from its old location
-        if (activeMode === 'adjusting' && targetFlower?.id === flower.id) {
-          return null;
-        }
-
         if (flower.sourceType || flower.sourceEventId) return <CanonicalFlowerArt key={flower.id} flower={flower} />;
         const def = getFlowerPlacementDefinition(flower.flowerName, flower.speciesCode);
         const img = getImageForFlower(flower.flowerName);
@@ -134,7 +129,7 @@ export function LegacyPlantedFlowerLayer({ depthPass = 'all' }: { depthPass?: Fl
         );
       })}
 
-      {/* 2. Active Preview Flower (Planting or Adjusting) */}
+      {/* 2. Active Preview Flower (Planting) */}
       {activeMode !== 'normal' && previewCoords && targetFlower && flowerInDepthPass(targetFlower.month, depthPass) && (
         <Group>
           {(() => {

@@ -31,6 +31,8 @@ interface AuthState extends AuthSnapshot {
   completeProfile: (profile: ProfileInput | string) => Promise<void>;
   /** Saves a library avatar (components/avatars) for the signed-in owner. */
   updateAvatar: (avatar: string) => Promise<void>;
+  /** Saves the app language (also the Weekly reflection language) and switches the app to it. */
+  updateLocale: (locale: 'en' | 'zh-Hans') => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   retry: () => Promise<void>;
@@ -245,6 +247,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...current,
         session: { ...current.session, user: { ...current.session.user, avatar: saved.avatar } },
         experience: current.experience && { ...current.experience, user: { ...current.experience.user, avatar: saved.avatar } },
+      });
+    },
+    updateLocale: async (locale) => {
+      const owner = state.session?.user.id;
+      if (state.phase !== 'signedIn' || !owner) throw new Error('Sign in to change the language.');
+      const saved = await apiRequest<{ user?: { preferredLocale?: string } }>(`/users/${owner}/profile`, 'PUT', { preferredLocale: locale });
+      const preferredLocale = saved.user?.preferredLocale ?? locale;
+      setState(current => current.session?.user.id !== owner || !current.experience ? current : {
+        ...current, experience: { ...current.experience, user: { ...current.experience.user, preferredLocale } },
       });
     },
     logout: () => logout(), deleteAccount, retry: () => sync(),

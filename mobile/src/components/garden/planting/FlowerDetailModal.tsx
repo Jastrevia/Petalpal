@@ -16,8 +16,10 @@ import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { resolveFlowerDetail } from './flowerDetailData';
 import { sourceFlowerImageUri } from './flowerDetailApi';
-import { localFlowerArtwork } from './localFlowerArtwork';
+import { clusterDrawing } from './flowerClusters';
+import { DeleteFlowerDialog } from './DeleteFlowerDialog';
 import { readEvent } from '../../../services/events';
+import { useAppLocale } from '../../../services/locale';
 
 const FLOWER_ASSETS: Record<string, any> = {
   pink: require('../../../../assets/garden/flowers/pink.png'),
@@ -31,7 +33,6 @@ export default function FlowerDetailModal() {
   const {
     selectedFlower,
     closeFlowerDetail,
-    startAdjusting,
     supportFlower,
     leaveMessage,
     deleteSelectedFlower,
@@ -44,6 +45,7 @@ export default function FlowerDetailModal() {
   } = usePlanting();
   const [messageText, setMessageText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const zh = useAppLocale() === 'zh-Hans';
   // Owner-only, on tap: the Event this flower grew from (GET /events/:id is owner-scoped).
   const [sourceEvent, setSourceEvent] = useState<{ id: string; state: 'loading' | 'ready' | 'error'; text?: string } | null>(null);
   const eventId = selectedFlowerIsOwner ? selectedFlower?.sourceEventId : undefined;
@@ -82,15 +84,11 @@ export default function FlowerDetailModal() {
 
   const existingImage = detail.image.split('/').pop()?.toLowerCase().replace('.png', '');
   const imageUri = sourceFlowerImageUri(detail.image);
-  const local = localFlowerArtwork(selectedFlower.speciesCode, detail.name);
-  const flowerImg = local?.source ?? (existingImage && FLOWER_ASSETS[existingImage]
+  // The same painted cluster the Garden draws for this flower's land.
+  const cluster = clusterDrawing({ ...selectedFlower, flowerName: detail.name });
+  const flowerImg = cluster?.source ?? (existingImage && FLOWER_ASSETS[existingImage]
     ? FLOWER_ASSETS[existingImage]
     : imageUri ? { uri: imageUri } : getImage(detail.name));
-  const bounds = local?.component.contentBounds;
-  const previewScale = bounds ? Math.min(90 / (bounds[2] - bounds[0]), 90 / (bounds[3] - bounds[1])) : 1;
-  const localPreviewStyle = local && bounds ? { position: 'absolute' as const,
-    width: local.component.canvasWidth * previewScale, height: local.component.canvasHeight * previewScale,
-    left: 45 - (bounds[0] + bounds[2]) * previewScale / 2, top: 45 - (bounds[1] + bounds[3]) * previewScale / 2 } : null;
 
   const plantedDate = new Date(selectedFlower.plantedDate);
   const formattedDate = Number.isNaN(plantedDate.getTime()) ? '' : plantedDate.toLocaleDateString(
@@ -134,7 +132,7 @@ export default function FlowerDetailModal() {
             <View style={styles.flowerImage}>
             <Image
               source={flowerImg}
-              style={localPreviewStyle ?? styles.flowerImage}
+              style={styles.flowerImage}
               resizeMode="contain"
             />
             </View>
@@ -205,20 +203,9 @@ export default function FlowerDetailModal() {
             </Pressable>
             </>}
             {selectedFlowerIsOwner && <>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isDetailLoading || isDetailWorking}
-              onPress={() => startAdjusting(selectedFlower)}
-              style={({ pressed }) => [
-                styles.adjustButton,
-                pressed && styles.buttonPressed,
-              ]}
-            >
-              <Text style={styles.adjustButtonText}>🔄 Adjust Position</Text>
-            </Pressable>
             <Pressable accessibilityRole="button" disabled={isDetailWorking || isDetailLoading}
               style={styles.deleteButton} onPress={() => setConfirmDelete(true)}>
-              <Text style={styles.deleteButtonText}>Delete Flower</Text>
+              <Text style={styles.deleteButtonText}>{zh ? '删除这朵花' : 'Delete Flower'}</Text>
             </Pressable>
             </>}
           </View>
@@ -233,23 +220,14 @@ export default function FlowerDetailModal() {
               <Text style={styles.supportButtonText}>Leave Message</Text>
             </Pressable>
           </View>}
-          {confirmDelete && selectedFlowerIsOwner && <View style={styles.messageForm}>
-            <Text style={styles.statusText}>Delete this {detail.name}?</Text>
-            <View style={styles.actionRow}>
-              <Pressable accessibilityRole="button" onPress={() => setConfirmDelete(false)} style={styles.supportButton}>
-                <Text style={styles.supportButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" disabled={isDetailWorking} style={styles.deleteButton}
-                onPress={async () => { if (await deleteSelectedFlower()) setConfirmDelete(false); }}>
-                <Text style={styles.deleteButtonText}>{isDetailWorking ? 'Working...' : 'Confirm Delete'}</Text>
-              </Pressable>
-            </View>
-          </View>}
           {detailError ? <Text accessibilityRole="alert" style={styles.actionError}>{detailError}</Text> : null}
           {!selectedFlowerIsOwner && !currentUserId && <Text style={styles.statusText}>Sign in to interact with this flower.</Text>}
           </ScrollView>
         </View>
       </View>
+      <DeleteFlowerDialog visible={confirmDelete && selectedFlowerIsOwner} flowerName={detail.name} busy={isDetailWorking}
+        error={confirmDelete ? detailError : ''} onCancel={() => setConfirmDelete(false)}
+        onDelete={async () => { if (await deleteSelectedFlower()) setConfirmDelete(false); }} />
     </Modal>
   );
 }
@@ -403,19 +381,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#BE185D',
-  },
-  adjustButton: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#245B45',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  adjustButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   buttonPressed: {
     opacity: 0.8,

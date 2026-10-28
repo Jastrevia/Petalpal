@@ -100,19 +100,8 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                 {summary.checkIn.checkedInToday ? copy.checkedIn : copy.checkInWaiting}
               </Text>
 
+              {/* One section for today: this round of check-ins, then what today has earned. */}
               <Section styles={styles} title={copy.today}>
-                {summary.today.filter(row => row.source !== 'STREAK_7' || row.count > 0).map((row, index) => <View key={row.source} style={[styles.row, index > 0 && styles.rowRule]}>
-                  <Image source={TASK_ART[row.source]} style={styles.medallion} resizeMode="cover" accessible={false} />
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowTitle}>{copy.sources[row.source]}</Text>
-                    <Text style={styles.small}>{copy.points(row.pointsEach)}</Text>
-                  </View>
-                  {row.count >= row.dailyCap ? <Text style={styles.done}>{copy.done}</Text>
-                    : <Text style={styles.count}>{row.count} / {row.dailyCap}</Text>}
-                </View>)}
-              </Section>
-
-              <Section styles={styles} title={copy.rewards}>
                 <View style={styles.rowBetween}>
                   <Text style={styles.rowTitle}>{copy.thisRound}</Text>
                   <Text style={styles.small}>{copy.days(summary.checkIn.cycleDay, 7)}</Text>
@@ -126,18 +115,20 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                   </View>)}
                 </View>
                 <Text style={styles.caption}>{copy.seventh}</Text>
-                {summary.monthly ? <>
-                  <View style={[styles.rowBetween, styles.gapTop]}>
-                    <Text style={styles.rowTitle}>{copy.thisMonth}</Text>
-                    <Text style={styles.small}>{copy.days(summary.monthly.checkIns, summary.monthly.needed)}</Text>
+                {summary.today.filter(row => row.source !== 'STREAK_7' || row.count > 0).map((row, index) => <View key={row.source} style={[styles.row, index > 0 && styles.rowRule]}>
+                  <Image source={TASK_ART[row.source]} style={styles.medallion} resizeMode="cover" accessible={false} />
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle}>{copy.sources[row.source]}</Text>
+                    <Text style={styles.small}>{copy.points(row.pointsEach)}</Text>
                   </View>
-                  <View style={styles.track}><View style={[styles.trackFill, { width: `${Math.min(100, Math.round(summary.monthly.checkIns / summary.monthly.needed * 100))}%` }]} /></View>
-                  <View style={styles.limited}>
-                    {keepsakeArt(summary.monthly.keepsake.id) ? <Image source={keepsakeArt(summary.monthly.keepsake.id)!} style={styles.limitedArt} resizeMode="cover" /> : null}
-                    <Text style={[styles.small, styles.flex]}>{summary.monthly.earned ? `${copy.earnedThisMonth} · ${summary.monthly.keepsake.name}`
-                      : copy.limited(summary.monthly.keepsake.name, summary.monthly.needed)}</Text>
-                  </View>
-                </> : <Text style={[styles.caption, styles.gapTop]}>{copy.noLimited}</Text>}
+                  {row.count >= row.dailyCap ? <Text style={styles.done}>{copy.done}</Text>
+                    : <Text style={styles.count}>{row.count} / {row.dailyCap}</Text>}
+                </View>)}
+                {summary.monthly ? <View style={[styles.limited, styles.gapTop]}>
+                  {keepsakeArt(summary.monthly.keepsake.id) ? <Image source={keepsakeArt(summary.monthly.keepsake.id)!} style={styles.limitedArt} resizeMode="cover" /> : null}
+                  <Text style={[styles.small, styles.flex]}>{copy.thisMonth} · {copy.days(summary.monthly.checkIns, summary.monthly.needed)} · {summary.monthly.earned
+                    ? `${copy.earnedThisMonth} · ${summary.monthly.keepsake.name}` : copy.limited(summary.monthly.keepsake.name, summary.monthly.needed)}</Text>
+                </View> : null}
               </Section>
 
               <Section styles={styles} title={copy.levels}>
@@ -174,8 +165,10 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
 
 // Hero geometry in units of the 1024² deck painting, scaled to the hero's width: the painting
 // shows from 23% down, PPL's elbows rest on the front slabs and her knees on the back ones.
-const DECK_BOX = { left: 0, top: -236, width: 1024, height: 1024 };
-const PPL_BOX = { left: 62, top: 276, width: 900, height: 900 * 572 / 1000 };
+// HERO_CROP: painting units cut from the top (sky) so the hero stays short on phones.
+const HERO_CROP = 250;
+const DECK_BOX = { left: 0, top: -236 - HERO_CROP, width: 1024, height: 1024 };
+const PPL_BOX = { left: 62, top: 276 - HERO_CROP, width: 900, height: 900 * 572 / 1000 };
 const heroBox = (width: number, box: typeof DECK_BOX) => {
   const k = width / 1024;
   return { position: 'absolute' as const, left: box.left * k, top: box.top * k, width: box.width * k, height: box.height * k };
@@ -204,7 +197,7 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: '#0B1F1B99' },
     sheet: { width: '100%', maxWidth: 440, maxHeight: '94%', borderRadius: 26, overflow: 'hidden', backgroundColor: theme.background, borderWidth: 1, borderColor: hair },
     content: { paddingBottom: 22 },
-    hero: { width: '100%', aspectRatio: 370 / 296, overflow: 'hidden', backgroundColor: theme.background },
+    hero: { width: '100%', aspectRatio: 1024 / 540, overflow: 'hidden', backgroundColor: theme.background },
     fill: { width: '100%', height: '100%' },
     close: { position: 'absolute', top: 12, right: 12, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.gold },
     closeText: { fontSize: 22, lineHeight: 26, color: theme.text },
@@ -243,14 +236,14 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     muted: { fontSize: 13, color: theme.muted, textAlign: 'center' },
     count: { fontFamily: 'serif', fontSize: 16, color: theme.muted },
     done: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 16, color: goldText },
-    week: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, marginBottom: 8 },
+    week: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, marginBottom: 6 },
     weekDay: { alignItems: 'center', gap: 4, width: '13.5%' },
-    dayCircle: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: hair, alignItems: 'center', justifyContent: 'center' },
+    dayCircle: { width: 30, height: 30, borderRadius: 17, borderWidth: 1, borderColor: hair, alignItems: 'center', justifyContent: 'center' },
     dayGot: { borderColor: theme.gold, backgroundColor: '#D6C3EC' },
     dayReward: { width: 38, height: 38, borderRadius: 19, borderColor: theme.gold, backgroundColor: MEDALLION },
     dayNumber: { fontFamily: 'serif', fontSize: 15, color: theme.muted },
     dayNumberGot: { color: '#4B3B69' },
-    dayFlower: { width: 46, height: 46 },
+    dayFlower: { width: 36, height: 36 },
     // Buds stay in colour (never grey or wilted), just quieter until the day is checked in.
     dayBud: { opacity: light ? 0.62 : 0.82 },
     dayToday: { color: theme.text, fontWeight: '600' },

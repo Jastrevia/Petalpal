@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
+import { apiRequest } from '../services/api';
 import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
@@ -65,11 +66,22 @@ export function useEventJournal(onGardenChanged?: () => void) {
           setResult((current) => current ? { ...current, event } : null); void refresh(); onGardenChanged?.(); return;
         }
       } catch (err) { if (!cancelled) setPollError((err as Error).message); }
-      if (!cancelled && ++attempts < 4) timer = setTimeout(poll, 15000);
+      if (!cancelled && ++attempts < 6) timer = setTimeout(poll, 6000);
     }
-    timer = setTimeout(poll, 10000);
+    timer = setTimeout(poll, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [result?.event.id, result?.event.emotionStatus, refresh, onGardenChanged]);
+  // SKIPPED also covers AI being paused or disabled on the server, so read the owner's own
+  // AI Processing consent before telling them to turn it on in Me.
+  const [aiProcessingOn, setAiProcessingOn] = useState<boolean | null>(null);
+  const skipped = result?.event.emotionStatus === 'SKIPPED';
+  useEffect(() => {
+    if (!skipped || !session) return;
+    let active = true;
+    apiRequest<{ aiProcessing: boolean }>(`/users/${session.user.id}/ai-consent`)
+      .then(c => { if (active) setAiProcessingOn(c.aiProcessing === true); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [skipped, session]);
   function plant(flower: BackendFlower) {
     const record = plantingRecord(flower, session?.user.timezone, result?.flower?.id === flower.id ? result.event.localDate : undefined);
     router.navigate({ pathname: '/', params: { mode: 'plant', flowerId: record.flowerId,
@@ -83,13 +95,18 @@ export function useEventJournal(onGardenChanged?: () => void) {
       if (mounted.current) { setResult({ ...result, event }); setPollError(''); await refresh(); onGardenChanged?.(); }
     } catch (err) { if (mounted.current) setPollError((err as Error).message); }
   }
+  // A planted flower never moves: if it already has its spot, just show it in the Garden.
   function placeFlower(flower: BackendFlower) {
-    if (placements.some(item => item.flowerId === flower.id)) {
-      router.navigate({ pathname: '/', params: { mode: 'adjust', flowerId: flower.id } });
+    if (flower.worldX != null || placements.some(item => item.flowerId === flower.id)) {
+      router.navigate({ pathname: '/', params: { mode: 'focus', flowerId: flower.id } });
     } else plant(flower);
+  }
+  // Back to an empty Event after one was saved (the saved one stays in the Garden).
+  function reset() {
+    pending.current = null; setResult(null); setContent(''); setMood(null); setError(''); setPollError('');
   }
   const currentFlowers = result ? flowers.filter(flower => flower.sourceEventId === result.event.id) : [];
   const flowersLeft = today?.limit == null ? null : today.remaining;
   return { flowers: currentFlowers, flowersToday: today, flowersLeft, placements, content, setContent, mood, setMood, result, busy, loading,
-    error, pollError, refresh, saveEvent, refreshEventStatus, placeFlower };
+    error, pollError, aiProcessingOn, refresh, saveEvent, refreshEventStatus, placeFlower, reset };
 }

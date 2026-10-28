@@ -15,7 +15,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { boundCamera, focusCamera, zoomCamera, type ShelfCamera } from '../components/bookhouse/shelfCamera';
 import { EngravedYear, ShelfMotif } from '../components/bookhouse/EngravedYear';
 import { useAuth } from '../services/auth';
-import { daysInMonth, journalYears, MONTHS, monthKey, openableMonths, readJournals, savePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
+import { daysInMonth, journalYears, MONTHS, monthKey, openableMonths, readJournals, savePrivateJournal, updatePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
 import { readEvent } from '../services/events';
 import { loadGardenPlacements } from '../components/garden/planting/gardenHydration';
 import { loadFlowerSource } from '../components/garden/planting/flowerDetailApi';
@@ -61,7 +61,7 @@ export default function Bookhouse() {
   useEffect(() => { setIntroVisible(true); }, [month?.year, month?.month, day]);
   const [entryIndex, setEntryIndex] = useState(0);
   useEffect(() => { setEntryIndex(0); }, [month?.year, month?.month, day]);
-  const [editor, setEditor] = useState(false);
+  const [editor, setEditor] = useState<false | { id?: string; text: string }>(false);
   const [history, setHistory] = useState(false);
   const [reader, setReader] = useState(false);
   const [pageSize, setPageSize] = useState({ width: 350, height: 260 });
@@ -263,7 +263,7 @@ export default function Bookhouse() {
                   selectedEntry?.journal ? null :
                   month && isToday(month.year, month.month, day) ? <View style={{ marginTop: 20, gap: 8, alignItems: 'flex-start' }}>
                     <Text style={[s.body, { color: '#725C42' }]}>Nothing written today yet.</Text>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => setEditor(true)} style={s.smallButton}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => setEditor({ text: '' })} style={s.smallButton}>
                       <Text style={[s.body, { color: '#5B3F26', textDecorationLine: 'underline' }]}>Write today’s journal  →</Text></Pressable>
                   </View> :
                   <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.'}</Text>}
@@ -280,6 +280,10 @@ export default function Bookhouse() {
             {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Read journal full screen" onPress={() => setReader(true)}
               style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '13%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
               <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Read in full ⤢</Text></Pressable>}
+            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Edit this journal"
+              onPress={() => setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content })}
+              style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '32%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
+              <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Edit ✎</Text></Pressable>}
             {month && <View style={s.tabs}>{MONTHS.map((label, i) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Read ${label} ${month.year}`}
               disabled={!openable.has(monthKey(month.year, i + 1))} accessibilityState={{ selected: month.month === i + 1, disabled: !openable.has(monthKey(month.year, i + 1)) }}
               onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: openable.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{label}</Text></Pressable>)}</View>}
@@ -300,10 +304,9 @@ export default function Bookhouse() {
             </Pressable>)}</ScrollView>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
           <View style={s.actions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => setEditor(true)} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => setEditor({ text: '' })} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Flower History" onPress={() => setHistory(true)} style={s.action}><BookhouseArt index={14} width={45} height={52} /><Text style={s.actionText}>Flower{ '\n' }History  →</Text></Pressable>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Back to Garden" onPress={leave} style={s.back}><Text style={[s.cream, { fontSize: 17 }]}>←  Back to Garden</Text></Pressable>
         </View>
         </Animated.View>
       </View>
@@ -316,8 +319,13 @@ export default function Bookhouse() {
         <Pressable accessibilityRole="button" disabled={yearOffset + 6 >= years.length} onPress={() => { setYearOffset(yearOffset + 6); setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>Later years</Text></Pressable>
       </>}
     </View>}
-    {editor && session && <JournalEditor userId={session.user.id} onClose={() => setEditor(false)} onSaved={async () => { setEditor(false); setNotice('Private journal saved.'); await reload(); }} />}
-    {reader && selectedEntry?.journal && <JournalReader text={selectedEntry.journal.content} night={lit} date={month ? `${MONTHS[month.month - 1]} ${day}, ${month.year}` : ''} onClose={() => setReader(false)} />}
+    {/* Always in the same corner, whatever is scrolled: back to the Garden. */}
+    <Pressable accessibilityRole="button" accessibilityLabel="Close Treehouse" onPress={leave} hitSlop={6}
+      style={[s.close, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
+    {editor && session && <JournalEditor userId={session.user.id} existing={editor.id ? { id: editor.id, text: editor.text } : undefined} onClose={() => setEditor(false)}
+      onSaved={async edited => { setEditor(false); setNotice(edited ? 'Journal updated.' : 'Private journal saved.'); await reload(); }} />}
+    {reader && selectedEntry?.journal && <JournalReader text={selectedEntry.journal.content} night={lit} date={month ? `${MONTHS[month.month - 1]} ${day}, ${month.year}` : ''} onClose={() => setReader(false)}
+      onEdit={() => { setReader(false); setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content }); }} />}
     {history && session && <FlowerHistory userId={session.user.id} timezone={session.user.timezone || 'UTC'} onClose={() => setHistory(false)} />}
   </Animated.View></GestureHandlerRootView>;
 }
@@ -330,8 +338,10 @@ function Sheet({ title, onClose, children, theme }: { title: string; onClose: ()
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 18, gap: 14 }}>{children}</ScrollView>
     </View></View></Modal>;
 }
-function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [text, setText] = useState('');
+function JournalEditor({ userId, existing, onClose, onSaved }: {
+  userId: string; existing?: { id: string; text: string }; onClose: () => void; onSaved: (edited: boolean) => Promise<void>;
+}) {
+  const [text, setText] = useState(existing?.text ?? '');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const saving = useRef(false);
   const voice = useEventVoiceInput(text, setText, busy, 2000, 'journal');
   const paperBody = [s.body, { color: '#4B3A27' }];
@@ -339,12 +349,15 @@ function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: 
   const save = async () => {
     if (saving.current || voice.active || !text.trim()) return;
     saving.current = true; setBusy(true); setError('');
-    try { await savePrivateJournal(userId, text); await onSaved(); }
+    try {
+      if (existing) await updatePrivateJournal(userId, existing.id, text); else await savePrivateJournal(userId, text);
+      await onSaved(Boolean(existing));
+    }
     catch (e) { setError(`${errorMessage(e)} If the connection was interrupted, check your shelf before saving again.`); }
     finally { saving.current = false; setBusy(false); }
   };
   // Written on the lifted page: one tall sheet with room to keep going.
-  return <ImmersivePaper title="New Journal ❧" subtitle="Only for you · not sent to AI or saved as an Event memory" closeLabel="Close New Journal"
+  return <ImmersivePaper title={existing ? 'Edit Journal ✎' : 'New Journal ❧'} subtitle="Only for you · not sent to AI or saved as an Event memory" closeLabel={existing ? 'Close without saving' : 'Close New Journal'}
     onClose={() => { if (!busy) onClose(); }} footer={<>
       {voice.active && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <Text accessibilityLiveRegion="polite" style={paperCaption}>{voice.phase === 'recording' ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…'}</Text>
@@ -363,7 +376,7 @@ function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: 
         </Pressable>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Save private journal" disabled={busy || voice.active || !text.trim()} onPress={save}
-        style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{busy ? 'Saving…' : 'Save private journal'}</Text></Pressable>
+        style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{busy ? 'Saving…' : existing ? 'Save changes' : 'Save private journal'}</Text></Pressable>
     </>}>
     <EmotionalSafetyNote text={text} />
     <TextInput accessibilityLabel="Private journal" placeholder="A moment to keep…" placeholderTextColor="#A08562" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy} autoFocus
@@ -372,8 +385,10 @@ function JournalEditor({ userId, onClose, onSaved }: { userId: string; onClose: 
 }
 
 // Reading a saved journal on the lifted page: the whole entry on one scrolling sheet.
-function JournalReader({ text, date, night, onClose }: { text: string; date: string; night?: boolean; onClose: () => void }) {
-  return <ImmersivePaper title={date || 'Private journal'} subtitle="Private journal" closeLabel="Close journal" night={night} onClose={onClose}>
+function JournalReader({ text, date, night, onClose, onEdit }: { text: string; date: string; night?: boolean; onClose: () => void; onEdit: () => void }) {
+  return <ImmersivePaper title={date || 'Private journal'} subtitle="Private journal" closeLabel="Close journal" night={night} onClose={onClose}
+    footer={<Pressable accessibilityRole="button" accessibilityLabel="Edit this journal" onPress={onEdit}
+      style={[s.save, { backgroundColor: '#5B7A62' }]}><Text style={[s.cream, { fontSize: 17 }]}>✎  Edit this journal</Text></Pressable>}>
     <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator>
       <Text selectable style={immersiveText}>{text}</Text>
     </ScrollView>
@@ -388,7 +403,7 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
   const load = useCallback(async () => { setLoading(true); setError(''); try {
     const [records, placements] = await Promise.all([loadGardenPlacements(userId, userId, timezone), loadFlowerPlacements()]);
     const plantedDates = new Map(placements.map(p => [p.flowerId, p.plantedDate]));
-    setFlowers(records.map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
+    setFlowers(records.map(flower => ({ ...flower, plantedDate: flower.placementOrigin !== 'FALLBACK'
       ? plantedDates.get(flower.flowerId) || flower.plantedDate : flower.plantedDate })).sort((a, b) => b.plantedDate.localeCompare(a.plantedDate)));
   } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); } }, [userId, timezone]);
   useEffect(() => { void load(); return () => { version.current++; }; }, [load]);
@@ -403,7 +418,7 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
     {loading ? <ActivityIndicator /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={load}><Text>Retry flower history</Text></Pressable></> : !flowers.length ? <Text style={s.body}>Your Garden has no flowers yet.</Text> : flowers.map(flower => <View key={flower.flowerId} style={s.historyEntry}>
       <Pressable accessibilityRole="button" accessibilityLabel={`Read flower ${flower.flowerName} ${flower.flowerId}`} onPress={() => inspect(flower)} style={{ minHeight: 48 }}>
         <Text style={s.title}>{flower.flowerName}</Text><Text style={s.caption}>{moodName(flower.mood || '')} · {flower.sourceType || 'Flower'}</Text>
-        <Text style={s.caption}>{flower.placementOrigin === 'LOCAL' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
+        <Text style={s.caption}>{flower.placementOrigin !== 'FALLBACK' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
       </Pressable>
       {detailBusy === flower.flowerId && <ActivityIndicator />}
       {detail?.id === flower.flowerId && <View style={{ gap: 8 }}><Text selectable style={s.body}>{detail.content || 'No written entry attached.'}</Text><Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>
@@ -436,7 +451,9 @@ const s = StyleSheet.create({
   journalDot: { position: 'absolute', bottom: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: '#DAB478' },
   days: { gap: 2, paddingTop: 8 }, day: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 }, entry: { paddingBottom: 12, gap: 5 },
   actions: { flexDirection: 'row', gap: 12, marginTop: 14 }, action: { flex: 1, minHeight: 66, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#F9EDCF', borderWidth: 2, borderColor: '#C9A264', borderRadius: 16 }, actionText: { fontFamily: serif, color: '#3D6255', fontSize: 17 },
-  back: { minHeight: 50, justifyContent: 'center', paddingHorizontal: 12 }, notice: { color: '#FFF3D8', backgroundColor: '#315E49', padding: 10, marginTop: 8, borderRadius: 8 },
+  close: { position: 'absolute', zIndex: 20, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#38291FCC', borderWidth: 1, borderColor: '#DAB478' },
+  closeText: { color: '#FFF1D6', fontSize: 20 }, notice: { color: '#FFF3D8', backgroundColor: '#315E49', padding: 10, marginTop: 8, borderRadius: 8 },
   scrim: { flex: 1, backgroundColor: '#231B16C9', paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' }, sheet: { width: '100%', maxWidth: 620, maxHeight: '100%', backgroundColor: '#F5EBD7', borderRadius: 18, borderWidth: 2, borderColor: '#C1A26E', overflow: 'hidden' }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 18, borderBottomWidth: 1, borderColor: '#D4C3A3' },
   input: { minHeight: 150, color: '#28483C', backgroundColor: '#FFFBF1', borderWidth: 1, borderColor: '#A5B29B', padding: 14, borderRadius: 10, fontSize: 16, textAlignVertical: 'top' }, moods: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, mood: { paddingHorizontal: 12, minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: '#B8C0A6', borderRadius: 20 }, chosen: { backgroundColor: '#CADAC7', borderColor: '#42654D' }, save: { minHeight: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#315E49', borderRadius: 24 }, historyEntry: { borderBottomWidth: 1, borderColor: '#D4C3A3', paddingBottom: 12 },
 });

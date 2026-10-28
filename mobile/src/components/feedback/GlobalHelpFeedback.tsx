@@ -18,7 +18,8 @@
  */
 
 import { usePathname } from 'expo-router';
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { onOpenHelpFeedback } from './helpFeedbackBus';
 import {
   Image,
   Platform,
@@ -73,6 +74,11 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<HelpFeedbackView>('menu');
   const [comingSoonNotice, setComingSoonNotice] = useState<string | null>(null);
+  const draft = useRef(hasDraft); draft.current = hasDraft;
+  useEffect(() => {
+    const open = () => { setIsOpen(true); setCurrentView('feedback_form'); setComingSoonNotice(null); };
+    return onOpenHelpFeedback(open);
+  }, []);
 
   // Check route visibility
   const isVisible = isHelpFeedbackVisibleOnRoute(pathname);
@@ -153,26 +159,7 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
       ]}
       pointerEvents="box-none"
     >
-      {/* ── TOP-RIGHT TRIGGER BUTTON ── */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Help and feedback"
-        accessibilityState={{ expanded: isOpen }}
-        onPress={handleToggle}
-        style={({ pressed, hovered }: any) => [
-          styles.triggerPill,
-          isOpen && styles.triggerPillActive,
-          pressed && styles.triggerPillPressed,
-          hovered && styles.triggerPillHovered,
-        ]}
-      >
-        <BotanicalSupportIcon type="trigger" size={17} />
-        <Text style={[styles.triggerText, isOpen && styles.triggerTextActive]}>
-          {isSmallScreen ? 'Help' : 'Help & Feedback'}
-        </Text>
-        {/* Subtle dot indicator when draft has text */}
-        {hasDraft && !isOpen && <View style={styles.draftIndicatorDot} />}
-      </Pressable>
+
 
       {/* ── FLOATING PAPER PANEL ── */}
       {isOpen && (
@@ -184,8 +171,6 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
             accessibilityLabel="Close help panel"
           />
 
-          {/* Upward Speech Caret pointing directly to trigger */}
-          <View style={styles.panelSpeechCaret} pointerEvents="none" />
 
           {/* Parchment Card Container */}
           <View
@@ -215,109 +200,10 @@ export const GlobalHelpFeedback = memo(function GlobalHelpFeedback() {
             </View>
 
             {/* ── VIEW A: MAIN HELP & FEEDBACK MENU ── */}
-            {currentView === 'menu' && (
-              <View style={styles.menuContainer}>
-                {/* Header */}
-                <View style={styles.headerSection}>
-                  <View style={styles.headerTitleColumn}>
-                    <Text style={styles.headerMainTitle}>Help & Feedback</Text>
-                    <Text style={styles.headerSubtitle}>Every thought matters.</Text>
-                  </View>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                    onPress={handleClose}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={({ pressed, hovered }: any) => [
-                      styles.closeIconButton,
-                      pressed && styles.closePressed,
-                      hovered && styles.closeHovered,
-                    ]}
-                  >
-                    <Text style={styles.closeIconGlyph}>✕</Text>
-                  </Pressable>
-                </View>
-
-                {/* 4 Support Topics List */}
-                <View style={styles.menuItemsList}>
-                  {SUPPORT_MENU_ITEMS.map((item, index) => {
-                    const isLast = index === SUPPORT_MENU_ITEMS.length - 1;
-                    return (
-                      <View key={item.id}>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`${item.title}: ${item.description}`}
-                          onPress={() => handleSelectMenuItem(item)}
-                          style={({ pressed, hovered }: any) => [
-                            styles.menuRow,
-                            pressed && styles.menuRowPressed,
-                            hovered && styles.menuRowHovered,
-                          ]}
-                        >
-                          <View style={styles.iconColumn}>
-                            <BotanicalSupportIcon type={item.iconType} size={30} />
-                          </View>
-
-                          <View style={styles.rowTextColumn}>
-                            <Text style={styles.rowTitleText}>{item.title}</Text>
-                            <Text style={styles.rowDescriptionText} numberOfLines={2}>
-                              {item.description}
-                            </Text>
-                          </View>
-
-                          <View style={styles.rowChevronColumn}>
-                            <Text style={styles.rowChevronText}>›</Text>
-                          </View>
-                        </Pressable>
-                        {!isLast && <View style={styles.menuDivider} />}
-                      </View>
-                    );
-                  })}
-                </View>
-
-                {/* Bottom Actions */}
-                <View style={styles.bottomActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Share Feedback"
-                    onPress={handlePrimaryCta}
-                    style={({ pressed, hovered }: any) => [
-                      styles.primaryActionButton,
-                      pressed && styles.primaryActionPressed,
-                      hovered && styles.primaryActionHovered,
-                    ]}
-                  >
-                    <Text style={styles.primaryActionIcon}>✿</Text>
-                    <Text style={styles.primaryActionText}>Share Feedback</Text>
-                  </Pressable>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="View Frequently Asked Questions"
-                    onPress={handleViewFaqs}
-                    style={styles.faqsLinkButton}
-                  >
-                    <Text style={styles.faqsLinkText}>View FAQs</Text>
-                  </Pressable>
-                </View>
-
-                {/* Modest Coming Soon In-World Notice */}
-                {comingSoonNotice && (
-                  <View style={styles.inWorldNotice}>
-                    <Text style={styles.noticeText}>{comingSoonNotice}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
             {/* ── VIEW B: SEND FEEDBACK FORM ── */}
             {currentView === 'feedback_form' && (
               <SendFeedbackForm
-                onBack={() => {
-                  setCurrentView('menu');
-                  setComingSoonNotice(null);
-                }}
+                onBack={handleClose}
                 onClose={handleClose}
                 currentRoute={pathname}
               />

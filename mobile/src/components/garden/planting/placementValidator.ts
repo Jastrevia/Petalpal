@@ -1,19 +1,16 @@
 // Authoritative Single Placement Validator for PetalPal Flower Planting System V1.
-// Used identically by initial planting and adjust position.
+// Used for planting only: a planted flower never moves. The server repeats the spacing rule.
 
 import {
   GARDEN_WORLD_HEIGHT,
   GARDEN_WORLD_WIDTH,
   MONTH_REGION_METAS,
 } from './plantingRegionData';
-import {
-  FlowerPlacementDefinition,
-  getFlowerPlacementDefinition,
-} from './flowerFootprintConfig';
+import type { FlowerPlacementDefinition } from './flowerFootprintConfig';
 import { type MonthRegionCalibration } from './plantingRegionGeometry';
 import { getApprovedRegionAtWorld, isFootprintInApprovedMonthMaskWorld } from './approvedPlantingMasks';
 import type { GardenLandLayout } from '../gardenMapLayout';
-import { resolveParentCollision } from './parentCollision';
+import { clusterFootprintRadius, hasClusterArt } from './flowerClusters';
 
 export interface FlowerPlacement {
   id: string;
@@ -76,8 +73,7 @@ export function validateFlowerPlacement({
   speciesCode,
   landLayout,
 }: ValidatePlacementParams): ValidationResult {
-  const collision = resolveParentCollision(speciesCode, flowerName);
-  if (collision.status === 'UNRESOLVED') {
+  if (!hasClusterArt(speciesCode, flowerName)) {
     return { isValid:false, reason:'COLLISION_CLASS_UNRESOLVED',
       userFeedback:'This flower is not ready for planting yet.' };
   }
@@ -125,8 +121,8 @@ export function validateFlowerPlacement({
   }
 
   // 3. Entire Footprint Containment Check
-  // The entire logical footprint (circle of radius footprintRadius) must fit inside the target month region.
-  const r = collision.radius;
+  // The whole cluster footprint (its land's small / medium / large circle) must fit inside the land.
+  const r = clusterFootprintRadius(month);
 
   if (!isFootprintInApprovedMonthMaskWorld(month, worldX, worldY, r, landLayout)) {
     return {
@@ -137,15 +133,13 @@ export function validateFlowerPlacement({
     };
   }
 
-  // 4. One Hole, One Flower: Footprint-to-Footprint Collision
-  // Visual overlap is allowed, but logical planting footprints must not intersect.
+  // 4. One Hole, One Flower: cluster footprints never intersect, so clusters are not crammed.
   for (const existing of existingPlacements) {
     if (ignorePlacementId && existing.id === ignorePlacementId) {
       continue;
     }
 
-    const existingDef = getFlowerPlacementDefinition(existing.flowerName, existing.speciesCode);
-    const minDistance = r + existingDef.footprintRadius;
+    const minDistance = r + clusterFootprintRadius(existing.month);
 
     const dx = worldX - existing.worldX;
     const dy = worldY - existing.worldY;

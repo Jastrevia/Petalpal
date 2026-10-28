@@ -16,13 +16,28 @@ export function StatusChip({ status }: { status: FeatureStatus }) {
   </View>;
 }
 
-export function FeatureActionButton({ title, onPress, disabled = false, secondary = false }: {
-  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
+export function FeatureActionButton({ title, onPress, disabled = false, secondary = false, danger = false }: {
+  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean; danger?: boolean;
 }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, disabled && ui.disabled, pressed && ui.pressed]}>
-    <Text style={ui.buttonText}>{title}</Text>
+    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={6}
+    style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, danger && ui.dangerButton, disabled && ui.disabled, pressed && ui.pressed]}>
+    <Text style={[ui.buttonText, danger && { color: '#FFF4EF' }]}>{title}</Text>
+  </Pressable>;
+}
+
+// A quiet list entry (policies, support): text and a chevron, not a big button.
+// `expanded` makes it a row that unfolds its content in place (chevron turns down).
+export function FeatureLinkRow({ title, onPress, first = false, expanded, note, danger = false, chevron = true }: {
+  title: string; onPress: () => void; first?: boolean; expanded?: boolean; note?: string; danger?: boolean; chevron?: boolean;
+}) {
+  const { theme } = usePanelTheme();
+  return <Pressable accessibilityRole={expanded === undefined ? 'link' : 'button'} accessibilityLabel={title}
+    accessibilityState={expanded === undefined ? undefined : { expanded }} onPress={onPress}
+    style={({ pressed }) => [ui.linkRow, { borderColor: theme.border }, first && { borderTopWidth: 0 }, pressed && { opacity: .6 }]}>
+    <Text style={[ui.linkText, { color: danger ? '#E0978A' : theme.text, flex: 1 }]}>{title}</Text>
+    {note ? <Text style={[ui.caption, { color: theme.muted, marginRight: 8 }]}>{note}</Text> : null}
+    {chevron ? <Text style={[ui.linkText, { color: theme.muted }]}>{expanded ? '⌄' : '›'}</Text> : null}
   </Pressable>;
 }
 
@@ -43,10 +58,14 @@ export const ui = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3 },
   tealWash: { backgroundColor: FEATURE_COLORS.tealWash },
   purpleWash: { backgroundColor: FEATURE_COLORS.purpleWash },
-  button: { minHeight: 46, justifyContent: 'center', alignItems: 'center', borderRadius: 15, paddingHorizontal: 16,
-    paddingVertical: 12, backgroundColor: FEATURE_COLORS.primary },
+  // Just big enough to tap (hitSlop adds the rest): sized to its words, not the panel.
+  button: { minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 16,
+    paddingVertical: 7, backgroundColor: FEATURE_COLORS.primary },
   secondaryButton: { backgroundColor: FEATURE_COLORS.secondary },
-  buttonText: { fontSize: 14, fontWeight: '700', color: FEATURE_COLORS.ink, textAlign: 'center' },
+  dangerButton: { backgroundColor: '#B5564A' },
+  buttonText: { fontSize: 13, fontWeight: '700', color: FEATURE_COLORS.ink, textAlign: 'center' },
+  linkRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 2 },
+  linkText: { fontSize: 15 },
   disabled: { opacity: .45 },
   pressed: { opacity: .8, transform: [{ scale: .98 }] },
   notice: { borderRadius: 16, padding: 13, gap: 8, backgroundColor: FEATURE_COLORS.purpleWash },

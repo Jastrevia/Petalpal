@@ -7,6 +7,7 @@
  * faking delivery or inventing imaginary server responses.
  */
 
+import { Linking, Platform } from 'react-native';
 import type {
   FeedbackSubmissionPayload,
   FeedbackSubmissionResult,
@@ -15,6 +16,8 @@ import type {
 export interface IFeedbackTransport {
   readonly isRealTransportConfigured: boolean;
   readonly transportName: string;
+  /** False when the transport cannot carry images (email links cannot attach files). */
+  readonly supportsAttachments?: boolean;
   submitFeedback(payload: FeedbackSubmissionPayload): Promise<FeedbackSubmissionResult>;
 }
 
@@ -75,7 +78,33 @@ export class LocalDevelopmentFeedbackTransport implements IFeedbackTransport {
  * In the future, this can be swapped with an HttpApiFeedbackTransport
  * without altering any UI components.
  */
-let activeTransport: IFeedbackTransport = new LocalDevelopmentFeedbackTransport();
+/**
+ * Email Transport (the default)
+ *
+ * Opens the person's email app with the feedback already written, addressed to the team.
+ * Nothing is stored on our servers, so nothing needs a new table; the message reaches us
+ * when they press Send in their email app.
+ */
+export const FEEDBACK_EMAIL = 'contact@jastrevia.com';
+export function feedbackEmailUrl(payload: FeedbackSubmissionPayload) {
+  const device = Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : `${Platform.OS} ${String(Platform.Version)}`;
+  const subject = `PetalPal feedback · ${payload.category}${payload.subject ? ` · ${payload.subject}` : ''}`;
+  const body = [payload.message, '', '—', `Category: ${payload.category}`,
+    ...(payload.email ? [`Reply to: ${payload.email}`] : []), ...(payload.route ? [`Page: ${payload.route}`] : []),
+    `Device: ${device}`, `Time: ${new Date(payload.timestamp).toISOString()}`].join('\n');
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+export class EmailFeedbackTransport implements IFeedbackTransport {
+  readonly isRealTransportConfigured = true;
+  readonly transportName = 'Email';
+  readonly supportsAttachments = false;
+  async submitFeedback(payload: FeedbackSubmissionPayload): Promise<FeedbackSubmissionResult> {
+    await Linking.openURL(feedbackEmailUrl(payload));
+    return { success: true, isRealTransport: true, message: 'EMAIL_OPENED', submittedAt: Date.now() };
+  }
+}
+
+let activeTransport: IFeedbackTransport = new EmailFeedbackTransport();
 
 export function getFeedbackTransport(): IFeedbackTransport {
   return activeTransport;

@@ -235,7 +235,7 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   const calls = [], context = {
     readOnly: false, fit: 1, selectedFlower: null, cameraZoom: { value: 1 }, cameraX: { value: 0 }, cameraY: { value: 0 }, baseX: 0, baseY: 0,
     __DEV__: false, perfFixtureRef: { current: false }, fairyStateRef: { current: 'idle' }, activeModeRef: { current: 'normal' }, placementsRef: { current: [] }, useMonthlyGrowth: true,
-    hitProductionFlower: () => null, updatePreview: () => calls.push('placement'), openFlowerDetail: () => calls.push('detail'),
+    hitCluster: () => null, updatePreview: () => calls.push('placement'), openFlowerDetail: () => calls.push('detail'),
     enableFairyWalk: true, treehousePlacement: {}, swingPlacement: {}, teaSetPlacement: {}, moonBedPlacement: {}, Platform: { OS: 'web' },
     canvasRef: { current: { redraw: () => calls.push('redraw') } },
     // A tap that may send her somewhere holds her schedule off (fairySchedule.ts).
@@ -257,9 +257,9 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   expect(['move', 'redraw']);
   context.hitsMailbox = () => true; context.fairyRef.current.isMailboxBusy = () => true;
   context.activeModeRef.current = 'plant'; expect(['placement']);
-  context.activeModeRef.current = 'normal'; context.hitProductionFlower = () => ({ id: 'synthetic-flower' }); expect(['detail']);
+  context.activeModeRef.current = 'normal'; context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail']);
   context.selectedFlower = {}; expect([]); context.selectedFlower = null;
-  context.hitProductionFlower = () => null; expect([]);
+  context.hitCluster = () => null; expect([]);
   context.fairyRef.current.isMailboxBusy = () => false;
   for (const [hit, action] of [['hitsMailbox','visitMailbox'],['hitsTreehouse','visitTreehouse'],['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => true; expect([action]); context[hit] = () => false;
@@ -272,6 +272,6 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   context.bookhouseOnEntry.current = true; expect(['move', 'redraw']); assert.equal(context.bookhouseOnEntry.current, false);
   context.readOnly = true; expect([]);
   // A friend's Garden still opens its flowers (support and messages), never planting or the Fairy.
-  context.hitProductionFlower = () => ({ id: 'synthetic-flower' }); expect(['detail'], false);
-  context.hitProductionFlower = () => null; context.activeModeRef.current = 'plant'; expect([]);
+  context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail'], false);
+  context.hitCluster = () => null; context.activeModeRef.current = 'plant'; expect([]);
 });

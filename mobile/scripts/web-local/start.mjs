@@ -24,7 +24,11 @@ const expo = spawn(windows ? 'npx.cmd' : 'npx', ['expo', 'start', '--port', Stri
   env: { ...process.env, TMPDIR: cache, TEMP: cache, TMP: cache, EXPO_NO_TELEMETRY: '1',
     EXPO_PUBLIC_API_BASE_URL: 'https://api.synthetic.invalid',
     EXPO_PUBLIC_FIREBASE_API_KEY: 'synthetic-public-build-fixture', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'fixture.invalid',
-    EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'petalpal-synthetic', EXPO_PUBLIC_FIREBASE_APP_ID: 'synthetic-public-app' },
+    EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'petalpal-synthetic', EXPO_PUBLIC_FIREBASE_APP_ID: 'synthetic-public-app',
+    // The published legal pages from public/legal, served by this preview like the real Web build.
+    EXPO_PUBLIC_PRIVACY_POLICY_URL: `http://localhost:${PORT}/legal/privacy.html`,
+    EXPO_PUBLIC_TERMS_URL: `http://localhost:${PORT}/legal/terms.html`,
+    EXPO_PUBLIC_DELETION_URL: `http://localhost:${PORT}/legal/account-deletion.html` },
 });
 
 const server = http.createServer((req, res) => {

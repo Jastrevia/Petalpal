@@ -548,7 +548,7 @@ test('Top header is simplified without redundant dark navbar or heavy slogans', 
   // Must not have bulky legacy slogans or heavy labels
   assert.ok(!pageSource.includes('HELD MAIL EXPERIENCE'), 'No clunky title slogans');
   assert.ok(!pageSource.includes('READING STATE ACTIVE'), 'No redundant debug state banners');
-  assert.ok(pageSource.includes('← Garden'), 'Clean back action to Garden');
+  assert.ok(pageSource.includes('accessibilityLabel="Close Mailbox"'), 'One close (×) back to the Garden');
   assert.ok(pageSource.includes('✿ PetalPal'), 'Minimal PetalPal branding');
 });
 

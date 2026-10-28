@@ -63,13 +63,12 @@ function textContent(tree) {
 function button(tree, label) {
   return elements(tree).find((element) => element.type === 'Pressable' && textContent(element) === label);
 }
-function modalHarness(overrides = {}, events = { readEvent: async () => { throw new Error('readEvent not expected'); } }) {
-  const calls = { close: 0, adjust: [], support: [], messages: [], deletes: 0 };
+function modalHarness(overrides = {}, events = { readEvent: async () => { throw new Error('readEvent not expected'); } }, locale = 'en') {
+  const calls = { close: 0, support: [], messages: [], deletes: 0 };
   const value = {
     selectedFlower: placement, selectedFlowerIsOwner: false, currentUserId: 'visitor',
     flowerDetailSource: source, isDetailLoading: false, isDetailWorking: false, detailError: '',
     closeFlowerDetail: () => { calls.close++; },
-    startAdjusting: (flower) => { calls.adjust.push(flower); },
     supportFlower: (id) => { calls.support.push(id); },
     leaveMessage: async (text) => { calls.messages.push(text); return true; },
     deleteSelectedFlower: async () => { calls.deletes++; return true; },
@@ -82,10 +81,11 @@ function modalHarness(overrides = {}, events = { readEvent: async () => { throw 
   const load = loadPlantingModules(undefined, hooks.react, undefined, true, {
     './PlantingContext': { usePlanting: () => value }, 'react-native': native,
     './plantingRegionData': monthData, '../../../services/events': events,
+    '../../../services/locale': { useAppLocale: () => locale },
   });
   const Modal = load('FlowerDetailModal').default;
   hooks.mount(() => Modal());
-  return { calls, value, hooks };
+  return { calls, value, hooks, load };
 }
 
 async function providerHarness({ userId = 'visitor', flower = placement, api = {} } = {}) {
@@ -171,8 +171,10 @@ test('ownership trusts explicit flower identity and never grants visitors the lo
   assert.equal(ownsFlower(legacy, { localOwner: false }), false);
 });
 
-test('owner modal shows received Support, Memory, Meaning and messages with Adjust/Delete only', async () => {
-  const { calls, hooks } = modalHarness({ selectedFlowerIsOwner: true, currentUserId: 'owner' });
+test('owner modal shows received Support, Memory, Meaning and messages with Delete only; no Adjust', async () => {
+  const { calls, hooks, load } = modalHarness({ selectedFlowerIsOwner: true, currentUserId: 'owner' });
+  const { DeleteFlowerDialog } = load('DeleteFlowerDialog');
+  const dialog = (tree) => elements(tree).find((node) => node.type === DeleteFlowerDialog);
   let tree = hooks.render();
   const content = textContent(tree);
   for (const text of ['CHERRY BLOSSOM', 'January Garden • Land01', 'Mood: Peaceful',
@@ -182,32 +184,78 @@ test('owner modal shows received Support, Memory, Meaning and messages with Adju
   }
   assert.equal(button(tree, 'Give Support 💗'), undefined);
   assert.equal(elements(tree).some((node) => node.type === 'TextInput'), false);
-  button(tree, '🔄 Adjust Position').props.onPress();
-  assert.equal(calls.adjust[0], placement);
+  // A planted flower never moves: there is no Adjust or move control.
+  assert.equal(elements(tree).some((node) => /adjust|move/i.test(textContent(node)) && node.type === 'Pressable'), false);
+  assert.equal(dialog(tree).props.visible, false);
   button(tree, 'Delete Flower').props.onPress();
   tree = await hooks.flush();
-  assert.ok(textContent(tree).includes('Delete this Cherry Blossom?'));
-  button(tree, 'Cancel').props.onPress();
+  assert.equal(dialog(tree).props.visible, true);
+  assert.equal(dialog(tree).props.flowerName, 'Cherry Blossom');
+  dialog(tree).props.onCancel();
   tree = await hooks.flush();
   assert.equal(calls.deletes, 0);
-  assert.equal(button(tree, 'Confirm Delete'), undefined);
+  assert.equal(dialog(tree).props.visible, false);
   button(tree, 'Delete Flower').props.onPress();
   tree = await hooks.flush();
-  await button(tree, 'Confirm Delete').props.onPress();
+  await dialog(tree).props.onDelete();
   assert.equal(calls.deletes, 1);
+  tree = await hooks.flush();
+  assert.equal(dialog(tree).props.visible, false);
   tree = await hooks.flush();
   elements(tree).find((node) => node.type === 'Modal').props.onRequestClose();
   assert.equal(calls.close, 1);
 });
 
+for (const locale of ['en', 'zh-Hans']) test(`Delete Flower warns (permanent, no planting back) and needs DELETE typed: ${locale}`, async () => {
+  const hooks = hookHarness();
+  const native = Object.fromEntries(['Modal', 'Pressable', 'Text', 'TextInput', 'View'].map((name) => [name, name]));
+  native.StyleSheet = { create: (styles) => styles, absoluteFill: {} };
+  const load = loadPlantingModules(undefined, hooks.react, undefined, true, {
+    'react-native': native, '../../../services/locale': { useAppLocale: () => locale } });
+  const { DeleteFlowerDialog, DELETE_FLOWER_COPY } = load('DeleteFlowerDialog');
+  const { FeatureActionButton } = load('../../features/FeatureUI');
+  const copy = DELETE_FLOWER_COPY[locale];
+  let deletes = 0, cancels = 0;
+  hooks.mount(() => DeleteFlowerDialog({ visible: true, flowerName: 'Tulip', busy: false,
+    onCancel: () => { cancels++; }, onDelete: () => { deletes++; } }));
+  let tree = hooks.render();
+  const text = textContent(tree);
+  const final = (current) => elements(current).find((node) => node.type === FeatureActionButton && node.props.title === copy.delete);
+  for (const line of [copy.warning, copy.quota, copy.typeLabel]) assert.ok(text.includes(line), line);
+  if (locale === 'zh-Hans') {
+    assert.match(copy.warning, /永久删除/); assert.match(copy.quota, /不会退还种花次数/);
+    // Fully Chinese apart from the English phrase the owner types.
+    for (const line of [copy.title, copy.warning, copy.quota, copy.what, copy.keep, copy.delete]) assert.doesNotMatch(line, /[A-Za-z]/, line);
+    assert.match(copy.typeLabel, /DELETE/);
+  } else {
+    assert.match(copy.warning, /permanently deleted/); assert.match(copy.quota, /does not give back a planting/);
+  }
+  const input = elements(tree).find((node) => node.type === 'TextInput');
+  assert.equal(input.props.placeholder, 'DELETE');
+  assert.equal(final(tree).props.disabled, true);
+  final(tree).props.onPress(); assert.equal(deletes, 0);
+  for (const typed of ['delete', 'DELET', 'DELETE NOW']) {
+    input.props.onChangeText(typed); tree = await hooks.flush();
+    assert.equal(final(tree).props.disabled, true, typed);
+  }
+  elements(tree).find((node) => node.type === 'TextInput').props.onChangeText(' DELETE ');
+  tree = await hooks.flush();
+  assert.equal(final(tree).props.disabled, false);
+  final(tree).props.onPress(); assert.equal(deletes, 1);
+  elements(tree).find((node) => node.type === FeatureActionButton && node.props.title === copy.keep).props.onPress();
+  assert.equal(cancels, 1);
+});
+
 test('visitor modal has Support/message controls, loaded daily state, and the existing 300-character form', async () => {
-  const { calls, value, hooks } = modalHarness();
+  const { calls, value, hooks, load } = modalHarness();
+  const { DeleteFlowerDialog } = load('DeleteFlowerDialog');
+  const dialog = (tree) => elements(tree).find((node) => node.type === DeleteFlowerDialog);
   let tree = hooks.render();
   assert.equal(button(tree, 'Give Support 💗').props.disabled, false);
   button(tree, 'Give Support 💗').props.onPress();
   assert.deepEqual(calls.support, [placement.flowerId]);
-  assert.equal(button(tree, '🔄 Adjust Position'), undefined);
   assert.equal(button(tree, 'Delete Flower'), undefined);
+  assert.equal(dialog(tree).props.visible, false);
   const input = elements(tree).find((node) => node.type === 'TextInput');
   assert.equal(input.props.maxLength, 300);
   assert.equal(input.props.multiline, true);
@@ -332,7 +380,7 @@ test('authenticated socket subscription filters owner/flower events and disconne
   assert.equal(disconnected, 1);
 });
 
-test('provider rejects self Support and visitor Adjust/Delete without API calls or placement writes', async () => {
+test('provider rejects self Support and visitor Delete without API calls or placement writes; there is no Adjust', async () => {
   const owner = await providerHarness({ userId: 'owner', api: {
     loadFlowerSource: async () => ({ ...source, supportState: { ...supportState, isOwner: true, canSupport: false } }),
   } });
@@ -347,10 +395,9 @@ test('provider rejects self Support and visitor Adjust/Delete without API calls 
   flow = visitor.hooks.render();
   flow.openFlowerDetail(placement); flow = await visitor.hooks.flush();
   assert.equal(flow.selectedFlowerIsOwner, false);
-  flow.startAdjusting(placement); flow = await visitor.hooks.flush();
+  assert.equal(flow.startAdjusting, undefined);
   assert.equal(flow.activeMode, 'normal');
   assert.equal(flow.targetFlower, null);
-  assert.match(flow.detailError, /owner/);
   assert.equal(await flow.deleteSelectedFlower(), false);
   assert.deepEqual(visitor.calls.deletes, []);
   assert.deepEqual(visitor.storage.writes, []);
