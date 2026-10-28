@@ -6,9 +6,9 @@ import { FeatureLinkRow, ui } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
 import { CommunityGuidelines } from './CommunityGuidelines';
 import { DeleteAccountSettings } from './DeleteAccountSettings';
-const COPY={en:{title:'Privacy & support',help:'Help & Feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',
+const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',
   support:'Contact support',mail:'Opening your email app to write to contact@jastrevia.com…',emergency:"PetalPal isn't an emergency service. If you or someone else is in danger, contact local emergency services."},
- 'zh-Hans':{title:'隐私与帮助',help:'帮助与反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',
+ 'zh-Hans':{title:'隐私与帮助',help:'发送反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',
   support:'联系客服',mail:'正在打开邮件应用，写信到 contact@jastrevia.com…',emergency:'PetalPal 不是紧急服务。如果你或他人有危险，请联系当地紧急服务。'}};
 // On the web a page opens in a new tab, so the Garden stays where it was.
 async function openPolicy(url:string|undefined,setStatus:(value:string)=>void){if(!url){setStatus('This policy URL is awaiting publication. Contact contact@jastrevia.com.');return;}
@@ -30,7 +30,8 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
  <FeatureLinkRow title={copy.privacy} onPress={()=>void open(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)}/>
  <FeatureLinkRow title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
  {account?null:<FeatureLinkRow title={copy.deletion} onPress={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/>}
- <FeatureLinkRow title={copy.problem} onPress={()=>{setStatus(copy.mail);void open(problemReportUrl());}}/>
+ {/* In Me the feedback form covers problem reports (category: bug). */}
+ {account?null:<FeatureLinkRow title={copy.problem} onPress={()=>{setStatus(copy.mail);void open(problemReportUrl());}}/>}
  <FeatureLinkRow title={copy.support} onPress={()=>{setStatus(copy.mail);void open('mailto:contact@jastrevia.com');}}/>
  {account?<>
   <FeatureLinkRow title={copy.guidelines} expanded={unfolded==='guidelines'} onPress={()=>setUnfolded(unfolded==='guidelines'?null:'guidelines')}/>
