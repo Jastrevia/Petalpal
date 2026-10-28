@@ -28,14 +28,14 @@ export function FeatureActionButton({ title, onPress, disabled = false, secondar
 
 // A quiet list entry (policies, support): text and a chevron, not a big button.
 // `expanded` makes it a row that unfolds its content in place (chevron turns down).
-export function FeatureLinkRow({ title, onPress, first = false, expanded, note }: {
-  title: string; onPress: () => void; first?: boolean; expanded?: boolean; note?: string;
+export function FeatureLinkRow({ title, onPress, first = false, expanded, note, danger = false }: {
+  title: string; onPress: () => void; first?: boolean; expanded?: boolean; note?: string; danger?: boolean;
 }) {
   const { theme } = usePanelTheme();
   return <Pressable accessibilityRole={expanded === undefined ? 'link' : 'button'} accessibilityLabel={title}
     accessibilityState={expanded === undefined ? undefined : { expanded }} onPress={onPress}
     style={({ pressed }) => [ui.linkRow, { borderColor: theme.border }, first && { borderTopWidth: 0 }, pressed && { opacity: .6 }]}>
-    <Text style={[ui.linkText, { color: theme.text, flex: 1 }]}>{title}</Text>
+    <Text style={[ui.linkText, { color: danger ? '#E0978A' : theme.text, flex: 1 }]}>{title}</Text>
     {note ? <Text style={[ui.caption, { color: theme.muted, marginRight: 8 }]}>{note}</Text> : null}
     <Text style={[ui.linkText, { color: theme.muted }]}>{expanded ? '⌄' : '›'}</Text>
   </Pressable>;
