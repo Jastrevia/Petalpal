@@ -18,12 +18,12 @@ const COPY={
  en:{title:'AI processing & privacy',loading:'Loading the AI disclosure. Optional AI cannot be enabled until this is available.',
   switches:['AI Processing','Personalization','Long-term Memory'],configured:'configured',unavailable:'unavailable',
   save:'Save my AI choices',withdraw:'Withdraw all AI consent',saved:'Privacy choices saved.',
-  suggested:'AI is on by default so your Events can be analysed. Tap Save to confirm, or turn it off.',
+  suggested:'Not saved yet: AI stays off until you tap Save. The switches show our suggestion; turn off anything you do not want first.',
   feature:(f:string)=>f,processor:(p:string)=>p,explanation:(t:string)=>t,retention:(t:string)=>t},
  'zh-Hans':{title:'AI 处理与隐私',loading:'正在加载 AI 说明。说明加载完成前无法开启 AI。',
   switches:['AI 处理','个性化','长期记忆'],configured:'已启用',unavailable:'不可用',
   save:'保存我的 AI 选择',withdraw:'撤回全部 AI 授权',saved:'隐私选择已保存。',
-  suggested:'AI 默认开启，这样才能分析你的事件。点「保存」确认，或者把它关掉。',
+  suggested:'还没保存：点「保存」之前 AI 不会开启。开关是我们建议的设置，不想要的可以先关掉。',
   feature:(f:string)=>ZH_FEATURES[f]??f,processor:(p:string)=>ZH_PROCESSORS[p]??p,
   explanation:()=>'开启「AI 处理」后，事件文字和你选择的心情会发送给下列服务，用于给出情绪建议；你提交的录音会发送去转成文字。「个性化」允许用符合条件的事件生成个性化的回顾。「长期记忆」允许保存事件摘要和向量，并在周报、月报中使用。回顾请求可能包含事件片段、日期、心情标签和由此生成的记忆。日记中打的字和日记照片不会进入事件记忆和回顾。用语音写日记时，录音同样会被发送去转文字；你也可以直接打字。显示为不可用的功能，即使授权也不会启用；显示已启用也不保证服务一直可用。',
   retention:()=>'处理可能在你所在国家以外进行。服务商的数据保留、处理地区和合同条款仍需运营方核实；这里不承诺零保留或不用于训练。撤回授权后，之后不会再发送新的请求，未完成的结果会被丢弃，但已经发出的请求无法撤回，服务商那里的副本也不会自动删除。关闭「长期记忆」会从数据库中移除生成的记忆和已保存的回顾；原始事件和日记会保留，直到你自己删除。'},
@@ -48,7 +48,8 @@ export function AiPrivacySettings() {
  return <View style={{gap:12}}>
  {disclosure ? <><Text style={ui.text}>{copy.explanation(disclosure.explanation)}</Text>{disclosure.features.map(f=><Text key={f.feature} style={ui.caption}>{copy.feature(f.feature)}: {copy.processor(f.processor)} — {f.configured?copy.configured:copy.unavailable}</Text>)}<Text style={ui.text}>{copy.retention(disclosure.retention)}</Text></>:<Text style={ui.text}>{copy.loading}</Text>}
  {(['aiProcessing','personalization','memoryEnabled'] as const).map((key,i)=><View key={key} style={ui.row}><Text style={[ui.text,{flex:1,color:theme.text}]}>{copy.switches[i]}</Text><Switch accessibilityLabel={copy.switches[i]} value={value[key]} disabled={busy||!disclosure||(key!=='aiProcessing'&&!value.aiProcessing)||(key==='memoryEnabled'&&!value.personalization)} onValueChange={enabled=>setValue(v=>({...v,[key]:enabled,...(!enabled&&key==='aiProcessing'?{personalization:false,memoryEnabled:false}:{}),...(!enabled&&key==='personalization'?{memoryEnabled:false}:{})}))}/></View>)}
- {suggested?<Text style={ui.caption}>{copy.suggested}</Text>:null}
+ {/* The switches look on but nothing is granted yet, so say so where the owner will see it. */}
+ {suggested?<View testID="ai-consent-unsaved" style={{borderWidth:1,borderColor:theme.gold,borderRadius:12,padding:10}}><Text style={[ui.text,{color:theme.text,fontWeight:'600'}]}>{copy.suggested}</Text></View>:null}
  <View style={[ui.row,{flexWrap:'wrap'}]}>
  <FeatureActionButton title={copy.save} disabled={busy||!disclosure} onPress={()=>void save(value)}/>
  <FeatureActionButton secondary title={copy.withdraw} disabled={busy} onPress={()=>void save({aiProcessing:false,personalization:false,memoryEnabled:false})}/>

@@ -25,7 +25,7 @@ const COPY = {
     limit: (of: number) => `Today's ${of} flowers are already growing, so this Event didn't add one. Come back tomorrow for new flowers.`,
     yourFlower: 'Your flower', mood: 'Mood you chose', analysis: 'AI emotion analysis', notDiagnosis: 'Suggestions, not a diagnosis.',
     pending: 'AI is reading your Event…', failed: 'AI analysis is unavailable right now. Your Event and flower are saved.',
-    skipped: 'AI analysis is off, so only your chosen mood is used. You can turn AI on in Me.', noEmotions: 'No other feelings stood out.',
+    skipped: 'AI is not turned on yet, so only your chosen mood is used. To turn it on, open Me and tap "Save my AI choices".', noEmotions: 'No other feelings stood out.',
     show: 'Show this Event to friends', showHint: 'Friends who visit your Garden can read what you wrote on this flower.', hiddenHint: 'Only you can read what you wrote. Friends see just the flower.',
     satisfied: 'Happy with it? Plant your flower in the Garden.',
     plant: 'Plant', plantWithout: 'Plant without analysis', plantNote: 'with the AI analysis', withoutNote: 'keeps only your mood',
@@ -42,7 +42,7 @@ const COPY = {
     limit: (of: number) => `今天的 ${of} 朵花已经在长了，这件事没有再长出新花。明天再来吧。`,
     yourFlower: '你的花', mood: '你选的心情', analysis: 'AI 情绪分析', notDiagnosis: '只是建议，不是诊断。',
     pending: 'AI 正在读你的事件…', failed: '暂时无法进行 AI 分析。你的事件和花都已保存。',
-    skipped: 'AI 分析已关闭，所以只用你选的心情。可以在「我」里打开 AI。', noEmotions: '没有发现其他明显的情绪。',
+    skipped: 'AI 还没开启，所以只用你选的心情。想开启的话，打开「我」，点「保存我的 AI 选择」。', noEmotions: '没有发现其他明显的情绪。',
     show: '把这件事展示给朋友', showHint: '来逛花园的朋友能在这朵花上读到你写的内容。', hiddenHint: '只有你能读到写的内容，朋友只能看到花。',
     satisfied: '满意的话，就把花种进花园吧。',
     plant: '种下', plantWithout: '不带分析种下', plantNote: '保留 AI 分析', withoutNote: '只保留你选的心情',
@@ -144,7 +144,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
             {!saved.event.secondaryEmotions.length ? <Text style={styles.text}>{copy.noEmotions}</Text> : null}
             <Text style={styles.caption}>{copy.notDiagnosis}</Text>
             <AiOutputReport kind="event" outputId={saved.event.id} />
-          </> : <Text style={styles.text}>{status === 'FAILED' ? copy.failed : copy.skipped}</Text>}
+          </> : <Text style={styles.text}>{status === 'FAILED' || (status === 'SKIPPED' && journal.aiProcessingOn) ? copy.failed : copy.skipped}</Text>}
         {journal.pollError ? <Text accessibilityRole="alert" style={styles.caption}>{journal.pollError}</Text> : null}
       </View> : journal.loading ? <ActivityIndicator color="#477D70" /> : null}
 

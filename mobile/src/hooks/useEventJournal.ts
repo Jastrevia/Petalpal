@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
+import { apiRequest } from '../services/api';
 import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
@@ -70,6 +71,17 @@ export function useEventJournal(onGardenChanged?: () => void) {
     timer = setTimeout(poll, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [result?.event.id, result?.event.emotionStatus, refresh, onGardenChanged]);
+  // SKIPPED also covers AI being paused or disabled on the server, so read the owner's own
+  // AI Processing consent before telling them to turn it on in Me.
+  const [aiProcessingOn, setAiProcessingOn] = useState<boolean | null>(null);
+  const skipped = result?.event.emotionStatus === 'SKIPPED';
+  useEffect(() => {
+    if (!skipped || !session) return;
+    let active = true;
+    apiRequest<{ aiProcessing: boolean }>(`/users/${session.user.id}/ai-consent`)
+      .then(c => { if (active) setAiProcessingOn(c.aiProcessing === true); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [skipped, session]);
   function plant(flower: BackendFlower) {
     const record = plantingRecord(flower, session?.user.timezone, result?.flower?.id === flower.id ? result.event.localDate : undefined);
     router.navigate({ pathname: '/', params: { mode: 'plant', flowerId: record.flowerId,
@@ -95,5 +107,5 @@ export function useEventJournal(onGardenChanged?: () => void) {
   const currentFlowers = result ? flowers.filter(flower => flower.sourceEventId === result.event.id) : [];
   const flowersLeft = today?.limit == null ? null : today.remaining;
   return { flowers: currentFlowers, flowersToday: today, flowersLeft, placements, content, setContent, mood, setMood, result, busy, loading,
-    error, pollError, refresh, saveEvent, refreshEventStatus, placeFlower, reset };
+    error, pollError, aiProcessingOn, refresh, saveEvent, refreshEventStatus, placeFlower, reset };
 }
