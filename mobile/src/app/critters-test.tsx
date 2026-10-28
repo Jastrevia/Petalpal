@@ -12,7 +12,9 @@ import { posePoints, type Pose } from '@/components/garden/critters/rig';
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
 // painting and motion can be judged up close; for the walkers, a strip of stills through one
 // stride (or hop) and their skeleton. Not part of production navigation.
-const WIDTH = 360, HEIGHT = 260, ZOOM = 2.4;
+const WIDTH = 360, HEIGHT = 260;
+// The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn.
+const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : 2.4);
 const FRAMES = 8;
 function stillPose(id: WalkerId, k: number): Pose {
   if (id === 'rabbit') return rabbitPose(k / FRAMES, 320, 0);
@@ -35,8 +37,9 @@ export default function CrittersTestScreen() {
   const [start, setStart] = useState(0);
   useEffect(() => { const timer = setTimeout(() => setStart(seconds.value), 100); return () => clearTimeout(timer); }, [id, round, seconds]);
   const visit = useMemo<Visit>(() => {
+    const ZOOM = zoomFor(id), margin = CRITTERS[id].size * 0.45;
     const y = CRITTERS[id].kind === 'walker' ? HEIGHT / ZOOM * 0.78 : HEIGHT / ZOOM * 0.5;
-    const path = [{ x: 16, y }, { x: WIDTH / ZOOM - 16, y: y - 6 }, { x: 24, y: y + 4 }];
+    const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
     const spec = CRITTERS[id], rhythm = RHYTHMS[id];
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
     return { key: round, id, path, start, duration: travelSeconds(length / spec.speed, rhythm) + FADE_SECONDS * 2, speed: spec.speed, rhythm };
@@ -57,7 +60,7 @@ export default function CrittersTestScreen() {
     <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
       <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#5C7F45" />
       <Rect x={0} y={HEIGHT * 0.62} width={WIDTH} height={HEIGHT * 0.3} color="#B9AA8C" />
-      <Critter key={id} visit={visit} clock={seconds} zoom={ZOOM} />
+      <Critter key={id} visit={visit} clock={seconds} zoom={zoomFor(id)} />
     </Canvas>
     <Text testID="critter-debug" style={styles.label}>{debug}</Text>
     <View style={styles.row}>{CRITTER_IDS.map(item => <Pressable key={item} onPress={() => setId(item)}
@@ -66,13 +69,13 @@ export default function CrittersTestScreen() {
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
       <Pressable onPress={() => setBones(value => !value)} style={[styles.button, bones && styles.selected]}><Text style={styles.label}>skeleton</Text></Pressable>
     </View>
-    {walker ? <Filmstrip id={walker} bones={bones} /> : null}
+    {walker && walker !== 'puppy' ? <Filmstrip id={walker} bones={bones} /> : null}
   </ScrollView>;
 }
 
 // One stride (or one hop) in stills, left to right; the first is the painting at rest when
 // `bones` is on, with its joints drawn over it.
-function Filmstrip({ id, bones }: { id: WalkerId; bones: boolean }) {
+function Filmstrip({ id, bones }: { id: 'rabbit' | 'hedgehog'; bones: boolean }) {
   const image = useImage(WALKER_ART[id].source), legs = useImage(WALKER_ART[id].legs);
   const mesh = WALKER_MESHES[id];
   const cellW = 300, s = cellW / mesh.w, cellH = mesh.h * s + 8;

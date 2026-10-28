@@ -13,15 +13,21 @@ import { posePoints, type Layer } from './rig';
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
 // walkers are skinned meshes on a skeleton (rig.ts, gaits.ts); the flyers are single paintings.
-const ART: Record<CritterId, { source: number; legs?: number; w: number; h: number }> = {
+// A painted walk: frames of one stride in a grid (scripts/critters/walk-frames.py), `w` × `h`
+// each, `ground` the row the paws stand on, `loop` the world units walked over all of them.
+type Frames = { columns: number; count: number; ground: number; loop: number };
+const ART: Record<CritterId, { source: number; legs?: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   bluebird: { source: require('@/assets/garden/critters/bluebird.webp'), w: 448, h: 448 },
   // Walkers: the body and the near legs, cut from one painting (scripts/critters/cut-parts.py).
   rabbit: { source: require('@/assets/garden/critters/rabbit-body.webp'), legs: require('@/assets/garden/critters/rabbit-legs.webp'), w: 512, h: 491 },
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-body.webp'), legs: require('@/assets/garden/critters/hedgehog-legs.webp'), w: 512, h: 467 },
-  puppy: { source: require('@/assets/garden/critters/puppy-body.webp'), legs: require('@/assets/garden/critters/puppy-legs.webp'), w: 512, h: 415 },
+  // The puppy walks in painted frames: one stride of a generated walking clip (scripts/critters/
+  // video-frames.py), every pose painted whole. `loop` is the ground its planted paws cover in
+  // that stride, so they do not skid.
+  puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
 };
-export const WALKER_ART = { puppy: ART.puppy, rabbit: ART.rabbit, hedgehog: ART.hedgehog };
+export const WALKER_ART = { rabbit: ART.rabbit, hedgehog: ART.hedgehog };
 
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
@@ -71,10 +77,47 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
 export function Critter({ visit, clock, zoom = 1 }: { visit: Visit; clock: SharedValue<number>; zoom?: number }) {
   const art = ART[visit.id];
   const image = useImage(art.source), legs = useImage(art.legs ?? null);
-  const walker = CRITTERS[visit.id].kind === 'walker';
-  if (!image || (walker && !legs)) return null;
+  const rigged = Boolean(art.legs);
+  if (!image || (rigged && !legs)) return null;
   return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
-    {walker ? <Walker visit={visit} clock={clock} body={image} legs={legs!} /> : <Flyer visit={visit} clock={clock} image={image} />}
+    {art.frames ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
+      : rigged ? <Walker visit={visit} clock={clock} body={image} legs={legs!} /> : <Flyer visit={visit} clock={clock} image={image} />}
+  </Group>;
+}
+
+// A walker in painted frames: which frame shows is set by how far it has come, so each stride
+// covers the same ground however the pace changes; standing still, it holds its frame.
+function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number }) {
+  const spec = CRITTERS[visit.id];
+  const reduced = useReducedMotion();
+  const scale = spec.size / Math.max(w, h);
+  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity, [visit]);
+  const transform = useDerivedValue(() => {
+    const pose = visitPose(visit, clock.value);
+    return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: (pose.dx < 0 ? -1 : 1) * scale }, { scaleY: scale },
+      { translateX: -w / 2 }, { translateY: -frames.ground }];
+  }, [visit, scale, w, frames]);
+  const frame = useDerivedValue(() => {
+    const along = reduced ? 0 : visitDistance(visit, clock.value) / frames.loop;
+    return Math.floor((along - Math.floor(along)) * frames.count) % frames.count;
+  }, [visit, frames, reduced]);
+  const x = useDerivedValue(() => -(frame.value % frames.columns) * w, [frames, w]);
+  const y = useDerivedValue(() => -Math.floor(frame.value / frames.columns) * h, [frames, h]);
+  const rows = Math.ceil(frames.count / frames.columns);
+  const clip = useMemo(() => ({ x: 0, y: 0, width: w, height: h }), [w, h]);
+  const shadow = useDerivedValue(() => {
+    const pose = visitPose(visit, clock.value);
+    return [{ translateX: pose.x }, { translateY: pose.y }];
+  }, [visit]);
+  return <Group opacity={opacity}>
+    <Group transform={shadow}>
+      <Oval x={-spec.size * 0.4} y={-spec.size * 0.06} width={spec.size * 0.8} height={spec.size * 0.12} color="rgba(30, 44, 26, 0.22)">
+        <BlurMask blur={3} style="normal" />
+      </Oval>
+    </Group>
+    <Group transform={transform} clip={clip}>
+      <Image image={sheet} x={x} y={y} width={w * frames.columns} height={h * rows} fit="fill" />
+    </Group>
   </Group>;
 }
 
