@@ -69,9 +69,13 @@ server.on('upgrade', (req, socket, head) => {
   });
   upstream.on('error', () => socket.destroy()); socket.on('error', () => upstream.destroy());
 });
-server.listen(PORT, PHONE ? '0.0.0.0' : '127.0.0.1', () => {
-  console.log(`\n  PetalPal local preview: http://localhost:${PORT}`);
-  if (PHONE) console.log(lanAddress ? `  On your phone (same Wi-Fi): http://${lanAddress}:${PORT}` : '  No Wi-Fi address found: connect this computer to Wi-Fi to open the preview on a phone.');
+// Phone mode listens only on a private Wi-Fi address (home Wi-Fi, a phone hotspot), never on a
+// public one: networks like campus Wi-Fi hand out public addresses anyone could reach.
+server.listen(PORT, PHONE && lanAddress ? lanAddress : '127.0.0.1', () => {
+  console.log(`\n  PetalPal local preview: http://${PHONE && lanAddress ? lanAddress : 'localhost'}:${PORT}`);
+  if (PHONE) console.log(lanAddress ? `  Open that address on your phone (same Wi-Fi). This computer can open it too.`
+    : '  This network gives no private address (campus or public Wi-Fi), so the preview stays on this computer only.\n'
+      + '  To try it on your phone: turn on the phone\'s Personal Hotspot, connect this computer to it, and run this again.');
   console.log('  Sign in with preview@example.invalid / preview-only (fake data; the first load takes about a minute).\n');
 });
 
