@@ -14,11 +14,29 @@ export function keepWebPageInPlace() {
     if (!typing && scrolled) window.scrollTo(0, 0);
   };
   const soon = () => { if (timer) clearTimeout(timer); timer = setTimeout(reset, 150); };
+  // Phones drop the Garden's GPU canvas (WebGL) when the browser is backgrounded or short on
+  // memory; it then stays blank until a refresh. Reload once the page is visible again instead.
+  // The app also releases canvases on purpose as screens close (gardenWebRenderer, Skia views):
+  // those canvases leave the page, so only a canvas still on the page counts as lost.
+  const lostCanvases = new Set<HTMLCanvasElement>();
+  const reloadIfLost = () => {
+    for (const canvas of lostCanvases) if (!canvas.isConnected) lostCanvases.delete(canvas);
+    if (lostCanvases.size && document.visibilityState === 'visible') window.location.reload();
+  };
+  const onLost = (event: Event) => {
+    if (!(event.target instanceof HTMLCanvasElement)) return;
+    lostCanvases.add(event.target);
+    setTimeout(reloadIfLost, 1500);
+  };
+  document.addEventListener('webglcontextlost', onLost, true);
+  document.addEventListener('visibilitychange', reloadIfLost);
   window.addEventListener('focusout', soon);
   window.addEventListener('orientationchange', soon);
   window.visualViewport?.addEventListener('resize', soon);
   return () => {
     if (timer) clearTimeout(timer);
+    document.removeEventListener('webglcontextlost', onLost, true);
+    document.removeEventListener('visibilitychange', reloadIfLost);
     window.removeEventListener('focusout', soon);
     window.removeEventListener('orientationchange', soon);
     window.visualViewport?.removeEventListener('resize', soon);
