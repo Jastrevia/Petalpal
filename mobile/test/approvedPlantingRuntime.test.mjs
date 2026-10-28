@@ -94,8 +94,6 @@ export async function runApprovedRuntimeTests(assert) {
   const occupied = { id: 'existing', flowerId: 'old', month: 1, worldX: p.x, worldY: p.y, flowerName: 'Chamomile' };
   assert(validator.validateFlowerPlacement({ flowerId: 'new', month: 1, worldX: p.x, worldY: p.y,
     speciesCode: 'CHAMOMILE', existingPlacements: [occupied] }).reason === 'COLLIDES_WITH_FLOWER', 'Planting footprints cannot overlap');
-  assert(validator.validateFlowerPlacement({ flowerId: 'old', month: 1, worldX: p.x, worldY: p.y,
-    speciesCode: 'CHAMOMILE', existingPlacements: [occupied], ignorePlacementId: 'existing' }).isValid, 'Adjust ignores only its own occupied footprint');
   const beforeLocked = JSON.stringify(approved.APPROVED_MASK_REFINEMENTS);
   mask.saveMonthMaskRefinement(1, [], 'central', 'central', { offsetX: 999, offsetY: 999 });
   assert(approved.isFootprintInApprovedMonthMaskWorld(1, p.x, p.y, 22) &&
@@ -148,24 +146,12 @@ export async function runApprovedRuntimeTests(assert) {
     'Confirmation persists all required identifiers, month/land, date, scale and rotation');
   const restarted = await loadPlantingModules(storage)('plantingPersistence').loadFlowerPlacements();
   assert(JSON.stringify(restarted[0]) === JSON.stringify(original), 'Fresh module/page restart restores exact placement coordinates and metadata');
-  flow.startAdjusting(original); flow = render(); flow.updatePreview(p.x + 1, p.y); flow = render();
-  const savedBeforeCancel = items.get('petalpal_flower_placements_v1');
-  flow.cancelPlacement(); flow = render();
-  assert(JSON.stringify(flow.placements[0]) === JSON.stringify(original) &&
-    items.get('petalpal_flower_placements_v1') === savedBeforeCancel, 'Adjust Cancel restores the original exact position without writes');
-  flow.startAdjusting(original); flow = render(); flow.updatePreview(0, 0); flow = render();
-  assert(!flow.validationResult.isValid && !(await flow.confirmPlacement()) &&
-    items.get('petalpal_flower_placements_v1') === savedBeforeCancel, 'Invalid Adjust preview cannot confirm or alter persisted coordinates');
-  const movedPoint = [{ x: p.x + 1, y: p.y }, { x: p.x - 1, y: p.y },
-    { x: p.x, y: p.y + 1 }, { x: p.x, y: p.y - 1 }].find((q) =>
-    approved.isFootprintInApprovedMonthMaskWorld(1, q.x, q.y, 22));
-  assert(Boolean(movedPoint), 'A new same-month adjustment position fits the approved footprint');
-  flow.updatePreview(movedPoint.x, movedPoint.y); flow = render();
-  assert(await flow.confirmPlacement(), 'Adjust Confirm accepts the same-month mask and ignores self collision');
-  const movedRestart = await loadPlantingModules(storage)('plantingPersistence').loadFlowerPlacements();
-  assert(movedRestart[0].worldX === movedPoint.x && movedRestart[0].worldY === movedPoint.y &&
-    movedRestart[0].month === original.month && movedRestart[0].landId === original.landId,
-    'Adjust Confirm persists only the confirmed new coordinates, retaining the assigned month/land');
+  // A planted flower never moves: there is no Adjust, and a moved spot is refused before any write.
+  assert(flow.startAdjusting === undefined && flow.activeMode === 'normal', 'There is no Adjust Position mode');
+  const savedBefore = items.get('petalpal_flower_placements_v1');
+  await loadPlantingModules(storage)('plantingPersistence').addOrUpdateFlowerPlacement({ ...original, worldX: original.worldX + 1 })
+    .then(() => assert(false, 'A moved spot must be refused'), (error) => assert(/can’t change/.test(error.message), 'A moved spot is refused'));
+  assert(items.get('petalpal_flower_placements_v1') === savedBefore, 'A refused move writes nothing');
   const nativeItems = new Map();
   const nativeStorage = { getItem: async (k) => nativeItems.get(k) ?? null,
     setItem: async (k, v) => nativeItems.set(k, v) };

@@ -36,12 +36,22 @@
   const detail = id => ({ id, summary: 'A gentle week of small routines and quiet walks.', eventCount: 3,
     topTopics: [{ topic: 'garden', count: 2 }], narrativeSections: [], trendSignals: {} });
   const friend = 'local-friend';
-  const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png',
+  const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png', worldX: 607, worldY: 1081, regionId: `Land${day(6).slice(5, 7)}`,
     createdAt: day(6) + 'T18:00:00.000Z', supportCount: 1, sourceType: 'EVENT', sourceEventId: 'fe1',
     supportState: { supportedToday: false, canSupport: true }, messages: [] };
   let signedIn = false, blocked = false, checkedInToday = false;
   // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
   const ownFlowers = [], events = new Map();
+  // Flowers already planted in every land (small 1-3, 5, 6; medium 4, 7-9; large 10-12), at spots
+  // the app's own validator accepts. Their spot lives on the "server" and never moves.
+  const title = code => code.toLowerCase().split('_').map(word => word[0].toUpperCase() + word.slice(1)).join(' ');
+  for (const [i, [month, code, x, y]] of [[1,"TULIP",1268,510],[1,"HYDRANGEA",1040,510],[1,"SUNFLOWER",1230,510],[2,"LAVENDER",1054,799],[2,"POPPY",1054,867],[3,"DAISY",1402,707],[3,"BLUEBELL",1402,775],[3,"ANEMONE",1345,792],[4,"GERBERA_DAISY",1415,134],[4,"SNOWDROP",1358,151],[4,"PETUNIA",1358,219],[4,"WHITE_ROSE",1301,168],[5,"YELLOW_DAFFODIL",1596,255],[5,"CHAMOMILE",1539,272],[6,"ASTER",1861,349],[6,"GENTIAN",2070,349],[6,"COREOPSIS",2070,417],[7,"HEATHER",2265,646],[7,"BIRD_OF_PARADISE",2265,714],[7,"OLIVE",2208,663],[7,"DANDELION",2208,731],[8,"CHINESE_VIOLET_CRESS",2167,1312],[8,"YELLOW_RAPESEED_FLOWER",2167,1380],[8,"TULIP",2110,1261],[9,"HYDRANGEA",1320,1167],[9,"SUNFLOWER",1320,1235],[9,"LAVENDER",1263,1116],[9,"POPPY",1263,1184],[10,"DAISY",607,945],[10,"BLUEBELL",607,1081],[10,"ANEMONE",607,1149],[10,"GERBERA_DAISY",550,1098],[10,"SNOWDROP",550,1166],[11,"PETUNIA",466,785],[11,"WHITE_ROSE",466,853],[11,"YELLOW_DAFFODIL",409,802],[11,"CHAMOMILE",409,870],[12,"ASTER",275,515],[12,"GENTIAN",275,583],[12,"COREOPSIS",218,668]].entries()) {
+    const mm = String(month).padStart(2, '0');
+    ownFlowers.push({ id: 'g' + i, userId: uid, name: title(code), speciesCode: code, mood: 'PEACEFUL_BLOOM', img: '',
+      createdAt: `2026-${mm}-15T18:00:00.000Z`, meaning: 'A preview flower', supportCount: i % 3, worldX: x, worldY: y, regionId: `Land${mm}` });
+  }
+  // Today's plantings: deleting a flower never gives one back.
+  let plantedToday = 0;
   let consent = { aiProcessing: false, personalization: false, memoryEnabled: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
   const EMOTIONS = { en: ['calm', 'grateful', 'a little tired'], zh: ['平静', '感激', '有点累'] };
   window.fetch = async (input, options = {}) => {
@@ -94,8 +104,8 @@
         events.set(id, event);
         const flower = { id: 'f' + id, userId: uid, sourceEventId: id, name: 'Lavender', speciesCode: 'LAVENDER', mood: request.primaryGardenMood,
           img: 'lavender.png', createdAt: now, event: '', supportCount: 0, sourceEvent: { secondaryEmotions: [] } };
-        ownFlowers.unshift(flower);
-        return json({ event, flower, emotion: { status: event.emotionStatus, labels: [] }, memoryJob: null, dailyFlowers: { limit: 2, planted: ownFlowers.length, limitReached: false } }, 201, 900);
+        ownFlowers.unshift(flower); plantedToday++;
+        return json({ event, flower, emotion: { status: event.emotionStatus, labels: [] }, memoryJob: null, dailyFlowers: { limit: 2, planted: plantedToday, limitReached: false } }, 201, 900);
       }
       const eventRead = p.match(/^\/events\/(.+)$/);
       if (eventRead && events.has(eventRead[1])) {
@@ -119,9 +129,32 @@
         entry.journal.content = String(request.content || '').trim();
         return json({ id: entry.journal.id, content: entry.journal.content });
       }
+      // Planting is written once, like lib/flower-placement.js: another spot is refused.
+      const placement = p.match(new RegExp(`^/users/${uid}/flowers/([^/]+)/placement$`));
+      if (placement && method === 'POST') {
+        const flower = ownFlowers.find(item => item.id === placement[1]);
+        if (!flower) return json({ error: 'Flower not found' }, 404);
+        if (flower.worldX != null && (flower.worldX !== request.worldX || flower.worldY !== request.worldY)) {
+          return json({ error: 'This flower is already planted. Its spot can’t change.', code: 'PLACEMENT_LOCKED' }, 409);
+        }
+        const created = flower.worldX == null;
+        Object.assign(flower, { worldX: request.worldX, worldY: request.worldY, regionId: request.landId });
+        return json({ flowerId: flower.id, worldX: flower.worldX, worldY: flower.worldY, landId: flower.regionId, placedAt: new Date().toISOString() }, created ? 201 : 200, 500);
+      }
+      const ownFlower = p.match(new RegExp(`^/users/${uid}/flowers/([^/]+)$`));
+      if (ownFlower && method === 'DELETE') {
+        const index = ownFlowers.findIndex(item => item.id === ownFlower[1]);
+        if (index < 0) return json({ error: 'Flower not found' }, 404);
+        const [deletedFlower] = ownFlowers.splice(index, 1);
+        return json({ success: true, message: 'Flower deleted successfully', deletedFlower }, 200, 500);
+      }
+      if (ownFlower && method === 'GET') {
+        const flower = ownFlowers.find(item => item.id === ownFlower[1]);
+        return flower ? json({ ...flower, messages: [], supportState: { isOwner: true, canSupport: false, supportedToday: false } }) : json({ error: 'Flower not found' }, 404);
+      }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
-      if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: ownFlowers.length, remaining: Math.max(0, 2 - ownFlowers.length) });
+      if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: plantedToday, remaining: Math.max(0, 2 - plantedToday) });
       if (p === '/ai/disclosure') return json({ version: 'ai-2026-10-15', features: [{ feature: 'Event emotion labels', processor: 'Cloudflare Workers AI', configured: true }],
         explanation: 'AI Processing permits sending Event text and selected mood for emotion suggestions.', retention: 'Processing may occur outside your country.' });
       if (p === `/users/${uid}/garden`) return json({ owner: { id: uid }, flowers: ownFlowers, visitRecords: [

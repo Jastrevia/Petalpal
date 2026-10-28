@@ -38,6 +38,10 @@ export async function loadGarden(ownerId: string, viewerId: string): Promise<Gar
       mood: flower.mood, img: flower.img, createdAt: flower.createdAt, meaning: flower.meaning,
       supportCount: flower.supportCount, colorAccent: flower.colorAccent, visualEffect: flower.visualEffect,
       variant: flower.variant, rarity: flower.rarity, growthState: flower.growthState, season: flower.season,
+      // Planted position (server-owned, written once); null until the owner plants it.
+      worldX: typeof flower.worldX === 'number' && Number.isFinite(flower.worldX) ? flower.worldX : null,
+      worldY: typeof flower.worldY === 'number' && Number.isFinite(flower.worldY) ? flower.worldY : null,
+      regionId: typeof flower.regionId === 'string' ? flower.regionId : null,
       sourceEventId: privateView ? flower.sourceEventId : undefined,
       dailyCheckInId: privateView ? flower.dailyCheckInId : undefined,
       sourceType: !privateView ? 'SOCIAL' : flower.sourceEventId ? 'EVENT'
@@ -45,6 +49,15 @@ export async function loadGarden(ownerId: string, viewerId: string): Promise<Gar
       secondaryEmotions: privateView ? flowerSecondaryEmotions(flower) : [],
     };
   });
+}
+
+// Plants the owner's flower at its spot, once. The server refuses any later move (409).
+export interface FlowerSpot { worldX: number; worldY: number; landId: string }
+export async function plantFlowerSpot(ownerId: string, flowerId: string, spot: FlowerSpot): Promise<FlowerSpot> {
+  const saved = await apiRequest<Partial<FlowerSpot>>(`/users/${encodeURIComponent(ownerId)}/flowers/${encodeURIComponent(flowerId)}/placement`,
+    'POST', { worldX: spot.worldX, worldY: spot.worldY, landId: spot.landId });
+  if (saved.worldX !== spot.worldX || saved.worldY !== spot.worldY || saved.landId !== spot.landId) throw new Error('Unable to save this flower’s spot. Try again.');
+  return spot;
 }
 
 // Who came by the owner's Garden: the server keeps the latest 30 visit records with the

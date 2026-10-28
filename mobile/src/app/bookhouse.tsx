@@ -403,7 +403,7 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
   const load = useCallback(async () => { setLoading(true); setError(''); try {
     const [records, placements] = await Promise.all([loadGardenPlacements(userId, userId, timezone), loadFlowerPlacements()]);
     const plantedDates = new Map(placements.map(p => [p.flowerId, p.plantedDate]));
-    setFlowers(records.map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
+    setFlowers(records.map(flower => ({ ...flower, plantedDate: flower.placementOrigin !== 'FALLBACK'
       ? plantedDates.get(flower.flowerId) || flower.plantedDate : flower.plantedDate })).sort((a, b) => b.plantedDate.localeCompare(a.plantedDate)));
   } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); } }, [userId, timezone]);
   useEffect(() => { void load(); return () => { version.current++; }; }, [load]);
@@ -418,7 +418,7 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
     {loading ? <ActivityIndicator /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={load}><Text>Retry flower history</Text></Pressable></> : !flowers.length ? <Text style={s.body}>Your Garden has no flowers yet.</Text> : flowers.map(flower => <View key={flower.flowerId} style={s.historyEntry}>
       <Pressable accessibilityRole="button" accessibilityLabel={`Read flower ${flower.flowerName} ${flower.flowerId}`} onPress={() => inspect(flower)} style={{ minHeight: 48 }}>
         <Text style={s.title}>{flower.flowerName}</Text><Text style={s.caption}>{moodName(flower.mood || '')} · {flower.sourceType || 'Flower'}</Text>
-        <Text style={s.caption}>{flower.placementOrigin === 'LOCAL' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
+        <Text style={s.caption}>{flower.placementOrigin !== 'FALLBACK' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
       </Pressable>
       {detailBusy === flower.flowerId && <ActivityIndicator />}
       {detail?.id === flower.flowerId && <View style={{ gap: 8 }}><Text selectable style={s.body}>{detail.content || 'No written entry attached.'}</Text><Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>

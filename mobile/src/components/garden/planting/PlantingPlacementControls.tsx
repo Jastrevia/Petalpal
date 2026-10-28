@@ -17,6 +17,11 @@ function zhFeedback(text: string) {
     'This flower is not ready for planting yet.': '这朵花还不能种。', 'Stay inside the garden.': '请种在花园里面。',
     'Choose a grassy spot.': '请选一块草地。', 'Choose a little more space around the flower.': '请给花留出一点空间。',
     'Another flower is already planted here.': '这里已经种了一朵花。', 'Ready to plant!': '可以种在这里！',
+    // Server answers when planting is saved (lib/flower-placement.js).
+    'Another flower is already planted here': '这里已经种了一朵花。', 'Choose a spot inside the Garden': '请种在花园里面。',
+    'This flower belongs in another month’s land': '这朵花属于另一个月的土地。',
+    'This flower is already planted. Its spot can’t change.': '这朵花已经种下了，位置不能再改。',
+    'Unable to plant here. Try again.': '没能种在这里，请再试一次。',
   };
   const month = text.match(/^This flower belongs in the (\w+) garden\.$/);
   if (month) {
@@ -45,12 +50,11 @@ export default function PlantingPlacementControls() {
 
   const meta = MONTH_REGION_METAS[targetFlower.month];
   const monthName = zh ? ZH_MONTHS[targetFlower.month - 1] ?? `${targetFlower.month} 月` : meta?.monthName || `Month ${targetFlower.month}`;
-  const isAdjusting = activeMode === 'adjusting';
 
   const isValid = validationResult?.isValid ?? false;
   const feedback = validationResult?.userFeedback ? (zh ? zhFeedback(validationResult.userFeedback) : validationResult.userFeedback) : zh
-    ? (isAdjusting ? '点一下，选一个新位置。' : `点${monthName}花园里的位置来种。`)
-    : (isAdjusting ? 'Tap to choose a new spot.' : `Tap in the ${monthName} garden to place.`);
+    ? `点${monthName}花园里的位置来种。`
+    : `Tap in the ${monthName} garden to place.`;
 
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
@@ -58,7 +62,7 @@ export default function PlantingPlacementControls() {
       <View style={styles.topBanner}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
-            {zh ? (isAdjusting ? '🔄 调整位置' : '🌱 正在种花') : (isAdjusting ? '🔄 ADJUST POSITION' : '🌱 PLANTING FLOWER')}
+            {zh ? '🌱 正在种花' : '🌱 PLANTING FLOWER'}
           </Text>
         </View>
         <Text style={styles.titleText}>
@@ -80,6 +84,9 @@ export default function PlantingPlacementControls() {
             {feedback}
           </Text>
         </View>
+        <Text style={styles.foreverText}>
+          {zh ? '种下以后，位置就不能再改了。' : 'Once planted, it stays in this spot for good.'}
+        </Text>
 
         {showPlacementDebug && previewCoords && (
           <Text style={styles.debugText}>
@@ -117,7 +124,7 @@ export default function PlantingPlacementControls() {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.confirmButtonText}>
-              {zh ? (isAdjusting ? '确认移动' : '种在这里') : (isAdjusting ? 'Confirm Move' : 'Plant Here')}
+              {zh ? '种在这里' : 'Plant Here'}
             </Text>
           )}
         </Pressable>
@@ -187,6 +194,12 @@ const styles = StyleSheet.create({
   },
   feedbackTextInvalid: {
     color: '#B91C1C',
+  },
+  foreverText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
   },
   debugText: {
     marginTop: 4,

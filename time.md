@@ -245,6 +245,13 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   conditional upsert on PGlite, 4 concurrent reserves → 2 granted) and the `two Flowers a day` test in
   [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (third Event saved
   without a Flower; deleting a Flower does not free the day).
+- **Flower land = month** ([lib/flower-placement.js](lib/flower-placement.js)): Garden lands 1–12
+  are the months. `POST /users/:userId/flowers/:flowerId/placement` accepts only the land of the
+  flower's month: `Event.localDate`, else `DailyCheckIn.localDate`, else `Flower.createdAt` in
+  `User.timezone` (the app's `plantingRecord` uses the same dates). The spot is written once
+  (`Flower.worldX/worldY/placedAt`, land in `regionId`) and never moves.
+  **VERIFIED:** [test/back/flower-placement.test.js](test/back/flower-placement.test.js) (wrong
+  land refused; a check-in date and a Vancouver evening `createdAt` pick their own month).
 - **Bookhouse month books** ([mobile/src/services/bookhouse.ts](mobile/src/services/bookhouse.ts)
   `openableMonths`): a month book opens when it holds a private Journal, keyed by the Journal's
   `localDate` (the linked check-in's date, else `createdAt` in `User.timezone`, server side). The

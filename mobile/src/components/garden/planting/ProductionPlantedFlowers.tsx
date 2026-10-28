@@ -1,55 +1,70 @@
 import { CanonicalFlowerArt } from './CanonicalFlowerArt';
 import { GardenMoodEffectsLayer } from '../flower-mood-effects/GardenMoodEffects';
-import {runtimeAudit,timeGardenWork} from '../performance/runtimeAudit';
-import { Circle, Group } from '@shopify/react-native-skia';
-import { useMemo } from 'react';
+import {runtimeAudit} from '../performance/runtimeAudit';
+import { BlurMask, Circle, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePlanting } from './PlantingContext';
-import { getFlowerPlacementDefinition } from './flowerFootprintConfig';
 import { flowerInDepthPass, type FlowerDepthPass } from '../flowerOcclusion';
-import { gardenSpecies, productionGrowth } from './productionGrowth';
-import { ProductionGrowthLayer } from './ProductionGrowthLayer';
+import GardenStaticPicture from '../GardenStaticPicture';
+import { clusterDrawing, clusterFootprintRadius, hasClusterArt } from './flowerClusters';
 import type { FlowerPlacementRecord } from './plantingPersistence';
 
-export function growthPreviewParents(placements:readonly FlowerPlacementRecord[],target:FlowerPlacementRecord|null,
-  preview:{worldX:number;worldY:number}|null,adjusting:boolean) {
-  return adjusting&&target&&preview?placements.map(p=>p.id===target.id?{...p,...preview}:p):placements;
+const ClusterLoader = memo(function ClusterLoader({ source, onLoad }: { source: number; onLoad: (source: number, image: SkImage) => void }) {
+  const image = useImage(source);
+  useEffect(() => { if (image) onLoad(source, image); }, [image, source, onLoad]);
+  return null;
+});
+
+/** One painted cluster per planted flower, standing on its planting point, back to front. */
+function ClusterBed({ flowers, cacheStatic = false }: { flowers: readonly FlowerPlacementRecord[]; cacheStatic?: boolean }) {
+  const [images, setImages] = useState<Record<string, SkImage>>({});
+  const onLoad = useCallback((source: number, image: SkImage) => setImages(previous =>
+    previous[source] === image ? previous : { ...previous, [source]: image }), []);
+  const drawn = useMemo(() => [...flowers].sort((a, b) => a.worldY - b.worldY || a.id.localeCompare(b.id))
+    .map(flower => ({ flower, cluster: clusterDrawing(flower) })), [flowers]);
+  const sources = useMemo(() => [...new Set(drawn.flatMap(({ cluster }) => cluster ? [cluster.source] : []))], [drawn]);
+  const complete = sources.every(source => images[source]);
+  const drawing = useMemo(() => <Group>
+    {drawn.map(({ flower, cluster }) => {
+      if (!cluster) return flower.sourceType || flower.sourceEventId ? <CanonicalFlowerArt key={flower.id} flower={flower} />
+        : __DEV__ ? <Circle key={flower.id} cx={flower.worldX} cy={flower.worldY} r={4} color="#a6643c" style="stroke" strokeWidth={1.5}/> : null;
+      const image = images[cluster.source];
+      return image ? <Group key={flower.id}>
+        <Oval x={flower.worldX - cluster.width * .4} y={flower.worldY - cluster.width * .07} width={cluster.width * .8}
+          height={cluster.width * .16} color="#2f3f22" opacity={.2}><BlurMask blur={2.5} style="normal"/></Oval>
+        <Image image={image} x={cluster.x} y={cluster.y} width={cluster.width} height={cluster.height} fit="fill" />
+      </Group> : null;
+    })}
+  </Group>, [drawn, images]);
+  return <Group>
+    {sources.map(source => <ClusterLoader key={source} source={source} onLoad={onLoad} />)}
+    {cacheStatic && complete ? <GardenStaticPicture images={Object.values(images)}>{drawing}</GardenStaticPicture> : drawing}
+  </Group>;
 }
+
 export function ProductionPlantedFlowers({depthPass='all'}:{depthPass?:FlowerDepthPass}) {
   runtimeAudit.render('ProductionPlantedFlowers');
   const {placements,activeMode,targetFlower,previewCoords,validationResult,showDevFootprints,showDevHitboxes,
     accountTimeZone,gardenOwnerUserId,currentUserId}=usePlanting();
-  // Drag changes only the lightweight validated parent rings. The committed
-  // botanical picture remains authoritative until provider Confirm changes
-  // placements. Cancel reuses the same field immediately.
-  const parents=placements;
-  const scenes=useMemo(()=>timeGardenWork('productionGrowth',()=>productionGrowth(parents)),[parents]);
-  // Unconfirmed Plant preview never contributes to the committed month's count.
-  const pending=useMemo(()=>activeMode==='planting'&&targetFlower&&previewCoords
-    ? timeGardenWork('pendingGrowth',()=>productionGrowth([{...targetFlower,...previewCoords}])):[],[activeMode,targetFlower,previewCoords]);
-  const active=activeMode!=='normal'&&targetFlower&&previewCoords&&flowerInDepthPass(targetFlower.month,depthPass);
+  const planted=useMemo(()=>placements.filter(p=>flowerInDepthPass(p.month,depthPass)),[placements,depthPass]);
+  // The unconfirmed Plant preview is drawn on its own and never joins the planted bed.
+  const pending=useMemo(()=>activeMode==='planting'&&targetFlower&&previewCoords&&flowerInDepthPass(targetFlower.month,depthPass)
+    ?[{...targetFlower,...previewCoords}]:[],[activeMode,targetFlower,previewCoords,depthPass]);
   const color=validationResult?.isValid?'#22c55e':'#ef4444';
   // The partner's mood effects, today only and on the owner's own Garden (account timezone).
   const own=!gardenOwnerUserId||gardenOwnerUserId===currentUserId;
-  const moodFlowers=useMemo(()=>own?parents.filter(p=>(p.sourceType||p.sourceEventId)&&gardenSpecies(p)&&flowerInDepthPass(p.month,depthPass)):[],
-    [own,parents,depthPass]);
+  const moodFlowers=useMemo(()=>own?planted.filter(p=>(p.sourceType||p.sourceEventId)&&hasClusterArt(p.speciesCode,p.flowerName)):[],
+    [own,planted]);
   return <Group>
     <GardenMoodEffectsLayer flowers={moodFlowers} timeZone={accountTimeZone} part="behind"/>
-    {scenes.filter(s=>flowerInDepthPass(s.month,depthPass)).map(scene=><Group key={scene.month}>
-      <ProductionGrowthLayer growth={scene.growth} month={scene.month} cacheStatic/>
-      {scene.unresolved.map(p => p.sourceType || p.sourceEventId ? <CanonicalFlowerArt key={p.id} flower={p} />
-        : __DEV__ ? <Circle key={p.id} cx={p.worldX} cy={p.worldY} r={4} color="#a6643c" style="stroke" strokeWidth={1.5}/> : null)}
-    </Group>)}
-    {pending.filter(s=>flowerInDepthPass(s.month,depthPass)).map(s=><Group key={`preview-${s.month}`} opacity={validationResult?.isValid ? .92 : .65}>
-      <ProductionGrowthLayer month={s.month} growth={{...s.growth,pieces:s.growth.primary,companions:[],filler:[]}}/>
-      {s.unresolved.map(p => p.sourceType || p.sourceEventId ? <CanonicalFlowerArt key={p.id} flower={p} />
-        : __DEV__ ? <Circle key={p.id} cx={p.worldX} cy={p.worldY} r={4} color="#a6643c" style="stroke" strokeWidth={1.5}/> : null)}
-    </Group>)}
+    <ClusterBed flowers={planted} cacheStatic/>
+    {pending.length>0&&<Group opacity={validationResult?.isValid ? .92 : .65}><ClusterBed flowers={pending}/></Group>}
     <GardenMoodEffectsLayer flowers={moodFlowers} timeZone={accountTimeZone} part="front"/>
-    {active&&<Group>
-      <Circle cx={previewCoords.worldX} cy={previewCoords.worldY} r={getFlowerPlacementDefinition(targetFlower.flowerName, targetFlower.speciesCode).footprintRadius+4} color={color} opacity={.2}/>
-      <Circle cx={previewCoords.worldX} cy={previewCoords.worldY} r={getFlowerPlacementDefinition(targetFlower.flowerName, targetFlower.speciesCode).footprintRadius} color={color} style="stroke" strokeWidth={2.5}/>
-    </Group>}
-    {__DEV__&&(showDevFootprints||showDevHitboxes)&&parents.filter(p=>flowerInDepthPass(p.month,depthPass)).map(p=><Circle key={p.id}
-      cx={p.worldX} cy={p.worldY} r={getFlowerPlacementDefinition(p.flowerName, p.speciesCode).footprintRadius} color="#38bdf8" style="stroke" strokeWidth={1}/>)}
+    {pending.map(p=><Group key="preview-ring">
+      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)+4} color={color} opacity={.2}/>
+      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)} color={color} style="stroke" strokeWidth={2.5}/>
+    </Group>)}
+    {__DEV__&&(showDevFootprints||showDevHitboxes)&&planted.map(p=><Circle key={p.id}
+      cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)} color="#38bdf8" style="stroke" strokeWidth={1}/>)}
   </Group>;
 }

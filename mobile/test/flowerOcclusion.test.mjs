@@ -141,8 +141,8 @@ for (const month of [6, 10]) {
   assert.equal(images('behind-tea-set').length, 2 + Number(month === 6));
   assert.equal(images('foreground').length, 1 + Number(month !== 6));
 }
-state.activeMode = 'adjusting'; state.targetFlower = records[0];
-assert.equal(images('behind-tea-set').length, 2, 'Adjusted Land06 flower draws once at the preview anchor');
+state.activeMode = 'normal'; state.targetFlower = null; state.previewCoords = null;
+assert.equal(images('behind-tea-set').length, 2, 'Cancelled planting leaves Land06 as it was');
 assert.equal(images('foreground').length, 1);
 assert.equal(JSON.stringify(records), saved);
 console.log('Land06 occlusion: DEV and production ownership passes, Tea Set draw order/transform, single rendering, active preview, and unchanged flower geometry passed.');

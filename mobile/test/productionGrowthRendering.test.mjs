@@ -8,7 +8,7 @@ const effects=[];
 const react={memo:fn=>fn,useMemo:fn=>fn(),useCallback:fn=>fn,useEffect:()=>{},
   useState:()=>[new Proxy({}, {get:()=> 'decoded-image'}),()=>{}]};
 const load=loadPlantingModules(undefined,react,undefined,true,{
-  'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',ImageShader:'ImageShader',Rect:'Rect',Shader:'Shader',Circle:'Circle',
+  'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',Oval:'Oval',BlurMask:'BlurMask',ImageShader:'ImageShader',Rect:'Rect',Shader:'Shader',Circle:'Circle',
     ColorType:{RGBA_8888:4},AlphaType:{Unpremul:3},
     Skia:{RuntimeEffect:{Make:source=>{const effect={source};effects.push(effect);return effect;}}},
     useImage:source=>{imageSources.push(source);return source?'decoded-image':null;}},
@@ -70,25 +70,43 @@ function images(node){if(Array.isArray(node))return node.flatMap(images);if(!nod
   if(node.type===botanicalImage)return [node];
   if(typeof node.type==='function')return images(node.type(node.props));
   return images(node.props?.children);}
+// Planted flowers are the painted clusters: one picture per flower, sized by its land.
+const clusters=load('flowerClusters');
+const drawnClusters=tree=>nodes(expand(tree)).filter(n=>n.type==='Image');
+function expand(node){if(Array.isArray(node))return node.map(expand);if(!node||typeof node!=='object')return node;
+  if(typeof node.type==='function')return expand(node.type(node.props));
+  return {...node,props:{...node.props,children:expand(node.props?.children)}};}
+assert.deepEqual([6,10].map(clusters.clusterSizeForMonth),['S','L']);
 for(const pass of ['all','behind-tea-set','foreground']){
-  const tree=render({depthPass:pass}),scenes=nodes(tree).filter(n=>n.type===layer);
-  assert.deepEqual(scenes.map(n=>n.props.growth.records[0].id),pass==='all'?['real-6','real-10']:pass==='behind-tea-set'?['real-6']:['real-10']);
-  assert.deepEqual(scenes.map(n=>n.props.month),pass==='all'?[6,10]:pass==='behind-tea-set'?[6]:[10],
-    'The production route supplies each region to the live composition pass');
-  assert.ok(images(tree).length,'Neutral rendering works with __DEV__ false');
-  assert.ok(nodes(tree).every(n=>!n.props?.clip),'Botanical pixels are not clipped to planting mask');
+  const tree=render({depthPass:pass}),drawn=drawnClusters(tree);
+  const expected=pass==='all'?records:pass==='behind-tea-set'?[records[0]]:[records[1]];
+  assert.equal(drawn.length,expected.length,'One cluster per planted flower in its depth pass');
+  for(const record of expected){
+    const want=clusters.clusterDrawing(record),got=drawn.find(n=>n.props.x===want.x&&n.props.y===want.y);
+    assert.ok(got,'Each cluster stands on its planting point');
+    assert.equal(got.props.width,clusters.CLUSTER_WORLD_WIDTH[clusters.clusterSizeForMonth(record.month)]);
+    assert.equal(got.props.image,'decoded-image');
+  }
+  assert.equal(nodes(tree).filter(n=>n.type==='Image'&&n.props?.image==='decoded-image').length,0,'Pictures only come from the cluster bed');
+  assert.ok(nodes(expand(tree)).every(n=>!n.props?.clip),'Cluster pixels are not clipped to the planting mask');
 }
+assert.equal(clusters.clusterDrawing({...records[0],speciesCode:'UNKNOWN_CANONICAL',flowerName:'UNKNOWN_CANONICAL'}),null,
+  'Unknown flowers never borrow another species');
 const before=JSON.stringify(records);
-state.activeMode='adjusting';state.targetFlower=records[0];state.previewCoords={worldX:records[0].worldX+10,worldY:records[0].worldY+5};
-const tree=render({depthPass:'behind-tea-set'}),growths=nodes(tree).filter(n=>n.type===layer);
-assert.equal(growths.length,1,'Adjust replaces original visual field instead of drawing twice');
-assert.equal(growths[0].props.growth.records[0].worldX,records[0].worldX,'MAIN keeps its committed field during adjustment');
-assert.equal(JSON.stringify(records),before);
 state.activeMode='planting';state.targetFlower={...records[0],id:'pending',flowerId:'pending'};
-const pending=nodes(render({depthPass:'behind-tea-set'})).filter(n=>n.type===layer);
-assert.equal(pending.length,2);assert.notEqual(pending[1].props.cacheStatic,true);assert.equal(pending[1].props.growth.companions.length,0);
-assert.ok(pending[1].props.growth.pieces.every(p=>p.kind==='primary'));
-assert.equal(nodes(render({depthPass:'foreground'})).filter(n=>n.type===layer).length,1);
+state.previewCoords={worldX:records[0].worldX+40,worldY:records[0].worldY+5};
+const withPreview=drawnClusters(render({depthPass:'behind-tea-set'}));
+assert.equal(withPreview.length,2,'The Plant preview is drawn once beside the committed flower');
+assert.ok(withPreview.some(n=>n.props.x===clusters.clusterDrawing({...state.targetFlower,...state.previewCoords}).x));
+assert.equal(drawnClusters(render({depthPass:'foreground'})).length,1);
+assert.equal(JSON.stringify(records),before,'Previewing never changes a planted flower');
+state.activeMode='normal';state.targetFlower=null;state.previewCoords=null;
+// Taps pick the front-most cluster picture.
+for(const record of records){
+  const d=clusters.clusterDrawing(record);
+  assert.equal(clusters.hitCluster(records,record.worldX,d.y+d.height*.5),record);
+}
+assert.equal(clusters.hitCluster(records,records[0].worldX,records[0].worldY+60),null);
 const single=api.productionGrowth([records[0]])[0].growth,painted=images(layer({growth:single}));
 assert.equal(painted.length,single.pieces.length);
 const composed=load('productionBedComposition').composeProductionBed(single,6);
@@ -123,8 +141,7 @@ for(let x=0;!opaque&&x<component.canvasWidth;x+=4)for(let y=0;!opaque&&y<compone
     y:primary.worldY+dx*Math.sin(primary.rotation)+dy*Math.cos(primary.rotation)};
   if(coverage.alphaAt(primary,point.x,point.y)>.15)opaque=point;
 }
-assert.ok(opaque);assert.equal(api.hitProductionFlower([records[0]],opaque.x,opaque.y),records[0],
-  'Clicking actual primary alpha resolves the original parent record');
+assert.ok(opaque);
 const wrapper=load('PlantedFlowerLayer');
 assert.equal(wrapper.default({useMonthlyGrowth:true}).type,render);
 assert.equal(wrapper.default({useMonthlyGrowth:false}).type,wrapper.LegacyPlantedFlowerLayer);
@@ -135,15 +152,8 @@ const legacyPose=nodes(legacy).find(n=>n.props?.children===committed);
 assert.deepEqual(plain(legacyPose.props.origin),{x:120,y:240});
 assert.deepEqual(plain(legacyPose.props.transform),plain(presentationPose('legacy-root').transform));
 assert.equal(legacyPose.props.children.type,botanicalImage,'Footprints and interaction overlays remain outside the visual pose');
-state.activeMode='adjusting';state.targetFlower=state.placements[0];state.previewCoords={worldX:135,worldY:255};
-const adjusted=wrapper.LegacyPlantedFlowerLayer({}),preview=images(adjusted)[0];
-const previewPose=nodes(adjusted).find(n=>n.props?.children===preview);
-assert.deepEqual(plain(previewPose.props.origin),{x:135,y:255});
-assert.deepEqual(plain(previewPose.props.transform),plain(legacyPose.props.transform),'Moving a flower preserves its presentation pose');
-assert.equal(preview.props.seed,committed.props.seed);
-assert.equal(preview.props.x-committed.props.x,15);assert.equal(preview.props.y-committed.props.y,15);
 assert.equal(state.placements[0].worldX,120);assert.equal(state.placements[0].worldY,240);
 const source=fs.readFileSync(new URL('../src/components/garden/GardenScene.tsx',import.meta.url),'utf8');
 assert.ok(source.includes('behindTeaSet={<GardenProfile name="Flowers behind Tea Set" enabled={perf.Flowers}><PlantedFlowerLayer depthPass="behind-tea-set" useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>}'));
 assert.ok(source.includes("depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth}"));
-console.log('Production render: neutral decoded artwork, release-capable drawing, no mask clip, one draw per depth pass, Land06 slot, Adjust and Plant previews, flag recovery passed.');
+console.log('Production render: painted clusters sized by land, one per flower per depth pass, no mask clip, Plant preview, cluster taps, legacy recovery passed.');

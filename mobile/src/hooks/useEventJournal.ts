@@ -95,9 +95,10 @@ export function useEventJournal(onGardenChanged?: () => void) {
       if (mounted.current) { setResult({ ...result, event }); setPollError(''); await refresh(); onGardenChanged?.(); }
     } catch (err) { if (mounted.current) setPollError((err as Error).message); }
   }
+  // A planted flower never moves: if it already has its spot, just show it in the Garden.
   function placeFlower(flower: BackendFlower) {
-    if (placements.some(item => item.flowerId === flower.id)) {
-      router.navigate({ pathname: '/', params: { mode: 'adjust', flowerId: flower.id } });
+    if (flower.worldX != null || placements.some(item => item.flowerId === flower.id)) {
+      router.navigate({ pathname: '/', params: { mode: 'focus', flowerId: flower.id } });
     } else plant(flower);
   }
   // Back to an empty Event after one was saved (the saved one stays in the Garden).

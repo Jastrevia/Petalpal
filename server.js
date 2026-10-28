@@ -147,6 +147,7 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
 
 
@@ -3273,6 +3274,23 @@ app.get("/users/:userId/flowers/:flowerId", requireSocialGardenAccess, async (re
     if (sendSocialError(res, error)) return;
     logServerError("GET /users/:userId/flowers/:flowerId error", error);
     res.status(500).json({ error: "Failed to get flower details" });
+  }
+});
+
+// Plants the owner's flower at its Garden spot, once. There is no move: another spot is a 409.
+app.post("/users/:userId/flowers/:flowerId/placement", async (req, res) => {
+  try {
+    if (!requireOwnUser(req, res, req.params.userId)) return;
+    const result = await plantFlowerOnce(prisma, {
+      userId: req.auth.userId, flowerId: req.params.flowerId, body: req.body
+    });
+    res.status(result.created ? 201 : 200).json(result.placement);
+  } catch (error) {
+    if (error instanceof FlowerPlacementError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    logServerError("POST /users/:userId/flowers/:flowerId/placement error", error);
+    res.status(500).json({ error: "Failed to plant flower" });
   }
 });
 

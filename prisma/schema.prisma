@@ -89,6 +89,11 @@ model Flower {
   top            Float
   regionId       String?  @db.VarChar(64)
   slotId         String?  @db.VarChar(64)
+  // Garden world position, written once when the owner plants the flower (regionId holds its
+  // land, e.g. "Land04"). Null until planted; never changed afterwards (lib/flower-placement.js).
+  worldX         Float?
+  worldY         Float?
+  placedAt       DateTime?
   scale          Float    @default(1)
   rotation       Float    @default(0)
   layer          Int      @default(0)

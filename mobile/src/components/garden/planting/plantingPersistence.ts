@@ -8,7 +8,9 @@ export interface FlowerPlacementRecord extends FlowerPlacement {
   supportCount: number;
   sourceType?: import('../../../services/garden').FlowerSource;
   dailyCheckInId?: string;
-  placementOrigin?: 'LOCAL' | 'FALLBACK';
+  /** SERVER: planted, spot saved on the server. LOCAL: planted earlier, spot only on this device.
+   * FALLBACK: not planted yet, shown at a preview spot. */
+  placementOrigin?: 'SERVER' | 'LOCAL' | 'FALLBACK';
   variant?: string;
   rarity?: string;
   growthState?: string;
@@ -295,6 +297,11 @@ export async function addOrUpdateFlowerPlacement(
   );
 
   let updated: FlowerPlacementRecord[];
+  const existing = loaded[existingIdx];
+  // A planted flower never moves: its details may refresh, its spot may not.
+  if (existing && (existing.worldX !== placement.worldX || existing.worldY !== placement.worldY)) {
+    throw new Error('This flower is already planted. Its spot can’t change.');
+  }
   if (existingIdx >= 0) {
     updated = [...loaded];
     updated[existingIdx] = {

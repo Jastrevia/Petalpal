@@ -1,5 +1,5 @@
 import { readEvent } from '../../../services/events';
-import { loadGarden } from '../../../services/garden';
+import { loadGarden, plantFlowerSpot } from '../../../services/garden';
 import { gardenPlantingRecord, loadGardenPlacements } from './gardenHydration';
 import { useFocusEffect } from 'expo-router';
 import React, {
@@ -36,7 +36,8 @@ import {
   type FlowerSession,
 } from './flowerDetailApi';
 
-export type PlantingMode = 'normal' | 'planting' | 'adjusting';
+/** There is no adjust mode: once planted, a flower's spot never changes. */
+export type PlantingMode = 'normal' | 'planting';
 
 interface PlantingContextValue {
   placements: FlowerPlacementRecord[];
@@ -68,7 +69,6 @@ interface PlantingContextValue {
   startPlanting: (
     flower: Partial<FlowerPlacementRecord> & { flowerId: string; month: number; flowerName: string }
   ) => void;
-  startAdjusting: (flower: FlowerPlacementRecord) => void;
   updatePreview: (worldX: number, worldY: number) => void;
   confirmPlacement: () => Promise<boolean>;
   cancelPlacement: () => void;
@@ -224,7 +224,6 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       worldY: number,
       month: number,
       flowerName?: string,
-      ignorePlacementId?: string,
       speciesCode?: string
     ) => {
       return validateFlowerPlacement({
@@ -233,7 +232,6 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         worldX,
         worldY,
         existingPlacements: placements,
-        ignorePlacementId,
         flowerName,
         speciesCode,
       });
@@ -312,33 +310,6 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     [placements, gardenOwnerUserId, session, backendMode]
   );
 
-  const startAdjusting = useCallback(
-    (flower: FlowerPlacementRecord) => {
-      if (!ownsFlower(flower, access)) {
-        setDetailError('Only this flower’s owner can adjust its position.');
-        return;
-      }
-      setTargetFlower(flower);
-      setPreviewCoords({ worldX: flower.worldX, worldY: flower.worldY });
-      setActiveMode('adjusting');
-      setSelectedFlower(null);
-      detailVersion.current++; detailWorking.current = false; setIsDetailWorking(false);
-
-      const res = validateFlowerPlacement({
-        flowerId: flower.flowerId,
-        month: flower.month,
-        worldX: flower.worldX,
-        worldY: flower.worldY,
-        existingPlacements: placements,
-        ignorePlacementId: flower.id,
-        flowerName: flower.flowerName,
-        speciesCode: flower.speciesCode,
-      });
-      setValidationResult(res);
-    },
-    [placements, session, gardenOwnerUserId]
-  );
-
   const updatePreview = useCallback(
     (worldX: number, worldY: number) => {
       if (!targetFlower || activeMode === 'normal') return;
@@ -350,7 +321,6 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         worldX,
         worldY,
         existingPlacements: placements,
-        ignorePlacementId: activeMode === 'adjusting' ? targetFlower.id : undefined,
         flowerName: targetFlower.flowerName,
         speciesCode: targetFlower.speciesCode,
       });
@@ -369,10 +339,11 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     const version = gardenVersion.current;
     setIsSaving(true);
     try {
-      // Revalidate before writing coordinates against the approved mask and
-      // current occupied footprints, ignoring self only during Adjust.
+      // Revalidate against the approved mask and every planted footprint before writing.
+      // A flower that already has a spot is never planted again.
+      if (placements.some(p => p.flowerId === targetFlower.flowerId && p.placementOrigin !== 'FALLBACK')) return false;
       const confirmed = validateAt(previewCoords.worldX, previewCoords.worldY, targetFlower.month,
-        targetFlower.flowerName, activeMode === 'adjusting' ? targetFlower.id : undefined, targetFlower.speciesCode);
+        targetFlower.flowerName, targetFlower.speciesCode);
       if (!confirmed.isValid) {
         setValidationResult(confirmed);
         return false;
@@ -383,10 +354,12 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         worldY: previewCoords.worldY,
         landId: MONTH_REGION_METAS[targetFlower.month].landId,
         placementVersion: 1,
-        placementOrigin: 'LOCAL',
+        placementOrigin: backendMode ? 'SERVER' : 'LOCAL',
       };
 
-      if (backendMode && session) await loadFlowerSource(session.user.id, committed.flowerId);
+      // The server keeps the spot for good and refuses any later move.
+      if (backendMode && session) await plantFlowerSpot(session.user.id, committed.flowerId,
+        { worldX: committed.worldX, worldY: committed.worldY, landId: committed.landId! });
       if (version !== gardenVersion.current) return false;
       const updated = await addOrUpdateFlowerPlacement(committed, cacheSession);
       if (version !== gardenVersion.current) return false;
@@ -400,11 +373,12 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       return true;
     } catch (err) {
       console.error('[PlantingContext] Unable to save placement.');
+      setValidationResult({ isValid: false, userFeedback: err instanceof Error && err.message ? err.message : 'Unable to plant here. Try again.' });
       return false;
     } finally {
       setIsSaving(false);
     }
-  }, [targetFlower, previewCoords, validationResult, isSaving, activeMode, validateAt, session, gardenOwnerUserId, backendMode]);
+  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode]);
 
   const cancelPlacement = useCallback(() => {
     setActiveMode('normal');
@@ -545,7 +519,6 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         showDevHitboxes,
         showPlacementDebug,
         startPlanting,
-        startAdjusting,
         updatePreview,
         confirmPlacement,
         cancelPlacement,
