@@ -15,7 +15,8 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     const { JsiSkRuntimeEffect } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkRuntimeEffect');
     const { JsiSkImage } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkImage');
     configureGardenWebNativeOwnership(JsiSkPaint.prototype, [
-      [Skia, ['Paint', 'PictureRecorder']],
+      // MakeVertices: the Garden walkers' skinned meshes, rebuilt every frame.
+      [Skia, ['Paint', 'PictureRecorder', 'MakeVertices']],
       [JsiSkPictureRecorder.prototype, ['finishRecordingAsPicture']],
       [JsiSkPaint.prototype, ['copy']],
       [Skia.Path, ['MakeFromSVGString']],

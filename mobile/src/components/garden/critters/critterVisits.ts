@@ -1,11 +1,11 @@
-// Garden visitors: a butterfly, a dragonfly, a bluebird, a rabbit and a hedgehog drop by now
+// Garden visitors: a butterfly, a bluebird, a rabbit, a hedgehog and a puppy drop by now
 // and then, do their thing for a while and leave. At most two at a time; each visit is planned
 // here (pure, seeded by the caller's random) and drawn by GardenCritters.tsx from the Garden
 // clock. Walkers only use connected dry paths of the walk network; flyers hop between
 // path points high above them, so nobody ever stands in the pond.
 import { distance, type Network, type Point } from '../fairy/walkNetwork';
 
-export type CritterId = 'butterfly' | 'dragonfly' | 'bluebird' | 'rabbit' | 'hedgehog';
+export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy';
 export type CritterKind = 'flyer' | 'walker';
 export type CritterSpec = {
   id: CritterId; kind: CritterKind;
@@ -18,10 +18,10 @@ export type CritterSpec = {
 };
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
-  dragonfly: { id: 'dragonfly', kind: 'flyer', size: 70, speed: 120, altitude: [30, 70] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
-  rabbit: { id: 'rabbit', kind: 'walker', size: 84, speed: 55, altitude: [0, 0] },
+  rabbit: { id: 'rabbit', kind: 'walker', size: 84, speed: 60, altitude: [0, 0] },
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 18, altitude: [0, 0] },
+  puppy: { id: 'puppy', kind: 'walker', size: 100, speed: 62, altitude: [0, 0] },
 };
 export const CRITTER_IDS = Object.keys(CRITTERS) as CritterId[];
 export const MAX_VISITORS = 2;
@@ -30,11 +30,12 @@ export const VISIT_GAP: [number, number] = [10, 35];
 export const FADE_SECONDS = 0.8;
 
 // How a visitor moves: in bursts of `moving` (fraction) of every `cycle` seconds, still otherwise
-// (cycle 0: steady). The rabbit hops, the dragonfly darts and hovers, the hedgehog stops to sniff.
+// (cycle 0: steady). Each of the rabbit's bursts is one hop; the hedgehog and the puppy stop
+// now and then to sniff.
 export type Rhythm = { cycle: number; moving: number };
 export const RHYTHMS: Readonly<Record<CritterId, Rhythm>> = {
   butterfly: { cycle: 0, moving: 1 }, bluebird: { cycle: 0, moving: 1 },
-  dragonfly: { cycle: 1.6, moving: 0.62 }, rabbit: { cycle: 0.9, moving: 0.5 }, hedgehog: { cycle: 4, moving: 0.65 },
+  rabbit: { cycle: 1.1, moving: 0.5 }, hedgehog: { cycle: 4, moving: 0.65 }, puppy: { cycle: 7, moving: 0.8 },
 };
 export type Visit = { key: number; id: CritterId; path: Point[]; start: number; duration: number; speed: number; rhythm: Rhythm };
 
@@ -100,8 +101,15 @@ export function planVisit({ key, now, active, network, edges, points, random }: 
   const path = spec.kind === 'walker' ? planWalk(network, edges, random) : planFlight(points, spec, random);
   if (!path || path.length < 2) return null;
   const rhythm = RHYTHMS[id];
-  const duration = pathLength(path) / spec.speed / rhythm.moving + FADE_SECONDS * 2;
-  return { key, id, path, start: now, duration, speed: spec.speed, rhythm };
+  return { key, id, path, start: now, duration: travelSeconds(pathLength(path) / spec.speed, rhythm) + FADE_SECONDS * 2, speed: spec.speed, rhythm };
+}
+
+// How long a visitor travels to move for `moving` seconds. In bursts it is a whole number of
+// them (at least one), so every hop lands and no stride is cut off; the visitor may then stop
+// a little short of the last point, never past it.
+export function travelSeconds(moving: number, rhythm: Rhythm) {
+  if (rhythm.cycle <= 0) return moving / rhythm.moving;
+  return Math.max(1, Math.floor(moving / (rhythm.cycle * rhythm.moving))) * rhythm.cycle;
 }
 
 export const nextGap = (random: () => number) => between(VISIT_GAP, random);
@@ -115,6 +123,17 @@ export function travelled(elapsed: number, rhythm: Rhythm) {
   // Each burst eases in and out, so hops and darts start and land softly.
   const u = Math.min(1, within / burst);
   return cycles * burst + burst * (u * u * (3 - 2 * u));
+}
+
+// How far a visitor has come along its path `seconds` into its visit (world units): walkers'
+// legs step by distance, so their feet stay put on the ground however the pace changes.
+export function visitDistance(visit: Visit, seconds: number) {
+  'worklet';
+  const travel = Math.max(0, Math.min(visit.duration - FADE_SECONDS * 2, seconds - visit.start - FADE_SECONDS));
+  let length = 0;
+  for (let i = 1; i < visit.path.length; i++) length += Math.hypot(visit.path[i].x - visit.path[i - 1].x, visit.path[i].y - visit.path[i - 1].y);
+  // A short walk can be less than one of the puppy's long bursts: it stops at the last point.
+  return Math.min(length, travelled(travel, visit.rhythm) * visit.speed);
 }
 
 // Where a visitor is `seconds` into its visit: point on its path, heading, how visible it is,

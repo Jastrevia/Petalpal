@@ -57,8 +57,9 @@ test('a visit fades in, travels its whole path in its rhythm, and fades out', ()
     assert.equal(start.opacity, 0, `${id} starts invisible`);
     assert.equal(mid.opacity, 1, `${id} is fully visible mid-visit`);
     assert.ok(end.opacity < 1e-9, `${id} ends invisible`);
-    const last = visit.path.at(-1);
-    assert.ok(Math.hypot(end.x - last.x, end.y - last.y) < 1e-6, `${id} reaches the end of its path`);
+    const length = visits.pathLength(visit.path), burst = visit.rhythm.cycle * visit.rhythm.moving * visit.speed;
+    const gone = visits.visitDistance(visit, 100 + visit.duration);
+    assert.ok(gone <= length + 1e-6 && gone >= length - (burst || 1e-6) - 1e-6, `${id} ends on its path, at most one burst short of the end`);
     // Travel never goes backwards.
     let previous = -1;
     for (let s = 0; s <= visit.duration; s += 0.05) {
@@ -68,10 +69,84 @@ test('a visit fades in, travels its whole path in its rhythm, and fades out', ()
   }
 });
 
-test('rhythms: steady flyers glide, hoppers and darters move in bursts', () => {
+test('rhythms: steady flyers glide, the rabbit moves in hops', () => {
   const steady = visits.RHYTHMS.bluebird, hop = visits.RHYTHMS.rabbit;
   assert.equal(visits.travelled(2, steady), 2);
-  // A rabbit is still for the second half of each 0.9 s hop.
-  assert.equal(visits.travelled(0.9 * 0.5, hop), visits.travelled(0.9 * 0.99, hop));
-  assert.ok(visits.travelled(0.9 * 0.25, hop) > 0);
+  // A rabbit is still for the second half of each hop cycle.
+  assert.equal(visits.travelled(hop.cycle * 0.5, hop), visits.travelled(hop.cycle * 0.99, hop));
+  assert.ok(visits.travelled(hop.cycle * 0.25, hop) > 0);
+});
+
+test('distance along the path grows with travel and stops at the end', () => {
+  const visit = { key: 1, id: 'puppy', path: [{ x: 0, y: 0 }, { x: 300, y: 0 }], start: 10, duration: 0, speed: 62, rhythm: visits.RHYTHMS.puppy };
+  visit.duration = visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, visit.rhythm) + visits.FADE_SECONDS * 2;
+  assert.equal(visits.visitDistance(visit, 10), 0);
+  let previous = 0;
+  for (let s = 10; s <= 10 + visit.duration; s += 0.1) {
+    const d = visits.visitDistance(visit, s);
+    assert.ok(d >= previous - 1e-9); previous = d;
+  }
+  const end = visits.visitDistance(visit, 10 + visit.duration + 5);
+  assert.ok(end <= 300 && end > 300 - 62 * 7 * 0.8, 'stops on the path, short of the end by less than one burst');
+});
+
+const gaits = load('../critters/gaits'), rig = load('../critters/rig');
+
+test('a walker at rest is its painting, point for point', () => {
+  for (const id of ['puppy', 'rabbit', 'hedgehog']) {
+    const mesh = gaits.WALKER_MESHES[id];
+    const rest = { lift: 0, pitch: 0, paws: gaits.WALKER_REST_PAWS[id], tilts: mesh.legs.map(() => 0), turns: {} };
+    const layers = rig.posePoints(mesh, rest);
+    layers.forEach((points, l) => points.forEach((p, i) => {
+      assert.ok(Math.abs(p.x - mesh.layers[l].rest[i * 2]) < 1e-6 && Math.abs(p.y - mesh.layers[l].rest[i * 2 + 1]) < 1e-6, `${id} layer ${l} point ${i}`);
+    }));
+  }
+});
+
+// Where each leg's paw really is for a pose (its chain run with the solved turns, in the body's
+// frame) against where the gait put it.
+function pawMisses(mesh, pose) {
+  const turns = rig.boneTurns(mesh, pose);
+  const c = Math.cos(-pose.pitch), s = Math.sin(-pose.pitch), bx = mesh.body[0], by = mesh.body[1];
+  return mesh.legs.map((leg, i) => {
+    const wx = pose.paws[i * 2] - bx, wy = pose.paws[i * 2 + 1] - pose.lift - by;
+    const tx = bx + wx * c - wy * s, ty = by + wx * s + wy * c;
+    let x = leg.joints[0], y = leg.joints[1], a = 0;
+    for (let k = 0; k < 3; k++) { a += turns[leg.bones[k]]; x += leg.lengths[k] * Math.cos(leg.rest[k] + a); y += leg.lengths[k] * Math.sin(leg.rest[k] + a); }
+    return Math.hypot(x - tx, y - ty);
+  });
+}
+
+test('paws on the ground are where the gait puts them (no hovering paws)', () => {
+  const walkers = [
+    ['puppy', d => gaits.puppyPose(d, 1, 0), gaits.PUPPY_WALK.stride, i => gaits.PUPPY_WALK.ground[i]],
+    ['hedgehog', d => gaits.hedgehogPose(d, 1, 0), gaits.HEDGEHOG_WALK.stride, i => gaits.HEDGEHOG_WALK.ground[i]],
+    ['rabbit', d => gaits.rabbitPose(d / 200, 200, 0), 200, i => (i === 0 ? gaits.WALKER_MESHES.rabbit.ground : gaits.WALKER_MESHES.rabbit.legs[i].joints[7])],
+  ];
+  for (const [id, poseAt, span, ground] of walkers) {
+    const mesh = gaits.WALKER_MESHES[id];
+    for (let d = 0; d < span; d += 2) {
+      const pose = poseAt(d), misses = pawMisses(mesh, pose);
+      misses.forEach((miss, i) => {
+        if (Math.abs(pose.paws[i * 2 + 1] - ground(i)) < 0.01) assert.ok(miss < 5, `${id} leg ${i} misses its spot by ${miss.toFixed(1)} px at ${d}`);
+      });
+    }
+  }
+});
+
+test('a paw on the ground keeps its place in the world while the body walks', () => {
+  const walk = gaits.PUPPY_WALK;
+  for (let i = 0; i < walk.stand.length; i++) {
+    let planted = null;
+    for (let d = 0; d < walk.stride * 2; d += 1) {
+      const phase = ((d / walk.stride + walk.phase[i]) % 1 + 1) % 1;
+      const pose = gaits.puppyPose(d, 1, 0);
+      if (phase < walk.duty - 0.01) {
+        // Painting x plus the distance walked: its spot in the world.
+        const world = pose.paws[i * 2] + d;
+        if (planted === null) planted = world;
+        else assert.ok(Math.abs(world - planted) < 1e-6, `leg ${i} paw slid at ${d}`);
+      } else planted = null;
+    }
+  }
 });

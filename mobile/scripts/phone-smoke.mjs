@@ -78,6 +78,9 @@ try {
       r = await tappable(page, page.getByTestId(`hud-${id}`)); check(phone, `bottom icon "${id}" visible and tappable`, r.ok, r.why);
     }
     await page.waitForTimeout(8000); // Let AUTO quality settle (it steps down within a few seconds).
+    // The busiest Garden: two walkers on their skeletons at once (dev hook, GardenCritters.tsx).
+    await page.evaluate(() => { const visitors = globalThis.__gardenCritters; visitors?.spawn('puppy'); visitors?.spawn('rabbit'); });
+    await page.waitForTimeout(1500);
     const speed = await fps(page); check(phone, `Garden animates smoothly (≥ ${MIN_FPS} fps)`, speed >= MIN_FPS, `${speed.toFixed(0)} fps`);
 
     // Every panel: its × is on top, it closes, and a tap outside closes it too.
