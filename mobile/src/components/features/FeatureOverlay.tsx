@@ -1,8 +1,6 @@
 import { PrivacyAndSupport } from './PrivacyAndSupport';
-import { DeleteAccountSettings } from './DeleteAccountSettings';
 import { AiPrivacySettings } from './AiPrivacySettings';
 import { ReportLanguageSettings } from './ReportLanguageSettings';
-import { CommunityGuidelines } from './CommunityGuidelines';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
 import { useEffect, useState } from 'react';
 import { SymbolView } from 'expo-symbols';
@@ -29,10 +27,10 @@ export const FEATURE_LABELS: Record<AppLocale, Record<string, string>> = {
   'zh-Hans': { garden: '花园', events: '事件', friends: '朋友', fairy: '小花仙', profile: '我', settings: '我', daily: '每日', visit: '拜访', weekly: '周报', monthly: '月报' },
 };
 const OVERLAY_COPY = {
-  en: { close: 'Close', account: 'Your account', accountText: 'Your Events and flowers are saved to your account.', accountNote: 'Signing out keeps your saved Garden safe.',
+  en: { close: 'Close',
     ai: 'AI & privacy', language: 'Language', background: 'Background', light: 'Light background', signOut: 'Sign out', signingOut: 'Signing out…',
     signOutFailed: 'Unable to sign out. Please try again.', eventsIntro: 'What is an Event?', none: 'No actions are available here yet.', account404: 'PetalPal account' },
-  'zh-Hans': { close: '关闭', account: '你的账号', accountText: '你的事件和花都保存在账号里。', accountNote: '退出登录后，你的花园会安全保存。',
+  'zh-Hans': { close: '关闭',
     ai: 'AI 与隐私', language: '语言', background: '背景', light: '浅色背景', signOut: '退出登录', signingOut: '正在退出…',
     signOutFailed: '退出失败，请再试一次。', eventsIntro: '什么是事件？', none: '这里暂时还没有可以操作的内容。', account404: 'PetalPal 账号' },
 };
@@ -138,13 +136,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
       {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
     </FeatureSection>
     <GardenPrivacySettings key={session?.user.id} />
-    <FeatureSection title={copy.account}>
-      <Text style={[ui.text, { color: theme.text }]}>{copy.accountText}</Text>
-      <Text style={[ui.caption, { color: theme.muted }]}>{copy.accountNote}</Text>
-    </FeatureSection>
-    <PrivacyAndSupport />
-    <CommunityGuidelines />
-    <DeleteAccountSettings key={`delete-${session?.user.id}`} />
+    <PrivacyAndSupport account key={`support-${session?.user.id}`} />
     {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
     <FeatureActionButton title={busy ? copy.signingOut : copy.signOut} disabled={busy} onPress={async () => {
       setBusy(true); setError('');
