@@ -100,6 +100,7 @@ import {
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
 import Letterwing from './Letterwing';
+import MemoryOtter from './spirits/MemoryOtter';
 import GardenCritters from './critters/GardenCritters';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
@@ -1423,6 +1424,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               opacity={1.0}
               mode={perf.WaterAnimation?lotusMode:'static'}
             /></GardenProfile>
+
+            {/* Memory Otter: on the water, under the islands and bridges; evening and night only. */}
+            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
 
             {/* V2 is one independent terrain; islands and treehouse occlude it naturally. */}
             {perf.Waterfall && showLandmarks && waterfallVersion === 'v2' && (

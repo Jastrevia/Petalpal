@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { Critter } from '@/components/garden/critters/GardenCritters';
+import { Otter } from '@/components/garden/spirits/MemoryOtter';
+import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
 import { CRITTER_IDS, CRITTERS, RHYTHMS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Visit } from '@/components/garden/critters/critterVisits';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
@@ -41,6 +43,19 @@ export default function CrittersTestScreen() {
     const timer = setInterval(() => { if (seconds.value > visit.start + visit.duration) setRound(value => value + 1); }, 200);
     return () => clearInterval(timer);
   }, [visit, seconds]);
+  // Memory Otter on night water: it swims across, dives, and comes back the other way.
+  const [otter, setOtter] = useState(false);
+  const [swimRound, setSwimRound] = useState(0);
+  const swim = useMemo<Swim>(() => {
+    const left = { x: 60, y: HEIGHT * 0.55 }, right = { x: WIDTH - 60, y: HEIGHT * 0.5 };
+    const [a, b] = swimRound % 2 ? [right, left] : [left, right];
+    return { a, b, start, swim: Math.hypot(b.x - a.x, b.y - a.y) / OTTER_SPEED, under: 1 };
+  }, [swimRound, start]);
+  useEffect(() => {
+    if (!otter) return;
+    const timer = setInterval(() => { if (seconds.value > swimEnd(swim)) { setSwimRound(value => value + 1); setStart(seconds.value); } }, 200);
+    return () => clearInterval(timer);
+  }, [otter, swim, seconds]);
   const [debug, setDebug] = useState('');
   useEffect(() => { const timer = setInterval(() => { const pose = visitPose(visit, seconds.value);
     setDebug(`t ${seconds.value.toFixed(1)} · x ${pose.x.toFixed(0)} y ${pose.y.toFixed(0)} · opacity ${pose.opacity.toFixed(2)}`); }, 250);
@@ -48,14 +63,18 @@ export default function CrittersTestScreen() {
   if (!__DEV__) return <Redirect href="/" />;
   return <ScrollView style={styles.scroll} contentContainerStyle={styles.page}>
     <Text style={styles.title}>Garden visitors</Text>
-    <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
+    {otter ? <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
+      <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#123C4A" />
+      <Otter key={swimRound} swim={swim} clock={seconds} />
+    </Canvas> : <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
       <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#5C7F45" />
       <Rect x={0} y={HEIGHT * 0.62} width={WIDTH} height={HEIGHT * 0.3} color="#B9AA8C" />
       <Critter key={id} visit={visit} clock={seconds} zoom={zoomFor(id)} />
-    </Canvas>
+    </Canvas>}
     <Text testID="critter-debug" style={styles.label}>{debug}</Text>
-    <View style={styles.row}>{CRITTER_IDS.map(item => <Pressable key={item} onPress={() => setId(item)}
-      style={[styles.button, id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View>
+    <View style={styles.row}>{CRITTER_IDS.map(item => <Pressable key={item} onPress={() => { setOtter(false); setId(item); }}
+      style={[styles.button, !otter && id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}
+      <Pressable onPress={() => { setOtter(true); setStart(seconds.value); }} style={[styles.button, otter && styles.selected]}><Text style={styles.label}>otter (night)</Text></Pressable></View>
     <View style={styles.row}>
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
     </View>
