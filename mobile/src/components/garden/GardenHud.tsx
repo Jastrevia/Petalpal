@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -118,9 +118,6 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       {isGardenLoading ? <ActivityIndicator accessibilityLabel="Loading Garden" size="small" color="#365b42" /> : null}
       {gardenError ? <><Text accessibilityRole="alert" style={styles.label}>{gardenError}</Text>
         <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
-      <Pressable accessibilityRole="button" onPress={() => router.push('/garden-history' as Href)}>
-        <Text style={styles.label}>{chinese ? '花园记录' : 'Garden history'}</Text>
-      </Pressable>
     </View>
     {notice ? <Pressable key={notice.key} testID="visit-notice" accessibilityRole="alert" accessibilityLiveRegion="polite"
       onPress={() => setNotice(null)} style={[styles.notice, { top: insets.top + 60, backgroundColor: theme.background, borderColor: theme.gold }]}>
