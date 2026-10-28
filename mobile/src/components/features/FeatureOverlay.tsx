@@ -136,7 +136,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
       {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
     </FeatureSection>
     <GardenPrivacySettings key={session?.user.id} />
-    <PrivacyAndSupport account key={`support-${session?.user.id}`} />
+    <PrivacyAndSupport account onLeave={onClose} key={`support-${session?.user.id}`} />
     {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
     <FeatureActionButton title={busy ? copy.signingOut : copy.signOut} disabled={busy} onPress={async () => {
       setBusy(true); setError('');
