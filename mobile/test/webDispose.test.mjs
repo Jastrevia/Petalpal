@@ -38,3 +38,34 @@ test('the polyfill defines the well-known disposal symbols only when missing', (
   vm.runInNewContext(polyfill, { Symbol, Object });
   assert.equal(Symbol.dispose, native, 'native symbol untouched');
 });
+
+// A friend's Garden closing can release an image another root still draws this frame.
+test('drawing a released image skips that draw instead of crashing the page', () => {
+  const api = { exports: {} };
+  const scope = { exports: api.exports, Symbol, WeakSet, FinalizationRegistry, globalThis: {} };
+  scope.globalThis = scope;
+  vm.runInNewContext(code, scope);
+  const drawn = [];
+  class Canvas {
+    drawImage(image) { if (image.ref.isDeleted()) throw Error('Cannot pass deleted object as a pointer of type Image const*'); drawn.push(image.name); }
+    drawImageRect(image) { this.drawImage(image); }
+  }
+  class Image { constructor(name, deleted) { this.name = name; this.ref = { isDeleted: () => deleted }; }
+    width() { if (this.ref.isDeleted()) throw Error('Cannot pass deleted object as a pointer of type Image const*'); return 300; }
+    height() { return this.width() / 2; }
+    makeShaderOptions() { if (this.ref.isDeleted()) throw Error('deleted'); return 'shader:' + this.name; } }
+  assert.throws(() => new Canvas().drawImage(new Image('gone', true)), /deleted object/, 'reproduces the crash');
+  api.exports.configureGardenWebDeletedImageGuard(Canvas.prototype, Image.prototype, () => 'transparent');
+  const canvas = new Canvas();
+  canvas.drawImage(new Image('live', false));
+  canvas.drawImage(new Image('gone', true));
+  canvas.drawImageRect(new Image('gone too', true));
+  assert.deepEqual(drawn, ['live']);
+  assert.equal(new Image('live', false).makeShaderOptions(), 'shader:live');
+  assert.equal(new Image('gone', true).makeShaderOptions(), 'transparent');
+  // ImageShader reads the size first (the crash seen when coming back from a friend's Garden).
+  assert.equal(new Image('live', false).width(), 300);
+  assert.equal(new Image('gone', true).width(), 1);
+  assert.equal(new Image('gone', true).height(), 1);
+  assert.equal(scope.__gardenSkippedImages, 5);
+});

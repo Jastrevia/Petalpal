@@ -127,3 +127,51 @@ export function configureGardenWebDispose(prototypes: readonly object[]) {
     };
   }
 }
+
+// Safety net: an image released by another Garden root (a friend's Garden closing, a remount
+// racing a frame) must cost at most one missing image for one frame, never a page crash
+// ("Cannot pass deleted object as a pointer of type Image const*"). Draws of a released image
+// are skipped, and its shaders become transparent. Counted in globalThis.__gardenSkippedImages.
+type CanvasLike = Record<string, Method>;
+export function configureGardenWebDeletedImageGuard(canvasPrototype: object, imagePrototype: object,
+  transparentShader: () => unknown) {
+  if (configured.has(canvasPrototype)) return;
+  configured.add(canvasPrototype);
+  const released = (value: unknown) => {
+    const ref = (value as NativeOwner | null | undefined)?.ref;
+    return !!ref && typeof ref.isDeleted === 'function' && ref.isDeleted();
+  };
+  const skipped = () => {
+    const scope = globalThis as { __gardenSkippedImages?: number };
+    scope.__gardenSkippedImages = (scope.__gardenSkippedImages ?? 0) + 1;
+  };
+  const canvas = canvasPrototype as CanvasLike;
+  for (const name of ['drawImage', 'drawImageRect', 'drawImageCubic', 'drawImageOptions', 'drawImageNine',
+    'drawImageRectCubic', 'drawImageRectOptions', 'drawAtlas']) {
+    const original = canvas[name];
+    if (typeof original !== 'function') continue;
+    canvas[name] = function (this: NativeOwner, ...args) {
+      if (released(args[0])) { skipped(); return undefined; }
+      return original.apply(this, args);
+    };
+  }
+  const image = imagePrototype as CanvasLike;
+  // Skia's ImageShader reads the size before it makes the shader; a released image reads as
+  // 1×1 (finite maths) and the shader below then comes back transparent.
+  for (const name of ['width', 'height']) {
+    const original = image[name];
+    if (typeof original !== 'function') continue;
+    image[name] = function (this: NativeOwner, ...args) {
+      if (released(this)) { skipped(); return 1; }
+      return original.apply(this, args);
+    };
+  }
+  for (const name of ['makeShaderOptions', 'makeShaderCubic']) {
+    const original = image[name];
+    if (typeof original !== 'function') continue;
+    image[name] = function (this: NativeOwner, ...args) {
+      if (released(this)) { skipped(); return transparentShader(); }
+      return original.apply(this, args);
+    };
+  }
+}
