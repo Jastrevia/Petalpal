@@ -1,4 +1,4 @@
-"""Cuts a Garden walker's painting into puppet parts for its skeleton (critters/gaits.ts):
+"""Cuts the Garden rabbit's painting into puppet parts for its skeleton (critters/gaits.ts):
 <name>-body.webp, the painting without its legs below the belly, and <name>-legs.webp, its near
 legs, each cut along the painted outline and fading in at the top so it grows out of the body's
 fur. The far legs are drawn as darker copies of the near legs, so their painted pixels are
@@ -15,16 +15,6 @@ FADE = 26  # pixels over which a leg fades in below the top edge of its outline
 # Per walker: the near legs' outlines (the first two points are the top edge, where the leg
 # fades in), and the far legs' painted areas to take out of the body.
 PARTS = {
-    "puppy": {
-        "near": [
-            [(48, 236), (156, 236), (130, 300), (114, 340), (120, 412), (30, 412), (38, 300)],
-            [(298, 262), (368, 262), (372, 330), (370, 374), (436, 380), (436, 414), (338, 414), (316, 330)],
-        ],
-        "far": [
-            [(130, 262), (218, 262), (228, 392), (148, 392), (118, 334), (128, 300)],
-            [(368, 264), (398, 264), (400, 378), (368, 378)],
-        ],
-    },
     "rabbit": {
         "near": [
             [(64, 424), (252, 440), (256, 491), (56, 491)],
@@ -32,15 +22,6 @@ PARTS = {
         ],
         "far": [
             [(314, 372), (362, 372), (398, 448), (398, 472), (338, 472), (318, 440)],
-        ],
-    },
-    "hedgehog": {
-        "near": [
-            [(126, 404), (236, 404), (240, 467), (116, 467)],
-            [(262, 362), (320, 352), (332, 420), (376, 434), (376, 467), (288, 467), (270, 420)],
-        ],
-        "far": [
-            [(332, 352), (384, 352), (420, 420), (420, 448), (360, 448), (336, 420)],
         ],
     },
 }

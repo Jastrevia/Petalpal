@@ -7,13 +7,13 @@ import { wingbeat, wingbeatEffect } from '../wingbeat';
 import {
   CRITTERS, nextGap, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
 } from './critterVisits';
-import { hedgehogPose, puppyPose, rabbitPose, WALKER_MESHES, type WalkerId } from './gaits';
+import { rabbitPose, WALKER_MESHES } from './gaits';
 import { posePoints, type Layer } from './rig';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
 // walkers are skinned meshes on a skeleton (rig.ts, gaits.ts); the flyers are single paintings.
-// A painted walk: frames of one stride in a grid (scripts/critters/walk-frames.py), `w` × `h`
+// A painted walk: frames of one stride in a grid (scripts/critters/video-frames.py), `w` × `h`
 // each, `ground` the row the paws stand on, `loop` the world units walked over all of them.
 type Frames = { columns: number; count: number; ground: number; loop: number };
 const ART: Record<CritterId, { source: number; legs?: number; frames?: Frames; w: number; h: number }> = {
@@ -21,13 +21,13 @@ const ART: Record<CritterId, { source: number; legs?: number; frames?: Frames; w
   bluebird: { source: require('@/assets/garden/critters/bluebird.webp'), w: 448, h: 448 },
   // Walkers: the body and the near legs, cut from one painting (scripts/critters/cut-parts.py).
   rabbit: { source: require('@/assets/garden/critters/rabbit-body.webp'), legs: require('@/assets/garden/critters/rabbit-legs.webp'), w: 512, h: 491 },
-  hedgehog: { source: require('@/assets/garden/critters/hedgehog-body.webp'), legs: require('@/assets/garden/critters/hedgehog-legs.webp'), w: 512, h: 467 },
-  // The puppy walks in painted frames: one stride of a generated walking clip (scripts/critters/
-  // video-frames.py), every pose painted whole. `loop` is the ground its planted paws cover in
-  // that stride, so they do not skid.
+  // The puppy and the hedgehog walk in painted frames: one stride of a generated walking clip
+  // (scripts/critters/video-frames.py), every pose painted whole. `loop` is the ground their
+  // planted paws cover in that stride, so they do not skid.
+  hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
   puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
 };
-export const WALKER_ART = { rabbit: ART.rabbit, hedgehog: ART.hedgehog };
+export const WALKER_ART = { rabbit: ART.rabbit };
 
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
@@ -121,20 +121,16 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
   </Group>;
 }
 
-// A walker on its skeleton: the gait sets where each paw is, the legs bend to reach.
+// The rabbit on its skeleton: the hop sets where each paw is, the legs bend to reach.
 function Walker({ visit, clock, body, legs }: { visit: Visit; clock: SharedValue<number>; body: SkImage; legs: SkImage }) {
-  const id = visit.id as WalkerId, mesh = WALKER_MESHES[id], spec = CRITTERS[visit.id];
+  const mesh = WALKER_MESHES.rabbit, spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
   const scale = spec.size / Math.max(mesh.w, mesh.h);
   // One hop per burst for the rabbit: its length in world units.
   const hop = visit.speed * visit.rhythm.cycle * visit.rhythm.moving;
   const layers = useDerivedValue(() => {
     const t = clock.value, here = visitDistance(visit, t);
-    const pace = Math.min(1, (here - visitDistance(visit, t - 0.1)) / 0.1 / visit.speed * 1.6);
-    const stepping = reduced ? 0 : pace * pace * (3 - 2 * pace), d = reduced ? 0 : here / scale;
-    const pose = id === 'rabbit' ? rabbitPose(reduced ? 0 : (here / hop) % 1, hop / scale, t)
-      : id === 'puppy' ? puppyPose(d, stepping, t) : hedgehogPose(d, stepping, t);
-    return posePoints(mesh, pose);
+    return posePoints(mesh, rabbitPose(reduced ? 0 : (here / hop) % 1, hop / scale, t));
   }, [visit, reduced, scale, hop]);
   const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity, [visit]);
   const transform = useDerivedValue(() => {
@@ -145,8 +141,8 @@ function Walker({ visit, clock, body, legs }: { visit: Visit; clock: SharedValue
   }, [visit, scale]);
   const shadow = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
-    // The rabbit's shadow shrinks as it leaves the ground.
-    const air = id === 'rabbit' ? Math.sin(Math.PI * Math.max(0, Math.min(1, ((visitDistance(visit, clock.value) / hop) % 1 - 0.14) / 0.66))) : 0;
+    // The shadow shrinks as it leaves the ground.
+    const air = Math.sin(Math.PI * Math.max(0, Math.min(1, ((visitDistance(visit, clock.value) / hop) % 1 - 0.14) / 0.66)));
     return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: 1 - air * 0.25 }, { scaleY: 1 - air * 0.25 }];
   }, [visit, hop]);
   const rect = useMemo(() => ({ x: 0, y: 0, width: mesh.w, height: mesh.h }), [mesh]);

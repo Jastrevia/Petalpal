@@ -42,7 +42,26 @@ def keyed(f):
     c[..., 1] -= np.clip(excess, 0, None) * np.clip(1.4 - a, 0, 1)
     # Un-mix the backdrop from partly covered edge pixels.
     c = np.clip((c - (1 - a[..., None]) * key) / np.maximum(a[..., None], 0.25), 0, 1)
-    return np.dstack([c, a])
+    return np.dstack([c, a * main_body(a)])
+
+
+def main_body(a):
+    # Only the animal: the largest solid region (found on a quarter-size grid), a little grown so
+    # its fur edge is kept; specks and streaks the video left on the backdrop go.
+    small = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).resize((a.shape[1] // 4, a.shape[0] // 4))) > 100
+    label = np.zeros(small.shape, np.int32); sizes = [0]
+    for y, x in zip(*np.nonzero(small)):
+        if label[y, x]: continue
+        n = len(sizes); label[y, x] = n; stack = [(y, x)]; count = 0
+        while stack:
+            cy, cx = stack.pop(); count += 1
+            for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
+                if 0 <= ny < small.shape[0] and 0 <= nx < small.shape[1] and small[ny, nx] and not label[ny, nx]:
+                    label[ny, nx] = n; stack.append((ny, nx))
+        sizes.append(count)
+    if len(sizes) == 1: return np.ones_like(a)
+    keep = Image.fromarray(((label == int(np.argmax(sizes))) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
+    return np.asarray(keep.resize((a.shape[1], a.shape[0]), Image.BILINEAR)).astype(np.float32) / 255
 
 frames = [keyed(f) for f in rgb]
 alpha = [f[..., 3] > 0.5 for f in frames]

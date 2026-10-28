@@ -20,7 +20,8 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
   rabbit: { id: 'rabbit', kind: 'walker', size: 84, speed: 60, altitude: [0, 0] },
-  hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 18, altitude: [0, 0] },
+  // The hedgehog's pace matches its painted steps: 30.2 units each 1.08 s.
+  hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
   // The puppy's pace matches its painted stride: 41.9 units each 1.42 s.
   puppy: { id: 'puppy', kind: 'walker', size: 100, speed: 30, altitude: [0, 0] },
 };

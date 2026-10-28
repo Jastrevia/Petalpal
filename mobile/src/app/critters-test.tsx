@@ -6,20 +6,18 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { Critter, MeshLayer, WALKER_ART } from '@/components/garden/critters/GardenCritters';
 import { CRITTER_IDS, CRITTERS, RHYTHMS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Visit } from '@/components/garden/critters/critterVisits';
-import { hedgehogPose, HEDGEHOG_WALK, puppyPose, PUPPY_WALK, rabbitPose, WALKER_MESHES, type WalkerId } from '@/components/garden/critters/gaits';
+import { rabbitPose, WALKER_MESHES } from '@/components/garden/critters/gaits';
 import { posePoints, type Pose } from '@/components/garden/critters/rig';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
-// painting and motion can be judged up close; for the walkers, a strip of stills through one
-// stride (or hop) and their skeleton. Not part of production navigation.
+// painting and motion can be judged up close; for the rabbit (on a skeleton), a strip of stills
+// through one hop and its skeleton. Not part of production navigation.
 const WIDTH = 360, HEIGHT = 260;
 // The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn.
 const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : 2.4);
 const FRAMES = 8;
-function stillPose(id: WalkerId, k: number): Pose {
-  if (id === 'rabbit') return rabbitPose(k / FRAMES, 320, 0);
-  if (id === 'puppy') return puppyPose((k / FRAMES) * PUPPY_WALK.stride, 1, 0);
-  return hedgehogPose((k / FRAMES) * HEDGEHOG_WALK.stride, 1, 0);
+function stillPose(k: number): Pose {
+  return rabbitPose(k / FRAMES, 320, 0);
 }
 
 export default function CrittersTestScreen() {
@@ -54,7 +52,6 @@ export default function CrittersTestScreen() {
     setDebug(`t ${seconds.value.toFixed(1)} · x ${pose.x.toFixed(0)} y ${pose.y.toFixed(0)} · opacity ${pose.opacity.toFixed(2)}`); }, 250);
     return () => clearInterval(timer); }, [visit, seconds]);
   if (!__DEV__) return <Redirect href="/" />;
-  const walker = CRITTERS[id].kind === 'walker' ? id as WalkerId : null;
   return <ScrollView style={styles.scroll} contentContainerStyle={styles.page}>
     <Text style={styles.title}>Garden visitors</Text>
     <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
@@ -69,17 +66,17 @@ export default function CrittersTestScreen() {
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
       <Pressable onPress={() => setBones(value => !value)} style={[styles.button, bones && styles.selected]}><Text style={styles.label}>skeleton</Text></Pressable>
     </View>
-    {walker && walker !== 'puppy' ? <Filmstrip id={walker} bones={bones} /> : null}
+    {id === 'rabbit' ? <Filmstrip bones={bones} /> : null}
   </ScrollView>;
 }
 
-// One stride (or one hop) in stills, left to right; the first is the painting at rest when
+// One hop in stills, left to right; the first is the painting at rest when
 // `bones` is on, with its joints drawn over it.
-function Filmstrip({ id, bones }: { id: 'rabbit' | 'hedgehog'; bones: boolean }) {
-  const image = useImage(WALKER_ART[id].source), legs = useImage(WALKER_ART[id].legs);
-  const mesh = WALKER_MESHES[id];
+function Filmstrip({ bones }: { bones: boolean }) {
+  const image = useImage(WALKER_ART.rabbit.source), legs = useImage(WALKER_ART.rabbit.legs);
+  const mesh = WALKER_MESHES.rabbit;
   const cellW = 300, s = cellW / mesh.w, cellH = mesh.h * s + 8;
-  const frames = useMemo(() => Array.from({ length: FRAMES }, (_, k) => posePoints(mesh, stillPose(id, k))), [id, mesh]);
+  const frames = useMemo(() => Array.from({ length: FRAMES }, (_, k) => posePoints(mesh, stillPose(k))), [mesh]);
   const rect = { x: 0, y: 0, width: mesh.w, height: mesh.h };
   if (!image || !legs) return null;
   const columns = 2, rows = Math.ceil((FRAMES + (bones ? 1 : 0)) / columns);

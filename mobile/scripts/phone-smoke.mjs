@@ -79,7 +79,7 @@ try {
     }
     await page.waitForTimeout(8000); // Let AUTO quality settle (it steps down within a few seconds).
     // The busiest Garden: two walkers on their skeletons at once (dev hook, GardenCritters.tsx).
-    await page.evaluate(() => { const visitors = globalThis.__gardenCritters; visitors?.spawn('puppy'); visitors?.spawn('rabbit'); });
+    await page.evaluate(() => { const visitors = globalThis.__gardenCritters; visitors?.spawn('puppy'); visitors?.spawn('hedgehog'); });
     await page.waitForTimeout(1500);
     const speed = await fps(page); check(phone, `Garden animates smoothly (≥ ${MIN_FPS} fps)`, speed >= MIN_FPS, `${speed.toFixed(0)} fps`);
 

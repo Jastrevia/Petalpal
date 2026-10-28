@@ -92,8 +92,8 @@ test('distance along the path grows with travel and stops at the end', () => {
 
 const gaits = load('../critters/gaits'), rig = load('../critters/rig');
 
-test('a walker at rest is its painting, point for point', () => {
-  for (const id of ['puppy', 'rabbit', 'hedgehog']) {
+test('the rabbit at rest is its painting, point for point', () => {
+  for (const id of ['rabbit']) {
     const mesh = gaits.WALKER_MESHES[id];
     const rest = { lift: 0, pitch: 0, paws: gaits.WALKER_REST_PAWS[id], tilts: mesh.legs.map(() => 0), turns: {} };
     const layers = rig.posePoints(mesh, rest);
@@ -119,8 +119,6 @@ function pawMisses(mesh, pose) {
 
 test('paws on the ground are where the gait puts them (no hovering paws)', () => {
   const walkers = [
-    ['puppy', d => gaits.puppyPose(d, 1, 0), gaits.PUPPY_WALK.stride, i => gaits.PUPPY_WALK.ground[i]],
-    ['hedgehog', d => gaits.hedgehogPose(d, 1, 0), gaits.HEDGEHOG_WALK.stride, i => gaits.HEDGEHOG_WALK.ground[i]],
     ['rabbit', d => gaits.rabbitPose(d / 200, 200, 0), 200, i => (i === 0 ? gaits.WALKER_MESHES.rabbit.ground : gaits.WALKER_MESHES.rabbit.legs[i].joints[7])],
   ];
   for (const [id, poseAt, span, ground] of walkers) {
@@ -134,19 +132,11 @@ test('paws on the ground are where the gait puts them (no hovering paws)', () =>
   }
 });
 
-test('a paw on the ground keeps its place in the world while the body walks', () => {
-  const walk = gaits.PUPPY_WALK;
-  for (let i = 0; i < walk.stand.length; i++) {
-    let planted = null;
-    for (let d = 0; d < walk.stride * 2; d += 1) {
-      const phase = ((d / walk.stride + walk.phase[i]) % 1 + 1) % 1;
-      const pose = gaits.puppyPose(d, 1, 0);
-      if (phase < walk.duty - 0.01) {
-        // Painting x plus the distance walked: its spot in the world.
-        const world = pose.paws[i * 2] + d;
-        if (planted === null) planted = world;
-        else assert.ok(Math.abs(world - planted) < 1e-6, `leg ${i} paw slid at ${d}`);
-      } else planted = null;
-    }
+test('the rabbit\'s hind feet keep their place while it pushes off', () => {
+  const S = 200, toe = gaits.WALKER_MESHES.rabbit.legs[0].joints[6];
+  for (let u = 0; u < 0.42; u += 0.01) {
+    // Painting x plus the distance hopped so far: its spot on the ground.
+    const pose = gaits.rabbitPose(u, S, 0);
+    assert.ok(Math.abs(pose.paws[0] + u * S - toe) < 1e-6, `hind toes slid at ${u.toFixed(2)}`);
   }
 });
