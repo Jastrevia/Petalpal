@@ -99,7 +99,7 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
-import MailboxGlow from './MailboxGlow';
+import PigeonCourier from './PigeonCourier';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
@@ -1508,7 +1508,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {enableFairyWalk && !readOnly && showLandmarks && <MailboxGlow placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
+            {enableFairyWalk && !readOnly && showLandmarks && <PigeonCourier placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
             <GardenFairy motionClock={fairySeconds} onMailboxOpened={() => {
