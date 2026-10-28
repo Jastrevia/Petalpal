@@ -21,6 +21,7 @@ import { loadGardenPlacements } from '../components/garden/planting/gardenHydrat
 import { loadFlowerSource } from '../components/garden/planting/flowerDetailApi';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from '../components/garden/planting/plantingPersistence';
 import { BookhouseArt } from '../components/bookhouse/BookhouseArt';
+import { Scrollkeeper } from '../components/bookhouse/Scrollkeeper';
 
 const serif = Platform.select({ ios: 'Georgia', web: 'Georgia', default: 'serif' });
 const moodName = (mood: string) => { const word = mood.replace('_BLOOM', '').toLowerCase(); return word.charAt(0).toUpperCase() + word.slice(1); };
@@ -224,6 +225,8 @@ export default function Bookhouse() {
                   })}
                 </View>
               </View>)}
+          {/* Scrollkeeper rests on the bookcase's top board, above the November books. */}
+          <Scrollkeeper x={sceneWidth * .74} y={rowBottom(0) - rowStep * .9} height={rowStep * .68} still={!!reducedMotion} />
           <SceneLighting width={sceneWidth} night={lit} />
           {/* Same scene coordinates as the two hanging lanterns; never change world time. */}
           {__DEV__ && ([.19, .79] as const).map((x, index) => <Pressable key={x}
