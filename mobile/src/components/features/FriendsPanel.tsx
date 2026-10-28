@@ -367,10 +367,13 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
         : { backgroundColor: `${theme.background}33` }]} pointerEvents="none" />
       <View style={styles.heroRow}>
         <Image source={ART.fairies} style={styles.fairies} resizeMode="contain" accessible={false} />
-        <View style={styles.heroText}><Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
-          <Text style={styles.subtitle}>{copy.tagline}</Text>
-          <View style={styles.selfRow}><View style={[styles.selfDot, { backgroundColor: selfOnline ? '#7FB77E' : '#9AA79F' }]} />
-            <Text testID="self-presence" style={styles.selfText}>{selfOnline ? copy.selfOnline : copy.selfOffline}</Text></View></View>
+        <View style={styles.heroText}>
+          {/* The owner's own status sits beside the title, leaving the tagline room. */}
+          <View style={styles.titleRow}><Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
+            <View accessible accessibilityLabel={selfOnline ? copy.selfOnline : copy.selfOffline} style={styles.selfPill}>
+              <View style={[styles.selfDot, { backgroundColor: selfOnline ? '#7FB77E' : '#9AA79F' }]} />
+              <Text testID="self-presence" style={styles.selfText}>{selfOnline ? copy.online : copy.offline}</Text></View></View>
+          <Text style={styles.subtitle}>{copy.tagline}</Text></View>
       </View>
     </View>}
 
@@ -421,14 +424,16 @@ const createStyles = (theme: PanelTheme, light: boolean) => StyleSheet.create({
   heroArt: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   heroFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 36 },
   heroScrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingLeft: 10, paddingRight: 14, paddingBottom: 12 },
-  fairies: { width: 132, height: 92, marginLeft: 14, marginBottom: 10 },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingLeft: 6, paddingRight: 10, paddingBottom: 12 },
+  fairies: { width: 124, height: 86, marginLeft: 12, marginBottom: 8 },
   heroText: { flex: 1, gap: 3, paddingBottom: 4 },
-  title: { fontFamily: 'serif', fontSize: 32, color: theme.text, textShadowColor: `${theme.background}AA`, textShadowRadius: 8 },
+  title: { fontFamily: 'serif', fontSize: 29, color: theme.text, textShadowColor: `${theme.background}AA`, textShadowRadius: 8 },
   subtitle: { fontSize: 9, lineHeight: 14, letterSpacing: 2, color: theme.text, opacity: 0.85 },
-  selfRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  selfPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+    borderWidth: 1, borderColor: `${theme.gold}99`, backgroundColor: `${theme.background}B3` },
   selfDot: { width: 8, height: 8, borderRadius: 4 },
-  selfText: { fontSize: 12, color: theme.text },
+  selfText: { fontSize: 11, color: theme.text },
   tabs: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 999, borderWidth: 1, borderColor: theme.border, backgroundColor: light ? theme.input : '#123A36' },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 999 },
   tabSelected: { backgroundColor: '#F6EBCF', borderWidth: 1.5, borderColor: theme.gold },
