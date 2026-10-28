@@ -2,15 +2,22 @@
 // fake data, so the team can look at screens without production accounts or keys.
 // Expo's dev server runs on 8082; this proxy on 8081 adds scripts/web-local/fixtures.js before
 // the app loads. Nothing here is part of the app bundle or any release build.
+// npm run web:phone — the same preview, also reachable from a phone on the same Wi-Fi, to try
+// the app on a real phone browser (Safari, Chrome) before a release. Still fake data only.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PORT = Number(process.env.LOCAL_PREVIEW_PORT || 8081), EXPO_PORT = PORT + 1;
+const PHONE = process.argv.includes('--lan');
+// This computer's Wi-Fi address, for the phone to open.
+const lanAddress = Object.values(networkInterfaces()).flat()
+  .find(item => item && item.family === 'IPv4' && !item.internal && /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(item.address))?.address;
+const HOST = PHONE && lanAddress ? lanAddress : 'localhost';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mobile = path.resolve(here, '../..');
 const fixtures = path.join(here, 'fixtures.js');
@@ -26,9 +33,9 @@ const expo = spawn(windows ? 'npx.cmd' : 'npx', ['expo', 'start', '--port', Stri
     EXPO_PUBLIC_FIREBASE_API_KEY: 'synthetic-public-build-fixture', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: 'fixture.invalid',
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'petalpal-synthetic', EXPO_PUBLIC_FIREBASE_APP_ID: 'synthetic-public-app',
     // The published legal pages from public/legal, served by this preview like the real Web build.
-    EXPO_PUBLIC_PRIVACY_POLICY_URL: `http://localhost:${PORT}/legal/privacy.html`,
-    EXPO_PUBLIC_TERMS_URL: `http://localhost:${PORT}/legal/terms.html`,
-    EXPO_PUBLIC_DELETION_URL: `http://localhost:${PORT}/legal/account-deletion.html` },
+    EXPO_PUBLIC_PRIVACY_POLICY_URL: `http://${HOST}:${PORT}/legal/privacy.html`,
+    EXPO_PUBLIC_TERMS_URL: `http://${HOST}:${PORT}/legal/terms.html`,
+    EXPO_PUBLIC_DELETION_URL: `http://${HOST}:${PORT}/legal/account-deletion.html` },
 });
 
 const server = http.createServer((req, res) => {
@@ -62,8 +69,9 @@ server.on('upgrade', (req, socket, head) => {
   });
   upstream.on('error', () => socket.destroy()); socket.on('error', () => upstream.destroy());
 });
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, PHONE ? '0.0.0.0' : '127.0.0.1', () => {
   console.log(`\n  PetalPal local preview: http://localhost:${PORT}`);
+  if (PHONE) console.log(lanAddress ? `  On your phone (same Wi-Fi): http://${lanAddress}:${PORT}` : '  No Wi-Fi address found: connect this computer to Wi-Fi to open the preview on a phone.');
   console.log('  Sign in with preview@example.invalid / preview-only (fake data; the first load takes about a minute).\n');
 });
 

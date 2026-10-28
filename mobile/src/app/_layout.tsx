@@ -12,6 +12,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import { FeedbackDraftProvider, GlobalHelpFeedback } from '../components/feedback';
 import { WorldTimeProvider } from '@/components/garden/world-time';
+import { keepWebPageInPlace } from '../services/webPageGuard';
 
 // Partner login/entrance preview host: DEV-only, so production keeps its plain Stack.
 const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> = __DEV__
@@ -19,6 +20,7 @@ const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> =
   : ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
 SplashScreen.preventAutoHideAsync();
+keepWebPageInPlace();
 
 export default function Layout() {
   if (__DEV__ && nativeSecurityEnabled) {

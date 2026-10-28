@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!--
+      Phones: the page itself never zooms (the Garden has its own pinch zoom). A zoomed page
+      pushed the calendar and the bottom icons off screen until a refresh; iOS also zoomed in
+      on any text field with a font under 16px. viewport-fit=cover lets safe-area insets reach
+      the app, so nothing sits under the notch or the home indicator.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>PetalPal</title>
+    <style id="expo-reset">
+      /* Full height that follows the browser's own bars: dvh shrinks while Safari or Chrome
+         show their toolbars, so the bottom icons are never underneath them. */
+      html,
+      body {
+        height: 100%;
+        height: 100dvh;
+      }
+      /* The page never scrolls, bounces or pulls to refresh; ScrollViews scroll inside it. */
+      body {
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+        /* No double-tap zoom and no grey tap flash. */
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      You need to enable JavaScript to run this app.
+    </noscript>
+    <div id="root"></div>
+  </body>
+</html>
