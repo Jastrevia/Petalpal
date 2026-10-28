@@ -19,7 +19,8 @@ export default function CrittersTestScreen() {
   const [round, setRound] = useState(0);
   // The start time is read once per round (outside render: the compiler would track the clock).
   const [start, setStart] = useState(0);
-  useEffect(() => { setStart(seconds.value); }, [id, round, seconds]);
+  // A moment later, so the clock has started ticking on first open.
+  useEffect(() => { const timer = setTimeout(() => setStart(seconds.value), 100); return () => clearTimeout(timer); }, [id, round, seconds]);
   const visit = useMemo<Visit>(() => {
     const y = CRITTERS[id].kind === 'walker' ? HEIGHT / ZOOM * 0.78 : HEIGHT / ZOOM * 0.5;
     const path = [{ x: 16, y }, { x: WIDTH / ZOOM - 16, y: y - 6 }, { x: 24, y: y + 4 }];
