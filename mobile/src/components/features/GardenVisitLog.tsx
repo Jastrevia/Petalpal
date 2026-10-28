@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { loadGardenVisits, type GardenVisit } from '../../services/garden';
 import { subscribeUserRealtime } from '../../services/userRealtime';
 import type { AppLocale } from '../../services/locale';
@@ -68,7 +68,8 @@ export function GardenVisitLog({ ownerId, locale, theme, revision = 0 }: { owner
     </View> : null}
     {!loading && !error && !visits.length ? <Text style={[styles.note, { color: theme.muted }]}>{copy.empty}</Text> : null}
     {groups.map(group => <View key={group.day} style={styles.group}>
-      <Text style={[styles.day, { color: theme.gold }]}>✿ <Text style={{ color: theme.text }}>{group.day}</Text></Text>
+      <View style={styles.dayRow}><Image source={require('@/assets/bond/checkin-bloom.webp')} style={styles.blossom} accessible={false} />
+        <Text style={[styles.day, { color: theme.text }]}>{group.day}</Text></View>
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         {group.items.map((visit, index) => <View key={visit.id}
           style={[styles.row, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
@@ -94,6 +95,8 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', gap: 10 },
   note: { fontFamily: 'serif', fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 24 },
   group: { gap: 8 },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  blossom: { width: 20, height: 20 },
   day: { fontFamily: 'serif', fontSize: 15, fontWeight: '600' },
   card: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },

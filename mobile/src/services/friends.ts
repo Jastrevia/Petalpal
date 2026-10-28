@@ -4,7 +4,7 @@ export interface FriendUser { id: string; name: string; displayName?: string; av
   /** Friends list only: whether this friend has PetalPal open right now. */
   online?: boolean }
 export interface FriendRequest {
-  id: string; senderId: string; receiverId: string; status: string;
+  id: string; senderId: string; receiverId: string; status: string; createdAt?: string;
   sender?: FriendUser; receiver?: FriendUser;
 }
 export interface FriendRequests { incoming: FriendRequest[]; outgoing: FriendRequest[] }

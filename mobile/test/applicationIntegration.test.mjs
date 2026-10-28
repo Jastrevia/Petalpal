@@ -11,8 +11,8 @@ function friendsHarness(fetch, initialSession = { user: { id: 'owner' } }, extra
   const hooks = hookHarness(); let session = initialSession;
   const { api, load } = setup(fetch, {
     '../../services/auth': { useAuth: () => ({ session }) },
-    'react-native': { ActivityIndicator: 'Spinner', Image: 'Image', Pressable: 'Pressable', Text: 'Text', TextInput: 'Input', View: 'View',
-      StyleSheet: { create: styles => styles } },
+    'react-native': { ActivityIndicator: 'Spinner', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', TextInput: 'Input', View: 'View',
+      Platform: { OS: 'ios' }, StyleSheet: { create: styles => styles, absoluteFill: {} } },
     'expo-symbols': { SymbolView: 'Symbol' },
     'expo-router': { router: { push() {} } },
     './FeatureUI': { FEATURE_COLORS: {}, FeatureActionButton: 'Action', FeatureSection: 'Section', ui: {} },
@@ -313,15 +313,20 @@ test('native Friends loads existing data and supports search, send, accept, reje
     throw Error(`Unexpected Friends request: ${url}`);
   });
   await panel.flush();
-  assert.match(panel.text(), /Bob/); assert.match(panel.text(), /Cara/); assert.match(panel.text(), /Erin.*Pending/);
+  // Add Friends opens on Requests → Received; Sent lists what the owner asked for.
+  assert.match(panel.text(), /Cara/); assert.match(panel.text(), /Dan/); assert.doesNotMatch(panel.text(), /Erin/);
+  await panel.press('Sent'); assert.match(panel.text(), /Erin/); await panel.press('Received');
   await panel.search('  Frank & friends  ');
   assert.doesNotMatch(panel.text(), /Self/);
   for (const label of ['Already Friends', 'Incoming Request', 'Request Sent']) assert.equal(panel.button(label).props.disabled, true);
-  const add = panel.button('Add Friend'); add.props.onPress(); add.props.onPress(); await panel.flush();
+  const add = panel.button('Send request to Frank'); add.props.onPress(); add.props.onPress(); await panel.flush();
   assert.equal(calls.filter(call => call.url === '/friends/request').length, 1, 'Double press sends only one request');
-  assert.equal(panel.nodes().filter(node => node.type === 'Action' && node.props.title === 'Request Sent').length, 2);
-  await panel.press('Accept Cara'); assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-cara')); assert.equal(incoming.length, 1);
+  assert.equal(panel.nodes().filter(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Request Sent').length, 2);
+  assert.match(panel.text(), /Friend request sent.*Frank/); await panel.press('OK'); assert.doesNotMatch(panel.text(), /Friend request sent/);
+  await panel.press('Back'); assert.match(panel.text(), /Cara/);
+  await panel.press('Accept Cara'); assert.equal(incoming.length, 1);
   await panel.press('Reject Dan'); assert.equal(incoming.length, 0);
+  await panel.press('My friends'); assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-cara'));
   assert.equal(panel.button('Remove Bob'), undefined, 'Remove only appears after Delete friends');
   await panel.press('Delete friends');
   await panel.press('Remove Bob'); assert.equal(calls.filter(call => call.url === '/friends/remove').length, 0);
@@ -344,10 +349,13 @@ test('native Friends preserves data after failed actions and allows loading/sear
   });
   await panel.flush(); assert.match(panel.text(), /Friends unavailable/);
   assert.equal(panel.button('Refresh Friends').props.disabled, false);
-  failLoad = false; await panel.press('Refresh Friends'); assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-bob'));
+  failLoad = false; await panel.press('Refresh Friends');
   assert.equal(panel.button('Refresh Friends'), undefined, 'Refresh only shows after a failed load');
+  await panel.press('My friends'); assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-bob'));
+  await panel.press('Requests');
   await panel.search('Nobody'); assert.match(panel.text(), /Search unavailable/);
   failSearch = false; await panel.press('Search'); assert.match(panel.text(), /No matching users found/);
+  await panel.press('Back'); await panel.press('My friends');
   await panel.press('Delete friends'); await panel.press('Remove Bob'); await panel.press('Confirm removal');
   assert.match(panel.text(), /Removal failed/); assert.ok(panel.button('Remove Bob'));
   assert.equal(panel.button('Confirm removal').props.disabled, false);
@@ -370,6 +378,8 @@ test('native Friends discards old account responses and rejects stale actions af
   const oldSearch = panel.button('Search');
   panel.switchSession({ user: { id: 'new-owner' } }); await panel.flush();
   finishSearch(response([{ id: 'private-result', name: 'Old private result' }])); await searching; await panel.flush();
+  assert.doesNotMatch(panel.text(), /Old private result/);
+  await panel.press('My friends');
   assert.match(panel.text(), /New Friend/); assert.doesNotMatch(panel.text(), /Old Friend|Old private result/);
   const count = calls.length; oldSearch.props.onPress(); await panel.flush(); assert.equal(calls.length, count);
   panel.switchSession(null); await panel.flush(); assert.match(panel.text(), /Sign in/); assert.equal(calls.length, count);
@@ -477,7 +487,7 @@ test('confirmed Friends retain visible Home icons and use persisted privacy meta
   };
   const extras = { 'expo-router': { router: { push: route => { navigation.push(route); closes++; } } } };
   const panel = friendsHarness(friendsApi, undefined, extras);
-  await panel.flush();
+  await panel.flush(); await panel.press('My friends');
   assert.match(panel.text(), /@alex/); assert.match(panel.text(), /@jenny/);
   for (const id of ['alex', 'jenny', 'offline']) {
     const home = panel.nodes().find(node => node.props?.testID === `visit-${id}`);
@@ -489,7 +499,7 @@ test('confirmed Friends retain visible Home icons and use persisted privacy meta
   assert.deepEqual(JSON.parse(JSON.stringify(navigation)), [{ pathname: '/visit/[ownerId]', params: { ownerId: 'alex' } }]);
   assert.equal(closes, 1);
   // The list reloads each time Friends opens, so a friend who closed their Garden shows on the next open.
-  alexAllowed = false; const reopened = friendsHarness(friendsApi, undefined, extras); await reopened.flush();
+  alexAllowed = false; const reopened = friendsHarness(friendsApi, undefined, extras); await reopened.flush(); await reopened.press('My friends');
   const disabledHome = reopened.nodes().find(node => node.props?.testID === 'visit-alex');
   assert.equal(disabledHome.props.disabled, true); assert.equal(disabledHome.props.onPress, undefined);
   assert.ok(calls.every(url => !url.includes('/garden')), 'The list makes no Garden content or per-friend access probes');
@@ -507,7 +517,7 @@ test('Friends: Delete friends swaps Homes for remove and report, and Visitors sh
     if (url === '/friends/requests/owner') return response({ incoming: [], outgoing: [] });
     throw Error(`Unexpected request: ${url}`);
   });
-  await panel.flush();
+  await panel.flush(); await panel.press('My friends');
   const has = id => Boolean(panel.nodes().find(node => node.props?.testID === id));
   // The ⚠ circle is SafetyActions' trigger for that friend.
   const report = () => panel.nodes().find(node => node.props?.userId === 'luna' && typeof node.props.trigger === 'function');

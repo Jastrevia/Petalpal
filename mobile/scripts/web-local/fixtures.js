@@ -6,6 +6,17 @@
   const nativeFetch = window.fetch.bind(window);
   const uid = 'local-preview-owner', email = 'preview@example.invalid', password = 'preview-only';
   const user = { id: uid, name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale: 'en', aiConsent: true };
+  // People to find and friend requests, so every state of Friends → Requests can be tried.
+  const ago = days => new Date(Date.now() - days * 86400e3).toISOString();
+  const people = [
+    { id: 'p-jeanc', name: 'JeanC', accountId: 'PP29240943', avatar: '🌷' }, { id: 'p-jeanchou', name: 'JeanChou', accountId: 'PP20731856', avatar: '🪻' },
+    { id: 'p-jeanflower', name: 'JeanC_Flower', accountId: 'PP33671204', avatar: '🌸' }, { id: 'p-jeanclover', name: 'JeanClover', accountId: 'PP29840122', avatar: '🍀' },
+    { id: 'p-jeanc1212', name: 'JeanC1212', accountId: 'PP44122788', avatar: '🌼' }];
+  let incomingRequests = [{ id: 'r-star', senderId: 'p-star', receiverId: uid, status: 'pending', createdAt: ago(1),
+    sender: { id: 'p-star', name: 'Star Night', accountId: 'PP55667788', avatar: '🌙' } }];
+  const outgoingRequests = [
+    { id: 'r-jeanclover', senderId: uid, receiverId: 'p-jeanclover', status: 'pending', createdAt: ago(1), receiver: people[3] },
+    { id: 'r-jeanchou', senderId: uid, receiverId: 'p-jeanchou', status: 'pending', createdAt: ago(2), receiver: people[1] }];
   const json = (data, status = 200, delay = 0) => new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify(data),
     { status, headers: { 'Content-Type': 'application/json' } })), delay));
   const token = () => {
@@ -62,6 +73,13 @@
       if (p === `/users/${friend}/flowers/ff1/support` && method === 'POST') { friendFlower.supportCount++; friendFlower.supportState = { supportedToday: true, canSupport: false }; return json(friendFlower); }
       if (p === `/users/${friend}/flowers/ff1/message` && method === 'POST') { friendFlower.messages.push({ id: 'm' + friendFlower.messages.length, text: request.text, userId: uid, authorUserId: uid, author: user.name }); return json(friendFlower); }
       if (p === `/users/me/blocks/${friend}`) { blocked = method === 'PUT'; return json({ success: true }); }
+      if (p === '/friends/request' && method === 'POST') {
+        const sent = { id: 'r-' + request.receiverId, senderId: uid, receiverId: request.receiverId, status: 'pending', createdAt: new Date().toISOString(),
+          receiver: people.find(person => person.id === request.receiverId) };
+        outgoingRequests.unshift(sent); return json({ request: sent, message: 'Friend request sent' }, 201, 500);
+      }
+      const answer = p.match(/^\/friends\/requests\/([^/]+)\/(accept|reject)$/);
+      if (answer && method === 'POST') { incomingRequests = incomingRequests.filter(item => item.id !== answer[1]); return json({ message: 'Done' }, 200, 400); }
       // Our Bond and today's petal card, so the calendar check-in and the petal ring can be tried.
       const localDate = new Date().toISOString().slice(0, 10);
       if (p === '/api/petal-cards/draw' && method === 'POST') { petalDrawn = { position: request.position, drawnAt: new Date().toISOString(), card: { id: 'major-01', name: 'The Magician', line: 'You already hold what you need.', text: 'A preview card: in the real app this is today\'s card from your deck.', disclaimer: 'For reflection only.' } }; return json({ created: true, locale: 'en', localDate, ...petalDrawn }); }
@@ -113,7 +131,9 @@
         { id: 'v0', visitorId: friend, visitorName: 'Friend Preview', visitorAvatar: '🌼', action: 'started visiting your garden', createdAt: new Date(Date.now() - 26 * 3600e3).toISOString() }] });
       if (p === `/users/${uid}/journals`) return json({ journals, nextCursor: null });
       if (p === `/users/${uid}/friends`) return json(blocked ? [] : [{ id: friend, name: 'Friend Preview', avatar: '🌼', allowGardenVisits: true, online: true }]);
-      if (p === `/friends/requests/${uid}`) return json({ incoming: [], outgoing: [] });
+      if (p === `/friends/requests/${uid}`) return json({ incoming: incomingRequests, outgoing: outgoingRequests });
+      if (p === '/users/search') { const q = (url.searchParams.get('name') || '').toLowerCase().replace(/^@/, '');
+        return json(people.filter(person => `${person.name} ${person.accountId}`.toLowerCase().includes(q)), 200, 400); }
       if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview' }] : [], nextCursor: null });
       if (p === `/users/${uid}/ai-consent`) return json(consent);
       if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true });
