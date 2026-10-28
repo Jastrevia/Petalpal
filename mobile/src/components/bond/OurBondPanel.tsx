@@ -68,14 +68,16 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                 <Image source={PPL} style={styles.fill} resizeMode="contain" accessible={false} />
               </Pressable>
             </> : null}
-            <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={[styles.close, styles.focus]}>
-              <Text style={styles.closeText}>×</Text>
-            </Pressable>
           </View>
 
           <View style={styles.body}>
             <Text style={styles.eyebrow}>{copy.withPpl}</Text>
             <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
+            {/* Days together and keepsakes as two small chips under the title, not a big block. */}
+            {summary ? <View style={styles.chips}>
+              <Chip styles={styles} icon={BLOOM} label={copy.chipDays(summary.daysTogether ?? 0)} />
+              <Chip styles={styles} icon={REWARD} round label={copy.chipKeepsakes(summary.collection.received)} />
+            </View> : null}
             {!summary ? <View style={styles.status}>
               {loading ? <ActivityIndicator color={theme.gold} accessibilityLabel={copy.loading} /> : <Text style={styles.muted}>{copy.error}</Text>}
             </View> : <>
@@ -91,11 +93,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               <View style={styles.track}><View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} /></View>
               <Text style={styles.next}>{summary.maxed ? copy.maxed : copy.toNext(summary.pointsForNextLevel! - summary.pointsIntoLevel, summary.level + 1)}</Text>
 
-              <View style={styles.stats}>
-                <Stat styles={styles} label={copy.daysTogether} value={summary.daysTogether ?? '—'} />
-                <View style={styles.statRule} />
-                <Stat styles={styles} label={copy.keepsakes} value={summary.collection.received} />
-              </View>
+
               <Text style={[styles.checkInLine, summary.checkIn.checkedInToday && styles.checkInDone]}>
                 {summary.checkIn.checkedInToday ? copy.checkedIn : copy.checkInWaiting}
               </Text>
@@ -157,6 +155,10 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
             </>}
           </View>
         </ScrollView>
+        {/* Outside the ScrollView so × stays in the corner while the panel scrolls. */}
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={[styles.close, styles.focus]}>
+          <Text style={styles.closeText}>×</Text>
+        </Pressable>
       </View>
     </View>
     <KeepsakeBook visible={bookOpen} locale={locale} onClose={() => setBookOpen(false)} />
@@ -176,8 +178,11 @@ const heroBox = (width: number, box: typeof DECK_BOX) => {
 
 type Styles = ReturnType<typeof makeStyles>;
 
-function Stat({ styles, label, value }: { styles: Styles; label: string; value: number | string }) {
-  return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+function Chip({ styles, icon, label, round = false }: { styles: Styles; icon: ImageSourcePropType; label: string; round?: boolean }) {
+  return <View accessible accessibilityLabel={label} style={styles.chip}>
+    <Image source={icon} style={[styles.chipIcon, round && styles.chipIconRound]} resizeMode={round ? 'cover' : 'contain'} accessible={false} />
+    <Text style={styles.chipText}>{label}</Text>
+  </View>;
 }
 
 // A serif heading between two gold hairlines.
@@ -199,7 +204,7 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     content: { paddingBottom: 22 },
     hero: { width: '100%', aspectRatio: 1024 / 540, overflow: 'hidden', backgroundColor: theme.background },
     fill: { width: '100%', height: '100%' },
-    close: { position: 'absolute', top: 12, right: 12, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.gold },
+    close: { position: 'absolute', top: 12, right: 12, zIndex: 2, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.gold },
     closeText: { fontSize: 22, lineHeight: 26, color: theme.text },
     body: { paddingHorizontal: 22, paddingTop: 12 },
     status: { padding: 24, alignItems: 'center' },
@@ -213,11 +218,11 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     track: { height: 3, borderRadius: 2, overflow: 'hidden', marginTop: 8, backgroundColor: light ? theme.input : theme.frame },
     trackFill: { height: '100%', borderRadius: 2, backgroundColor: theme.gold },
     next: { textAlign: 'right', fontFamily: 'serif', fontStyle: 'italic', fontSize: 14, color: theme.muted, marginTop: 5 },
-    stats: { flexDirection: 'row', marginTop: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: hair },
-    stat: { flex: 1, alignItems: 'center', paddingVertical: 10 },
-    statRule: { width: 1, backgroundColor: hair },
-    statValue: { fontFamily: 'serif', fontSize: 28, color: theme.text },
-    statLabel: { fontSize: 9.5, fontWeight: '600', letterSpacing: 1.9, textTransform: 'uppercase', color: theme.muted, marginTop: 2 },
+    chips: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 5, paddingRight: 11, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: hair, backgroundColor: `${theme.gold}14` },
+    chipIcon: { width: 20, height: 20 },
+    chipIconRound: { borderRadius: 10 },
+    chipText: { fontFamily: 'serif', fontSize: 13, color: theme.text },
     checkInLine: { textAlign: 'center', fontFamily: 'serif', fontStyle: 'italic', fontSize: 14, color: theme.muted, marginTop: 8 },
     checkInDone: { color: light ? '#4F7A5E' : '#9CC5A7' },
     section: { marginTop: 22 },
