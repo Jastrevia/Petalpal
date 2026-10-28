@@ -49,8 +49,10 @@ export function AiPrivacySettings() {
  {disclosure ? <><Text style={ui.text}>{copy.explanation(disclosure.explanation)}</Text>{disclosure.features.map(f=><Text key={f.feature} style={ui.caption}>{copy.feature(f.feature)}: {copy.processor(f.processor)} — {f.configured?copy.configured:copy.unavailable}</Text>)}<Text style={ui.text}>{copy.retention(disclosure.retention)}</Text></>:<Text style={ui.text}>{copy.loading}</Text>}
  {(['aiProcessing','personalization','memoryEnabled'] as const).map((key,i)=><View key={key} style={ui.row}><Text style={[ui.text,{flex:1,color:theme.text}]}>{copy.switches[i]}</Text><Switch accessibilityLabel={copy.switches[i]} value={value[key]} disabled={busy||!disclosure||(key!=='aiProcessing'&&!value.aiProcessing)||(key==='memoryEnabled'&&!value.personalization)} onValueChange={enabled=>setValue(v=>({...v,[key]:enabled,...(!enabled&&key==='aiProcessing'?{personalization:false,memoryEnabled:false}:{}),...(!enabled&&key==='personalization'?{memoryEnabled:false}:{})}))}/></View>)}
  {suggested?<Text style={ui.caption}>{copy.suggested}</Text>:null}
+ <View style={[ui.row,{flexWrap:'wrap'}]}>
  <FeatureActionButton title={copy.save} disabled={busy||!disclosure} onPress={()=>void save(value)}/>
  <FeatureActionButton secondary title={copy.withdraw} disabled={busy} onPress={()=>void save({aiProcessing:false,personalization:false,memoryEnabled:false})}/>
+ </View>
  {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
 }
 const REPORT_COPY={
@@ -65,6 +67,6 @@ export function AiOutputReport({kind,outputId}:{kind:string;outputId:string}) {
  const copy=REPORT_COPY[useAppLocale()];
  const [open,setOpen]=useState(false),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  return <View style={{gap:8}}><FeatureActionButton secondary title={copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>
- {open?<><Text style={ui.text}>{copy.note}</Text>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</>:null}
+ {open?<><Text style={ui.text}>{copy.note}</Text><View style={[ui.row,{flexWrap:'wrap',gap:8}]}>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</View></>:null}
  {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
 }

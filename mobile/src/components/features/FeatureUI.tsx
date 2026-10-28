@@ -20,9 +20,19 @@ export function FeatureActionButton({ title, onPress, disabled = false, secondar
   title: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
 }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={6}
     style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, disabled && ui.disabled, pressed && ui.pressed]}>
     <Text style={ui.buttonText}>{title}</Text>
+  </Pressable>;
+}
+
+// A quiet list entry (policies, support): text and a chevron, not a big button.
+export function FeatureLinkRow({ title, onPress, first = false }: { title: string; onPress: () => void; first?: boolean }) {
+  const { theme } = usePanelTheme();
+  return <Pressable accessibilityRole="link" accessibilityLabel={title} onPress={onPress}
+    style={({ pressed }) => [ui.linkRow, { borderColor: theme.border }, first && { borderTopWidth: 0 }, pressed && { opacity: .6 }]}>
+    <Text style={[ui.linkText, { color: theme.text }]}>{title}</Text>
+    <Text style={[ui.linkText, { color: theme.muted }]}>›</Text>
   </Pressable>;
 }
 
@@ -43,10 +53,13 @@ export const ui = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3 },
   tealWash: { backgroundColor: FEATURE_COLORS.tealWash },
   purpleWash: { backgroundColor: FEATURE_COLORS.purpleWash },
-  button: { minHeight: 46, justifyContent: 'center', alignItems: 'center', borderRadius: 15, paddingHorizontal: 16,
-    paddingVertical: 12, backgroundColor: FEATURE_COLORS.primary },
+  // Just big enough to tap (hitSlop adds the rest): sized to its words, not the panel.
+  button: { minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 16,
+    paddingVertical: 7, backgroundColor: FEATURE_COLORS.primary },
   secondaryButton: { backgroundColor: FEATURE_COLORS.secondary },
-  buttonText: { fontSize: 14, fontWeight: '700', color: FEATURE_COLORS.ink, textAlign: 'center' },
+  buttonText: { fontSize: 13, fontWeight: '700', color: FEATURE_COLORS.ink, textAlign: 'center' },
+  linkRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 2 },
+  linkText: { fontSize: 15 },
   disabled: { opacity: .45 },
   pressed: { opacity: .8, transform: [{ scale: .98 }] },
   notice: { borderRadius: 16, padding: 13, gap: 8, backgroundColor: FEATURE_COLORS.purpleWash },

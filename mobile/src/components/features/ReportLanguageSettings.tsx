@@ -14,6 +14,6 @@ export function ReportLanguageSettings() {
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  async function save(next:AppLocale){if(!owner||busy||next===locale)return;setBusy(true);setStatus('');try{await updateLocale(next);}catch{setStatus(copy.failed);}finally{setBusy(false);}}
  return <View style={{gap:8}}><Text style={ui.text}>{copy.current}</Text>
-  <View style={ui.row}>{(['en','zh-Hans'] as const).map(l=><View key={l} style={{flex:1}}><FeatureActionButton secondary={l!==locale} title={l===locale?`✓ ${LABELS[l]}`:LABELS[l]} disabled={busy||!owner||l===locale} onPress={()=>void save(l)}/></View>)}</View>
+  <View style={ui.row}>{(['en','zh-Hans'] as const).map(l=><View key={l}><FeatureActionButton secondary={l!==locale} title={l===locale?`✓ ${LABELS[l]}`:LABELS[l]} disabled={busy||!owner||l===locale} onPress={()=>void save(l)}/></View>)}</View>
   {status?<Text accessibilityRole="alert" style={ui.caption}>{status}</Text>:null}</View>;
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
 import { useAppLocale } from '../../services/locale';
 import { openHelpFeedback } from '../feedback/helpFeedbackBus';
-import { FeatureActionButton, ui } from './FeatureUI';
+import { FeatureLinkRow, ui } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
 const COPY={en:{title:'Privacy & support',help:'Help & Feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',
   support:'Contact support',emergency:"PetalPal isn't an emergency service. If you or someone else is in danger, contact local emergency services."},
@@ -16,13 +16,15 @@ export function PrivacyAndSupport(){
  const copy=COPY[useAppLocale()];
  const titleColor=usePanelTheme().theme.text;
  const open=(url?:string)=>openPolicy(url,setStatus);
- return <View style={{gap:10}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
- <FeatureActionButton title={copy.help} onPress={openHelpFeedback}/>
- <FeatureActionButton secondary title={copy.privacy} onPress={()=>void open(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)}/>
- <FeatureActionButton secondary title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
- <FeatureActionButton secondary title={copy.deletion} onPress={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/>
- <FeatureActionButton secondary title={copy.problem} onPress={()=>void open(problemReportUrl())}/>
- <FeatureActionButton secondary title={copy.support} onPress={()=>void open('mailto:contact@jastrevia.com')}/>
+ return <View style={{gap:6}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
+ <View>
+ <FeatureLinkRow first title={copy.help} onPress={openHelpFeedback}/>
+ <FeatureLinkRow title={copy.privacy} onPress={()=>void open(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)}/>
+ <FeatureLinkRow title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
+ <FeatureLinkRow title={copy.deletion} onPress={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/>
+ <FeatureLinkRow title={copy.problem} onPress={()=>void open(problemReportUrl())}/>
+ <FeatureLinkRow title={copy.support} onPress={()=>void open('mailto:contact@jastrevia.com')}/>
+ </View>
  <Text style={ui.caption}>{copy.emergency}</Text>
  {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
 }
