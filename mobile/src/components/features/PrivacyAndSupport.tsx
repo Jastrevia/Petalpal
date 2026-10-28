@@ -28,6 +28,7 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
  const support=()=>{setStatus(copy.mail);void open('mailto:contact@jastrevia.com');};
  const toggle=(item:'guidelines'|'delete')=>setUnfolded(unfolded===item?null:item);
  // In Me: three groups, most used first, the one that cannot be undone last and on its own.
+ // Delete account unfolds its warning and typed confirmation only when tapped.
  if(account) return <View style={{gap:6}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
   <Group label={copy.groupHelp}>
    <FeatureLinkRow first title={copy.help} onPress={feedback}/>
@@ -41,7 +42,7 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
    <FeatureLinkRow title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
   </Group>
   <Group label={copy.groupAccount}>
-   <FeatureLinkRow first danger title={copy.deleteAccount} expanded={unfolded==='delete'} onPress={()=>toggle('delete')}/>
+   <FeatureLinkRow first chevron={false} title={copy.deleteAccount} expanded={unfolded==='delete'} onPress={()=>toggle('delete')}/>
    {unfolded==='delete'?<Unfolded><DeleteAccountSettings embedded onPolicy={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/></Unfolded>:null}
   </Group>
   <Text style={ui.caption}>{copy.emergency}</Text></View>;

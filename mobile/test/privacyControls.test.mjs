@@ -6,7 +6,7 @@ const nodes=t=>Array.isArray(t)?t.flatMap(nodes):t&&typeof t==='object'?[t,...no
 function fixture(component, handler, auth={session:{user:{id:'owner'}}}){
  const hooks=hookHarness(),calls=[];
  const load=loadPlantingModules(undefined,hooks.react,null,false,{
-  'react-native':{View:'View',Text:'Text',Switch:'Switch'},'./FeatureUI':{FeatureActionButton:'Action',ui:{}},
+  'react-native':{View:'View',Text:'Text',Switch:'Switch',TextInput:'Input'},'./FeatureUI':{FeatureActionButton:'Action',ui:{}},
   '../../services/auth':{useAuth:()=>auth},
   '../../services/locale':{useAppLocale:()=>auth.experience?.user?.preferredLocale==='zh-Hans'?'zh-Hans':'en'},
   '../../services/api':{apiRequest:async(path,method,body)=>{calls.push({path,method,body});return handler(path,method,body);}},
@@ -47,12 +47,19 @@ test('community acceptance is an explicit versioned request with recoverable err
  assert.equal(f.calls.at(-1).body.accepted,true);assert.equal(f.calls.at(-1).body.version,'petalpal-community-2026-10-15');
  assert.ok(f.all().some(n=>n.props?.children==='Accepted'));
 });
-test('account deletion requires confirmation; cancellation and retry are operable',async()=>{
+test('account deletion warns it is permanent and only works after the confirmation phrase is typed',async()=>{
  let count=0;const f=fixture(['DeleteAccountSettings','DeleteAccountSettings'],async()=>{}, {deleteAccount:async()=>{count++;throw Error('Sign in again');}});
- assert.equal(count,0);await f.press('Delete Account');await f.press('Cancel deletion');assert.equal(count,0);
- assert.ok(!f.all().some(n=>n.props?.title==='Permanently delete my account'));
- await f.press('Delete Account');await f.press('Permanently delete my account');assert.equal(count,1);
- assert.ok(f.all().some(n=>n.props?.children==='Sign in again'));await f.press('Permanently delete my account');assert.equal(count,2);
+ const text=()=>f.all().filter(n=>n.type==='Text').map(n=>[].concat(n.props.children).join('')).join(' | ');
+ assert.match(text(),/permanently deletes all of your data/);
+ const button=()=>f.all().find(n=>n.props?.title==='Permanently delete my account');
+ const input=()=>f.all().find(n=>n.type==='Input');
+ assert.equal(button().props.disabled,true);
+ for(const almost of ['delete','DELET','DELETE NOW']){input().props.onChangeText(almost);await f.flush();assert.equal(button().props.disabled,true,almost);}
+ await button().props.onPress();assert.equal(count,0);
+ input().props.onChangeText(' DELETE ');await f.flush();
+ await f.press('Permanently delete my account');assert.equal(count,1);
+ assert.ok(f.all().some(n=>n.props?.children==='Sign in again'));
+ await f.press('Permanently delete my account');assert.equal(count,2);
 });
 test('the language follows the account and switches the whole app through updateLocale',async()=>{
  const saved=[];const auth={session:{user:{id:'owner'}},experience:{user:{preferredLocale:'en'}},

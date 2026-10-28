@@ -16,20 +16,20 @@ export function StatusChip({ status }: { status: FeatureStatus }) {
   </View>;
 }
 
-export function FeatureActionButton({ title, onPress, disabled = false, secondary = false }: {
-  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
+export function FeatureActionButton({ title, onPress, disabled = false, secondary = false, danger = false }: {
+  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean; danger?: boolean;
 }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={6}
-    style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, disabled && ui.disabled, pressed && ui.pressed]}>
-    <Text style={ui.buttonText}>{title}</Text>
+    style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, danger && ui.dangerButton, disabled && ui.disabled, pressed && ui.pressed]}>
+    <Text style={[ui.buttonText, danger && { color: '#FFF4EF' }]}>{title}</Text>
   </Pressable>;
 }
 
 // A quiet list entry (policies, support): text and a chevron, not a big button.
 // `expanded` makes it a row that unfolds its content in place (chevron turns down).
-export function FeatureLinkRow({ title, onPress, first = false, expanded, note, danger = false }: {
-  title: string; onPress: () => void; first?: boolean; expanded?: boolean; note?: string; danger?: boolean;
+export function FeatureLinkRow({ title, onPress, first = false, expanded, note, danger = false, chevron = true }: {
+  title: string; onPress: () => void; first?: boolean; expanded?: boolean; note?: string; danger?: boolean; chevron?: boolean;
 }) {
   const { theme } = usePanelTheme();
   return <Pressable accessibilityRole={expanded === undefined ? 'link' : 'button'} accessibilityLabel={title}
@@ -37,7 +37,7 @@ export function FeatureLinkRow({ title, onPress, first = false, expanded, note, 
     style={({ pressed }) => [ui.linkRow, { borderColor: theme.border }, first && { borderTopWidth: 0 }, pressed && { opacity: .6 }]}>
     <Text style={[ui.linkText, { color: danger ? '#E0978A' : theme.text, flex: 1 }]}>{title}</Text>
     {note ? <Text style={[ui.caption, { color: theme.muted, marginRight: 8 }]}>{note}</Text> : null}
-    <Text style={[ui.linkText, { color: theme.muted }]}>{expanded ? '⌄' : '›'}</Text>
+    {chevron ? <Text style={[ui.linkText, { color: theme.muted }]}>{expanded ? '⌄' : '›'}</Text> : null}
   </Pressable>;
 }
 
@@ -62,6 +62,7 @@ export const ui = StyleSheet.create({
   button: { minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 16,
     paddingVertical: 7, backgroundColor: FEATURE_COLORS.primary },
   secondaryButton: { backgroundColor: FEATURE_COLORS.secondary },
+  dangerButton: { backgroundColor: '#B5564A' },
   buttonText: { fontSize: 13, fontWeight: '700', color: FEATURE_COLORS.ink, textAlign: 'center' },
   linkRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 2 },
   linkText: { fontSize: 15 },
