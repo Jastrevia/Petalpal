@@ -66,6 +66,7 @@ import {
 } from "./lib/fairy-closeness.js";
 import { petalCardsEnabledFor } from "./lib/petal-cards.js";
 import { drawPetalCard, petalDrawsForMonth, todaysPetalDraw } from "./lib/petal-card-draw.js";
+import { listRedemptions, redeemCode, RedeemError } from "./lib/redeem-codes.js";
 import { fairyMomentCaptionsEnabled, fillFairyMomentCaptions } from "./lib/haiku-fairy-moment.js";
 import {
   STARTER_FAIRY,
@@ -128,7 +129,7 @@ import {
   requireRecentAuthentication
 } from "./lib/auth.js";
 import { createRealtimeSecurity, SOCKET_MAX_PACKET_BYTES } from "./lib/socket-security.js";
-import { rateLimiters } from "./lib/rate-limit.js";
+import { createRateLimiter, rateLimiters } from "./lib/rate-limit.js";
 import { deleteFirebaseUser } from "./lib/firebase-admin.js";
 import { verifyFirebaseIdToken, findFirebaseUserByEmail } from './lib/firebase-admin.js';
 import { createNativeSecurityHarnessBridge, nativeSecurityHarnessRouter, assertNativeTestDeletion } from './lib/native-security-harness.js';
@@ -2015,6 +2016,30 @@ app.post("/api/petal-cards/draw", allowBodyFields(["position"]), (req, res, next
   next();
 }, petalDrawRoute("POST /api/petal-cards/draw",
   req => drawPetalCard(prisma, { userId: req.auth.userId, position: req.body.position, now: new Date() })));
+
+// Redemption codes (lib/redeem-codes.js). Wrong guesses are limited per account; a code
+// that works does not count against the limit.
+const redeemRateLimit = createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000, skipSuccessfulRequests: true });
+
+app.get("/api/redeem", async (req, res) => {
+  try {
+    res.json({ redemptions: await listRedemptions(prisma, { userId: req.auth.userId }) });
+  } catch (error) {
+    logServerError("GET /api/redeem error", error);
+    res.status(500).json({ error: "Unable to load your codes" });
+  }
+});
+
+app.post("/api/redeem", redeemRateLimit, allowBodyFields(["code"]), async (req, res) => {
+  if (typeof req.body?.code !== "string") return res.status(400).json({ error: "code is required", code: "INVALID_CODE" });
+  try {
+    res.json(await redeemCode(prisma, { userId: req.auth.userId, code: req.body.code }));
+  } catch (error) {
+    if (error instanceof RedeemError) return res.status(error.status).json({ error: error.message, code: error.code });
+    logServerError("POST /api/redeem error", error);
+    res.status(500).json({ error: "Unable to redeem this code" });
+  }
+});
 
 app.put("/users/:userId/fairy-state", async (req, res) => {
   if (!requireOwnUser(req, res, req.params.userId)) return;

@@ -55,6 +55,7 @@ model User {
   fairyKeepsakeGrants     FairyKeepsakeGrant[]
   fairyClosenessAwards    FairyClosenessAward[]
   petalCardDraws          PetalCardDraw[]
+  redeemCodeClaims        RedeemCodeClaim[]
   dailyFlowerQuotas       DailyFlowerQuota[]
   events                  Event[]
   eventMemories           EventMemory[]
@@ -409,6 +410,24 @@ model PetalCardDraw {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, localDate])
+}
+
+/// A redeemed code (lib/redeem-codes.js): the code's SHA-256, never the code. Each code once,
+/// ever (the row stays, without its owner, if the account is deleted); one code per account
+/// and batch. `rewardStatus` is "pending" until the reward is granted.
+model RedeemCodeClaim {
+  id           String    @id @default(cuid())
+  codeHash     String    @unique @db.VarChar(64)
+  batch        String    @db.VarChar(64)
+  reward       String    @db.VarChar(64)
+  rewardStatus String    @default("pending") @db.VarChar(16)
+  userId       String?
+  createdAt    DateTime  @default(now())
+  grantedAt    DateTime?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, batch])
 }
 
 model FairyMonthlyProgress {
