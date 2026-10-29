@@ -202,4 +202,13 @@ test("petal draw routes", async (t) => {
     assert.deepEqual((await call("/api/petal-cards/reading", "POST", {})).body, { available: false });
     assert.equal((await call("/api/petal-cards/reading", "POST", { topic: "LOVE" })).status, 400);
   });
+  await t.test("a reading that cannot be looked up never breaks today's card", async () => {
+    process.env.AI_PETAL_READING_MODEL = "claude-haiku-5-5";
+    stub(prisma.subscriptionEntitlement, "findUnique", async () => { throw new Error("database unavailable"); });
+    const today = await call("/api/petal-cards/today");
+    assert.equal(today.status, 200);
+    assert.ok(today.body.drawn.card.id);
+    assert.deepEqual(today.body.drawn.reading, { available: false });
+    delete process.env.AI_PETAL_READING_MODEL;
+  });
 });

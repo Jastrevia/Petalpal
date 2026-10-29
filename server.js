@@ -2007,8 +2007,13 @@ app.get("/api/flowers/today", async (req, res) => {
 });
 
 // A drawn card carries its reading state (lib/petal-reading.js): whether this owner can have one, and how far it got.
+// The reading is extra: if its state cannot be read, the card is still shown, without one.
+async function petalReadingState(userId, drawId) {
+  try { return await petalReadingFor(prisma, { userId, drawId, now: new Date() }); }
+  catch (error) { logServerError("petal reading state error", error); return { available: false }; }
+}
 async function withPetalReading(userId, result) {
-  if (result?.drawn) result.drawn.reading = await petalReadingFor(prisma, { userId, drawId: result.drawn.id, now: new Date() });
+  if (result?.drawn) result.drawn.reading = await petalReadingState(userId, result.drawn.id);
   return result;
 }
 app.get("/api/petal-cards/today", petalDrawRoute("GET /api/petal-cards/today",
@@ -2027,7 +2032,7 @@ app.post("/api/petal-cards/draw", allowBodyFields(["position", "topic"]), (req, 
 }, petalDrawRoute("POST /api/petal-cards/draw", async req => {
   const result = await drawPetalCard(prisma, { userId: req.auth.userId, position: req.body.position, topic: req.body.topic,
     heavy: heavyCardsOn(), now: new Date() });
-  if (result) result.reading = await petalReadingFor(prisma, { userId: req.auth.userId, drawId: result.id, now: new Date() });
+  if (result) result.reading = await petalReadingState(req.auth.userId, result.id);
   return result;
 }));
 

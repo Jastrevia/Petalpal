@@ -32,6 +32,7 @@ const COPY = {
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
+const READING_TRIES = 8;
 
 // The petal ring (design: the owner's loop ring): first the owner picks today's topic, then a few
 // card places on a tilted ring carry the whole of today's deck flowing through them. One step brings the next card to the front, a
@@ -95,14 +96,19 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   }
 
   // Once the card faces up, ask for its reading if this owner can have one. Another device may be
-  // writing it already (GENERATING): look again a few times.
+  // writing it already (GENERATING): look again, at most READING_TRIES times. Anything unexpected
+  // (an error, the switch turned off) hides the reading; the card itself is never affected.
+  const tries = useRef(0);
+  useEffect(() => { tries.current = 0; }, [visible]);
   useEffect(() => {
     if (!visible || phase !== 'revealed' || !reading?.available || reading.needsConsent) return;
     if (reading.status !== 'NONE' && reading.status !== 'GENERATING') return;
+    const hide = { available: true, needsConsent: false, status: 'FAILED' } as const;
+    if (++tries.current > READING_TRIES) { setReading(hide); return; }
     let active = true;
     const timer = setTimeout(() => {
-      void requestPetalReading().then(next => { if (active && next) setReading(next); })
-        .catch(() => { if (active) setReading({ available: true, needsConsent: false, status: 'FAILED' }); });
+      void requestPetalReading().then(next => { if (active) setReading(next ?? { available: false }); })
+        .catch(() => { if (active) setReading(hide); });
     }, reading.status === 'GENERATING' ? 4000 : 0);
     return () => { active = false; clearTimeout(timer); };
   }, [visible, phase, reading]);
