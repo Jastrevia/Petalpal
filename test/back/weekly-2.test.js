@@ -8,6 +8,7 @@ import { computeInsights, keyPhrase } from "../../lib/insight-compute.js";
 import { BANNED, checkSentence } from "../../lib/insight-validate.js";
 import { renderWeekly2, templateHeadline, WEEKLY_2, WEEKLY_2_INSTRUCTIONS, WEEKLY_2_SCHEMA, weekly2Packet } from "../../lib/insight-write.js";
 import { INSIGHT_CARDS } from "../../lib/petal-card-match.js";
+import { PrivateReportRepository, WEEKLY_INSIGHT_FEEDBACK } from "../../lib/report-foundation.js";
 import { petalCard } from "../../lib/petal-cards.js";
 import { weeklyInsightsEnabledFor } from "../../lib/weekly-contract.js";
 import { reportShowsEvent, WEEKLY_SHORT, weeklyMoodCurve } from "../../lib/weekly-short.js";
@@ -238,4 +239,26 @@ test("packet and switch: the request fits the Gateway admission; the owner list 
   assert.equal(weeklyInsightsEnabledFor({ WEEKLY_INSIGHTS_OWNER_IDS: " bob, alice " }, "alice"), true);
   assert.equal(weeklyInsightsEnabledFor({ WEEKLY_INSIGHTS_OWNER_IDS: "alice;bob" }, "alice"), false);
   for (const id of Object.values(INSIGHT_CARDS).flat()) assert.equal(petalCard(id)?.heavy, false, id);
+});
+
+test("insight feedback: the owner marks one insight of their own report; anything else is refused or not found", async () => {
+  const sections = [{ kind: "HEADLINE", claim: "h" }, { kind: "INSIGHT", claim: "i", type: "SMALL_GOODS" }, { kind: "QUESTION", claim: "q" }];
+  const rows = new Map([["r-alice", { ownerId: "alice", narrativeSections: sections }]]);
+  const db = { $queryRawUnsafe: async (query, ...args) => query.includes("AiConsent")
+      ? [{ userId: args[0], aiProcessing: true, personalization: true, memoryEnabled: true }]
+      : rows.get(args[0])?.ownerId === args[1] ? [{ id: args[0] }] : [],
+    weeklyReport: { findFirst: async ({ where }) => rows.get(where.id)?.ownerId === where.ownerId ? rows.get(where.id) : null,
+      update: async ({ where, data }) => Object.assign(rows.get(where.id), data) } };
+  db.$transaction = fn => fn(db);
+  const reports = new PrivateReportRepository(db), alice = { userId: "alice" };
+  const hidden = await reports.setWeeklyInsightFeedback({ identity: alice, reportId: "r-alice", index: 1, verdict: "HIDDEN" });
+  assert.equal(hidden[1].feedback, "HIDDEN"); assert.equal(rows.get("r-alice").narrativeSections[1].feedback, "HIDDEN");
+  assert.equal((await reports.setWeeklyInsightFeedback({ identity: alice, reportId: "r-alice", index: 1, verdict: "INACCURATE" }))[1].feedback, "INACCURATE");
+  assert.equal(Object.hasOwn((await reports.setWeeklyInsightFeedback({ identity: alice, reportId: "r-alice", index: 1, verdict: null }))[1], "feedback"), false);
+  assert.equal(await reports.setWeeklyInsightFeedback({ identity: alice, reportId: "r-alice", index: 0, verdict: "HIDDEN" }), null, "only INSIGHT sections");
+  assert.equal(await reports.setWeeklyInsightFeedback({ identity: { userId: "bob" }, reportId: "r-alice", index: 1, verdict: "HIDDEN" }), null, "never another owner's");
+  for (const [index, verdict] of [[1, "WRONG"], [1, undefined], [-1, "HIDDEN"], [1.5, "HIDDEN"], [40, "HIDDEN"]]) {
+    await assert.rejects(reports.setWeeklyInsightFeedback({ identity: alice, reportId: "r-alice", index, verdict }), { code: "INSIGHT_FEEDBACK_INVALID" });
+  }
+  assert.deepEqual(WEEKLY_INSIGHT_FEEDBACK, ["INACCURATE", "HIDDEN"]);
 });

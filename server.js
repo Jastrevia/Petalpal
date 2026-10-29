@@ -2489,6 +2489,25 @@ app.get("/ai/reports/:reportType/:reportId", async (req, res) => {
   }
 });
 
+// Weekly 2.0: the owner marks one insight of their own Weekly report "INACCURATE" or "HIDDEN" (null clears it).
+app.post("/ai/reports/weekly/:reportId/insights/:index/feedback", async (req, res) => {
+  const index = /^\d{1,2}$/.test(req.params.index) ? Number(req.params.index) : -1;
+  if (!validId(req.params.reportId) || Object.keys(req.query).length || Object.keys(req.body ?? {}).some(key => key !== "verdict")
+      || !Object.hasOwn(req.body ?? {}, "verdict")) {
+    return res.status(400).json({ error: "Send only the verdict for one insight of your Weekly report" });
+  }
+  try {
+    const sections = await new PrivateReportRepository(prisma).setWeeklyInsightFeedback({ identity: req.auth,
+      reportId: req.params.reportId, index, verdict: req.body.verdict });
+    if (!sections) return res.status(404).json({ error: "Insight not found" });
+    return res.json({ narrativeSections: sections });
+  } catch (error) {
+    if (error?.code === "INSIGHT_FEEDBACK_INVALID") return res.status(400).json({ error: "Send only the verdict for one insight of your Weekly report" });
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI processing is not currently authorized" });
+    throw error;
+  }
+});
+
 app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
   const allowedBodyFields = new Set(["localDate"]);
   if (Object.keys(req.body).some((field) => !allowedBodyFields.has(field)) || Object.keys(req.query).length > 0) {
