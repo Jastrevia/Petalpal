@@ -14,7 +14,7 @@ import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
 import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
-import { isGardenGroundBlocked } from './fairy/gardenGround';
+import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
 import {DEFAULT_ISOLATION,type GardenIsolation,runtimeAudit} from './performance/runtimeAudit';
 import {productionQARecords} from './planting/productionGrowthQAData';
@@ -99,7 +99,11 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
-import MailboxGlow from './MailboxGlow';
+import Letterwing from './Letterwing';
+import MemoryOtter from './spirits/MemoryOtter';
+import Bluebird from './spirits/Bluebird';
+import Butterfly from './critters/Butterfly';
+import GardenCritters from './critters/GardenCritters';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
@@ -244,6 +248,8 @@ export type GardenSceneProps = {
   gardenOwnerUserId?: string;
   readOnly?: boolean;
   onOpenBookhouse?: () => void;
+  // Tapping a lawn that has flowers (owner only): the lawn glows, the camera leans in, then this.
+  onOpenEvents?: (month: number) => void;
   onOpenReflection?: () => void;
   showCalendar?: boolean;
   /** The owner's language ('en' | 'zh-Hans' …) for the Fairy's in-Garden hints. */
@@ -257,7 +263,24 @@ const treehouseHint = (locale?: string | null) =>
     ?{ label: '小花仙在树屋里 ✨', hint: '点一下叫她出来' }
     : { label: 'Your fairy is in the treehouse ✨', hint: 'Tap to call her out' };
 
-function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
+// Whether a tap is on (or within a finger's reach of) a month's lawn.
+const NEAR_LAWN = 30;
+function nearLawn(month: number, x: number, y: number) {
+  if (isOnMonthLawn(month, { x, y })) return true;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    if (isOnMonthLawn(month, { x: x + Math.cos(a) * NEAR_LAWN, y: y + Math.sin(a) * NEAR_LAWN })) return true;
+  }
+  return false;
+}
+// The month whose lawn is at (x, y), when that lawn has flowers.
+function plantedLawnAt(placements: readonly { month: number }[], x: number, y: number) {
+  const months = new Set(placements.map(p => p.month));
+  for (const month of months) if (isOnMonthLawn(month, { x, y })) return month;
+  return null;
+}
+
+function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenEvents, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
   const isDev = showDevControls && mode === 'development';
   runtimeAudit.render('GardenScene');
   const planting = usePlanting();
@@ -298,6 +321,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     .map(p => p.speciesCode || p.flowerName || 'UNKNOWN'))], [placements]);
 
   const activeModeRef = useRef(activeMode);
+  // The month being planted (planting only), for taps and the camera.
+  const plantingMonth = activeMode === 'planting' ? targetFlower?.month ?? null : null;
+  const plantingMonthRef = useRef(plantingMonth); plantingMonthRef.current = plantingMonth;
+  const onOpenEventsRef = useRef(onOpenEvents); onOpenEventsRef.current = onOpenEvents;
   const perfFixtureRef=useRef(false);perfFixtureRef.current=fixtureParents!==null;
   const placementsRef = useRef(placements);
   useEffect(() => {
@@ -683,6 +710,41 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     calendarHighlight.value = .45;
     calendarHighlight.value = withTiming(0, { duration: calendarReducedMotion ? 400 : 1700 });
   };
+  // Planting: the camera eases in until the flower's month lawn fills the view, and back out to
+  // where it was once the flower is planted or the planting is left.
+  const plantingCamera = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  useEffect(() => {
+    if (viewport.width === 0 || viewport.height === 0 || fit <= 0) return;
+    const duration = calendarReducedMotion ? 0 : 550;
+    const glide = (x: number, y: number, zoom: number) => {
+      cameraZoom.value = withTiming(zoom, { duration });
+      cameraX.value = withTiming(x, { duration });
+      cameraY.value = withTiming(y, { duration });
+    };
+    if (plantingMonth !== null) {
+      if (!plantingCamera.current) plantingCamera.current = { x: cameraX.value, y: cameraY.value, zoom: cameraZoom.value };
+      const b = monthLawnBounds(plantingMonth);
+      const zoom = Math.max(1.2, Math.min(3, 0.72 * Math.min(viewport.width / ((b.maxX - b.minX) * fit), viewport.height / ((b.maxY - b.minY) * fit))));
+      glide(viewport.width / 2 - baseX - (b.minX + b.maxX) / 2 * fit * zoom, viewport.height / 2 - baseY - (b.minY + b.maxY) / 2 * fit * zoom, zoom);
+    } else if (plantingCamera.current) {
+      const back = plantingCamera.current;
+      plantingCamera.current = null;
+      glide(back.x, back.y, back.zoom);
+    }
+  }, [plantingMonth, viewport.width, viewport.height, fit, baseX, baseY, calendarReducedMotion, cameraX, cameraY, cameraZoom]);
+  // A lawn with flowers was tapped: it glows where the finger touched, the camera leans towards
+  // it, and Events opens as the lean finishes.
+  const openLawnEvents = useCallback((month: number, worldX: number, worldY: number) => {
+    const duration = calendarReducedMotion ? 0 : 380;
+    const zoom = Math.min(3, cameraZoom.value * 1.25);
+    calendarPoint.value = { x: worldX, y: worldY };
+    calendarHighlight.value = .55;
+    calendarHighlight.value = withTiming(0, { duration: calendarReducedMotion ? 300 : 900 });
+    cameraZoom.value = withTiming(zoom, { duration });
+    cameraX.value = withTiming(viewport.width / 2 - baseX - worldX * fit * zoom, { duration });
+    cameraY.value = withTiming(viewport.height / 2 - baseY - worldY * fit * zoom, { duration });
+    setTimeout(() => onOpenEventsRef.current?.(month), duration + 40);
+  }, [calendarReducedMotion, cameraZoom, cameraX, cameraY, calendarPoint, calendarHighlight, viewport.width, viewport.height, baseX, baseY, fit]);
   const focusCalMonth = useCallback((month: number) => {
     if (fit <= 0) return;
     const centroid = getCalibratedCentroid(month, plantingCalibrationMap, calibrationLayout);
@@ -970,7 +1032,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
     if(perfFixtureRef.current)return;
     if (activeModeRef.current !== 'normal') {
-      if (!readOnly) updatePreview(worldX, worldY);
+      if (readOnly) return;
+      // Planting zooms in on the month's lawn: a tap well away from it leaves planting.
+      const month = plantingMonthRef.current;
+      if (month !== null && !nearLawn(month, worldX, worldY)) { cancelPlacement(); return; }
+      updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;
       let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitCluster(currentPlacements,worldX,worldY):null;
@@ -992,34 +1058,27 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (readOnly) return;
       // Placement and flower details own taps before any Fairy destination.
       if (enableFairyWalk && fairyRef.current?.isMailboxBusy()) return;
+      // A place she goes (landmarks first), else a lawn with flowers (which opens its Events and
+      // leaves her be), else a spot on the paths.
+      const at = { x: worldX, y: worldY };
+      const destination = !enableFairyWalk ? null
+        : hitsMailbox(at, treehousePlacement) ? () => fairyRef.current?.visitMailbox()
+        : hitsTreehouse(at, treehousePlacement) ? () => tapTreehouse.current()
+        : hitsSwing(at, swingPlacement) ? () => fairyRef.current?.visitSwing()
+        : hitsTeaArea(at, teaSetPlacement) ? () => fairyRef.current?.visitTea()
+        : hitsMoonBed(at, moonBedPlacement) ? () => fairyRef.current?.visitMoonBed()
+        : null;
+      const lawn = !destination && onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
+      if (lawn !== null) { openLawnEvents(lawn, worldX, worldY); return; }
       if (enableFairyWalk) { noteFairyUser(); bookhouseOnEntry.current = false; }
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
-      if (enableFairyWalk && hitsMailbox({x:worldX,y:worldY},treehousePlacement)) {
-        fairyRef.current?.visitMailbox();
-        return;
-      }
-      if (enableFairyWalk && hitsTreehouse({x:worldX,y:worldY},treehousePlacement)) {
-        tapTreehouse.current();
-        return;
-      }
-      if (enableFairyWalk && hitsSwing({x:worldX,y:worldY}, swingPlacement)) {
-        fairyRef.current?.visitSwing();
-        return;
-      }
-      if (enableFairyWalk && hitsTeaArea({x:worldX,y:worldY},teaSetPlacement)) {
-        fairyRef.current?.visitTea();
-        return;
-      }
-      if (enableFairyWalk && hitsMoonBed({x:worldX,y:worldY}, moonBedPlacement)) {
-        fairyRef.current?.visitMoonBed();
-        return;
-      }
+      if (destination) { destination(); return; }
       if (enableFairyWalk) {
         const accepted = fairyRef.current?.move({ x: worldX, y: worldY });
         if (accepted && Platform.OS === 'web') canvasRef.current?.redraw();
       }
     }
-  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement]);
+  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, cancelPlacement, openLawnEvents, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement]);
 
   const startMaskPos = useRef({ localX: 0, localY: 0 });
 
@@ -1423,6 +1482,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               mode={perf.WaterAnimation?lotusMode:'static'}
             /></GardenProfile>
 
+            {/* Memory Otter: on the water, under the islands and bridges; evening and night only. */}
+            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
+
             {/* V2 is one independent terrain; islands and treehouse occlude it naturally. */}
             {perf.Waterfall && showLandmarks && waterfallVersion === 'v2' && (
               <WaterfallV2Entity active={worldActive && perf.WaterAnimation} animated={topWaterMotionMode === 'animate' && perf.WaterAnimation} />
@@ -1508,7 +1570,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {enableFairyWalk && !readOnly && showLandmarks && <MailboxGlow placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
             <GardenFairy motionClock={fairySeconds} onMailboxOpened={() => {

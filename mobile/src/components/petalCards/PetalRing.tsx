@@ -5,6 +5,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Reanimated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { drawPetalCard, type PetalCardFace, type PetalToday } from '../../services/petalCardDraw';
 import { PETAL_CARD_ART } from './petalCardArt';
+import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
 
 const BACKS = {
@@ -15,10 +16,14 @@ const BACKS = {
 const COPY = {
   en: { title: 'THE PETAL RING', sub: "Spin through today's whole deck and choose one", hint: 'Drag to spin · tap the glowing card',
     no: 'No.', round: 'Round', turnOver: 'Turn it over', close: 'Close', today: "Today's petal card", drawing: 'Drawing…',
-    failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose No. ${n} of today's deck` },
+    failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose No. ${n} of today's deck`,
+    share: 'Share', preparing: 'Preparing…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
+    shareFailed: "Couldn't share this time. Try again." },
   'zh-Hans': { title: 'THE PETAL RING', sub: '转动花环，翻遍今天的整副牌，选一张', hint: '拖动转圈 · 点发光的那张',
     no: '第', round: '轮次', turnOver: '翻开它', close: '关闭', today: '今日花语卡', drawing: '正在抽牌…',
-    failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张` },
+    failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张`,
+    share: '分享', preparing: '正在准备…', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
+    shareFailed: '这次没有分享成功，再试一次。' },
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -48,6 +53,22 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const [chosenNo, setChosenNo] = useState(0);
   const [error, setError] = useState('');
   const lift = useRef(new Animated.Value(0)).current, flip = useRef(new Animated.Value(0)).current;
+  // The share picture is made once the card faces up (petalShare.ts).
+  const [prepared, setPrepared] = useState<PreparedShare | null>(null);
+  const [shared, setShared] = useState<ShareOutcome | null>(null);
+  useEffect(() => {
+    setPrepared(null); setShared(null);
+    if (phase !== 'revealed' || !face) return;
+    let active = true;
+    void prepareShare(face, PETAL_CARD_ART[face.id], locale).then(result => {
+      if (!active) return;
+      setPrepared(result);
+      // Development only: window.__petalShare holds the picture, to look at without sharing.
+      if (__DEV__ && typeof window !== 'undefined') (window as unknown as { __petalShare?: PreparedShare }).__petalShare = result;
+    });
+    return () => { active = false; };
+  }, [phase, face, locale]);
+  const share = () => { if (prepared) void sharePrepared(prepared).then(setShared); };
 
   // Opening: show today's card straight away if it was drawn already, else spin in.
   useEffect(() => {
@@ -169,6 +190,11 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         <Text style={styles.line}>{face.line}</Text>
         <Text style={styles.text}>{face.text}</Text>
         <Text style={styles.disclaimer}>{face.disclaimer}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.share} accessibilityState={{ disabled: !prepared }} disabled={!prepared}
+          onPress={share} style={({ pressed }) => [styles.secondary, !prepared && styles.waiting, pressed && styles.pressed]}>
+          <Text style={styles.secondaryText}>{prepared ? copy.share : copy.preparing}</Text>
+        </Pressable>
+        {shared === 'saved' || shared === 'failed' ? <Text accessibilityRole="alert" style={styles.disclaimer}>{shared === 'saved' ? copy.saved : copy.shareFailed}</Text> : null}
         <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
           <Text style={styles.primaryText}>{copy.close}</Text>
         </Pressable>
@@ -231,6 +257,9 @@ const styles = StyleSheet.create({
   primary: { alignSelf: 'stretch', paddingVertical: 12, borderRadius: 14, alignItems: 'center', backgroundColor: '#E9CF8A' },
   primaryText: { fontFamily: 'serif', fontSize: 16, color: '#2B2457' },
   pressed: { opacity: 0.8 },
+  secondary: { alignSelf: 'stretch', paddingVertical: 11, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E9CF8A' },
+  secondaryText: { fontFamily: 'serif', fontSize: 16, color: '#F3DFA8' },
+  waiting: { opacity: 0.55 },
   reveal: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   revealContent: { paddingHorizontal: 24, paddingBottom: 30, alignItems: 'center', gap: 8 },
   kicker: { fontFamily: 'serif', fontSize: 12, letterSpacing: 2, color: '#C9C0E8' },

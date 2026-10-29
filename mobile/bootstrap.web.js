@@ -2,7 +2,7 @@
 import './src/polyfills/symbolDispose';
 import { LoadSkiaWeb } from '@shopify/react-native-skia/lib/module/web/LoadSkiaWeb';
 import { configureGardenWebCanvasCache, isOwnedGardenWebView } from './src/components/garden/webCanvasCache';
-import { configureGardenWebDispose, configureGardenWebNativeOwnership, configureGardenWebRootCleanup } from './src/components/garden/webNativeHandles';
+import { configureGardenWebDeletedImageGuard, configureGardenWebDispose, configureGardenWebNativeOwnership, configureGardenWebRootCleanup } from './src/components/garden/webNativeHandles';
 
 LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
   .then(() => {
@@ -15,7 +15,8 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     const { JsiSkRuntimeEffect } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkRuntimeEffect');
     const { JsiSkImage } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkImage');
     configureGardenWebNativeOwnership(JsiSkPaint.prototype, [
-      [Skia, ['Paint', 'PictureRecorder']],
+      // MakeVertices: the Garden walkers' skinned meshes, rebuilt every frame.
+      [Skia, ['Paint', 'PictureRecorder', 'MakeVertices']],
       [JsiSkPictureRecorder.prototype, ['finishRecordingAsPicture']],
       [JsiSkPaint.prototype, ['copy']],
       [Skia.Path, ['MakeFromSVGString']],
@@ -32,6 +33,10 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     const { BaseHostObject } = require('@shopify/react-native-skia/lib/module/skia/web/Host');
     const { JsiSkFontMgr } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkFontMgr');
     configureGardenWebDispose([BaseHostObject.prototype, JsiSkFontMgr.prototype]);
+    // A released image (another Garden root closing mid-frame) skips one draw instead of crashing.
+    const { JsiSkCanvas } = require('@shopify/react-native-skia/lib/module/skia/web/JsiSkCanvas');
+    configureGardenWebDeletedImageGuard(JsiSkCanvas.prototype, JsiSkImage.prototype,
+      () => Skia.Shader.MakeColor(Skia.Color('transparent')));
     const { SkiaSGRoot } = require('@shopify/react-native-skia/lib/module/sksg/Reconciler');
     configureGardenWebRootCleanup(SkiaSGRoot.prototype, nativeId => isOwnedGardenWebView(globalThis.SkiaViewApi, nativeId));
     return require('expo-router/entry');

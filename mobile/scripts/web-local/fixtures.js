@@ -28,6 +28,7 @@
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
+  let redemptions = [];
   const journals = [[3, 'A slow morning with tea and the window open.'], [12, 'Walked home the long way.'], [35, 'Started a new notebook.']]
     .map(([offset, content], i) => ({ id: 'c' + i, localDate: day(offset), createdAt: day(offset) + 'T18:00:00.000Z',
       journal: { id: 'j' + i, content }, emotionResult: null, flower: null }));
@@ -93,6 +94,14 @@
       // Our Bond and today's petal card, so the calendar check-in and the petal ring can be tried.
       const localDate = new Date().toISOString().slice(0, 10);
       if (p === '/api/petal-cards/draw' && method === 'POST') { petalDrawn = { position: request.position, drawnAt: new Date().toISOString(), card: { id: 'major-01', name: 'The Magician', line: 'You already hold what you need.', text: 'A preview card: in the real app this is today\'s card from your deck.', disclaimer: 'For reflection only.' } }; return json({ created: true, locale: 'en', localDate, ...petalDrawn }); }
+      // Redemption codes: any well-formed code works once here (the real codes live on the server).
+      if (p === '/api/redeem' && method === 'POST') {
+        if (String(request.code || '').replace(/[\s-]/g, '').length !== 20) return json({ error: 'Invalid code', code: 'INVALID_CODE' }, 400, 300);
+        if (redemptions.length) return json({ error: 'Already redeemed', code: 'ALREADY_REDEEMED' }, 409, 300);
+        redemptions = [{ batch: 'beta-gift-2026-10', reward: 'beta-gift', status: 'pending', redeemedAt: new Date().toISOString() }];
+        return json({ created: true, ...redemptions[0] }, 200, 300);
+      }
+      if (p === '/api/redeem') return json({ redemptions });
       if (p === '/api/fairy/check-in' && method === 'POST') {
         const created = !checkedInToday; checkedInToday = true;
         return json({ created, checkIn: { localDate: day(0), streak: 4, graceUsed: false }, keepsakes: [], points: created ? 2 : 0 });

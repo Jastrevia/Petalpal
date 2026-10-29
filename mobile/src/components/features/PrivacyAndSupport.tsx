@@ -6,9 +6,11 @@ import { FeatureLinkRow, ui } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
 import { CommunityGuidelines } from './CommunityGuidelines';
 import { DeleteAccountSettings } from './DeleteAccountSettings';
-const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',groupHelp:'Get help',groupRules:'Rules & policies',groupAccount:'Account',close:'Close',
+import { RedeemCodeSettings } from './RedeemCodeSettings';
+import { useRedemptions } from '../../services/redeemCodes';
+const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',redeem:'Redeem a code',redeemed:'Redeemed',groupHelp:'Get help',groupRules:'Rules & policies',groupAccount:'Account',close:'Close',
   support:'Contact support',mail:'Opening your email app to write to contact@jastrevia.com…',emergency:"PetalPal isn't an emergency service. If you or someone else is in danger, contact local emergency services."},
- 'zh-Hans':{title:'隐私与帮助',help:'发送反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',groupHelp:'获取帮助',groupRules:'规则与政策',groupAccount:'账号',close:'关闭',
+ 'zh-Hans':{title:'隐私与帮助',help:'发送反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',redeem:'兑换码',redeemed:'已兑换',groupHelp:'获取帮助',groupRules:'规则与政策',groupAccount:'账号',close:'关闭',
   support:'联系客服',mail:'正在打开邮件应用，写信到 contact@jastrevia.com…',emergency:'PetalPal 不是紧急服务。如果你或他人有危险，请联系当地紧急服务。'}};
 // On the web a page opens in a new tab, so the Garden stays where it was.
 async function openPolicy(url:string|undefined,setStatus:(value:string)=>void){if(!url){setStatus('This policy URL is awaiting publication. Contact contact@jastrevia.com.');return;}
@@ -21,15 +23,17 @@ async function openPolicy(url:string|undefined,setStatus:(value:string)=>void){i
 export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLeave?:()=>void}={}){
  const [status,setStatus]=useState('');
  const [unfolded,setUnfolded]=useState<'guidelines'|null>(null);
- const [deleting,setDeleting]=useState(false);
+ const [dialog,setDialog]=useState<'delete'|'redeem'|null>(null);
+ const [redemptions,setRedemptions]=useRedemptions(account);
  const copy=COPY[useAppLocale()];
  const titleColor=usePanelTheme().theme.text;
  const open=(url?:string)=>openPolicy(url,setStatus);
  const feedback=()=>{onLeave?.();setTimeout(openHelpFeedback,onLeave?250:0);};
  const support=()=>{setStatus(copy.mail);void open('mailto:contact@jastrevia.com');};
  const toggle=(item:'guidelines')=>setUnfolded(unfolded===item?null:item);
- // In Me: three groups, most used first, the one that cannot be undone last and on its own.
- // Delete account opens its own dialog: the warning and the typed confirmation.
+ // In Me: three groups, most used first, the one that cannot be undone last.
+ // Redeem a code and Delete account each open their own dialog (delete: the warning and the
+ // typed confirmation).
  if(account) return <View style={{gap:6}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
   <Group label={copy.groupHelp}>
    <FeatureLinkRow first title={copy.help} onPress={feedback}/>
@@ -43,11 +47,15 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
    <FeatureLinkRow title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
   </Group>
   <Group label={copy.groupAccount}>
-   <FeatureLinkRow first chevron={false} title={copy.deleteAccount} onPress={()=>setDeleting(true)}/>
+   <FeatureLinkRow first title={copy.redeem} note={redemptions?.length?copy.redeemed:undefined} onPress={()=>setDialog('redeem')}/>
+   <FeatureLinkRow chevron={false} title={copy.deleteAccount} onPress={()=>setDialog('delete')}/>
   </Group>
-  {deleting?<DeleteDialog title={copy.deleteAccount} closeLabel={copy.close} onClose={()=>setDeleting(false)}>
+  {dialog==='redeem'?<Dialog title={copy.redeem} closeLabel={copy.close} onClose={()=>setDialog(null)}>
+   <RedeemCodeSettings redemptions={redemptions} onRedeemed={item=>setRedemptions([item])}/>
+  </Dialog>:null}
+  {dialog==='delete'?<Dialog title={copy.deleteAccount} closeLabel={copy.close} onClose={()=>setDialog(null)}>
    <DeleteAccountSettings embedded onPolicy={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/>
-  </DeleteDialog>:null}
+  </Dialog>:null}
   <Text style={ui.caption}>{copy.emergency}</Text></View>;
  return <View style={{gap:6}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
  <View>
@@ -65,8 +73,8 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
 function Group({label,children}:{label:string;children:ReactNode}){
  return <View style={{marginTop:10}}><Text style={[ui.caption,{fontWeight:'700',letterSpacing:.6,textTransform:'uppercase',marginBottom:2}]}>{label}</Text>{children}</View>;
 }
-// Its own dialog over the Me panel; × or a tap outside closes it without deleting anything.
-function DeleteDialog({title,closeLabel,onClose,children}:{title:string;closeLabel:string;onClose:()=>void;children:ReactNode}){
+// Its own dialog over the Me panel; × or a tap outside closes it without doing anything.
+function Dialog({title,closeLabel,onClose,children}:{title:string;closeLabel:string;onClose:()=>void;children:ReactNode}){
  const {theme}=usePanelTheme();
  return <Modal transparent visible animationType="fade" onRequestClose={onClose}>
   <View style={dialog.scrim}>

@@ -94,7 +94,9 @@ test('integrated scene retains one cached Canvas, current app contracts and came
   assert.ok(source.includes('if (fit <= 0) return;') && source.includes('if (readOnly) return;'));
   assert.ok(source.includes('showCalendar && !readOnly'));
   assert.ok(source.includes('(screenX - baseX - currentCamX) / (fit * currentZoom)'));
-  assert.ok(source.indexOf('hitsMailbox({x:worldX,y:worldY}')<source.indexOf('hitsTreehouse({x:worldX,y:worldY}'));
+  // Landmarks in order (the mailbox before the treehouse), then a lawn with flowers.
+  assert.ok(source.indexOf('hitsMailbox(at, treehousePlacement)')>0&&source.indexOf('hitsMailbox(at, treehousePlacement)')<source.indexOf('hitsTreehouse(at, treehousePlacement)'));
+  assert.ok(source.indexOf('hitsMoonBed(at, moonBedPlacement)')<source.indexOf('plantedLawnAt(placementsRef.current'));
   assert.ok(source.indexOf('<FishLayer')<source.indexOf('<SurfaceRippleLayer'));
   assert.ok(source.indexOf('<GardenFairy')<source.indexOf('renderPass="static-front"'));
   assert.ok(fs.readFileSync(path.join(garden,'LandLayer.tsx'),'utf8').includes('GardenStaticPicture'));
