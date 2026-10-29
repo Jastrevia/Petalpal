@@ -53,36 +53,42 @@ export function lastClosedMonthKey(now = new Date()) {
   return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}`;
 }
 // "October · Week 2" (the Monday's week of its month) and "Oct 12 – 18" for a Weekly periodKey.
-export function weekLabel(periodKey: string) {
+export function weekLabel(periodKey: string, lang: ShortLocale = 'en') {
   const match = periodKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return { title: periodKey, chip: periodKey, range: '' };
   const [year, month, day] = match.slice(1).map(Number), start = new Date(Date.UTC(year, month - 1, day));
   const end = new Date(Date.UTC(year, month - 1, day + 6));
+  const week = Math.ceil(day / 7), sameMonth = end.getUTCMonth() === start.getUTCMonth();
+  if (lang === 'zh-Hans') {
+    const title = `${month}月 · 第${week}周`;
+    return { title, chip: title, range: `${month}月${day}日 – ${sameMonth ? '' : `${end.getUTCMonth() + 1}月`}${end.getUTCDate()}日` };
+  }
   const name = (date: Date, style: 'long' | 'short') => date.toLocaleDateString('en-US', { month: style, timeZone: 'UTC' });
-  const week = Math.ceil(day / 7);
   return { title: `${name(start, 'long')} · Week ${week}`, chip: `${name(start, 'short')} · Week ${week}`,
-    range: `${name(start, 'short')} ${day} – ${end.getUTCMonth() === start.getUTCMonth() ? '' : `${name(end, 'short')} `}${end.getUTCDate()}` };
+    range: `${name(start, 'short')} ${day} – ${sameMonth ? '' : `${name(end, 'short')} `}${end.getUTCDate()}` };
 }
 
 export type WeeklyTriggerOutcome = {
   kind: 'ready' | 'empty' | 'pending' | 'consent' | 'paused' | 'failed'; message: string; periodKey?: string;
 };
-export function weeklyTriggerOutcome(result?: WeeklyTriggerResult, error?: unknown, period: 'week' | 'month' = 'week'): WeeklyTriggerOutcome {
-  const last = `Last ${period}’s reflection`;
+export function weeklyTriggerOutcome(result?: WeeklyTriggerResult, error?: unknown, period: 'week' | 'month' = 'week',
+  lang: ShortLocale = 'en'): WeeklyTriggerOutcome {
+  const zh = lang === 'zh-Hans', last = zh ? (period === 'week' ? '上周的周报' : '上个月的月报') : `Last ${period}’s reflection`;
   if (error) {
     const status = error instanceof ApiError ? error.status : 0;
-    if (status === 403) return { kind: 'consent', message: 'Turn on AI memory in your privacy settings to create reflections.' };
-    if ([409, 429, 503].includes(status)) return { kind: 'paused', message: 'Reflections are taking a short break. Please try again later.' };
-    if (status === 502) return { kind: 'failed', message: `${last} couldn’t be written.` };
+    if (status === 403) return { kind: 'consent', message: zh ? '在隐私设置里打开 AI 记忆后，才能写回看。' : 'Turn on AI memory in your privacy settings to create reflections.' };
+    if ([409, 429, 503].includes(status)) return { kind: 'paused', message: zh ? '回看暂时休息一下，请稍后再试。' : 'Reflections are taking a short break. Please try again later.' };
+    if (status === 502) return { kind: 'failed', message: zh ? `${last}没能写出来。` : `${last} couldn’t be written.` };
     const message = (error as { message?: unknown }).message;
-    return { kind: 'failed', message: typeof message === 'string' && message ? message : `Unable to create last ${period}’s reflection.` };
+    // The server's own message is English; Chinese readers get ours.
+    return { kind: 'failed', message: zh ? `${last}没能写出来。` : typeof message === 'string' && message ? message : `Unable to create last ${period}’s reflection.` };
   }
   const periodKey = result?.periodKey;
-  if (result?.report?.narrativeStatus === 'GENERATED') return { kind: 'ready', message: `${last} is ready.`, periodKey };
+  if (result?.report?.narrativeStatus === 'GENERATED') return { kind: 'ready', message: zh ? `${last}写好了。` : `${last} is ready.`, periodKey };
   if (result?.job?.status === 'SUCCEEDED') {
-    return { kind: 'empty', message: `Last ${period} didn’t have enough moments for a written reflection.`, periodKey };
+    return { kind: 'empty', message: zh ? `上${period === 'week' ? '周' : '个月'}的记录还不够写一篇回看。` : `Last ${period} didn’t have enough moments for a written reflection.`, periodKey };
   }
-  return { kind: 'pending', message: `${last} is being written. Check back in a few minutes.`, periodKey };
+  return { kind: 'pending', message: zh ? `${last}正在写，过几分钟再来看看。` : `${last} is being written. Check back in a few minutes.`, periodKey };
 }
 
 // Short Weekly report (backend contract weekly-short-v1). Only a report whose every
@@ -221,14 +227,14 @@ export const SHORT_COPY = {
     question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card',
     bloomed: 'Your flowers for this week have opened', tapBud: 'Tap the bud to open your week', bouquet: 'This week’s bouquet',
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
-    undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.',
+    undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
     question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张',
     bloomed: '你这周的花开了', tapBud: '轻点花苞，打开这一周', bouquet: '本周花束',
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
-    undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。',
+    undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
     write: '写一写', open: '看完整记录', close: '收起', loading: '正在打开…',
     unavailable: '现在打不开这条记录。', support: '支持', days: ['一', '二', '三', '四', '五', '六', '日'] },
 } as const;

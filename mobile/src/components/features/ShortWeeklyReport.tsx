@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { readEvent } from '../../services/events';
@@ -6,49 +6,39 @@ import { moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, t
   type ShortWeekly } from '../../services/reflections';
 import { petalCardArt } from '../petalCards/petalCardArt';
 import { EventIllustration } from './EventIllustration';
-import { BudGate, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
+import { useAppLocale } from '../../services/locale';
+import { BudGate, useBloom, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
 // One Event open at a time, under the part (`at`) that opened it.
 type Opened = { at: string; id: string } & ({ state: 'loading' } | { state: 'ready'; text: string } | { state: 'error' });
 
-// Weekly 2.0 reports opened while the app runs: they open straight to the bouquet next time (and on the page-turn copy).
-const BLOOMED = new Set<string>();
 const MARK_TEXT = { HIDDEN: 'hidden', INACCURATE: 'thanks' } as const;
+export type ReportPart = 'left' | 'right' | 'all';
 
 // Rendering only: every part was chosen and validated on the backend; a hidden part simply is not saved.
-// Weekly 2.0 (docs/product/WEEKLY_2.0.md): a bud to tap → the week's flowers rise into the bouquet → the headline →
-// main insight → more insights, side by side to swipe → "还有一件事" (then and now) → petal card → question; each insight
-// can be marked "不准确" or hidden. With insights but no 2.0 headline: the same order around the mood curve. Without
-// insights the layout is the short report's (a 2.0 headline still shows first).
-export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reducedMotion = false }: {
-  short: ShortWeekly; interactive: boolean; onWrite: () => void; reportId?: string; reducedMotion?: boolean;
+// Labels and dates follow the app language; the report's own sentences stay as saved.
+// Weekly 2.0 (docs/product/WEEKLY_2.0.md) is one spread of the book. Left page (`part` left): the date and headline
+// (after the bloom) over the week's bouquet; tap a flower for that day's words. Right page (`part` right): main insight
+// → more insights, side by side to swipe → "还有一件事" (then and now) → petal card with the safety note → question and
+// "写一写". It opens on a bud alone; tapping it raises the bouquet, then the headline, then the right page. A 2.0 week
+// with no insights shows only its headline and a gentle question. Phones (`part` all) stack both pages.
+// Older reports: with insights, the same order around the mood curve; without, the short report's layout.
+export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reducedMotion = false, part = 'all', date, safety, report }: {
+  short: ShortWeekly; interactive: boolean; onWrite: () => void; reportId?: string; reducedMotion?: boolean; part?: ReportPart;
+  // Weekly 2.0 only: the period's date lines, the safety note (shown with the petal card) and the AI-output report link.
+  date?: { eyebrow: string; range: string }; safety?: ReactNode; report?: ReactNode;
 }) {
-  const copy = SHORT_COPY[short.locale];
+  const lang = useAppLocale(), copy = SHORT_COPY[lang];
   const [opened, setOpened] = useState<Opened | null>(null);
   const [width, setWidth] = useState(0);
   const request = useRef(0);
   useEffect(() => () => { request.current += 1; }, []);
-  // ---- Weekly 2.0 opening ----
-  const bloomKey = reportId ?? '';
+  // ---- Weekly 2.0 opening (shared by both pages) ----
   const ceremony = short.version2 && !!short.insights;
-  const [bloomed, setBloomed] = useState(() => !ceremony || reducedMotion || BLOOMED.has(bloomKey));
   const points = short.curve?.points ?? [];
-  const bud = useRef(new Animated.Value(1)).current, headlineIn = useRef(new Animated.Value(bloomed ? 1 : 0)).current;
-  const restIn = useRef(new Animated.Value(bloomed ? 1 : 0)).current;
-  const rise = useRef(points.map(() => new Animated.Value(bloomed ? 1 : 0))).current;
+  const { bloomed, bloom, bud, headline: headlineIn, rest: restIn, rise } = useBloom(reportId ?? '', points.length, { enabled: ceremony, reducedMotion });
   const species = useEventSpecies();
-  function bloom() {
-    BLOOMED.add(bloomKey);
-    if (reducedMotion) { [headlineIn, restIn, ...rise].forEach(value => value.setValue(1)); setBloomed(true); return; }
-    const ease = (value: Animated.Value, duration = 360) => Animated.timing(value, { toValue: 1, duration, useNativeDriver: true });
-    Animated.timing(bud, { toValue: 0, duration: 320, useNativeDriver: true }).start(() => {
-      setBloomed(true);
-      Animated.sequence([Animated.stagger(110, rise.map(value => ease(value))), ease(headlineIn, 380), ease(restIn, 320)]).start();
-    });
-  }
-  // Reduced motion arrives asynchronously: no bud then.
-  useEffect(() => { if (reducedMotion && !bloomed) bloom(); }, [reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
   // ---- 不准确 / 隐藏 ----
   const [marks, setMarks] = useState<Record<number, InsightFeedback | null>>({});
   const [markError, setMarkError] = useState<number | null>(null);
@@ -103,10 +93,10 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
     {item.fact && <Text selectable={interactive} style={s.small}>{item.fact}</Text>}
     <View style={s.chips}>{item.evidence.map(entry => {
       const on = opened?.at === at && opened.id === entry.eventId;
-      return <Pressable key={entry.eventId} accessibilityRole="button" accessibilityLabel={shortDate(entry.date, short.locale)}
+      return <Pressable key={entry.eventId} accessibilityRole="button" accessibilityLabel={shortDate(entry.date, lang)}
         accessibilityHint={on ? copy.close : copy.open} disabled={!interactive}
         onPress={() => void toggle(at, entry.eventId)} style={({ pressed }) => [s.chip, on && s.chipOn, pressed && { opacity: .7 }]}>
-        <Text style={[s.chipText, on && s.chipTextOn]}>{shortDate(entry.date, short.locale)}</Text>
+        <Text style={[s.chipText, on && s.chipTextOn]}>{shortDate(entry.date, lang)}</Text>
       </Pressable>;
     })}</View>
     {panel(at)}
@@ -138,7 +128,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         width: segment.length, transform: [{ rotate: `${segment.angle}rad` }] }]} />)}
       {/* With insights each flower opens its Event; otherwise the curve stays a picture, as before. */}
       {layout?.dots.map(dot => insights
-        ? <Pressable key={dot.sourceEventId} accessibilityRole="button" accessibilityLabel={shortDate(dot.date, short.locale)} disabled={!interactive}
+        ? <Pressable key={dot.sourceEventId} accessibilityRole="button" accessibilityLabel={shortDate(dot.date, lang)} disabled={!interactive}
           onPress={() => void toggle('curve', dot.sourceEventId)}
           style={({ pressed }) => [s.dot, { left: dot.x - CHIP / 2, top: dot.y - CHIP / 2 },
             opened?.at === 'curve' && opened.id === dot.sourceEventId && s.dotOn, pressed && { opacity: .7 }]}>
@@ -168,11 +158,11 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   const thenAndNow = (heading: string) => short.thenAndNow && <>
     <Text style={s.heading}>{heading}</Text>
     {([['then', short.thenAndNow.then], ['now', short.thenAndNow.now]] as const).map(([key, side]) => <View key={key} style={s.pair}>
-      <Text style={s.pairLabel}>{copy[key]} · {shortDate(side.date, short.locale)}</Text>
+      <Text style={s.pairLabel}>{copy[key]} · {shortDate(side.date, lang)}</Text>
       <Text selectable={interactive} style={s.pairQuote}>{`“${side.quote}”`}</Text>
     </View>)}
     {short.thenAndNow.count && short.thenAndNow.phrase
-      ? <Text selectable={interactive} style={s.small}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, short.locale)}</Text> : null}
+      ? <Text selectable={interactive} style={s.small}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, lang)}</Text> : null}
   </>;
   const headline = short.headline && <Text accessibilityRole="header" style={s.headline}>{short.headline}</Text>;
   const tail = <>
@@ -186,25 +176,47 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   </>;
   const fadeRise = (value: Animated.Value) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] });
 
-  if (ceremony && insights) return <View testID="short-weekly-report">
-    {!bloomed ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} interactive={interactive} onOpen={bloom} /> : <>
-      <Animated.View style={fadeRise(headlineIn)}>{headline}</Animated.View>
-      {short.curve && <>
-        <Text style={s.heading}>{copy.bouquet}</Text>
-        <WeeklyBouquet days={short.curve.days} points={points} locale={short.locale} dayNames={copy.days} species={species} rise={rise}
-          openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
-        <Animated.View style={fadeRise(restIn)}><Text selectable={interactive} style={s.small}>{short.curve.claim}</Text></Animated.View>
-        {panel('bouquet')}
-      </>}
-      <Animated.View style={fadeRise(restIn)}>
-        {insightCard(insights.main, 'main', true)}
-        {insights.secondary.length > 0 && <><Text style={s.heading}>{copy.more}</Text>{more(insights.secondary)}</>}
-        {thenAndNow(copy.oneMore)}
-        {card}
-        {tail}
-      </Animated.View>
-    </>}
-  </View>;
+  if (short.version2) {
+    const dateLines = date && <>
+      <Text style={s.eyebrow}>{date.eyebrow}</Text>
+      {!!date.range && <Text style={s.range}>{date.range}</Text>}
+    </>;
+    const question = short.question && <>
+      <Text style={s.heading}>{copy.question}</Text>
+      <Text selectable={interactive} style={s.body}>{short.question}</Text>
+      <Pressable accessibilityRole="button" disabled={!interactive} onPress={onWrite}
+        style={({ pressed }) => [s.button, pressed && { opacity: .7 }]}><Text style={s.buttonText}>{copy.answer}</Text></Pressable>
+    </>;
+    // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
+    if (!insights) return <View testID="short-weekly-report">
+      {part !== 'right' && <>{dateLines}{headline}{question}</>}
+    </View>;
+    const left = !bloomed
+      ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} interactive={interactive} onOpen={bloom} />
+      : <>
+        <Animated.View style={fadeRise(headlineIn)}>{dateLines}{headline}</Animated.View>
+        {short.curve && <>
+          <Text style={s.heading}>{copy.bouquet}</Text>
+          <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species} rise={rise}
+            openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
+          <Animated.View style={fadeRise(restIn)}><Text selectable={interactive} style={s.small}>{short.curve.claim}</Text></Animated.View>
+          {panel('bouquet')}
+        </>}
+      </>;
+    const right = bloomed && <Animated.View style={fadeRise(restIn)}>
+      {insightCard(insights.main, 'main', true)}
+      {insights.secondary.length > 0 && <><Text style={s.heading}>{copy.more}</Text>{more(insights.secondary)}</>}
+      {thenAndNow(copy.oneMore)}
+      {card}
+      {safety && <View style={s.safety}>{safety}</View>}
+      {question}
+      {report}
+    </Animated.View>;
+    return <View testID="short-weekly-report">
+      {part !== 'right' && <View testID="weekly-left-page">{left}</View>}
+      {part !== 'left' && right && <View testID="weekly-right-page" style={part === 'all' ? { marginTop: 18 } : undefined}>{right}</View>}
+    </View>;
+  }
   return <View testID="short-weekly-report">
     {insights ? <>
       {headline}
@@ -240,6 +252,9 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   insight: { borderWidth: 1, borderColor: '#B8934A55', borderRadius: 10, padding: 14, marginBottom: 12, backgroundColor: '#FFF8EA99' },
   insightMain: { borderColor: '#B8934A', backgroundColor: '#FFF8EA' },
+  eyebrow: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2.2, color: '#8C6E3A', marginTop: 4 },
+  range: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: '#5E4B33', marginTop: 3, marginBottom: 10 },
+  safety: { marginTop: 4, marginBottom: 14 },
   insightMarked: { paddingVertical: 10, backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 12 },
   marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
   markButton: { minHeight: 32, justifyContent: 'center' },

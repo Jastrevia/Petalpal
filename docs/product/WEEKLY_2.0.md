@@ -90,21 +90,31 @@
 - 每节仍标 `contractVersion: weekly-short-v1`，所以旧版 App 照样能读；新的 `HEADLINE`（带 `reportVersion: weekly-2.0` 和
   `insightType`）、`INSIGHT` 节旧版 App 会跳过。`INSIGHT` 节有 `type`、`role`、`text`、`fact`、`items`、`quote`、
   `evidence: [{ sourceEventId, date }]`，代码模板生成的带 `template: true`。删除 Event 时 `reportShowsEvent` 会查这些 id。
-- App 首屏（[ShortWeeklyReport.tsx](../../mobile/src/components/features/ShortWeeklyReport.tsx)、
-  [WeeklyBloom.tsx](../../mobile/src/components/features/WeeklyBloom.tsx)、[reflections.ts](../../mobile/src/services/reflections.ts)），
-  只对 2.0 周报（`HEADLINE.reportVersion` 为 `weekly-2.0`）且有洞察时：
-  1. **开报：** 先看到“你这周的花开了”和一朵手绘番红花苞（`assets/bond/checkin-bud.webp`），轻点后花苞淡出。
-  2. **本周花束**替代心情曲线：本周每条 Event 一朵花，用它在花园里真正长出的那种花（从花园读 `speciesCode`；
-     没种下、已删或读不到时按心情用固定的一种花）。按星期排开，**所有花站在同一条地平线上，不按心情分高低**；
-     同一天的几朵挨在一起。花一朵朵升起（每朵 360ms、错开 110ms、上移 8px），然后标题浮现，再显示其余部分。
-     点花看那天的原文。系统开了“减少动态效果”时没有花苞，直接显示。同一份周报在这次使用 App 期间只开一次。
-  3. 主洞察 → 次洞察（**左右滑动**，下一张露出一角）→ “还有一件事”（那时与现在）→ 花语卡 → 给下周的问题。
-  4. **不准确 / 隐藏：** 每条洞察右下角两个小字按钮。点了以后这一条收成一行（“谢谢，已记下，这条先收起来。”或
-     “已隐藏。”），可以“重新显示”。标记存在这份周报的那一节上（`feedback: INACCURATE | HIDDEN`，
-     `POST /ai/reports/weekly/:id/insights/:index/feedback`，只能改自己的周报，需要 Memory 授权），
-     随周报一起删除。同一周如果重新生成周报，标记不会保留。
-  没有 2.0 标题的旧洞察周报仍是第一阶段的版面；没有洞察时也会显示 2.0 的标题（“这周的花还在长”）。
-- 本地网页 `npm run web:local`：第 2 份周报（`w2`）由 2.0 渲染代码离线生成（合成 Event，没有模型）。
+- App（[reflection.tsx](../../mobile/src/app/reflection.tsx)、[ShortWeeklyReport.tsx](../../mobile/src/components/features/ShortWeeklyReport.tsx)、
+  [WeeklyBloom.tsx](../../mobile/src/components/features/WeeklyBloom.tsx)、[reflections.ts](../../mobile/src/services/reflections.ts)）：
+  2.0 周报（`HEADLINE.reportVersion` 为 `weekly-2.0`）是书里的**一个跨页**，不再有“摘要 / 主题 / 规律”三个标签，
+  也没有旧版的主题、规律和“证据不足”说明。
+  - **左页：** 日期、一句话标题（花开后浮现），下面是**本周花束**：每条 Event 一朵花，用它在花园里真正长出的那种花
+    （从花园读 `speciesCode`；没种下、已删或读不到时按心情用固定的一种花），按星期排开，**所有花站在同一条地平线上，
+    不按心情分高低**，同一天的几朵挨在一起，页面窄时花会变小。点花看那天的原文。
+  - **右页：** 从上往下依次是主洞察卡（日期小标签可展开原文）→ 次洞察（**左右滑动**，下一张露出一角）→
+    “还有一件事”（那时与现在）→ 花语卡（花语卡自己的免责声明和 App 的安全提示都放在这里）→ 给下周的问题和
+    “写一条来回答” → “举报 AI 内容”。
+  - **打开时：** 整个跨页先只有“你这周的花开了”和一朵手绘番红花苞（`assets/bond/checkin-bud.webp`）。轻点后花苞淡出，
+    花一朵朵升起（每朵 360ms、错开 110ms、上移 8px），然后日期和标题浮现，右页最后淡入。左右两页共用一次开花；
+    同一份周报在这次使用 App 期间只开一次；系统开了“减少动态效果”时没有花苞，直接显示。
+  - **没洞察的周：** 只显示日期、“这周的花还在长”和一个轻问题（带“写一条来回答”），右页只留插画。后端对 2.0 用户
+    先走 2.0，再查证据：只有 0–1 条记录的周也存这份代码周报，不再存空的“证据不足”周报。
+  - **手机：** 竖着拿时左页在上、右页在下，同一页里滚动；横着拿时左栏是左页、右栏是右页。
+  - **不准确 / 隐藏：** 每条洞察右下角两个小字按钮。点了以后这一条收成一行（“谢谢，已记下，这条先收起来。”或
+    “已隐藏。”），可以“重新显示”。标记存在这份周报的那一节上（`feedback: INACCURATE | HIDDEN`，
+    `POST /ai/reports/weekly/:id/insights/:index/feedback`，只能改自己的周报，需要 Memory 授权），
+    随周报一起删除。同一周如果重新生成周报，标记不会保留。
+  - **界面文字跟随 App 语言**（Me 里选的 `preferredLocale`）：中文用户看到的书名、日期、标签、页脚、翻页、
+    错误和提示都是中文；周报正文保持生成时的语言。
+  旧的短周报和第一阶段的洞察周报不变，只是标签和页脚也跟随 App 语言。
+- 本地网页 `npm run web:local`：`w2` 是有洞察的 2.0 周报，`w0` 是记录太少的 2.0 周报，都由 2.0 渲染代码离线生成
+  （合成 Event，没有模型）；`w1` 是同一周的旧短周报。
 
 ## 开关、版本和时间
 
