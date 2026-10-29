@@ -27,7 +27,8 @@ async function orOff<T>(request: Promise<T>): Promise<T | null> {
   try { return await request; } catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
 }
 
-export const loadPetalToday = () => orOff(apiRequest<PetalToday>('/api/petal-cards/today'));
+// deck=full: this app sends a topic and can show all 78 cards, reversed ones too.
+export const loadPetalToday = () => orOff(apiRequest<PetalToday>('/api/petal-cards/today?deck=full'));
 export async function drawPetalCard(position: number, topic: PetalTopic) {
   const result = await orOff(apiRequest<PetalDrawResult>('/api/petal-cards/draw', 'POST', { position, topic }));
   if (result?.created) closenessChanged(); // the calendar shows the day's card

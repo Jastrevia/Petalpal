@@ -2012,7 +2012,9 @@ async function withPetalReading(userId, result) {
   return result;
 }
 app.get("/api/petal-cards/today", petalDrawRoute("GET /api/petal-cards/today",
-  async req => withPetalReading(req.auth.userId, await todaysPetalDraw(prisma, { userId: req.auth.userId, now: new Date() }))));
+  // ?deck=full: an app that sends a topic with its draw; without it, an older app's 69-card deck.
+  async req => withPetalReading(req.auth.userId,
+    await todaysPetalDraw(prisma, { userId: req.auth.userId, now: new Date(), legacy: req.query.deck !== "full" }))));
 
 app.post("/api/petal-cards/draw", allowBodyFields(["position", "topic"]), (req, res, next) => {
   const { position, topic } = req.body ?? {};

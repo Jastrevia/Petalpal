@@ -204,8 +204,9 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [vh * 0.25, 0] }) },
           { scale: lift.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }) }, { perspective: 1200 }, { rotateY: turn }] }]}>
         <Animated.Image source={back} style={[styles.bigImage, { opacity: backFace }]} />
-        {face && PETAL_CARD_ART[face.id] ? <Animated.Image source={PETAL_CARD_ART[face.id]}
-          style={[styles.bigImage, { opacity: frontFace }, face.reversed && styles.upsideDown]} /> : null}
+        {/* A card without bundled art keeps its back rather than turning blank. */}
+        {face ? <Animated.Image source={PETAL_CARD_ART[face.id] ?? back}
+          style={[styles.bigImage, { opacity: frontFace }, face.reversed && PETAL_CARD_ART[face.id] !== undefined && styles.upsideDown]} /> : null}
       </Animated.View> : null}
 
       {phase === 'drawing' ? <ActivityIndicator style={styles.drawing} color="#E9CF8A" accessibilityLabel={copy.drawing} /> : null}

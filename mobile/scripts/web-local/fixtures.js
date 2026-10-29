@@ -203,7 +203,7 @@
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
         collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
-      if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: 78, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
+      if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });
       if (p === `/users/${friend}/flowers/ff1`) return json(friendFlower);

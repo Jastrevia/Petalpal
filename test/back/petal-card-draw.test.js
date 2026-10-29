@@ -82,6 +82,7 @@ test("once a day: the chosen place gives today's card; a second draw keeps the f
   const before = await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22") });
   assert.equal(before.localDate, "2026-10-22");
   assert.equal(before.deckSize, 78);
+  assert.equal((await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22"), legacy: true })).deckSize, 69);
   assert.deepEqual(before.topics.map(topic => topic.id), PETAL_TOPIC_IDS);
   assert.equal(before.topics[0].label, "今日运势");
   assert.equal(before.drawn, null);
@@ -175,6 +176,8 @@ test("petal draw routes", async (t) => {
     process.env.PETAL_CARDS_OWNER_IDS = "*";
     const today = await call("/api/petal-cards/today");
     assert.equal(today.status, 200);
+    assert.equal(today.body.deckSize, 69, "an app that does not ask for the full deck keeps the 69 cards it has art for");
+    assert.equal((await call("/api/petal-cards/today?deck=full")).body.deckSize, 78);
     assert.equal(today.body.drawn, null);
     assert.ok(["lilac", "violet"].includes(today.body.back));
     for (const body of [{}, { position: -1, topic: "LOVE" }, { position: "3", topic: "LOVE" }, { position: 2.5, topic: "LOVE" },
