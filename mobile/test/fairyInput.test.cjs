@@ -136,7 +136,7 @@ function fairyHarness() {
     step: () => { now += 50; const callbacks = [...queue.values()]; queue.clear(); callbacks.forEach(fn => fn(now)); render(); },
     finish: () => { let frames = 0; while (harness.state().remaining.length || ['flying','flyingToSwing','flyingToMoonBed','flyingToTea','flyingToTreehouse','flyingToMailbox'].includes(harness.state().state)) {
       harness.step(); if(harness.state().state==='walking')assert.ok(nearest(harness.state().position, WALK_NETWORK, .001)); assert.ok(++frames < 5000);
-    } assert.equal(harness.state().target, null); assert.equal(harness.state().frame, 4); },
+    } assert.equal(harness.state().target, null); assert.equal(harness.state().frame, 0, 'standing: her painting (WALK_IDLE)'); },
     active: value => { props = { ...props, active: value }; render(); },
   };
   render(); harness.step(); return harness;
@@ -236,6 +236,10 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     readOnly: false, fit: 1, selectedFlower: null, cameraZoom: { value: 1 }, cameraX: { value: 0 }, cameraY: { value: 0 }, baseX: 0, baseY: 0,
     __DEV__: false, perfFixtureRef: { current: false }, fairyStateRef: { current: 'idle' }, activeModeRef: { current: 'normal' }, placementsRef: { current: [] }, useMonthlyGrowth: true,
     hitCluster: () => null, updatePreview: () => calls.push('placement'), openFlowerDetail: () => calls.push('detail'),
+    // Planting zooms in on its month's lawn; a tap well away from it leaves planting.
+    plantingMonthRef: { current: null }, nearLawn: () => true, cancelPlacement: () => calls.push('cancel'),
+    // A lawn with flowers opens Events (owner's Garden only).
+    onOpenEventsRef: { current: () => {} }, plantedLawnAt: () => null, openLawnEvents: () => calls.push('events'),
     enableFairyWalk: true, treehousePlacement: {}, swingPlacement: {}, teaSetPlacement: {}, moonBedPlacement: {}, Platform: { OS: 'web' },
     canvasRef: { current: { redraw: () => calls.push('redraw') } },
     // A tap that may send her somewhere holds her schedule off (fairySchedule.ts).
@@ -257,6 +261,8 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   expect(['move', 'redraw']);
   context.hitsMailbox = () => true; context.fairyRef.current.isMailboxBusy = () => true;
   context.activeModeRef.current = 'plant'; expect(['placement']);
+  context.plantingMonthRef.current = 10; expect(['placement']);
+  context.nearLawn = () => false; expect(['cancel']); context.nearLawn = () => true; context.plantingMonthRef.current = null;
   context.activeModeRef.current = 'normal'; context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail']);
   context.selectedFlower = {}; expect([]); context.selectedFlower = null;
   context.hitCluster = () => null; expect([]);
@@ -269,6 +275,11 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     context.fairyStateRef.current = state; context[hit] = () => true; expect([action]); context[hit] = () => false;
   }
   context.fairyStateRef.current = 'idle';
+  // A lawn with flowers opens Events and leaves her be (no hold, no closeness); landmarks first.
+  context.plantedLawnAt = () => 10; expect(['events']);
+  context.hitsSwing = () => true; expect(['visitSwing']); context.hitsSwing = () => false;
+  context.onOpenEventsRef.current = undefined; expect(['move', 'redraw']); context.onOpenEventsRef.current = () => {};
+  context.plantedLawnAt = () => null;
   context.bookhouseOnEntry.current = true; expect(['move', 'redraw']); assert.equal(context.bookhouseOnEntry.current, false);
   context.readOnly = true; expect([]);
   // A friend's Garden still opens its flowers (support and messages), never planting or the Fairy.

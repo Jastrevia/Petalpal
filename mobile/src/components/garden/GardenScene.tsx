@@ -1058,31 +1058,21 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (readOnly) return;
       // Placement and flower details own taps before any Fairy destination.
       if (enableFairyWalk && fairyRef.current?.isMailboxBusy()) return;
+      // A place she goes (landmarks first), else a lawn with flowers (which opens its Events and
+      // leaves her be), else a spot on the paths.
+      const at = { x: worldX, y: worldY };
+      const destination = !enableFairyWalk ? null
+        : hitsMailbox(at, treehousePlacement) ? () => fairyRef.current?.visitMailbox()
+        : hitsTreehouse(at, treehousePlacement) ? () => tapTreehouse.current()
+        : hitsSwing(at, swingPlacement) ? () => fairyRef.current?.visitSwing()
+        : hitsTeaArea(at, teaSetPlacement) ? () => fairyRef.current?.visitTea()
+        : hitsMoonBed(at, moonBedPlacement) ? () => fairyRef.current?.visitMoonBed()
+        : null;
+      const lawn = !destination && onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
+      if (lawn !== null) { openLawnEvents(lawn, worldX, worldY); return; }
       if (enableFairyWalk) { noteFairyUser(); bookhouseOnEntry.current = false; }
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
-      if (enableFairyWalk && hitsMailbox({x:worldX,y:worldY},treehousePlacement)) {
-        fairyRef.current?.visitMailbox();
-        return;
-      }
-      if (enableFairyWalk && hitsTreehouse({x:worldX,y:worldY},treehousePlacement)) {
-        tapTreehouse.current();
-        return;
-      }
-      if (enableFairyWalk && hitsSwing({x:worldX,y:worldY}, swingPlacement)) {
-        fairyRef.current?.visitSwing();
-        return;
-      }
-      if (enableFairyWalk && hitsTeaArea({x:worldX,y:worldY},teaSetPlacement)) {
-        fairyRef.current?.visitTea();
-        return;
-      }
-      if (enableFairyWalk && hitsMoonBed({x:worldX,y:worldY}, moonBedPlacement)) {
-        fairyRef.current?.visitMoonBed();
-        return;
-      }
-      // A lawn with flowers (not a flower itself): open its Events.
-      const lawn = onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
-      if (lawn !== null) { openLawnEvents(lawn, worldX, worldY); return; }
+      if (destination) { destination(); return; }
       if (enableFairyWalk) {
         const accepted = fairyRef.current?.move({ x: worldX, y: worldY });
         if (accepted && Platform.OS === 'web') canvasRef.current?.redraw();
