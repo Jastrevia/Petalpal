@@ -167,8 +167,8 @@ test("deleting an Event removes a short Weekly report whose mood curve shows it,
   };
   const result = await new PrivateEventRepository({ $transaction: fn => fn(tx) })
     .deleteEventAndAffectedReports({ identity: { userId: "alice" }, eventId: "event-1" });
-  // Reports up to five weeks later can still quote it in "then and now".
-  assert.deepEqual(where, { ownerId: "alice", periodStartUtc: { lte: new Date("2026-10-21T12:00:00Z") }, periodEndUtc: { gt: occurredAt } });
+  // Any later report can still show it ("then and now" up to five weeks later, a Weekly 2.0 echo up to a year).
+  assert.deepEqual(where, { ownerId: "alice", periodEndUtc: { gt: occurredAt } });
   assert.deepEqual(deleted, ["weekly-short"]);
   assert.deepEqual(result.deletedReports, { weekly: 1, monthly: 0, yearly: 0 });
 });

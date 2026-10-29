@@ -41,10 +41,11 @@ export const createLastWeekReflection = (signal?: AbortSignal) =>
 export const createLastMonthReflection = (signal?: AbortSignal) =>
   apiRequest<WeeklyTriggerResult>('/ai/reports/monthly/trigger', 'POST', {}, { signal });
 
-// Weekly periodKey is the local Monday (YYYY-MM-DD) of a Monday-Sunday week.
+// Weekly periodKey is the local Monday (YYYY-MM-DD) of a Monday-Sunday week: the newest week that may be written,
+// this week from Sunday 23:59 (as the server's trigger, time.md §3), else last week.
 export function lastClosedWeekKey(now = new Date()) {
-  const offset = (now.getDay() + 6) % 7;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset - 7);
+  const offset = (now.getDay() + 6) % 7, ready = now.getDay() === 0 && now.getHours() * 60 + now.getMinutes() >= 23 * 60 + 59;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset - (ready ? 0 : 7));
   return [monday.getFullYear(), monday.getMonth() + 1, monday.getDate()].map((n, i) => String(n).padStart(i ? 2 : 4, '0')).join('-');
 }
 // Monthly periodKey is the previous calendar month (YYYY-MM).
@@ -108,7 +109,7 @@ export interface ShortWeekly {
 }
 export interface PetalCard { id: string; name: string; line: string; text: string; fact: string; disclaimer: string; reason: string | null }
 // TREND is Weekly 2.0's code-written fallback (backend lib/insight-compute.js).
-export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND';
+export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND' | 'ECHO';
 export type InsightFeedback = 'INACCURATE' | 'HIDDEN';
 export interface Insight {
   // `index` is the section's place in the saved report, which the feedback call names.
@@ -131,7 +132,7 @@ export function shortWeekly(report: Pick<ReflectionReport, 'narrativeSections'>)
     side: find('SIDE_BY_SIDE')?.claim ?? null, question: find('QUESTION')?.claim ?? null, support: find('SUPPORT_RESOURCES')?.claim ?? null,
     thenAndNow: thenNow(find('THEN_AND_NOW')), card: petalCard(find('PETAL_CARD')), ...insightsOf(sections) };
 }
-const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND'];
+const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND', 'ECHO'];
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
 const spanOf = (value?: { text?: unknown; sourceEventId?: unknown } | null) =>
   value && filled(value.text) && filled(value.sourceEventId) ? { text: value.text, eventId: value.sourceEventId } : null;
@@ -229,7 +230,7 @@ export const SHORT_COPY = {
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
     undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
     types: { SAID_BEFORE: 'Something you said', HIDDEN_LINK: 'A quiet link', SMALL_GOODS: 'Small good things',
-      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned' }, page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
+      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo' }, page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
@@ -237,7 +238,7 @@ export const SHORT_COPY = {
     bloomed: '你这周的花开了', tapBud: '轻点花苞，打开这一周', bouquet: '本周花束',
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
-    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向' },
+    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声' },
     page: '洞察', previousCard: '上一条', nextCard: '下一条',
     write: '写一写', open: '看完整记录', close: '收起', loading: '正在打开…',
     unavailable: '现在打不开这条记录。', support: '支持', days: ['一', '二', '三', '四', '五', '六', '日'] },

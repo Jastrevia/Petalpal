@@ -13,7 +13,15 @@ export const INSIGHT_ART: Record<string, number> = {
   SMALL_GOODS: require('@/assets/reflection/weekly/small-goods.webp'),
   OPEN_QUESTION: require('@/assets/reflection/weekly/open-question.webp'),
   TREND: require('@/assets/reflection/weekly/trend.webp'),
+  ECHO: require('@/assets/reflection/weekly/echo.webp'),
+};
+// One painted crocus petal per mood (the same petal recoloured), for the opening bud.
+export const PETAL_ART: Record<string, number> = {
+  SUNNY_BLOOM: require('@/assets/reflection/weekly/petals/sunny.webp'), GENTLE_BLOOM: require('@/assets/reflection/weekly/petals/gentle.webp'),
+  QUIET_BLOOM: require('@/assets/reflection/weekly/petals/quiet.webp'), HEALING_BLOOM: require('@/assets/reflection/weekly/petals/healing.webp'),
+  FIRE_BLOOM: require('@/assets/reflection/weekly/petals/fire.webp'), WONDER_BLOOM: require('@/assets/reflection/weekly/petals/wonder.webp'),
+  DRIFTING_BLOOM: require('@/assets/reflection/weekly/petals/drifting.webp'), PEACEFUL_BLOOM: require('@/assets/reflection/weekly/petals/peaceful.webp'),
 };
 // Width / height of each picture, so a fixed height never stretches it.
 export const ART_RATIO: Record<string, number> = { bud: 335 / 450, ground: 1050 / 600, oneMore: 163 / 216, question: 202 / 216,
-  SAID_BEFORE: 212 / 216, HIDDEN_LINK: 174 / 216, SMALL_GOODS: 185 / 216, OPEN_QUESTION: 119 / 216, TREND: 171 / 216 };
+  SAID_BEFORE: 212 / 216, HIDDEN_LINK: 174 / 216, SMALL_GOODS: 185 / 216, OPEN_QUESTION: 119 / 216, TREND: 171 / 216, ECHO: 180 / 216, petal: 75 / 150 };

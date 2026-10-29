@@ -140,11 +140,19 @@ test("Cloudflare Cron enqueues only bounded opaque IDs from the authenticated re
   const env = { AI_JOB_EXECUTOR_URL: "https://render.example", AI_JOB_EXECUTOR_TOKEN: "executor-secret",
     AI_JOB_QUEUE: { send: async (message) => sent.push(message) } };
   try {
-    globalThis.fetch = async (_url, init) => {
+    const weeklyJob = "cmweeklyjob00001";
+    globalThis.fetch = async (url, init) => {
       assert.equal(init.headers.Authorization, "Bearer executor-secret");
-      return Response.json({ jobs: [{ jobId }] });
+      return Response.json({ jobs: [{ jobId: String(url).endsWith("/schedule-weekly") ? weeklyJob : jobId }] });
     };
     await cloudflareWorker.scheduled({}, env);
-    assert.deepEqual(sent, [{ jobId }]);
+    assert.deepEqual(sent, [{ jobId: weeklyJob }, { jobId }], "server-written Weekly jobs first, then reconciliation");
+    // The Weekly schedule failing, or answering with anything but bounded ids, never stops reconciliation.
+    for (const schedule of [() => new Response(null, { status: 503 }), () => Response.json({ jobs: [{ jobId, text: "private" }] })]) {
+      sent.length = 0;
+      globalThis.fetch = async url => String(url).endsWith("/schedule-weekly") ? schedule() : Response.json({ jobs: [{ jobId }] });
+      await cloudflareWorker.scheduled({}, env);
+      assert.deepEqual(sent, [{ jobId }]);
+    }
   } finally { globalThis.fetch = originalFetch; }
 });

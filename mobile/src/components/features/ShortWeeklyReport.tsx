@@ -38,7 +38,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   // ---- Weekly 2.0 opening (shared by both pages) ----
   const ceremony = short.version2 && !!short.insights;
   const points = short.curve?.points ?? [];
-  const { bloomed, bloom, bud, headline: headlineIn, rest: restIn, rise } = useBloom(reportId ?? '', points.length, { enabled: ceremony, reducedMotion });
+  const { bloomed, bloom, bud, fan, headline: headlineIn, rest: restIn, rise } = useBloom(reportId ?? '', points.length, { enabled: ceremony, reducedMotion });
   const species = useEventSpecies();
   // ---- 不准确 / 隐藏 ----
   const [marks, setMarks] = useState<Record<number, InsightFeedback | null>>({});
@@ -273,7 +273,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       {part !== 'right' && <>{dateLines}{title}{question}</>}
     </View>;
     const left = !bloomed
-      ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} interactive={interactive} onOpen={bloom} />
+      ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} fan={fan} moods={points.map(point => point.mood)} interactive={interactive} onOpen={bloom} />
       : <>
         <Animated.View style={fadeRise(headlineIn)}>{dateLines}{title}</Animated.View>
         {short.curve && <View style={v.bouquet}>

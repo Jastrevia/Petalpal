@@ -63,6 +63,8 @@ test('Weekly reflections are named by week of month and the last closed week is 
   const service = load('../../../services/reflections');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 19, 10)), '2026-10-12', 'Monday: the week that just ended');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23)), '2026-10-05', 'Sunday: the current week is still open');
+  assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23, 58, 59)), '2026-10-05', 'Sunday 23:58: not yet');
+  assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23, 59)), '2026-10-12', 'Sunday 23:59: this week can be written');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 10, 2, 0, 5)), '2026-10-26');
   assert.deepEqual({ ...service.weekLabel('2026-10-12') }, { title: 'October · Week 2', chip: 'Oct · Week 2', range: 'Oct 12 – 18' });
   assert.deepEqual({ ...service.weekLabel('2026-09-28') }, { title: 'September · Week 4', chip: 'Sep · Week 4', range: 'Sep 28 – Oct 4' });

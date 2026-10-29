@@ -108,6 +108,8 @@ test('Weekly 2.0: a TREND main insight, and the headline of a week with no insig
   const headline = { kind: 'HEADLINE', claim: '这周的花还在长', reportVersion: 'weekly-2.0', ...meta };
   const read = list => plain(shortWeekly({ narrativeSections: [...sections, ...list] }));
   assert.equal(read([headline, trend]).insights.main.type, 'TREND');
+  const echo = { ...trend, type: 'ECHO', items: [{ text: '我又在凌晨三点醒来了，不知道为什么。', sourceEventId: 'event-9' }, { text: '我又在凌晨三点醒来了。', sourceEventId: 'event-0' }] };
+  assert.deepEqual(read([headline, echo]).insights.main.items.map(item => item.eventId), ['event-9', 'event-0'], 'a lone time echo is the main insight');
   const growing = read([headline]);
   assert.equal(growing.headline, '这周的花还在长'); assert.equal(growing.insights, null);
   assert.equal(read([{ ...headline, reportVersion: undefined }]).headline, null, 'a v1 headline still needs its main insight');
