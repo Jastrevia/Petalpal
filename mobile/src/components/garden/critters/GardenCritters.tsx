@@ -5,7 +5,7 @@ import { isGardenGroundBlocked } from '../fairy/gardenGround';
 import { safeSegment, WALK_NETWORK } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CRITTERS, nextGap, planNextLeg, planVisit, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
+  AWAY_SECONDS, burstLength, CRITTERS, nextGap, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
 } from './critterVisits';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
@@ -14,8 +14,10 @@ import {
 // A painted motion: frames in a grid (scripts/critters/video-frames.py), `w` × `h` each. A
 // walk: `ground` the row the paws stand on, `loop` the world units walked over all its frames.
 // A flight: `fps`, played in time. `rest`: frames of settling down (same cells), played while it
-// rests between legs, and backwards to get up again.
-type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number; rest?: { source: number; count: number } };
+// rests between legs, and backwards as far as `rise` (standing) to get up again. `trail`: a
+// painted petal it sheds behind it while it moves.
+type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number;
+  rest?: { source: number; count: number; rise: number }; trail?: number };
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -28,10 +30,12 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // planted paws cover in that stride, so they do not skid.
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
   puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
-  // The Silktail Fox spirit: a generated walking clip (several strides), and between legs it sits
-  // down to rest (a generated settling clip) and gets up again.
-  silktail: { source: require('@/assets/garden/spirits/silktail-walk.webp'), w: 237, h: 180,
-    frames: { columns: 8, count: 62, ground: 176, loop: 131.8, rest: { source: require('@/assets/garden/spirits/silktail-rest.webp'), count: 41 } } },
+  // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
+  // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
+  // from that same running pose), and gets up again (back to its standing frame, 24).
+  silktail: { source: require('@/assets/garden/spirits/silktail-run.webp'), w: 240, h: 180,
+    frames: { columns: 8, count: 47, ground: 167, loop: 394, trail: require('@/assets/garden/spirits/silktail-petal.webp'),
+      rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24 } } },
 };
 const REST_FPS = 12;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
@@ -122,9 +126,9 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     const rest = frames.rest, e = clock.value - visit.start;
     if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
     if (reduced) return rest.count - 1;
-    const settle = rest.count / REST_FPS;
+    const settle = rest.count / REST_FPS, rise = (rest.count - rest.rise) / REST_FPS;
     if (e < settle) return Math.floor(e * REST_FPS);
-    if (e > visit.lead - settle) return Math.max(0, Math.floor((visit.lead - e) * REST_FPS));
+    if (e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
     return rest.count - 1;
   }, [visit, frames, reduced]);
   const walkOpacity = useDerivedValue(() => (restFrame.value < 0 ? 1 : 0), [restFrame]);
@@ -140,10 +144,43 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
         <BlurMask blur={3} style="normal" />
       </Oval>
     </Group>
+    {frames.trail ? <PetalTrail visit={visit} clock={clock} source={frames.trail} reduced={!!reduced} /> : null}
     <Group transform={transform}>
       <Group opacity={walkOpacity}><SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} /></Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
     </Group>
+  </Group>;
+}
+
+// Petals shed behind a running spirit: one every SPACING units of ground it covers, each let go at
+// its tail and drifting down and back as it fades. Each petal's age comes from when the runner
+// passed that spot (its pace is steady), so petals keep drifting and fading after it stops.
+const PETALS = 18, SPACING = 20, PETAL_LIFE = 1.8, PETAL_SIZE = 15;
+function PetalTrail({ visit, clock, source, reduced }: { visit: Visit; clock: SharedValue<number>; source: number; reduced: boolean }) {
+  const petal = useImage(source);
+  if (!petal || reduced) return null;
+  return <>{Array.from({ length: PETALS }, (_, i) => <Petal key={i} index={i} visit={visit} clock={clock} petal={petal} />)}</>;
+}
+
+function Petal({ index, visit, clock, petal }: { index: number; visit: Visit; clock: SharedValue<number>; petal: SkImage }) {
+  const size = CRITTERS[visit.id].size;
+  const state = useDerivedValue(() => {
+    const now = clock.value, moved = visitDistance(visit, now);
+    const at = (Math.floor(moved / SPACING) - index) * SPACING;
+    const age = now - (visit.start + visit.lead + at / visit.speed);
+    if (at < 0 || age < 0 || age > PETAL_LIFE) return { x: 0, y: 0, o: 0, r: 0 };
+    const p = pointAlong(visit.path, at), back = p.dx < 0 ? 1 : -1;
+    // Let go from the tail (behind and a little up), then drift back, down and sideways.
+    const x = p.x + back * (size * 0.42 + age * 16) + Math.sin(age * 4 + index) * 5;
+    const y = p.y - size * 0.32 + age * age * 14 + age * 8;
+    const o = Math.min(1, age / 0.15) * (1 - age / PETAL_LIFE);
+    return { x, y, o, r: age * 2.2 + index * 0.9 };
+  }, [visit, index, size]);
+  const opacity = useDerivedValue(() => state.value.o, [state]);
+  const transform = useDerivedValue(() => [{ translateX: state.value.x }, { translateY: state.value.y }, { rotate: state.value.r },
+    { translateX: -PETAL_SIZE / 2 }, { translateY: -PETAL_SIZE / 2 }], [state]);
+  return <Group opacity={opacity} transform={transform}>
+    <Image image={petal} x={0} y={0} width={PETAL_SIZE} height={PETAL_SIZE} fit="fill" />
   </Group>;
 }
 

@@ -28,8 +28,8 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
   // The puppy's pace matches its painted stride: 41.9 units each 1.42 s.
   puppy: { id: 'puppy', kind: 'walker', size: 100, speed: 30, altitude: [0, 0] },
-  // The fox's pace matches its painted walk: 131.8 units each 5.17 s.
-  silktail: { id: 'silktail', kind: 'walker', size: 130, speed: 25.5, altitude: [0, 0] },
+  // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
+  silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
 };
 export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail');
 export const MAX_VISITORS = 2;
@@ -40,7 +40,7 @@ export const FADE_SECONDS = 0.8;
 export const AWAY_SECONDS = 10 * 60;
 // Seconds a visitor rests where a leg ended before the next one (the bluebird flies on).
 export const REST: Readonly<Record<CritterId, [number, number]>> = {
-  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10], silktail: [8, 16],
+  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10], silktail: [12, 24],
 };
 
 // How a visitor moves: in bursts of `moving` (fraction) of every `cycle` seconds, still otherwise
@@ -176,6 +176,21 @@ export function travelled(elapsed: number, rhythm: Rhythm) {
   // Each burst eases in and out, so hops and darts start and land softly.
   const u = Math.min(1, within / burst);
   return cycles * burst + burst * (u * u * (3 - 2 * u));
+}
+
+// The point `distance` along a path, and the direction of the segment it is on.
+export function pointAlong(path: readonly Point[], distance: number) {
+  'worklet';
+  let left = Math.max(0, distance);
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i], length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (left <= length || i === path.length - 1) {
+      const u = length ? Math.min(1, left / length) : 1;
+      return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, dx: b.x - a.x };
+    }
+    left -= length;
+  }
+  return { x: path[0].x, y: path[0].y, dx: 1 };
 }
 
 // How far a visitor has come along its path `seconds` into its visit (world units): walkers'
