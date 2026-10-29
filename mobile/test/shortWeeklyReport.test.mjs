@@ -30,7 +30,8 @@ test('short Weekly sections are read only from the short contract; older reports
   assert.equal(shortWeekly({ narrativeSections: [...sections, { kind: 'RECENT_MOMENTS', claim: 'Mixed.' }] }), null);
   assert.equal(shortWeekly({ narrativeSections: [] }), null);
   const support = plain(shortWeekly({ narrativeSections: [{ kind: 'SUPPORT_RESOURCES', claim: 'You do not have to face this alone.', contractVersion: WEEKLY_SHORT, locale: 'en' }] }));
-  assert.deepEqual({ ...support, support: !!support.support }, { locale: 'en', line: null, curve: null, side: null, question: null, support: true, thenAndNow: null, card: null });
+  assert.deepEqual({ ...support, support: !!support.support }, { locale: 'en', line: null, curve: null, side: null, question: null, support: true, thenAndNow: null, card: null,
+    headline: null, insights: null });
 });
 
 test('mood curve puts each day in its column, higher moods higher, and joins points in time order', () => {
@@ -65,8 +66,36 @@ test('petal card is read only when every field is present', () => {
     text: '大星星挂在夜空。', fact: '这周你 4 次选了「安静」。', disclaimer: '花语卡只是陪你回看自己。', evidenceRefs: [], ...meta };
   assert.equal(shortWeekly({ narrativeSections: sections }).card, null);
   assert.deepEqual(plain(shortWeekly({ narrativeSections: [...sections, card] }).card),
-    { id: 'major-17', name: '星星', line: card.line, text: card.text, fact: card.fact, disclaimer: card.disclaimer });
+    { id: 'major-17', name: '星星', line: card.line, text: card.text, fact: card.fact, disclaimer: card.disclaimer, reason: null });
+  assert.equal(shortWeekly({ narrativeSections: [...sections, { ...card, reason: '小花仙看到你常写到“妈妈”，给你配了「星星」。' }] }).card.reason,
+    '小花仙看到你常写到“妈妈”，给你配了「星星」。');
   assert.equal(shortWeekly({ narrativeSections: [...sections, { ...card, disclaimer: ' ' }] }).card, null);
   assert.equal(shortWeekly({ narrativeSections: [...sections, { ...card, fact: undefined }] }).card, null);
   assert.equal(SHORT_COPY['zh-Hans'].card, '花语卡');
+});
+
+// Weekly insights: saved under the same v1 contract, as new section kinds older apps skip.
+test('insights: a valid main insight brings the headline and up to three more; malformed ones are skipped', () => {
+  const insight = (role, type, extra = {}) => ({ kind: 'INSIGHT', claim: 'x', role, type, text: `${type} text`, fact: null, items: [], quote: null,
+    evidence: [{ sourceEventId: 'event-0', date: '2026-09-14' }], ...meta, ...extra });
+  const goods = insight('secondary', 'SMALL_GOODS', { items: [{ text: '阳光很好。', sourceEventId: 'event-1' }, { text: '喝到了热汤。', sourceEventId: 'event-2' }] });
+  const read = list => plain(shortWeekly({ narrativeSections: [...sections, { kind: 'HEADLINE', claim: '写到妈妈的日子，多是亮的', ...meta }, ...list] }));
+  const short = read([insight('main', 'HIDDEN_LINK', { fact: '这五周有 3 条记录写到“妈妈”。' }), goods,
+    insight('secondary', 'OPEN_QUESTION', { quote: { text: '我到底想要什么？', sourceEventId: 'event-2' } }),
+    insight('secondary', 'MADE_UP'), insight('secondary', 'SAID_BEFORE', { evidence: [{ sourceEventId: 'event-0', date: 'Sep 14' }] }),
+    insight('secondary', 'SMALL_GOODS', { items: [{ text: '只有一件。', sourceEventId: 'event-1' }] })]);
+  assert.equal(short.headline, '写到妈妈的日子，多是亮的');
+  assert.deepEqual(short.insights.main, { type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
+    evidence: [{ eventId: 'event-0', date: '2026-09-14' }] });
+  assert.deepEqual(short.insights.secondary.map(item => item.type), ['SMALL_GOODS', 'OPEN_QUESTION']);
+  assert.deepEqual(short.insights.secondary[0].items.map(item => item.eventId), ['event-1', 'event-2']);
+  assert.deepEqual(short.insights.secondary[1].quote, { text: '我到底想要什么？', eventId: 'event-2' });
+  // The rest of the report reads as before.
+  assert.equal(short.side, sections[2].claim); assert.equal(short.line.eventId, 'event-0');
+  // No valid main insight: no headline and no insight cards, the short report as it was.
+  for (const list of [[goods], [insight('main', 'HIDDEN_LINK', { text: ' ' })], [insight('main', 'HIDDEN_LINK', { evidence: [] })]]) {
+    const plainShort = read(list);
+    assert.equal(plainShort.headline, null); assert.equal(plainShort.insights, null);
+  }
+  assert.equal(SHORT_COPY['zh-Hans'].whyCard, '为什么是这张');
 });
