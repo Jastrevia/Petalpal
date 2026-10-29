@@ -18,6 +18,7 @@ import { momentLocale } from '../moments/momentFormat';
 import { startUserRealtime, stopUserRealtime, subscribeUserRealtime, visitNotice } from '../../services/userRealtime';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { zhHans } from './fairy/tapLines';
+import { onOpenGardenPanel } from './gardenPanelBus';
 
 // One navigation model; only its sizing changes with the viewport.
 export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) {
@@ -31,6 +32,8 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const [highlightedFeature, setHighlightedFeature] = useState<string>();
   const [openFeature, setOpenFeature] = useState<string>();
   const { feature: entryFeature } = useLocalSearchParams<{ feature?: string }>();
+  // The Garden itself can open a panel (a tapped lawn with flowers opens Events).
+  useEffect(() => onOpenGardenPanel(feature => setOpenFeature(gardenFeature(feature)?.id)), []);
   // Fairy Moments: when the server has Moments on for this owner, the Fairy icon opens her
   // feed (with a dot for new posts); otherwise it keeps focusing the camera on her.
   // The runtime response carries `moments` only for owners on the server's Moments allowlist.
