@@ -9,10 +9,17 @@ import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey
 import { ShortWeeklyReport } from '../components/features/ShortWeeklyReport';
 import { useAppLocale } from '../services/locale';
 
+// The shelf's books: Weekly, Monthly, and the third one, notes about the reflections (safety note, disclaimers).
+type Book = ReportType | 'notes';
+const BOOKS: Book[] = ['weekly', 'monthly', 'notes'];
 // Every label on this screen follows the app language; saved reflections keep their own words.
 const CHROME = {
-  en: { book: { weekly: 'Weekly', monthly: 'Monthly' }, unit: { weekly: 'week', monthly: 'month' },
-    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: ReportType) => `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
+  en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'About' }, unit: { weekly: 'week', monthly: 'month' },
+    reportOutput: 'Report final output', notesTitle: 'About these reflections', notes: [
+      'Your petal card is only a way to look back at yourself. It is not a prediction, and it cannot replace professional help.',
+      'Every number and every quote in a reflection is found by the app in your own entries; AI only words them, and any sentence that does not match what you wrote is left out.',
+      'Don’t want to see an insight? Tap Hide under it. If something in a reflection seems wrong, report it at the end of that reflection.'],
+    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: Book) => type === 'notes' ? 'About these reflections' : `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
     inProgress: ' · In progress', writing: (type: ReportType) => `Writing last ${type === 'weekly' ? 'week' : 'month'}’s reflection…`,
     loading: 'Loading reflection', tryLoad: 'Try loading again', tryRead: 'Try reading again', loadFailed: 'Unable to load saved reflections.',
     readFailed: 'Unable to read this reflection.', emptyTitle: 'A place to look back', empty: (type: ReportType) => `No saved ${type} reflections yet.`,
@@ -26,8 +33,12 @@ const CHROME = {
     previous: (type: ReportType) => `Previous ${type === 'weekly' ? 'week' : 'month'}`, next: (type: ReportType) => `Next ${type === 'weekly' ? 'week' : 'month'}`,
     close: 'Close Reflections', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
     kept: 'Your reflections, kept here.' },
-  'zh-Hans': { book: { weekly: '周报', monthly: '月报' }, unit: { weekly: '周', monthly: '月' },
-    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: ReportType) => type === 'weekly' ? '周报' : '月报',
+  'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于' }, unit: { weekly: '周', monthly: '月' },
+    reportOutput: '举报最终内容', notesTitle: '关于这些回看', notes: [
+      '花语卡只是陪你回看自己，不是预测，也不能代替专业的帮助。',
+      '回看里的每个数字、每句原话，都是程序从你自己的记录里找出来的；AI 只负责把它们说通顺，和你写过的话对不上的句子不会出现。',
+      '不想看到某一条，可以点它下面的「隐藏」。觉得哪份回看有问题，可以在那份回看的最后举报。'],
+    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: Book) => type === 'notes' ? '关于这些回看' : type === 'weekly' ? '周报' : '月报',
     inProgress: ' · 还在写', writing: (type: ReportType) => type === 'weekly' ? '正在写上周的周报…' : '正在写上个月的月报…',
     loading: '正在打开', tryLoad: '重新加载', tryRead: '重新打开', loadFailed: '没能打开保存的回看。', readFailed: '没能打开这份回看。',
     emptyTitle: '回看的地方', empty: (type: ReportType) => type === 'weekly' ? '还没有保存的周报。' : '还没有保存的月报。',
@@ -78,6 +89,9 @@ export default function Reflection() {
     animation.start(); return () => animation.stop();
   }, [night, reducedMotion, lighting]);
   const [type, setType] = useState<ReportType>('weekly');
+  const [notes, setNotes] = useState(false);
+  const openBook = (book: Book) => { if (book === 'notes') setNotes(true); else { setNotes(false); setType(book); } };
+  const onBook = (book: Book) => book === 'notes' ? notes : !notes && type === book;
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   // One page per period, oldest first. null = the newest page.
@@ -228,8 +242,8 @@ export default function Reflection() {
   const cloth = type === 'weekly' ? (night ? '#2F4739' : '#3E5A4C') : (night ? '#233F62' : '#2D5279');
   const accent = type === 'weekly' ? '#55704A' : '#3B5F8C', bookInk = type === 'weekly' ? '#34472F' : '#2A4466';
   // Shelf spines cropped from the same painted art (1000-wide units, rows 138–318): the phone's Weekly/Monthly switch.
-  const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 } };
-  const shelfSpine = (item: ReportType, h: number) => {
+  const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 } };
+  const shelfSpine = (item: Book, h: number) => {
     const { x, w } = shelf[item], k = h / 180;
     return <View style={{ width: w * k, height: h, overflow: 'hidden', borderRadius: 2 }}>
       <Image source={night ? interiorNight : interiorDay} accessible={false} style={{ position: 'absolute', width: 1000 * k, height: 4000 / 3 * k, left: -x * k, top: -138 * k }} />
@@ -272,8 +286,7 @@ export default function Reflection() {
     const found = weekly2Of(report)!, label = weekLabel(report.periodKey, lang);
     return <ShortWeeklyReport short={found.short} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
       date={{ eyebrow: lang === 'en' ? label.title.toUpperCase() : label.title, range: label.range + (report.status === 'PARTIAL' ? t.inProgress : '') }}
-      safety={<EmotionalSafetyNote style={s.quietNote} />}
-      report={interactive ? <View style={{ marginBottom: 12 }}><AiOutputReport kind="weekly" outputId={found.detail.id} linkStyle={s.quietLink} /></View> : null}
+      report={interactive ? <View style={{ marginTop: 8 }}><AiOutputReport kind="weekly" outputId={found.detail.id} linkStyle={s.quietLink} title={t.reportOutput} /></View> : null}
       onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
   };
 
@@ -281,13 +294,22 @@ export default function Reflection() {
     const detail = report ? details[report.id] ?? null : null;
     const shown: Section = interactive ? section : 'Summary';
     const spread = weekly2Of(report);
+    // The third book: the safety note and the disclaimers that used to sit inside the reflections.
+    const notesPage = <View style={{ flex: 1, minHeight: 0 }}>
+      <Text accessibilityRole="header" style={[s.heading, { fontSize: compact ? 20 : Math.max(20, Math.min(25, sceneWidth * .024)), marginBottom: 12 }]}>{t.notesTitle}</Text>
+      <ScrollView style={{ flex: 1 }}>
+        <EmotionalSafetyNote style={s.notesText} />
+        {t.notes.map((line, i) => <Text key={i} style={[s.notesText, { marginTop: 12 }]}>{line}</Text>)}
+      </ScrollView>
+    </View>;
     return <View style={{ flex: 1, minHeight: 0, paddingRight: compact ? 0 : 30, flexDirection: wide ? 'row' : 'column', gap: wide ? 22 : 0 }}>
-      <View style={wide ? { width: '38%', minHeight: 0 } : undefined}>
-      {compact && <View style={s.shelf}>{(['weekly', 'monthly'] as const).map(item => <Pressable key={item} accessibilityRole="tab"
-        accessibilityState={{ selected: type === item }} aria-selected={type === item} accessibilityLabel={t.shelf(item)}
-        disabled={!interactive || !!turning} onPress={() => setType(item)} style={[s.shelfItem, { opacity: type === item ? 1 : .62 }]}>
-        <View style={[s.shelfSpine, type === item && s.shelfSpineOn]}>{shelfSpine(item, wide ? 44 : 52)}</View>
-        <Text style={[s.small, type === item && [s.shelfTextOn, { borderColor: '#B8934A' }]]}>{t.book[item]}</Text></Pressable>)}</View>}
+      <View style={wide ? { width: '42%', minHeight: 0 } : undefined}>
+      {compact && <View style={s.shelf}>{BOOKS.map(item => <Pressable key={item} accessibilityRole="tab"
+        accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)} accessibilityLabel={t.shelf(item)}
+        disabled={!interactive || !!turning} onPress={() => openBook(item)} style={[s.shelfItem, { opacity: onBook(item) ? 1 : .62 }]}>
+        <View style={[s.shelfSpine, onBook(item) && s.shelfSpineOn]}>{shelfSpine(item, wide ? 32 : 48)}</View>
+        <Text style={[s.small, onBook(item) && [s.shelfTextOn, { borderColor: '#B8934A' }]]}>{t.book[item]}</Text></Pressable>)}</View>}
+      {notes && interactive ? (wide ? null : notesPage) : <>
       {!spread && <>
       <Text accessibilityRole="header" style={[s.heading, compact && { color: bookInk }, { fontSize: compact ? 22 : Math.max(21, Math.min(27, sceneWidth * .026)) }]}>{t.title(type)}</Text>
       {report && (report.type === 'weekly'
@@ -301,26 +323,27 @@ export default function Reflection() {
       </View>}
       {!spread && <View accessible={false} style={s.ornament}><View style={s.goldLine} /><Text style={s.fleuron}>❦</Text><View style={s.goldLine} /></View>}
       {/* A phone on its side: the 2.0 left page fills this column and its right page the other. */}
-      {wide && spread && report && <ScrollView key={`${report.id}-left`} style={{ flex: 1 }} scrollEnabled={interactive} contentContainerStyle={{ paddingBottom: 15 }}>
-        {weekly2Page(report, 'left', interactive)}</ScrollView>}
+      {wide && spread && report && !notes && <View key={`${report.id}-left`} style={{ flex: 1, minHeight: 0 }}>{weekly2Page(report, 'left', interactive)}</View>}
       {compact && detail && !spread && <View style={s.textTabs}>{(['Summary', 'Topics', 'Patterns'] as const).map(item => <Pressable key={item} accessibilityRole="tab"
         accessibilityState={{ selected: shown === item, disabled: !interactive || !detail }} aria-selected={shown === item} disabled={!interactive || !detail}
         onPress={() => setSection(item)} style={[s.textTab, shown === item && { borderColor: accent }]}><Text style={[s.small, shown === item && s.textTabTextOn]}>{t.tabs[item]}</Text></Pressable>)}</View>}
+      </>}
       </View>
-      <View style={[{ flex: 1, minHeight: 0 }, wide && s.gutter]}>
+      {notes && interactive && wide && <View style={[{ flex: 1, minHeight: 0 }, s.gutter]}>{notesPage}</View>}
+      {!(notes && interactive) && <View style={[{ flex: 1, minHeight: 0 }, wide && s.gutter]}>
       {interactive && (loading || reading) && <ActivityIndicator color="#6E744E" accessibilityLabel={t.loading} />}
       {interactive && !!listError && <><Text style={s.body}>{listError}</Text><Pressable accessibilityRole="button" onPress={() => void load(cursor || undefined)}><Text style={s.link}>{t.tryLoad}</Text></Pressable></>}
       {interactive && !!readError && <><Text style={s.body}>{readError}</Text><Pressable accessibilityRole="button" onPress={() => setRetry(value => value + 1)}><Text style={s.link}>{t.tryRead}</Text></Pressable></>}
-      <ScrollView key={`${report?.id}-${shown}`} style={{ flex: 1 }} scrollEnabled={interactive} contentContainerStyle={{ paddingBottom: 15 }}>
+      {/* Weekly 2.0 pages never scroll: they turn (ShortWeeklyReport's Paged). */}
+      {detail && spread && report ? <View key={report.id} style={{ flex: 1, minHeight: 0 }}>{weekly2Page(report, wide ? 'right' : compact ? 'all' : 'left', interactive)}</View>
+      : <ScrollView key={`${report?.id}-${shown}`} style={{ flex: 1 }} scrollEnabled={interactive} contentContainerStyle={{ paddingBottom: 15 }}>
         {interactive && !loading && !listError && !report && <View style={{ paddingTop: compact ? 4 : 20 }}>
           <Text style={[s.heading, { fontSize: compact ? 20 : 22, marginBottom: compact ? 8 : 15 }]}>{t.emptyTitle}</Text>
           <Text style={s.body}>{t.empty(type)}</Text>
           <Text style={s.body}>{t.emptyBody}{cursor ? t.older : ''}</Text>
           <Image source={require('../../assets/garden/environment/flowers/ivory_wildflowers.png')} resizeMode="contain" style={{ width: 105, height: 80, marginTop: 8, opacity: .8 }} accessible={false} />
         </View>}
-        {detail && spread && report && weekly2Page(report, wide ? 'right' : compact ? 'all' : 'left', interactive)}
         {detail && !spread && <>
-          <EmotionalSafetyNote />
           {shown === 'Summary' && (() => {
             const short = shortWeekly(detail);
             if (short) return <ShortWeeklyReport short={short} interactive={interactive} reportId={detail.id} reducedMotion={reducedMotion}
@@ -341,21 +364,19 @@ export default function Reflection() {
               {detail.trendSignals.topicChanges?.map(item => <Text key={item.topic} selectable={interactive} style={s.pattern}>❧  {item.topic}: {item.previousCount} → {item.currentCount}</Text>)}
             </> : <Text style={s.body}>{t.notEnough}</Text>}
           </>}
-          {interactive && <View style={{ marginTop: 6, marginBottom: 12 }}><AiOutputReport kind={type} outputId={detail.id} /></View>}
+          {interactive && <View style={{ marginTop: 6, marginBottom: 12 }}><AiOutputReport kind={type} outputId={detail.id} title={t.reportOutput} /></View>}
           {compact && rightFace(report)}
         </>}
-      </ScrollView>
+      </ScrollView>}
       {detail && <Text style={[s.small, { paddingTop: 7, borderTopWidth: 1, borderColor: '#AA8B5933' }]}>{t.footer(detail.eventCount)}</Text>}
-      </View>
+      </View>}
     </View>;
   }
   function rightFace(report: SavedReport | null, interactive = false) {
-    const detail = report ? details[report.id] ?? null : null, spread = weekly2Of(report);
+    const detail = report && !notes ? details[report.id] ?? null : null, spread = notes ? null : weekly2Of(report);
     // Weekly 2.0, right page: the insights, petal card and question (blank paper until the bud is opened).
-    if (spread && report && spread.short.insights) return <View style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
-      <ScrollView key={report.id} style={{ flex: 1 }} scrollEnabled={interactive} contentContainerStyle={{ paddingBottom: 15 }}>
-        {weekly2Page(report, 'right', interactive)}
-      </ScrollView>
+    if (spread && report && spread.short.insights) return <View key={report.id} style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
+      {weekly2Page(report, 'right', interactive)}
     </View>;
     return <View style={{ flex: compact ? undefined : 1, minHeight: 0, alignItems: 'center', paddingLeft: compact ? 0 : 18, paddingTop: compact ? 15 : 0, paddingBottom: compact ? 0 : artHeight * .045 }}>
       <Image source={require('../../assets/reflection/botanical.png')} resizeMode="contain" accessible={false} style={{ width: '100%', height: compact ? 120 : undefined, flex: compact ? undefined : 1, opacity: .88 }} />
@@ -385,11 +406,11 @@ export default function Reflection() {
       </View>
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)} hitSlop={6}
         style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
-      {!compact && (['weekly', 'monthly'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: type === item }} aria-selected={type === item} accessibilityLabel={t.shelf(item)} disabled={!!turning} onPress={() => setType(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>
-        <Text style={{ fontFamily: 'Georgia', fontSize: Math.max(12, sceneWidth * .018), color: '#EAD6AA', textShadowColor: '#42301C', textShadowRadius: 2, borderBottomWidth: type === item ? 1 : 0, borderColor: '#DCC49588', paddingBottom: 4 }}>{t.book[item]}</Text>
+      {!compact && BOOKS.map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)} accessibilityLabel={t.shelf(item)} disabled={!!turning} onPress={() => openBook(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>
+        <Text style={{ fontFamily: 'Georgia', fontSize: Math.max(12, sceneWidth * .018), color: '#EAD6AA', textShadowColor: '#42301C', textShadowRadius: 2, borderBottomWidth: onBook(item) ? 1 : 0, borderColor: '#DCC49588', paddingBottom: 4 }}>{t.book[item]}</Text>
       </Pressable>)}
       <View testID="reflection-book" style={{ position: 'absolute', top: bookTop, left: bookLeft, width: bookWidth, height: bookHeight }}>
-        {!compact && !weekly2Of(selected) && <View style={{ position: 'absolute', left: '-6%', top: '10%', gap: 6, zIndex: 2 }}>
+        {!compact && !notes && !weekly2Of(selected) && <View style={{ position: 'absolute', left: '-6%', top: '10%', gap: 6, zIndex: 2 }}>
           {(['Summary', 'Topics', 'Patterns'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: section === item, disabled: !selected || !details[selected.id] || !!turning }} aria-selected={section === item} disabled={!selected || !details[selected.id] || !!turning} onPress={() => setSection(item)} style={[s.edgeTab, { backgroundColor: ['#BBC09A', '#E1C49A', '#DCA9A0'][i], opacity: section === item ? 1 : .88 }]}><Text style={s.small}>{t.tabs[item]}</Text></Pressable>)}
         </View>}
         {compact && <>
@@ -445,7 +466,7 @@ export default function Reflection() {
             </Animated.View>
           </>}
         </View>
-        {pages.length > 0 && <View style={[s.turns, compact
+        {pages.length > 0 && !notes && <View style={[s.turns, compact
           ? { left: area.left + 8, width: area.width - 16, top: area.top + area.height - 52, borderTopWidth: 1, borderColor: '#AA8B5933' }
           : { left: area.left, width: area.width, top: area.top + area.height + 4 }]}>
           <Pressable testID="reflection-previous-page" accessibilityRole="button" accessibilityLabel={t.previous(type)}
@@ -471,7 +492,7 @@ const s = StyleSheet.create({
   pattern: { fontFamily: 'Georgia', fontSize: 15, lineHeight: 23, color: '#556040', marginBottom: 8 },
   topic: { alignItems: 'center', minWidth: 70, maxWidth: 125, padding: 5 },
   edgeTab: { width: 83, minHeight: 49, justifyContent: 'center', alignItems: 'center', borderRadius: 4, borderWidth: 1, borderColor: '#9F805866', shadowColor: '#372412', shadowOpacity: .18, shadowRadius: 2, shadowOffset: { width: 1, height: 2 } },
-  quietNote: { fontFamily: 'Georgia', fontSize: 12, lineHeight: 18, color: '#7A6448' },
+  notesText: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: '#4D3B28' },
   quietLink: { fontFamily: 'Georgia', fontSize: 12, color: '#8C7556', textDecorationLine: 'underline' },
   note: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 17, lineHeight: 25, color: '#775633', textAlign: 'center', padding: 9 },
   caption: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, color: '#8B6C44', paddingVertical: 16, textAlign: 'center' },
@@ -503,8 +524,8 @@ const s = StyleSheet.create({
   fox: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(150,104,48,.05)', boxShadow: '0 0 26px 14px rgba(150,104,48,.07)' },
   // Aged paper: hinge shadow at the spine and a warm, worn edge all round.
   aged: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, boxShadow: 'inset 14px 0 14px -8px rgba(70,42,16,.45), inset 0 0 36px rgba(128,86,38,.34)' },
-  shelf: { flexDirection: 'row', alignItems: 'flex-end', gap: 20, marginBottom: 10 },
-  shelfItem: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, minHeight: 44 },
+  shelf: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 10, flexWrap: 'wrap' },
+  shelfItem: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, minHeight: 44 },
   shelfSpine: { borderRadius: 2, boxShadow: '1px 2px 3px rgba(40,25,10,.35)' },
   shelfSpineOn: { transform: [{ translateY: -3 }], boxShadow: '1px 5px 6px rgba(40,25,10,.45)' },
   shelfTextOn: { color: '#3A2C1C', borderBottomWidth: 1, paddingBottom: 2 },

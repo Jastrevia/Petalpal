@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useAuth } from '../../services/auth';
 import { eventFlowers } from '../../services/events';
 import { bouquetLayout, MOOD_SPECIES, shortDate, type MoodPoint, type ShortLocale } from '../../services/reflections';
+import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
 import { clusterPicture } from '../garden/planting/flowerClusters';
 import { ART_RATIO, PETAL_ART, WEEKLY_ART } from './weeklyArt';
 
@@ -100,7 +101,8 @@ export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, o
   const [width, setWidth] = useState(0);
   // A narrow page gets smaller flowers, about one day column wide.
   const size = width ? Math.min(FLOWER, Math.round(width / 7 * 1.05)) : FLOWER;
-  const placed = width ? bouquetLayout(days, points, width, size) : [], ground = Math.round(size * 1.3);
+  const placed = width ? bouquetLayout(days, points, width, size) : [];
+  const ground = Math.round(size * 1.3 + Math.max(0, ...placed.map(point => point.lift)));
   return <View>
     <View testID="weekly-bouquet" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: ground }}>
       {/* A painted bed of moss under the flowers. */}
@@ -108,14 +110,14 @@ export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, o
         style={{ position: 'absolute', left: -6, right: -6, bottom: -4, height: Math.round(size * .7) }} />
       {placed.map((point, i) => {
         const art = clusterPicture(species?.get(point.sourceEventId) ?? MOOD_SPECIES[point.mood], '', 'S');
-        const height = art ? Math.min(ground - 4, size * art.ratio) : size, value = rise[i];
-        return <Animated.View key={point.sourceEventId} style={[s.flower, { left: point.x, width: size, height: ground, opacity: value ?? 1,
-          transform: [{ translateY: value ? value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) : 0 }] }]}>
+        const height = art ? Math.min(size * 1.3 - 4, point.size * art.ratio) : point.size, value = rise[i];
+        return <Animated.View key={point.sourceEventId} style={[s.flower, { left: point.x, width: point.size, height: ground, zIndex: 10 - point.row,
+          bottom: point.lift, opacity: value ?? 1, transform: [{ translateY: value ? value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) : 0 }] }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={shortDate(point.date, locale)} disabled={!interactive}
             onPress={() => onOpen(point.sourceEventId)} style={({ pressed }) => [s.flowerHit, pressed && { opacity: .75 }]}>
-            {art && <Image source={art.source} contentFit="contain" style={{ width: size, height }} accessible={false} />}
+            {art && <Image source={art.source} contentFit="contain" style={{ width: point.size, height }} accessible={false} />}
           </Pressable>
-          {openId === point.sourceEventId && <View style={[s.mark, { left: size * .25, width: size * .5 }]} />}
+          {openId === point.sourceEventId && <View style={[s.mark, { left: point.size * .25, width: point.size * .5 }]} />}
         </Animated.View>;
       })}
     </View>
@@ -123,7 +125,36 @@ export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, o
   </View>;
 }
 
+// The week's moods as an 8-axis chart drawn with the painted petals: each mood keeps its own direction every week
+// (clockwise from the top, in the app's mood order), and its petal grows with how many times it was chosen. Every petal is
+// labelled with its mood's name and count, so the colours are never the only way to tell them apart.
+export function MoodPetalChart({ points, names, label, width }: { points: MoodPoint[]; names: Record<PrimaryMood, string>;
+  label: string; width: number }) {
+  const counts = new Map<PrimaryMood, number>(PRIMARY_MOODS.map(mood => [mood, 0]));
+  for (const point of points) counts.set(point.mood, (counts.get(point.mood) ?? 0) + 1);
+  const most = Math.max(1, ...counts.values()), box = Math.min(width, 260), centre = box / 2, longest = box * .27, shortest = box * .1;
+  const summary = PRIMARY_MOODS.map(mood => `${names[mood]} ${counts.get(mood)}`).join(', ');
+  return <View accessible accessibilityRole="image" accessibilityLabel={`${label}: ${summary}`} style={{ width: box, height: box, alignSelf: 'center' }}>
+    <View style={[s.ring, { width: longest * 2, height: longest * 2, borderRadius: longest, left: centre - longest, top: centre - longest }]} />
+    {PRIMARY_MOODS.map((mood, i) => {
+      const count = counts.get(mood) ?? 0, angle = i * 45, rad = angle * Math.PI / 180;
+      const length = count ? shortest + (longest - shortest) * count / most : 0, petalWidth = length * ART_RATIO.petal;
+      const labelAt = longest + 20, lx = centre + Math.sin(rad) * labelAt, ly = centre - Math.cos(rad) * labelAt;
+      return <View key={mood} pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View style={[s.axis, { left: centre, top: centre - longest, height: longest, transformOrigin: '50% 100%', transform: [{ rotate: `${angle}deg` }] }]} />
+        {count > 0 && <Image source={PETAL_ART[mood]} contentFit="contain" accessible={false} style={{ position: 'absolute', width: petalWidth, height: length,
+          left: centre - petalWidth / 2, top: centre - length, transformOrigin: '50% 100%', transform: [{ rotate: `${angle}deg` }] }} />}
+        <Text style={[s.chartLabel, { left: lx - 34, top: ly - 9 }, !count && s.chartLabelNone]}>{`${names[mood]} ${count}`}</Text>
+      </View>;
+    })}
+  </View>;
+}
+
 const s = StyleSheet.create({
+  ring: { position: 'absolute', borderWidth: 1, borderColor: '#A8823F33' },
+  axis: { position: 'absolute', width: 1, backgroundColor: '#A8823F40' },
+  chartLabel: { position: 'absolute', width: 68, textAlign: 'center', fontFamily: 'Georgia', fontSize: 11, color: '#4D3B28' },
+  chartLabelNone: { color: '#9A8261' },
   gate: { alignItems: 'center', paddingTop: 28, paddingBottom: 18, marginBottom: 8 },
   eyebrow: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 14, letterSpacing: 3, marginBottom: 40, textAlign: 'center' },
   bud: { minWidth: 120, height: BUD_HEIGHT + 8, alignItems: 'center', justifyContent: 'center' },
@@ -131,7 +162,7 @@ const s = StyleSheet.create({
   petal: { position: 'absolute', top: BUD_HEIGHT * .22 - PETAL / 2 + 4, left: '50%', marginLeft: -PETAL * ART_RATIO.petal / 2 },
   budArt: { width: BUD_HEIGHT * ART_RATIO.bud, height: BUD_HEIGHT },
   hint: { fontFamily: 'Georgia', fontStyle: 'italic', color: '#7A5E3C', fontSize: 15, marginTop: 14, textAlign: 'center' },
-  flower: { position: 'absolute', top: 0, justifyContent: 'flex-end' },
+  flower: { position: 'absolute', justifyContent: 'flex-end' },
   flowerHit: { minHeight: 44, justifyContent: 'flex-end', paddingBottom: 4 },
   mark: { position: 'absolute', bottom: 0, height: 2, borderRadius: 1, backgroundColor: '#B8934A' },
   days: { flexDirection: 'row', marginTop: 8, marginBottom: 10 },

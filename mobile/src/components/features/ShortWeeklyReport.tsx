@@ -3,11 +3,11 @@ import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, V
 import { Image } from 'expo-image';
 import { readEvent } from '../../services/events';
 import { moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, thenNowCount, type Insight, type InsightFeedback,
-  type ShortWeekly } from '../../services/reflections';
+  type ShortCopy, type ShortWeekly } from '../../services/reflections';
 import { petalCardArt } from '../petalCards/petalCardArt';
 import { EventIllustration } from './EventIllustration';
 import { useAppLocale } from '../../services/locale';
-import { BudGate, useBloom, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
+import { BudGate, MoodPetalChart, useBloom, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
@@ -20,15 +20,17 @@ export type ReportPart = 'left' | 'right' | 'all';
 // Rendering only: every part was chosen and validated on the backend; a hidden part simply is not saved.
 // Labels and dates follow the app language; the report's own sentences stay as saved.
 // Weekly 2.0 (docs/product/WEEKLY_2.0.md) is one spread of the book. Left page (`part` left): the date and headline
-// (after the bloom) over the week's bouquet; tap a flower for that day's words. Right page (`part` right): main insight
-// → more insights, side by side to swipe → "还有一件事" (then and now) → petal card with the safety note → question and
-// "写一写". It opens on a bud alone; tapping it raises the bouquet, then the headline, then the right page. A 2.0 week
-// with no insights shows only its headline and a gentle question. Phones (`part` all) stack both pages.
+// (after the bloom) over the week's bouquet (tap a flower for that day's words) and the 8-mood petal chart. Right page
+// (`part` right): main insight → more insights, side by side to swipe → "还有一件事" (then and now) → petal card → the
+// question → the report link. It opens on a bud alone; tapping it raises the bouquet, then the headline, then the right
+// page. A 2.0 week with no insights shows only its headline and a gentle question. Phones (`part` all) put both pages in
+// one flow. Text never scrolls: what does not fit on a page turns to the next (Paged). The safety note and disclaimers
+// live in the third book on the shelf, not here.
 // Older reports: with insights, the same order around the mood curve; without, the short report's layout.
-export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reducedMotion = false, part = 'all', date, safety, report }: {
+export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reducedMotion = false, part = 'all', date, report }: {
   short: ShortWeekly; interactive: boolean; onWrite: () => void; reportId?: string; reducedMotion?: boolean; part?: ReportPart;
-  // Weekly 2.0 only: the period's date lines, the safety note (shown with the petal card) and the AI-output report link.
-  date?: { eyebrow: string; range: string }; safety?: ReactNode; report?: ReactNode;
+  // Weekly 2.0 only: the period's date lines and the link to report this output.
+  date?: { eyebrow: string; range: string }; report?: ReactNode;
 }) {
   const lang = useAppLocale(), copy = SHORT_COPY[lang];
   const [opened, setOpened] = useState<Opened | null>(null);
@@ -156,7 +158,6 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         <Text selectable={interactive} style={s.small}>{short.card.reason}</Text>
       </View>}
       <Text selectable={interactive} style={[s.small, s.stretch]}>{short.card.fact}</Text>
-      <Text style={s.disclaimer}>{short.card.disclaimer}</Text>
     </View>
   </>;
   const thenAndNow = (heading: string) => short.thenAndNow && <>
@@ -181,7 +182,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   const fadeRise = (value: Animated.Value) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] });
 
   if (short.version2) {
-    // Weekly 2.0 is written on the paper itself: no boxes, only painted vignettes, serif type and gold hairlines.
+    // Weekly 2.0 is written on the paper itself: no boxes, only painted vignettes, serif type and gold hairlines. Every
+    // block keeps one text size; the page is split into book pages (Paged) instead of scrolling.
     const eyebrow = (text: string) => <Text style={v.eyebrow}>{text}</Text>;
     const art = (key: string, height: number, source = INSIGHT_ART[key]) => source
       ? <Image source={source} contentFit="contain" accessible={false} style={{ width: height * (ART_RATIO[key] ?? 1), height }} /> : null;
@@ -197,9 +199,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       })}
     </View>;
     const entry = (item: Insight, at: string, main: boolean) => {
-      const marked = markOf(item);
-      if (marked) return <View key={at} testID={`insight-${at}`} style={v.marked}>
-        <Text style={v.markedText}>{copy[MARK_TEXT[marked]]}</Text>
+      if (markOf(item) === 'HIDDEN') return <View key={at} testID={`insight-${at}`} style={v.marked}>
+        <Text style={v.markedText}>{copy.hidden}</Text>
         {canMark && <Pressable accessibilityRole="button" accessibilityLabel={copy.undo} onPress={() => void mark(item, null)} hitSlop={12}>
           <Text style={v.link}>{copy.undo}</Text></Pressable>}
       </View>;
@@ -207,23 +208,20 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         <View style={v.entryHead}>
           <View style={{ flex: 1 }}>
             {eyebrow(copy.types[item.type])}
-            <Text selectable={interactive} style={main ? v.mainText : v.text}>{item.text}</Text>
+            <Text selectable={interactive} style={v.text}>{item.text}</Text>
           </View>
-          <View style={main ? v.artMain : v.art}>{art(item.type, main ? 66 : 56)}</View>
+          <View style={main ? v.artMain : v.art}>{art(item.type, main ? 60 : 50)}</View>
         </View>
-        {item.quote && !item.text.includes(item.quote.text) && <Text selectable={interactive} style={v.quote}>{`“${item.quote.text}”`}</Text>}
-        {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={v.good}>{thing.text}</Text>)}
-        {item.fact && <Text selectable={interactive} style={v.fact}>{item.fact}</Text>}
+        {item.quote && !item.text.includes(item.quote.text) && <Text selectable={interactive} style={v.text}>{`“${item.quote.text}”`}</Text>}
+        {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={[v.text, v.good]}>{thing.text}</Text>)}
+        {item.fact && <Text selectable={interactive} style={v.text}>{item.fact}</Text>}
         {dates(item, at)}
         {panel(at)}
         {canMark && <View style={v.marks}>
-          {(['INACCURATE', 'HIDDEN'] as const).map(verdict => <Pressable key={verdict} accessibilityRole="button" hitSlop={12}
-            accessibilityLabel={copy[verdict === 'HIDDEN' ? 'hide' : 'inaccurate']}
-            onPress={() => void mark(item, verdict)} style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}>
-            <Text style={v.markText}>{copy[verdict === 'HIDDEN' ? 'hide' : 'inaccurate']}</Text>
-          </Pressable>)}
+          <Pressable accessibilityRole="button" hitSlop={12} accessibilityLabel={copy.hide} onPress={() => void mark(item, 'HIDDEN')}
+            style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}><Text style={v.markText}>{copy.hide}</Text></Pressable>
         </View>}
-        {markError === item.index && <Text accessibilityRole="alert" style={v.fact}>{copy.feedbackFailed}</Text>}
+        {markError === item.index && <Text accessibilityRole="alert" style={v.text}>{copy.feedbackFailed}</Text>}
       </View>;
     };
     // More insights page sideways, one at a time, with a quiet "1 / 3" and arrows.
@@ -250,83 +248,70 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         </View>
       </View>;
     };
-    const dateLines = date && <>
-      <Text style={v.eyebrow}>{date.eyebrow}</Text>
-      {!!date.range && <Text style={v.range}>{date.range}</Text>}
+    const head = <>
+      {date && <><Text style={v.eyebrow}>{date.eyebrow}</Text>{!!date.range && <Text style={v.range}>{date.range}</Text>}</>}
+      {short.headline && <Text accessibilityRole="header" style={v.headline}>{short.headline}</Text>}
     </>;
-    const title = short.headline && <Text accessibilityRole="header" style={v.headline}>{short.headline}</Text>;
-    const question = short.question && <View style={v.question}>
-      <View style={v.entryHead}>
-        <View style={{ flex: 1 }}>
-          {eyebrow(copy.question)}
-          <Text selectable={interactive} style={v.questionText}>{short.question}</Text>
-        </View>
-        <View style={v.art}>{art('question', 60, WEEKLY_ART.question)}</View>
-      </View>
-      <Pressable accessibilityRole="button" disabled={!interactive} onPress={onWrite}
-        style={({ pressed }) => [v.answer, pressed && { transform: [{ scale: .97 }] }]}>
-        <Text style={v.answerText}>{copy.answer}</Text><Text style={v.answerArrow}>›</Text>
-      </Pressable>
-    </View>;
-    // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
-    if (!insights) return <View testID="short-weekly-report">
-      {part !== 'right' && <>{dateLines}{title}{question}</>}
-    </View>;
-    const left = !bloomed
-      ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} fan={fan} moods={points.map(point => point.mood)} interactive={interactive} onOpen={bloom} />
-      : <>
-        <Animated.View style={fadeRise(headlineIn)}>{dateLines}{title}</Animated.View>
-        {short.curve && <View style={v.bouquet}>
+    // Only the question itself.
+    const question = short.question && <Text selectable={interactive} style={v.text}>{short.question}</Text>;
+    type Block = { key: string; node: ReactNode };
+    let left: Block[], right: Block[];
+    if (!insights) {
+      // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
+      left = [{ key: 'head', node: head }, ...(question ? [{ key: 'question', node: question }] : [])];
+      right = [];
+    } else if (!bloomed) {
+      left = [{ key: 'bud', node: <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} fan={fan} moods={points.map(point => point.mood)}
+        interactive={interactive} onOpen={bloom} /> }];
+      right = [];
+    } else {
+      const fade = (node: ReactNode, value = restIn) => <Animated.View style={fadeRise(value)}>{node}</Animated.View>;
+      left = [{ key: 'head', node: fade(head, headlineIn) }];
+      if (short.curve) {
+        left.push({ key: 'bouquet', node: <View style={v.block}>
           {eyebrow(copy.bouquet)}
           <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species} rise={rise}
             openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
-          <Animated.View style={fadeRise(restIn)}><Text selectable={interactive} style={v.fact}>{short.curve.claim}</Text></Animated.View>
           {panel('bouquet')}
-        </View>}
-      </>;
-    const right = bloomed && <Animated.View style={fadeRise(restIn)}>
-      {entry(insights.main, 'main', true)}
-      {insights.secondary.length > 0 && <>{rule}{pages(insights.secondary)}</>}
-      {short.thenAndNow && <>
+        </View> });
+        left.push({ key: 'moods', node: fade(<View style={v.block}>{eyebrow(copy.moodChart)}
+          <MoodPetalChart points={points} names={copy.moods} label={copy.moodChart} width={210} /></View>) });
+      }
+      right = [{ key: 'main', node: fade(entry(insights.main, 'main', true)) }];
+      if (insights.secondary.length) right.push({ key: 'more', node: fade(<>{rule}{pages(insights.secondary)}</>) });
+      if (short.thenAndNow) right.push({ key: 'oneMore', node: fade(<>
         {rule}
         <View style={v.entryHead}>
           <View style={{ flex: 1 }}>
             {eyebrow(copy.oneMore)}
             {([['then', short.thenAndNow.then], ['now', short.thenAndNow.now]] as const).map(([key, side]) => <View key={key} style={v.pair}>
               <Text style={v.pairLabel}>{copy[key]} · {shortDate(side.date, lang)}</Text>
-              <Text selectable={interactive} style={v.quote}>{`“${side.quote}”`}</Text>
+              <Text selectable={interactive} style={v.text}>{`“${side.quote}”`}</Text>
             </View>)}
             {short.thenAndNow.count && short.thenAndNow.phrase
-              ? <Text selectable={interactive} style={v.fact}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, lang)}</Text> : null}
+              ? <Text selectable={interactive} style={v.text}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, lang)}</Text> : null}
           </View>
-          <View style={v.art}>{art('oneMore', 60, WEEKLY_ART.oneMore)}</View>
+          <View style={v.art}>{art('oneMore', 50, WEEKLY_ART.oneMore)}</View>
         </View>
-      </>}
-      {short.card && cardArt && <>
+      </>) });
+      if (short.card && cardArt) right.push({ key: 'card', node: fade(<>
         {rule}
         {eyebrow(copy.card)}
         <View style={s.card}>
-          <Image source={cardArt} contentFit="contain" style={s.cardArt} accessibilityLabel={short.card.name} />
-          <Text style={s.cardName}>{short.card.name}</Text>
-          <Text selectable={interactive} style={s.cardLine}>{short.card.line}</Text>
-          <Text selectable={interactive} style={s.cardText}>{short.card.text}</Text>
-          {short.card.reason && <View style={s.stretch}>
-            <Text style={v.pairLabel}>{copy.whyCard}</Text>
-            <Text selectable={interactive} style={v.fact}>{short.card.reason}</Text>
-          </View>}
-          <Text selectable={interactive} style={[v.fact, s.stretch]}>{short.card.fact}</Text>
-          <Text style={s.disclaimer}>{short.card.disclaimer}</Text>
+          <Image source={cardArt} contentFit="contain" style={v.cardArt} accessibilityLabel={short.card.name} />
+          <Text style={v.pairLabel}>{short.card.name}</Text>
+          <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.line}</Text>
+          <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.text}</Text>
+          {short.card.reason && <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>}
+          <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>
         </View>
-      </>}
-      {safety && <View style={s.safety}>{safety}</View>}
-      {rule}
-      {question}
-      {report}
-    </Animated.View>;
-    return <View testID="short-weekly-report">
-      {part !== 'right' && <View testID="weekly-left-page">{left}</View>}
-      {part !== 'left' && right && <View testID="weekly-right-page" style={part === 'all' ? { marginTop: 18 } : undefined}>{right}</View>}
-    </View>;
+      </>) });
+      if (question) right.push({ key: 'question', node: fade(<>{rule}{question}</>) });
+      if (report) right.push({ key: 'report', node: fade(report) });
+    }
+    if (part === 'left') return <Paged blocks={left} testID="weekly-left-page" copy={copy} />;
+    if (part === 'right') return <Paged blocks={right} testID="weekly-right-page" copy={copy} />;
+    return <Paged blocks={[...left, ...right]} testID="short-weekly-report" copy={copy} />;
   }
   return <View testID="short-weekly-report">
     {insights ? <>
@@ -365,7 +350,6 @@ const s = StyleSheet.create({
   insightMain: { borderColor: '#B8934A', backgroundColor: '#FFF8EA' },
   eyebrow: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2.2, color: '#8C6E3A', marginTop: 4 },
   range: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: '#5E4B33', marginTop: 3, marginBottom: 10 },
-  safety: { marginTop: 4, marginBottom: 14 },
   insightMarked: { paddingVertical: 10, backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 12 },
   marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
   markButton: { minHeight: 32, justifyContent: 'center' },
@@ -400,41 +384,79 @@ const s = StyleSheet.create({
 });
 // Weekly 2.0: type on the page, gold hairlines, painted vignettes (no boxes).
 const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
+// One page of the book: blocks laid out once, split into pages that fit the page's height (a block never splits; a
+// block taller than the page scrolls on its own page). Other pages' blocks stay laid out but hidden, so they keep their
+// measured place; "‹ 1 / 2 ›" turns.
+function Paged({ blocks, testID, copy }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy }) {
+  const [height, setHeight] = useState(0);
+  // Block heights only: positions are their running sum (on the web a block's measured y is not updated when a block
+  // above it changes height).
+  const [sizes, setSizes] = useState<Record<string, number>>({});
+  const [page, setPage] = useState(0);
+  const scroller = useRef<ScrollView>(null);
+  const room = Math.max(0, height - PAGER);
+  const pages: number[][] = [];
+  let current: number[] = [], used = 0;
+  const tops: number[] = [];
+  blocks.forEach((block, i) => {
+    const h = sizes[block.key] ?? 0;
+    tops.push(i ? tops[i - 1] + (sizes[blocks[i - 1].key] ?? 0) : 0);
+    if (current.length && used + h > room) { pages.push(current); current = []; used = 0; }
+    current.push(i); used += h;
+  });
+  if (current.length) pages.push(current);
+  const count = Math.max(1, pages.length), at = Math.min(page, count - 1), shown = new Set(pages[at] ?? []);
+  const start = tops[pages[at]?.[0] ?? 0] ?? 0;
+  const overflow = (pages[at] ?? []).reduce((sum, i) => sum + (sizes[blocks[i].key] ?? 0), 0) > room;
+  useEffect(() => { scroller.current?.scrollTo({ y: start, animated: false }); }, [start, at]);
+  return <View testID={testID} style={{ flex: 1, minHeight: 0 }} onLayout={event => setHeight(event.nativeEvent.layout.height)}>
+    <ScrollView ref={scroller} style={{ flex: 1 }} scrollEnabled={overflow} showsVerticalScrollIndicator={overflow}>
+      {blocks.map((block, i) => <View key={block.key} aria-hidden={!shown.has(i)} importantForAccessibility={shown.has(i) ? 'auto' : 'no-hide-descendants'}
+        pointerEvents={shown.has(i) ? 'auto' : 'none'} style={!shown.has(i) ? { opacity: 0 } : undefined}
+        onLayout={event => { const h = event.nativeEvent.layout.height;
+          setSizes(sizes => sizes[block.key] === h ? sizes : { ...sizes, [block.key]: h }); }}>
+        {block.node}
+      </View>)}
+      <View style={{ height: room }} />
+    </ScrollView>
+    {count > 1 && <View style={v.pager}>
+      <Pressable accessibilityRole="button" accessibilityLabel={copy.previousCard} disabled={at === 0} onPress={() => setPage(at - 1)}
+        style={[v.arrow, at === 0 && { opacity: .3 }]}><Text style={v.arrowText}>‹</Text></Pressable>
+      <Text accessibilityLiveRegion="polite" style={v.pageText}>{`${at + 1} / ${count}`}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={copy.nextCard} disabled={at === count - 1} onPress={() => setPage(at + 1)}
+        style={[v.arrow, at === count - 1 && { opacity: .3 }]}><Text style={v.arrowText}>›</Text></Pressable>
+    </View>}
+  </View>;
+}
+const PAGER = 40;
+
+// Weekly 2.0 type: one body size for every block, smaller labels, gold hairlines.
 const v = StyleSheet.create({
-  eyebrow: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2.4, color: GOLD, marginBottom: 6 },
-  range: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: SOFT, marginTop: -2, marginBottom: 14 },
-  headline: { fontFamily: 'Georgia', fontSize: 27, lineHeight: 38, color: INK, marginBottom: 22 },
-  bouquet: { marginBottom: 6 },
-  rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 22 },
-  entryHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  art: { width: 58, alignItems: 'center', paddingTop: 2 },
-  artMain: { width: 66, alignItems: 'center', paddingTop: 2 },
-  mainText: { fontFamily: 'Georgia', fontSize: 20, lineHeight: 32, color: INK, marginBottom: 10 },
-  text: { fontFamily: 'Georgia', fontSize: 17, lineHeight: 28, color: INK, marginBottom: 8 },
-  quote: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, lineHeight: 26, color: '#4D3B28', marginBottom: 8 },
-  good: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, lineHeight: 26, color: '#4D3B28', marginBottom: 2, paddingLeft: 14,
-    borderLeftWidth: 1, borderColor: '#A8823F55' },
-  fact: { fontFamily: 'Georgia', fontSize: 13, lineHeight: 20, color: SOFT, marginTop: 4, marginBottom: 8 },
-  dates: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2, marginBottom: 4 },
+  eyebrow: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: GOLD, marginBottom: 6 },
+  range: { fontFamily: 'Georgia', fontSize: 13, color: SOFT, marginBottom: 10 },
+  headline: { fontFamily: 'Georgia', fontSize: 21, lineHeight: 30, color: INK, marginBottom: 16 },
+  block: { marginBottom: 12 },
+  rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 16 },
+  entryHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  art: { width: 50, alignItems: 'center', paddingTop: 2 },
+  artMain: { width: 60, alignItems: 'center', paddingTop: 2 },
+  text: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: INK, marginBottom: 6 },
+  good: { paddingLeft: 12, borderLeftWidth: 1, borderColor: '#A8823F55', marginBottom: 2 },
+  dates: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 2 },
   date: { minHeight: 32, justifyContent: 'center' },
-  dateText: { fontFamily: 'Georgia', fontSize: 13, color: GOLD, textDecorationLine: 'underline', textDecorationColor: '#A8823F66' },
+  dateText: { fontFamily: 'Georgia', fontSize: 12, color: GOLD, textDecorationLine: 'underline', textDecorationColor: '#A8823F66' },
   dateOn: { color: INK },
-  marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 20 },
+  marks: { flexDirection: 'row', justifyContent: 'flex-end' },
   markButton: { minHeight: 32, justifyContent: 'center' },
-  markText: { fontFamily: 'Georgia', fontSize: 12, color: '#9A8261', letterSpacing: .3 },
-  marked: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6 },
-  markedText: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14, color: SOFT },
-  link: { fontFamily: 'Georgia', fontSize: 13, color: GOLD, textDecorationLine: 'underline' },
-  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
-  arrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  arrowText: { fontFamily: 'Georgia', fontSize: 24, color: GOLD },
-  pageText: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2, color: SOFT },
-  pair: { marginBottom: 6 },
-  pairLabel: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 1, color: '#8C6E3A', marginBottom: 2 },
-  question: { marginBottom: 8 },
-  questionText: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 19, lineHeight: 30, color: INK, marginBottom: 14 },
-  answer: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 20,
-    borderRadius: 22, backgroundColor: '#FBF3E2', borderWidth: 1, borderColor: '#C9A96E', boxShadow: '0 1px 3px rgba(80,55,25,.18)', marginBottom: 18 },
-  answerText: { fontFamily: 'Georgia', fontSize: 15, color: '#234A3F' },
-  answerArrow: { fontFamily: 'Georgia', fontSize: 18, color: '#234A3F' },
+  markText: { fontFamily: 'Georgia', fontSize: 12, color: '#9A8261' },
+  marked: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  markedText: { fontFamily: 'Georgia', fontSize: 12, color: SOFT },
+  link: { fontFamily: 'Georgia', fontSize: 12, color: GOLD, textDecorationLine: 'underline' },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: PAGER },
+  arrow: { minWidth: 44, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  arrowText: { fontFamily: 'Georgia', fontSize: 22, color: GOLD },
+  pageText: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: SOFT },
+  pair: { marginBottom: 4 },
+  pairLabel: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 1, color: '#8C6E3A', marginBottom: 2 },
+  cardArt: { width: 132, height: 198, borderRadius: 8, marginBottom: 8 },
 });

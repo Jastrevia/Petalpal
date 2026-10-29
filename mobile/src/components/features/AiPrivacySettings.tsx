@@ -65,12 +65,13 @@ const REPORT_COPY={
   categories:{HARASSMENT:'骚扰',HATE_SPEECH:'仇恨言论',SELF_HARM:'自我伤害',PRIVACY:'隐私',OTHER:'其他'} as Record<string,string>},
 };
 // `linkStyle`: show the opener as a quiet text link in that style (the Weekly 2.0 page), not a button.
-export function AiOutputReport({kind,outputId,linkStyle}:{kind:string;outputId:string;linkStyle?:TextStyle}) {
+// `title` replaces the opener's label (the Reflection pages say what is being reported).
+export function AiOutputReport({kind,outputId,linkStyle,title}:{kind:string;outputId:string;linkStyle?:TextStyle;title?:string}) {
  const copy=REPORT_COPY[useAppLocale()];
  const [open,setOpen]=useState(false),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  return <View style={{gap:8}}>{linkStyle
-  ?<Pressable accessibilityRole="button" onPress={()=>setOpen(!open)} disabled={busy} hitSlop={10} style={{alignSelf:'flex-start',minHeight:32,justifyContent:'center'}}><Text style={linkStyle}>{copy.report}</Text></Pressable>
-  :<FeatureActionButton secondary title={copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>}
+  ?<Pressable accessibilityRole="button" onPress={()=>setOpen(!open)} disabled={busy} hitSlop={10} style={{alignSelf:'flex-start',minHeight:32,justifyContent:'center'}}><Text style={linkStyle}>{title??copy.report}</Text></Pressable>
+  :<FeatureActionButton secondary title={title??copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>}
  {open?<><Text style={ui.text}>{copy.note}</Text><View style={[ui.row,{flexWrap:'wrap',gap:8}]}>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</View></>:null}
  {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
 }

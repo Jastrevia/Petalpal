@@ -205,17 +205,21 @@ export const moodIcon = (mood: PrimaryMood) => PRIMARY_MOODS.indexOf(mood) + 1; 
 export const setInsightFeedback = (reportId: string, index: number, verdict: InsightFeedback | null) =>
   apiRequest<{ narrativeSections: ReportSection[] }>(`/ai/reports/weekly/${encodeURIComponent(reportId)}/insights/${index}/feedback`, 'POST', { verdict });
 
-// The bouquet: every Event of the week stands on one ground line in its day's column, side by side,
-// never higher or lower by mood. Flowers of one day stand together as a small bunch, overlapping a little.
+// The bouquet: every Event of the week is one flower in its day's column, never higher or lower by mood. One or two
+// flowers on a day stand side by side; more stand in rows of up to three, each row behind a little higher and smaller,
+// so every flower shows however many Events the day has. `lift` is how far a back row stands above the ground line.
 export function bouquetLayout(days: string[], points: MoodPoint[], width: number, size: number) {
   const column = width / 7, perDay = new Map<string, number>(), seen = new Map<string, number>();
   for (const point of points) perDay.set(point.date, (perDay.get(point.date) ?? 0) + 1);
   return points.filter(point => days.includes(point.date)).map(point => {
     const count = perDay.get(point.date) ?? 1, nth = seen.get(point.date) ?? 0;
-    const step = count > 1 ? Math.min(size * .5, column / count) : 0;
     seen.set(point.date, nth + 1);
-    const x = (days.indexOf(point.date) + .5) * column + (nth - (count - 1) / 2) * step - size / 2;
-    return { ...point, x: Math.max(0, Math.min(width - size, x)) };
+    const perRow = count <= 2 ? count : 3, rows = Math.ceil(count / perRow);
+    // The front row is the newest; earlier Events of the day stand behind.
+    const row = rows - 1 - Math.floor(nth / perRow), place = nth % perRow, inRow = Math.min(perRow, count - Math.floor(nth / perRow) * perRow);
+    const flower = Math.round(size * (count <= 2 ? 1 : .78) * (1 - row * .1)), step = Math.min(flower * .55, column / perRow);
+    const x = (days.indexOf(point.date) + .5) * column + (place - (inRow - 1) / 2) * step - flower / 2;
+    return { ...point, x: Math.max(0, Math.min(width - flower, x)), size: flower, lift: Math.round(row * size * .34), row };
   });
 }
 // A flower for an Event whose own flower is not known here (not planted, deleted, or not loaded): one
@@ -223,6 +227,7 @@ export function bouquetLayout(days: string[], points: MoodPoint[], width: number
 export const MOOD_SPECIES: Record<PrimaryMood, string> = { SUNNY_BLOOM: 'SUNFLOWER', GENTLE_BLOOM: 'PETUNIA', QUIET_BLOOM: 'BLUEBELL',
   HEALING_BLOOM: 'CHAMOMILE', FIRE_BLOOM: 'POPPY', WONDER_BLOOM: 'ASTER', DRIFTING_BLOOM: 'LAVENDER', PEACEFUL_BLOOM: 'WHITE_ROSE' };
 
+export type ShortCopy = (typeof SHORT_COPY)[ShortLocale];
 export const SHORT_COPY = {
   en: { line: 'Line of the week', curve: 'Your week in moods', side: 'Side by side', thenNow: 'Then and now', then: 'Then', now: 'Now',
     question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card',
@@ -230,7 +235,10 @@ export const SHORT_COPY = {
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
     undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
     types: { SAID_BEFORE: 'Something you said', HIDDEN_LINK: 'A quiet link', SMALL_GOODS: 'Small good things',
-      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo' }, page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
+      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo' },
+    // The names the Events screen shows when a mood is chosen.
+    moods: { SUNNY_BLOOM: 'Sunny', GENTLE_BLOOM: 'Gentle', QUIET_BLOOM: 'Quiet', HEALING_BLOOM: 'Healing', FIRE_BLOOM: 'Fire',
+      WONDER_BLOOM: 'Wonder', DRIFTING_BLOOM: 'Drifting', PEACEFUL_BLOOM: 'Peaceful' }, moodChart: 'Moods this week', pageOf: 'Page', page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
@@ -239,6 +247,8 @@ export const SHORT_COPY = {
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
     types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声' },
+    moods: { SUNNY_BLOOM: '晴朗', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '安静', HEALING_BLOOM: '治愈', FIRE_BLOOM: '热烈',
+      WONDER_BLOOM: '惊喜', DRIFTING_BLOOM: '飘忽', PEACEFUL_BLOOM: '平和' }, moodChart: '这周的心情', pageOf: '页',
     page: '洞察', previousCard: '上一条', nextCard: '下一条',
     write: '写一写', open: '看完整记录', close: '收起', loading: '正在打开…',
     unavailable: '现在打不开这条记录。', support: '支持', days: ['一', '二', '三', '四', '五', '六', '日'] },

@@ -129,7 +129,13 @@ test('Weekly 2.0: version marker, insight marks, and a bouquet that never ranks 
   const points = [{ date: days[0], mood: 'QUIET_BLOOM', level: 1, sourceEventId: 'a' }, { date: days[0], mood: 'SUNNY_BLOOM', level: 3, sourceEventId: 'b' },
     { date: days[3], mood: 'FIRE_BLOOM', level: 1, sourceEventId: 'c' }];
   const placed = plain(bouquetLayout(days, points, 350, 44));
-  assert.deepEqual(placed.map(point => Math.round(point.x)), [0, 14, 153]);
-  assert.ok(placed.every(point => !('y' in point)));
+  assert.deepEqual(placed.map(point => Math.round(point.x)), [0, 15, 153]);
+  assert.ok(placed.every(point => point.lift === 0), 'one or two flowers a day all stand on the ground line');
+  // Five Events on one day: every flower is drawn, in two rows (the earlier ones behind, higher and smaller).
+  const busy = plain(bouquetLayout(days, Array.from({ length: 5 }, (_, i) => ({ date: days[2], mood: PRIMARY_MOODS[i], level: 1, sourceEventId: `b${i}` })), 350, 44));
+  assert.equal(busy.length, 5);
+  assert.deepEqual(busy.map(point => point.row), [1, 1, 1, 0, 0]);
+  assert.ok(busy.filter(point => point.row === 1).every(point => point.lift > 0 && point.size < busy[4].size));
+  assert.equal(new Set(busy.map(point => `${point.x}:${point.row}`)).size, 5, 'no two flowers in the same place');
   assert.deepEqual(Object.keys(MOOD_SPECIES).sort(), [...PRIMARY_MOODS].sort());
 });
