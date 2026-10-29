@@ -102,6 +102,7 @@ import LandLayer, { GardenLandResources } from './LandLayer';
 import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
+import Butterfly from './critters/Butterfly';
 import GardenCritters from './critters/GardenCritters';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
@@ -1516,6 +1517,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
