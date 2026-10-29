@@ -975,6 +975,17 @@ test("Weekly 2.0 owner list: one request with the 2.0 contract; a failing insigh
   assert.deepEqual(downSaved.narrativeSections.map(section => section.kind), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "QUESTION"]);
   assert.ok(downSaved.narrativeSections.every(section => section.template !== false));
 
+  // A week with one entry: no insufficient-evidence report, but the code-only "这周的花还在长" one, with no model call.
+  const thin = await fixture(t, { locale: "zh-CN", count: 1 });
+  await thin.pg.exec(`ALTER TABLE "Event" ADD COLUMN "primaryGardenMood" text; UPDATE "Event" SET "primaryGardenMood"='QUIET_BLOOM'`);
+  thin.respond(() => assert.fail("no model call for a thin week"));
+  const thinResult = await thin.run({ ...settings, WEEKLY_INSIGHTS_OWNER_IDS: "alice" });
+  assert.equal(thinResult.succeeded, true, `${thinResult.error?.code} ${thinResult.error?.stack}`); assert.equal(thin.calls.length, 0);
+  const thinSaved = (await thin.rows("WeeklyReport"))[0].document;
+  assert.equal(thinSaved.narrativeStatus, "GENERATED");
+  assert.deepEqual(thinSaved.narrativeSections.map(section => section.kind), ["HEADLINE", "MOOD_CURVE", "QUESTION"]);
+  assert.equal(thinSaved.narrativeSections[0].claim, "这周的花还在长");
+
   for (const list of [undefined, "bob", "alice;bob"]) {
     const off = await insightsFixture();
     respond(off, "这周你记下了这些小事。");
