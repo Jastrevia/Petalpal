@@ -5,10 +5,11 @@ import { useAuth } from '../../services/auth';
 import { eventFlowers } from '../../services/events';
 import { bouquetLayout, MOOD_SPECIES, shortDate, type MoodPoint, type ShortLocale } from '../../services/reflections';
 import { clusterPicture } from '../garden/planting/flowerClusters';
+import { ART_RATIO, WEEKLY_ART } from './weeklyArt';
 
 // Weekly 2.0 opening (docs/product/WEEKLY_2.0.md): a crocus bud, then the week's bouquet, one painted flower per Event.
-const BUD = require('@/assets/bond/checkin-bud.webp');
-export const FLOWER = 44;
+const BUD_HEIGHT = 150;
+export const FLOWER = 52;
 
 // Each Event's own flower species, from the owner's Garden (read once per owner while the app runs).
 const speciesCache = new Map<string, Promise<Map<string, string>>>();
@@ -67,7 +68,7 @@ export function BudGate({ title, hint, fade, interactive, onOpen }: { title: str
     <Text style={s.eyebrow}>{title}</Text>
     <Pressable testID="weekly-bud" accessibilityRole="button" accessibilityLabel={hint} disabled={!interactive} onPress={onOpen}
       style={({ pressed }) => [s.bud, pressed && { transform: [{ scale: .97 }] }]}>
-      <Image source={BUD} contentFit="contain" style={s.budArt} accessible={false} />
+      <Image source={WEEKLY_ART.bud} contentFit="contain" style={s.budArt} accessible={false} />
     </Pressable>
     <Text style={s.hint}>{hint}</Text>
   </Animated.View>;
@@ -84,7 +85,9 @@ export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, o
   const placed = width ? bouquetLayout(days, points, width, size) : [], ground = Math.round(size * 1.3);
   return <View>
     <View testID="weekly-bouquet" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: ground }}>
-      <View style={s.ground} />
+      {/* A painted bed of moss under the flowers. */}
+      <Image source={WEEKLY_ART.ground} contentFit="fill" accessible={false}
+        style={{ position: 'absolute', left: -6, right: -6, bottom: -4, height: Math.round(size * .7) }} />
       {placed.map((point, i) => {
         const art = clusterPicture(species?.get(point.sourceEventId) ?? MOOD_SPECIES[point.mood], '', 'S');
         const height = art ? Math.min(ground - 4, size * art.ratio) : size, value = rise[i];
@@ -103,15 +106,14 @@ export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, o
 }
 
 const s = StyleSheet.create({
-  gate: { alignItems: 'center', paddingVertical: 18, marginBottom: 8 },
-  eyebrow: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 13, letterSpacing: 2, marginBottom: 12, textAlign: 'center' },
-  bud: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center' },
-  budArt: { width: 96, height: 96 },
-  hint: { fontFamily: 'Georgia', fontStyle: 'italic', color: '#654D30', fontSize: 14, marginTop: 10, textAlign: 'center' },
-  ground: { position: 'absolute', left: 0, right: 0, bottom: 4, height: 1, backgroundColor: '#B8934A66' },
+  gate: { alignItems: 'center', paddingTop: 28, paddingBottom: 18, marginBottom: 8 },
+  eyebrow: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 14, letterSpacing: 3, marginBottom: 16, textAlign: 'center' },
+  bud: { minWidth: 120, height: BUD_HEIGHT + 8, alignItems: 'center', justifyContent: 'center' },
+  budArt: { width: BUD_HEIGHT * ART_RATIO.bud, height: BUD_HEIGHT },
+  hint: { fontFamily: 'Georgia', fontStyle: 'italic', color: '#7A5E3C', fontSize: 15, marginTop: 14, textAlign: 'center' },
   flower: { position: 'absolute', top: 0, justifyContent: 'flex-end' },
   flowerHit: { minHeight: 44, justifyContent: 'flex-end', paddingBottom: 4 },
   mark: { position: 'absolute', bottom: 0, height: 2, borderRadius: 1, backgroundColor: '#B8934A' },
-  days: { flexDirection: 'row', marginTop: 4, marginBottom: 8 },
-  day: { flex: 1, textAlign: 'center', fontFamily: 'Georgia', color: '#8B6C44', fontSize: 12 },
+  days: { flexDirection: 'row', marginTop: 8, marginBottom: 10 },
+  day: { flex: 1, textAlign: 'center', fontFamily: 'Georgia', color: '#9A7D52', fontSize: 11, letterSpacing: 1 },
 });

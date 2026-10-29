@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, View, Switch } from 'react-native';
+import { Pressable, Text, View, Switch, type TextStyle } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { apiRequest } from '../../services/api';
 import { useAppLocale } from '../../services/locale';
@@ -64,10 +64,13 @@ const REPORT_COPY={
   received:'已收到举报。我们会查看每一条举报，不会另外通知结果。',
   categories:{HARASSMENT:'骚扰',HATE_SPEECH:'仇恨言论',SELF_HARM:'自我伤害',PRIVACY:'隐私',OTHER:'其他'} as Record<string,string>},
 };
-export function AiOutputReport({kind,outputId}:{kind:string;outputId:string}) {
+// `linkStyle`: show the opener as a quiet text link in that style (the Weekly 2.0 page), not a button.
+export function AiOutputReport({kind,outputId,linkStyle}:{kind:string;outputId:string;linkStyle?:TextStyle}) {
  const copy=REPORT_COPY[useAppLocale()];
  const [open,setOpen]=useState(false),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
- return <View style={{gap:8}}><FeatureActionButton secondary title={copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>
+ return <View style={{gap:8}}>{linkStyle
+  ?<Pressable accessibilityRole="button" onPress={()=>setOpen(!open)} disabled={busy} hitSlop={10} style={{alignSelf:'flex-start',minHeight:32,justifyContent:'center'}}><Text style={linkStyle}>{copy.report}</Text></Pressable>
+  :<FeatureActionButton secondary title={copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>}
  {open?<><Text style={ui.text}>{copy.note}</Text><View style={[ui.row,{flexWrap:'wrap',gap:8}]}>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</View></>:null}
  {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
 }

@@ -8,6 +8,7 @@ import { petalCardArt } from '../petalCards/petalCardArt';
 import { EventIllustration } from './EventIllustration';
 import { useAppLocale } from '../../services/locale';
 import { BudGate, useBloom, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
+import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
 // One Event open at a time, under the part (`at`) that opened it.
@@ -112,6 +113,9 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   };
   // More insights: one card at a time, the next one peeking in from the side.
   const [rowWidth, setRowWidth] = useState(0);
+  const [moreAt, setMoreAt] = useState(0);
+  const [pageHeights, setPageHeights] = useState<number[]>([]);
+  const moreRow = useRef<ScrollView>(null);
   const cardWidth = Math.max(0, rowWidth - 36);
   const more = (list: Insight[]) => list.length === 1 ? insightCard(list[0], 'more-0', false)
     : <View onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
@@ -177,38 +181,145 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   const fadeRise = (value: Animated.Value) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] });
 
   if (short.version2) {
+    // Weekly 2.0 is written on the paper itself: no boxes, only painted vignettes, serif type and gold hairlines.
+    const eyebrow = (text: string) => <Text style={v.eyebrow}>{text}</Text>;
+    const art = (key: string, height: number, source = INSIGHT_ART[key]) => source
+      ? <Image source={source} contentFit="contain" accessible={false} style={{ width: height * (ART_RATIO[key] ?? 1), height }} /> : null;
+    const rule = <View accessible={false} style={v.rule} />;
+    const dates = (item: Insight, at: string) => <View style={v.dates}>
+      {item.evidence.map((entry, i) => {
+        const on = opened?.at === at && opened.id === entry.eventId;
+        return <Pressable key={entry.eventId} accessibilityRole="button" accessibilityLabel={shortDate(entry.date, lang)}
+          accessibilityHint={on ? copy.close : copy.open} disabled={!interactive} hitSlop={10}
+          onPress={() => void toggle(at, entry.eventId)} style={({ pressed }) => [v.date, pressed && { opacity: .6 }]}>
+          <Text style={[v.dateText, on && v.dateOn]}>{i ? '· ' : ''}{shortDate(entry.date, lang)}</Text>
+        </Pressable>;
+      })}
+    </View>;
+    const entry = (item: Insight, at: string, main: boolean) => {
+      const marked = markOf(item);
+      if (marked) return <View key={at} testID={`insight-${at}`} style={v.marked}>
+        <Text style={v.markedText}>{copy[MARK_TEXT[marked]]}</Text>
+        {canMark && <Pressable accessibilityRole="button" accessibilityLabel={copy.undo} onPress={() => void mark(item, null)} hitSlop={12}>
+          <Text style={v.link}>{copy.undo}</Text></Pressable>}
+      </View>;
+      return <View key={at} testID={`insight-${at}`}>
+        <View style={v.entryHead}>
+          <View style={{ flex: 1 }}>
+            {eyebrow(copy.types[item.type])}
+            <Text selectable={interactive} style={main ? v.mainText : v.text}>{item.text}</Text>
+          </View>
+          <View style={main ? v.artMain : v.art}>{art(item.type, main ? 66 : 56)}</View>
+        </View>
+        {item.quote && !item.text.includes(item.quote.text) && <Text selectable={interactive} style={v.quote}>{`“${item.quote.text}”`}</Text>}
+        {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={v.good}>{thing.text}</Text>)}
+        {item.fact && <Text selectable={interactive} style={v.fact}>{item.fact}</Text>}
+        {dates(item, at)}
+        {panel(at)}
+        {canMark && <View style={v.marks}>
+          {(['INACCURATE', 'HIDDEN'] as const).map(verdict => <Pressable key={verdict} accessibilityRole="button" hitSlop={12}
+            accessibilityLabel={copy[verdict === 'HIDDEN' ? 'hide' : 'inaccurate']}
+            onPress={() => void mark(item, verdict)} style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}>
+            <Text style={v.markText}>{copy[verdict === 'HIDDEN' ? 'hide' : 'inaccurate']}</Text>
+          </Pressable>)}
+        </View>}
+        {markError === item.index && <Text accessibilityRole="alert" style={v.fact}>{copy.feedbackFailed}</Text>}
+      </View>;
+    };
+    // More insights page sideways, one at a time, with a quiet "1 / 3" and arrows.
+    const pages = (list: Insight[]) => {
+      if (list.length === 1) return entry(list[0], 'more-0', false);
+      const go = (to: number) => { const next = Math.max(0, Math.min(list.length - 1, to)); setMoreAt(next);
+        moreRow.current?.scrollTo({ x: next * rowWidth, animated: !reducedMotion }); };
+      return <View onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
+        {rowWidth > 0 && <ScrollView ref={moreRow} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+          style={pageHeights[moreAt] ? { height: pageHeights[moreAt] } : undefined} contentContainerStyle={{ alignItems: 'flex-start' }}
+          onMomentumScrollEnd={event => setMoreAt(Math.round(event.nativeEvent.contentOffset.x / rowWidth))}
+          onScroll={event => setMoreAt(Math.round(event.nativeEvent.contentOffset.x / rowWidth))} scrollEventThrottle={64}>
+          {list.map((item, i) => <View key={i} style={{ width: rowWidth }} onLayout={event => {
+            const height = Math.ceil(event.nativeEvent.layout.height);
+            setPageHeights(current => current[i] === height ? current : Object.assign([...current], { [i]: height }));
+          }}>{entry(item, `more-${i}`, false)}</View>)}
+        </ScrollView>}
+        <View style={v.pager}>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.previousCard} disabled={moreAt === 0} onPress={() => go(moreAt - 1)}
+            style={[v.arrow, moreAt === 0 && { opacity: .3 }]}><Text style={v.arrowText}>‹</Text></Pressable>
+          <Text accessibilityLiveRegion="polite" style={v.pageText}>{`${moreAt + 1} / ${list.length}`}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.nextCard} disabled={moreAt === list.length - 1} onPress={() => go(moreAt + 1)}
+            style={[v.arrow, moreAt === list.length - 1 && { opacity: .3 }]}><Text style={v.arrowText}>›</Text></Pressable>
+        </View>
+      </View>;
+    };
     const dateLines = date && <>
-      <Text style={s.eyebrow}>{date.eyebrow}</Text>
-      {!!date.range && <Text style={s.range}>{date.range}</Text>}
+      <Text style={v.eyebrow}>{date.eyebrow}</Text>
+      {!!date.range && <Text style={v.range}>{date.range}</Text>}
     </>;
-    const question = short.question && <>
-      <Text style={s.heading}>{copy.question}</Text>
-      <Text selectable={interactive} style={s.body}>{short.question}</Text>
+    const title = short.headline && <Text accessibilityRole="header" style={v.headline}>{short.headline}</Text>;
+    const question = short.question && <View style={v.question}>
+      <View style={v.entryHead}>
+        <View style={{ flex: 1 }}>
+          {eyebrow(copy.question)}
+          <Text selectable={interactive} style={v.questionText}>{short.question}</Text>
+        </View>
+        <View style={v.art}>{art('question', 60, WEEKLY_ART.question)}</View>
+      </View>
       <Pressable accessibilityRole="button" disabled={!interactive} onPress={onWrite}
-        style={({ pressed }) => [s.button, pressed && { opacity: .7 }]}><Text style={s.buttonText}>{copy.answer}</Text></Pressable>
-    </>;
+        style={({ pressed }) => [v.answer, pressed && { transform: [{ scale: .97 }] }]}>
+        <Text style={v.answerText}>{copy.answer}</Text><Text style={v.answerArrow}>›</Text>
+      </Pressable>
+    </View>;
     // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
     if (!insights) return <View testID="short-weekly-report">
-      {part !== 'right' && <>{dateLines}{headline}{question}</>}
+      {part !== 'right' && <>{dateLines}{title}{question}</>}
     </View>;
     const left = !bloomed
       ? <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} interactive={interactive} onOpen={bloom} />
       : <>
-        <Animated.View style={fadeRise(headlineIn)}>{dateLines}{headline}</Animated.View>
-        {short.curve && <>
-          <Text style={s.heading}>{copy.bouquet}</Text>
+        <Animated.View style={fadeRise(headlineIn)}>{dateLines}{title}</Animated.View>
+        {short.curve && <View style={v.bouquet}>
+          {eyebrow(copy.bouquet)}
           <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species} rise={rise}
             openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
-          <Animated.View style={fadeRise(restIn)}><Text selectable={interactive} style={s.small}>{short.curve.claim}</Text></Animated.View>
+          <Animated.View style={fadeRise(restIn)}><Text selectable={interactive} style={v.fact}>{short.curve.claim}</Text></Animated.View>
           {panel('bouquet')}
-        </>}
+        </View>}
       </>;
     const right = bloomed && <Animated.View style={fadeRise(restIn)}>
-      {insightCard(insights.main, 'main', true)}
-      {insights.secondary.length > 0 && <><Text style={s.heading}>{copy.more}</Text>{more(insights.secondary)}</>}
-      {thenAndNow(copy.oneMore)}
-      {card}
+      {entry(insights.main, 'main', true)}
+      {insights.secondary.length > 0 && <>{rule}{pages(insights.secondary)}</>}
+      {short.thenAndNow && <>
+        {rule}
+        <View style={v.entryHead}>
+          <View style={{ flex: 1 }}>
+            {eyebrow(copy.oneMore)}
+            {([['then', short.thenAndNow.then], ['now', short.thenAndNow.now]] as const).map(([key, side]) => <View key={key} style={v.pair}>
+              <Text style={v.pairLabel}>{copy[key]} · {shortDate(side.date, lang)}</Text>
+              <Text selectable={interactive} style={v.quote}>{`“${side.quote}”`}</Text>
+            </View>)}
+            {short.thenAndNow.count && short.thenAndNow.phrase
+              ? <Text selectable={interactive} style={v.fact}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, lang)}</Text> : null}
+          </View>
+          <View style={v.art}>{art('oneMore', 60, WEEKLY_ART.oneMore)}</View>
+        </View>
+      </>}
+      {short.card && cardArt && <>
+        {rule}
+        {eyebrow(copy.card)}
+        <View style={s.card}>
+          <Image source={cardArt} contentFit="contain" style={s.cardArt} accessibilityLabel={short.card.name} />
+          <Text style={s.cardName}>{short.card.name}</Text>
+          <Text selectable={interactive} style={s.cardLine}>{short.card.line}</Text>
+          <Text selectable={interactive} style={s.cardText}>{short.card.text}</Text>
+          {short.card.reason && <View style={s.stretch}>
+            <Text style={v.pairLabel}>{copy.whyCard}</Text>
+            <Text selectable={interactive} style={v.fact}>{short.card.reason}</Text>
+          </View>}
+          <Text selectable={interactive} style={[v.fact, s.stretch]}>{short.card.fact}</Text>
+          <Text style={s.disclaimer}>{short.card.disclaimer}</Text>
+        </View>
+      </>}
       {safety && <View style={s.safety}>{safety}</View>}
+      {rule}
       {question}
       {report}
     </Animated.View>;
@@ -286,4 +397,44 @@ const s = StyleSheet.create({
   cardText: { fontFamily: 'Georgia', color: '#4D3B28', fontSize: 15, lineHeight: 24, marginBottom: 10, alignSelf: 'stretch' },
   stretch: { alignSelf: 'stretch' },
   disclaimer: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 11, lineHeight: 16, alignSelf: 'stretch' },
+});
+// Weekly 2.0: type on the page, gold hairlines, painted vignettes (no boxes).
+const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
+const v = StyleSheet.create({
+  eyebrow: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2.4, color: GOLD, marginBottom: 6 },
+  range: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: SOFT, marginTop: -2, marginBottom: 14 },
+  headline: { fontFamily: 'Georgia', fontSize: 27, lineHeight: 38, color: INK, marginBottom: 22 },
+  bouquet: { marginBottom: 6 },
+  rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 22 },
+  entryHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  art: { width: 58, alignItems: 'center', paddingTop: 2 },
+  artMain: { width: 66, alignItems: 'center', paddingTop: 2 },
+  mainText: { fontFamily: 'Georgia', fontSize: 20, lineHeight: 32, color: INK, marginBottom: 10 },
+  text: { fontFamily: 'Georgia', fontSize: 17, lineHeight: 28, color: INK, marginBottom: 8 },
+  quote: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, lineHeight: 26, color: '#4D3B28', marginBottom: 8 },
+  good: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, lineHeight: 26, color: '#4D3B28', marginBottom: 2, paddingLeft: 14,
+    borderLeftWidth: 1, borderColor: '#A8823F55' },
+  fact: { fontFamily: 'Georgia', fontSize: 13, lineHeight: 20, color: SOFT, marginTop: 4, marginBottom: 8 },
+  dates: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2, marginBottom: 4 },
+  date: { minHeight: 32, justifyContent: 'center' },
+  dateText: { fontFamily: 'Georgia', fontSize: 13, color: GOLD, textDecorationLine: 'underline', textDecorationColor: '#A8823F66' },
+  dateOn: { color: INK },
+  marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 20 },
+  markButton: { minHeight: 32, justifyContent: 'center' },
+  markText: { fontFamily: 'Georgia', fontSize: 12, color: '#9A8261', letterSpacing: .3 },
+  marked: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6 },
+  markedText: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14, color: SOFT },
+  link: { fontFamily: 'Georgia', fontSize: 13, color: GOLD, textDecorationLine: 'underline' },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
+  arrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  arrowText: { fontFamily: 'Georgia', fontSize: 24, color: GOLD },
+  pageText: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 2, color: SOFT },
+  pair: { marginBottom: 6 },
+  pairLabel: { fontFamily: 'Georgia', fontSize: 12, letterSpacing: 1, color: '#8C6E3A', marginBottom: 2 },
+  question: { marginBottom: 8 },
+  questionText: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 19, lineHeight: 30, color: INK, marginBottom: 14 },
+  answer: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 20,
+    borderRadius: 22, backgroundColor: '#FBF3E2', borderWidth: 1, borderColor: '#C9A96E', boxShadow: '0 1px 3px rgba(80,55,25,.18)', marginBottom: 18 },
+  answerText: { fontFamily: 'Georgia', fontSize: 15, color: '#234A3F' },
+  answerArrow: { fontFamily: 'Georgia', fontSize: 18, color: '#234A3F' },
 });

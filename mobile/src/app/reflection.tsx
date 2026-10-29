@@ -272,7 +272,8 @@ export default function Reflection() {
     const found = weekly2Of(report)!, label = weekLabel(report.periodKey, lang);
     return <ShortWeeklyReport short={found.short} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
       date={{ eyebrow: lang === 'en' ? label.title.toUpperCase() : label.title, range: label.range + (report.status === 'PARTIAL' ? t.inProgress : '') }}
-      safety={<EmotionalSafetyNote />} report={interactive ? <View style={{ marginTop: 6, marginBottom: 12 }}><AiOutputReport kind="weekly" outputId={found.detail.id} /></View> : null}
+      safety={<EmotionalSafetyNote style={s.quietNote} />}
+      report={interactive ? <View style={{ marginBottom: 12 }}><AiOutputReport kind="weekly" outputId={found.detail.id} linkStyle={s.quietLink} /></View> : null}
       onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
   };
 
@@ -409,7 +410,8 @@ export default function Reflection() {
           {compact && <>
             {paintedPaper()}
             {/* A sprig pressed between the pages. */}
-            {!wide && <Image source={require('../../assets/garden/environment/flowers/sparse_sprig.png')} accessible={false} resizeMode="contain"
+            {/* Weekly 2.0 pages carry their own paintings. */}
+            {!wide && !weekly2Of(turning ? (backwards ? from : to) : selected) && <Image source={require('../../assets/garden/environment/flowers/sparse_sprig.png')} accessible={false} resizeMode="contain"
               style={{ position: 'absolute', right: 22, top: 128, width: 82, height: 76, opacity: .5, transform: [{ rotate: '16deg' }] }} />}
             <View pointerEvents="none" style={s.ribbon}><View style={s.ribbonBody} />
               <View style={{ flexDirection: 'row' }}><View style={s.ribbonTailLeft} /><View style={s.ribbonTailRight} /></View></View>
@@ -469,6 +471,8 @@ const s = StyleSheet.create({
   pattern: { fontFamily: 'Georgia', fontSize: 15, lineHeight: 23, color: '#556040', marginBottom: 8 },
   topic: { alignItems: 'center', minWidth: 70, maxWidth: 125, padding: 5 },
   edgeTab: { width: 83, minHeight: 49, justifyContent: 'center', alignItems: 'center', borderRadius: 4, borderWidth: 1, borderColor: '#9F805866', shadowColor: '#372412', shadowOpacity: .18, shadowRadius: 2, shadowOffset: { width: 1, height: 2 } },
+  quietNote: { fontFamily: 'Georgia', fontSize: 12, lineHeight: 18, color: '#7A6448' },
+  quietLink: { fontFamily: 'Georgia', fontSize: 12, color: '#8C7556', textDecorationLine: 'underline' },
   note: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 17, lineHeight: 25, color: '#775633', textAlign: 'center', padding: 9 },
   caption: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, color: '#8B6C44', paddingVertical: 16, textAlign: 'center' },
   heading: { fontFamily: 'Georgia', color: '#453321', lineHeight: 34 },
