@@ -185,8 +185,13 @@ no model).
 
 - **The whole deck.** The ring deals all 78 cards, the 9 heavy ones included, each with prewritten
   copy that reads its traditional meaning gently (Death: an ending that makes room). Heavy cards
-  are still never matched to a Weekly report. The 9 paintings must be bundled
-  (`scripts/compress-petal-cards.mjs`) before release; their copy is checked against them then.
+  are still never matched to a Weekly report. Until their 9 paintings are bundled
+  (`scripts/compress-petal-cards.mjs`, from the owner's zip) the deck stays at 69: the server deals
+  the heavy cards only with `PETAL_HEAVY_CARDS=on`, to set after the web build that bundles them
+  (and their copy is checked against the paintings then).
+- **Rollout safety.** An app from before topics draws without a topic: it keeps the 69-card deck and
+  never gets a reversed card. Only an app that asks `GET /api/petal-cards/today?deck=full` is told
+  the full deck size. A card without bundled art keeps its back instead of turning blank.
 - **A topic first.** Before spinning, the owner picks one of five topics, once a day:
   今日运势 / Today’s fortune, 接下来的方向 / The way ahead, 感情 / Love, 工作与学习 / Work & study,
   人际关系 / People around you. No money or health topics.

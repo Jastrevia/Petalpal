@@ -9,30 +9,33 @@ import { vector } from "@electric-sql/pglite/vector";
 import prisma from "../../lib/prisma.js";
 import { setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
 import { PETAL_CARDS } from "../../lib/petal-cards.js";
-import { cardBackFor, dailyDeck, drawPetalCard, PETAL_TOPIC_IDS, petalDrawsForMonth, reversedAt, todaysPetalDraw } from "../../lib/petal-card-draw.js";
+import { cardBackFor, dailyDeck, drawPetalCard, heavyCardsOn, PETAL_TOPIC_IDS, petalDrawsForMonth, reversedAt, todaysPetalDraw } from "../../lib/petal-card-draw.js";
 import { app } from "../../server.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const at = (localDate, hourUtc = 20) => new Date(`${localDate}T${String(hourUtc).padStart(2, "0")}:00:00.000Z`);
 
-test("today's deck: all 78 cards once, fixed per owner and day, different across days and owners", () => {
-  const deck = dailyDeck("u1", "2026-10-22");
+test("today's deck: every card once, fixed per owner and day, different across days and owners", () => {
+  const deck = dailyDeck("u1", "2026-10-22", { heavy: true });
   assert.equal(deck.length, 78);
   assert.deepEqual([...deck].sort(), PETAL_CARDS.map(card => card.id).sort());
-  assert.ok(deck.includes("major-13"), "heavy cards are dealt too");
-  assert.deepEqual(dailyDeck("u1", "2026-10-22"), deck);
-  assert.notDeepEqual(dailyDeck("u1", "2026-10-23"), deck);
-  assert.notDeepEqual(dailyDeck("u2", "2026-10-22"), deck);
+  assert.ok(deck.includes("major-13"), "heavy cards are dealt once switched on");
+  assert.equal(dailyDeck("u1", "2026-10-22").length, 69, "until their art ships, the 69");
+  assert.equal(heavyCardsOn({}), false);
+  assert.equal(heavyCardsOn({ PETAL_HEAVY_CARDS: "on" }), true);
+  assert.deepEqual(dailyDeck("u1", "2026-10-22", { heavy: true }), deck);
+  assert.notDeepEqual(dailyDeck("u1", "2026-10-23", { heavy: true }), deck);
+  assert.notDeepEqual(dailyDeck("u2", "2026-10-22", { heavy: true }), deck);
 });
 
 test("an app from before topics draws from the 69-card deck and never gets a reversed card", async () => {
   const db = fakeDatabase(OWNER);
-  const legacy = dailyDeck("o", "2026-10-22", { legacy: true });
+  const legacy = dailyDeck("o", "2026-10-22");
   assert.equal(legacy.length, 69);
   assert.ok(!legacy.includes("major-13"));
   for (const [i, day] of ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26"].entries()) {
-    const drawn = await drawPetalCard(db, { userId: "o", position: 70 + i * 11, now: at(day) });
-    assert.equal(drawn.card.id, dailyDeck("o", day, { legacy: true })[(70 + i * 11) % 69]);
+    const drawn = await drawPetalCard(db, { userId: "o", position: 70 + i * 11, heavy: true, now: at(day) });
+    assert.equal(drawn.card.id, dailyDeck("o", day)[(70 + i * 11) % 69], "even with heavy cards on");
     assert.equal(drawn.card.reversed, false);
     assert.equal(drawn.topic, null);
     assert.equal(drawn.topicLabel, null);
@@ -81,8 +84,8 @@ test("once a day: the chosen place gives today's card; a second draw keeps the f
   const db = fakeDatabase(OWNER);
   const before = await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22") });
   assert.equal(before.localDate, "2026-10-22");
-  assert.equal(before.deckSize, 78);
-  assert.equal((await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22"), legacy: true })).deckSize, 69);
+  assert.equal(before.deckSize, 69);
+  assert.equal((await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22"), heavy: true })).deckSize, 78);
   assert.deepEqual(before.topics.map(topic => topic.id), PETAL_TOPIC_IDS);
   assert.equal(before.topics[0].label, "今日运势");
   assert.equal(before.drawn, null);
@@ -91,12 +94,12 @@ test("once a day: the chosen place gives today's card; a second draw keeps the f
 
   await assert.rejects(drawPetalCard(db, { userId: "o", position: 12, topic: "MONEY", now: at("2026-10-22") }), TypeError);
   await assert.rejects(drawPetalCard(db, { userId: "o", position: 12, topic: null, now: at("2026-10-22") }), TypeError);
-  const first = await drawPetalCard(db, { userId: "o", position: 12, topic: "LOVE", now: at("2026-10-22") });
+  const first = await drawPetalCard(db, { userId: "o", position: 12, topic: "LOVE", heavy: true, now: at("2026-10-22") });
   assert.equal(first.created, true);
   assert.equal(first.position, 12);
   assert.equal(first.topic, "LOVE");
   assert.equal(first.topicLabel, "感情");
-  assert.equal(first.card.id, dailyDeck("o", "2026-10-22")[12]);
+  assert.equal(first.card.id, dailyDeck("o", "2026-10-22", { heavy: true })[12]);
   assert.equal(first.card.reversed, reversedAt("o", "2026-10-22", 12));
   assert.equal(first.card.keywords.length, 3);
   assert.ok(first.card.name && first.card.line && first.card.text && first.card.disclaimer);
@@ -109,7 +112,7 @@ test("once a day: the chosen place gives today's card; a second draw keeps the f
 
   // 06:30 UTC on the 23rd is still the 22nd in Vancouver; the next local day draws afresh.
   assert.equal((await drawPetalCard(db, { userId: "o", position: 0, topic: "LOVE", now: new Date("2026-10-23T06:30:00Z") })).created, false);
-  const next = await drawPetalCard(db, { userId: "o", position: 78 + 5, topic: "FORTUNE", now: at("2026-10-23") });
+  const next = await drawPetalCard(db, { userId: "o", position: 78 + 5, topic: "FORTUNE", heavy: true, now: at("2026-10-23") });
   assert.equal(next.position, 5, "places wrap around the deck");
   assert.equal(next.card.id, dailyDeck("o", "2026-10-23")[5]);
 
@@ -156,6 +159,7 @@ test("petal draw routes", async (t) => {
   await new Promise(resolve => server.once("listening", resolve));
   t.after(async () => {
     delete process.env.PETAL_CARDS_OWNER_IDS;
+    delete process.env.PETAL_HEAVY_CARDS;
     restore.forEach(fn => fn());
     setFirebaseTokenVerifierForTests();
     await new Promise(resolve => server.close(resolve));
@@ -177,7 +181,10 @@ test("petal draw routes", async (t) => {
     const today = await call("/api/petal-cards/today");
     assert.equal(today.status, 200);
     assert.equal(today.body.deckSize, 69, "an app that does not ask for the full deck keeps the 69 cards it has art for");
+    assert.equal((await call("/api/petal-cards/today?deck=full")).body.deckSize, 69, "heavy cards wait for PETAL_HEAVY_CARDS");
+    process.env.PETAL_HEAVY_CARDS = "on";
     assert.equal((await call("/api/petal-cards/today?deck=full")).body.deckSize, 78);
+    assert.equal((await call("/api/petal-cards/today")).body.deckSize, 69);
     assert.equal(today.body.drawn, null);
     assert.ok(["lilac", "violet"].includes(today.body.back));
     for (const body of [{}, { position: -1, topic: "LOVE" }, { position: "3", topic: "LOVE" }, { position: 2.5, topic: "LOVE" },
@@ -186,7 +193,7 @@ test("petal draw routes", async (t) => {
     }
     const drawn = await call("/api/petal-cards/draw", "POST", { position: 7, topic: "PEOPLE" });
     assert.equal(drawn.status, 200);
-    assert.equal(drawn.body.card.id, dailyDeck("owner-1", "2026-10-22")[7]);
+    assert.equal(drawn.body.card.id, dailyDeck("owner-1", "2026-10-22", { heavy: true })[7]);
     assert.equal(drawn.body.topicLabel, "People around you");
     assert.deepEqual(drawn.body.reading, { available: false }, "readings stay off without the model switch");
     const after = (await call("/api/petal-cards/today")).body;

@@ -96,12 +96,12 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
     calls.push(JSON.parse(options.body));
     return response();
   };
-  const draw = (userId = "alice", position = 0, topic = "FORTUNE") => drawPetalCard(prisma, { userId, position, topic, now: NOW });
+  const draw = (userId = "alice", position = 0, topic = "FORTUNE") => drawPetalCard(prisma, { userId, position, topic, heavy: true, now: NOW });
   const reading = async drawId => one(pg, `SELECT "status","attempts","paragraphs" FROM "PetalCardReading" WHERE "drawId"=$1`, [drawId]);
   return { pg, prisma, calls, fetchImpl, draw, reading, respond: fn => { response = fn; } };
 }
 const ask = (f, env = enabled, userId = "alice") => requestPetalReading(f.prisma, { userId, env, now: NOW, fetchImpl: f.fetchImpl });
-const place = (userId, id) => dailyDeck(userId, "2026-10-30").indexOf(id);
+const place = (userId, id) => dailyDeck(userId, "2026-10-30", { heavy: true }).indexOf(id);
 
 test("a listed owner's reading is written once from the card, its orientation, the topic and the week's moods", async (t) => {
   const f = await fixture(t);
