@@ -1,5 +1,6 @@
-// Bundled petal card artwork keyed by the server's card id (lib/petal-cards.js), drawable
-// cards only. Compressed from the owner's artwork by scripts/compress-petal-cards.mjs.
+// Bundled petal card artwork keyed by the server's card id (lib/petal-cards.js), all 78 cards.
+// Compressed from the owner's artwork by scripts/compress-petal-cards.mjs.
+// TODO(art): the 9 heavy cards are not bundled yet; the server deals them only with PETAL_HEAVY_CARDS=on.
 export const PETAL_CARD_ART: Record<string, number> = {
   'major-00': require('@/assets/petal-cards/major-00.webp'),
   'major-01': require('@/assets/petal-cards/major-01.webp'),
