@@ -115,7 +115,7 @@ test("a listed owner's reading is written once from the card, its orientation, t
   assert.equal(f.calls.length, 1);
   const input = JSON.parse(f.calls[0].messages[0].content);
   assert.deepEqual(input, { l: "zh-Hans", q: "FORTUNE", c: { n: "死神", o: reversedAt("alice", "2026-10-30", at) ? "reversed" : "upright",
-    k: drawn.card.keywords, s: "一段结束，腾出新的位置。", d: drawn.card.text }, m: { 安静: 2, 疗愈: 1 } });
+    k: drawn.card.keywords, s: "一段结束，腾出新的位置。", d: drawn.card.text }, m: { 安静: 2, 治愈: 1 } });
   assert.doesNotMatch(f.calls[0].messages[0].content, /private sentence/);
   assert.equal(f.calls[0].model, PETAL_READING_MODEL_ID);
   assert.match(f.calls[0].system, /never as certain outcomes/);

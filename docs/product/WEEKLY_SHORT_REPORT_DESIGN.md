@@ -61,7 +61,8 @@ Enable with `AI_WEEKLY_REFLECTION_CONTRACT=weekly-short-v1` (Sonnet provider). C
 
 Open items for the owner:
 
-- zh-Hans mood names confirmed by the owner (2026-10-20): 晴朗 平静 温柔 好奇 疗愈 安静 迷茫 火焰.
+- zh-Hans mood names (owner, 2026-10-29: the same names the Events screen shows when a mood is chosen): 晴朗 平和 温柔 惊喜 治愈 安静 飘忽 热烈.
+  Earlier saved reports keep the names they were written with (晴朗 平静 温柔 好奇 疗愈 安静 迷茫 火焰).
 - A week with fewer than two selectable Events stays "insufficient evidence" (no curve-only report yet).
 - Hosted TEST only allows the v2 contract (`lib/integration-environment.js`); live acceptance needs that
   gate widened under a separately approved task, then paid inference approval.

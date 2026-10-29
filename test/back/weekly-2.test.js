@@ -47,7 +47,7 @@ function answer(built, change = {}) {
   const cite = candidate => candidate.evidence.map(item => alias(built, item.sourceEventId));
   return { version: WEEKLY_2, locale: "zh-Hans", headline: "说过想跑步，后来也写到了", insights: [
     { id: plan.id, role: "main", text: "9月2日你写过：“我想每天早上跑步。”之后有 1 条写到跑步。", evidence_ids: cite(plan), picks: [] },
-    { id: link.id, role: "secondary", text: "这五周有 3 条记录写到“妈妈”，这 3 条的心情都是晴朗、平静、疗愈或温柔。", evidence_ids: cite(link), picks: [] },
+    { id: link.id, role: "secondary", text: "这五周有 3 条记录写到“妈妈”，这 3 条的心情都是晴朗、平和、治愈或温柔。", evidence_ids: cite(link), picks: [] },
     { id: goods.id, role: "secondary", text: "这周你记下了这些小事。", evidence_ids: cite(goods), picks: goods.spans.slice(1, 3).map(span => span.id) },
     { id: open.id, role: "secondary", text: "你问过自己：“我到底想要什么样的生活？”", evidence_ids: cite(open), picks: [] }
   ], question: "下周跑步的时候，你想留意什么？", ...change };
@@ -150,7 +150,7 @@ test("compute: thresholds per module, code-written facts, priority picks the mai
   const lifting = [["c-0", "2026-09-14T12:00:00Z", "QUIET_BLOOM", "a。"], ["c-1", "2026-09-15T12:00:00Z", "DRIFTING_BLOOM", "b。"],
     ["c-2", "2026-09-18T12:00:00Z", "HEALING_BLOOM", "c。"], ["c-3", "2026-09-19T12:00:00Z", "HEALING_BLOOM", "d。"]];
   const trend = computeInsights(input({ current: lifting, earlier: [] }), { days }).candidates;
-  assert.deepEqual(trend.map(candidate => [candidate.type, candidate.fact]), [["TREND", "前半周多是「迷茫」，后半周「疗愈」多了起来。"]]);
+  assert.deepEqual(trend.map(candidate => [candidate.type, candidate.fact]), [["TREND", "前半周多是「飘忽」，后半周「治愈」多了起来。"]]);
   assert.equal(keyPhrase("周末去看海"), "看海"); assert.equal(keyPhrase("我到底想要什么样的生活？"), null);
 });
 
