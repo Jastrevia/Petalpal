@@ -28,8 +28,8 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   rabbit: { id: 'rabbit', kind: 'walker', size: 104, speed: 138, altitude: [0, 0] },
   // The hedgehog's pace matches its painted steps: 30.2 units each 1.08 s.
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
-  // The puppy's pace matches its painted stride: 41.9 units each 1.42 s.
-  puppy: { id: 'puppy', kind: 'walker', size: 100, speed: 30, altitude: [0, 0] },
+  // The puppy's pace matches its painted stride: 41.8 units each 1.42 s (it runs at RUN_SPEED).
+  puppy: { id: 'puppy', kind: 'walker', size: 113, speed: 29.5, altitude: [0, 0] },
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
   silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
 };
@@ -65,7 +65,27 @@ export type Visit = {
   lead: number; fadeIn: boolean; walked: number;
   // The lawn (month) a lawn animal plays on; `leaving`: fading out where it stands.
   lawn?: number; leaving?: boolean;
+  // The puppy: `chase`, running after the bluebird; `sits`, sitting where it caught up (its rest
+  // is sitting down, sitting, getting up); `rising`, getting up before it runs off again.
+  chase?: boolean; sits?: boolean; rising?: boolean;
 };
+
+// The puppy chases the bluebird about half the times it takes off: it runs (its painted gallop,
+// RUN_SPEED to match) along the paths to the one nearest below where the bird will land, sits
+// there watching it for SIT_SECONDS, and then strolls on.
+export const CHASE_CHANCE = 0.5;
+export const RUN_SPEED = 145;
+export const SIT_SECONDS: [number, number] = [14, 28];
+export const RISE_SECONDS = 1.2;
+const RUNNING: Rhythm = { cycle: 0, moving: 1 };
+export function planChase({ visit, now, path }: { visit: Visit; now: number; path: Point[] | null }): Visit | null {
+  if (!path || path.length < 2 || pathLength(path) < 40) return null;
+  // Sitting: get up first.
+  const rising = Boolean(visit.sits) && now < visit.start + visit.lead;
+  const lead = rising ? RISE_SECONDS : 0.15;
+  return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + visitDistance(visit, now),
+    chase: true, sits: false, rising, speed: RUN_SPEED, rhythm: RUNNING, duration: lead + pathLength(path) / RUN_SPEED };
+}
 
 // The rabbit and the hedgehog play only on lawns with no flowers yet, one animal to a lawn (and
 // the rabbit never on the butterfly's lawn). Once every lawn has flowers they walk the paths.
@@ -213,14 +233,17 @@ export function planNextLeg({ visit, now, network, edges, points, random, lawns 
   visit: Visit; now: number; network: Network; edges: Network['edges']; points: readonly Point[]; random: () => number; lawns?: Lawns;
 }): Visit | null {
   const spec = CRITTERS[visit.id], gone = visitDistance(visit, visit.start + visit.duration);
+  // After a chase the puppy sits a while where it caught up, then walks on at its own pace.
+  const after = visit.chase ? { sits: true, chase: false, rising: false, speed: spec.speed, rhythm: RHYTHMS[visit.id] } : { sits: false, rising: false };
+  const rest = () => (visit.chase ? between(SIT_SECONDS, random) : between(REST[visit.id], random));
   if (visit.lawn !== undefined && lawns) {
     // On its lawn: stroll on from where it stopped; a planted lawn is left (leaveVisit).
     const end = visitPose(visit, visit.start + visit.duration);
     const path = planLawnWalk(visit.lawn, lawns, random, { x: end.x, y: end.y });
     if (!path) return null;
-    const lead = between(REST[visit.id], random);
-    return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + gone,
-      duration: lead + travelSeconds(pathLength(path) / spec.speed, visit.rhythm) };
+    const lead = rest();
+    return { ...visit, ...after, path, start: now, lead, fadeIn: false, walked: visit.walked + gone,
+      duration: lead + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
   }
   // Where it stopped (walkers move in whole steps, so maybe short of the last point) and the
   // path point ahead of it: a walker finishes that segment, then strolls on from there.
@@ -230,15 +253,16 @@ export function planNextLeg({ visit, now, network, edges, points, random, lawns 
     if (gone < along - 1e-6) { ahead = i; break; }
   }
   const pose = visitPose(visit, visit.start + visit.duration), here = { x: pose.x, y: pose.y };
-  const node = network.nodes.indexOf(visit.path[ahead]);
+  const target = visit.path[ahead];
+  const node = network.nodes.findIndex(n => Math.abs(n.x - target.x) < 1e-3 && Math.abs(n.y - target.y) < 1e-3);
   const onward = spec.kind === 'walker' && node >= 0 ? planWalk(network, edges, random, undefined, node) : null;
   const path = spec.kind === 'walker'
     ? (onward ? (distance(here, onward[0]) > 1e-6 ? [here, ...onward] : onward) : null)
     : planFlight(points, spec, random, undefined, here);
   if (!path || path.length < 2) return null;
-  const lead = between(REST[visit.id], random);
-  return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + gone,
-    duration: lead + travelSeconds(pathLength(path) / spec.speed, visit.rhythm) };
+  const lead = rest();
+  return { ...visit, ...after, path, start: now, lead, fadeIn: false, walked: visit.walked + gone,
+    duration: lead + travelSeconds(pathLength(path) / spec.speed, visit.chase ? RHYTHMS[visit.id] : visit.rhythm) };
 }
 
 // How long a visitor travels to move for `moving` seconds. In bursts it is a whole number of

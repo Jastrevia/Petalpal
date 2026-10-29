@@ -192,3 +192,25 @@ test('a lawn animal whose lawn gets flowers fades out where it stands', () => {
   assert.ok(Math.hypot(start.x - at.x, start.y - at.y) < 1e-6 && start.opacity === 1, 'fades from where it was');
   assert.ok(end.opacity < 1e-9, 'gone after the fade');
 });
+
+test('the puppy chases the bluebird at a run, sits where it caught up, then strolls on', () => {
+  const nodes = WALK_NETWORK.nodes, edge = edges[0];
+  const a = nodes[edge.a], b = nodes[edge.b];
+  const walking = { key: 1, id: 'puppy', path: [a, b], start: 0, lead: 0, fadeIn: false, walked: 0, duration: 100,
+    speed: visits.CRITTERS.puppy.speed, rhythm: visits.RHYTHMS.puppy };
+  assert.equal(visits.planChase({ visit: walking, now: 1, path: [a, { x: a.x + 10, y: a.y }] }), null, 'too short a run is not worth it');
+  const chase = visits.planChase({ visit: walking, now: 1, path: [a, b] });
+  assert.ok(chase.chase && !chase.rising && chase.speed === visits.RUN_SPEED);
+  assert.ok(Math.abs(chase.duration - (chase.lead + visits.pathLength([a, b]) / visits.RUN_SPEED)) < 1e-9);
+  // Caught up: it sits a while, then walks on at its own pace.
+  const sitting = visits.planNextLeg({ visit: chase, now: chase.start + chase.duration, network: WALK_NETWORK, edges, points, random: seeded(3) });
+  assert.ok(sitting && sitting.sits && !sitting.chase);
+  assert.ok(sitting.lead >= visits.SIT_SECONDS[0] && sitting.lead <= visits.SIT_SECONDS[1]);
+  assert.equal(sitting.speed, visits.CRITTERS.puppy.speed);
+  // Off again while sitting: it gets up first.
+  const again = visits.planChase({ visit: sitting, now: sitting.start + 2, path: [sitting.path[0], b] });
+  if (again) assert.ok(again.rising && again.lead === visits.RISE_SECONDS);
+  // A walk after the sit is an ordinary one.
+  const on = visits.planNextLeg({ visit: sitting, now: sitting.start + sitting.duration, network: WALK_NETWORK, edges, points, random: seeded(4) });
+  assert.ok(on && !on.sits && !on.chase);
+});

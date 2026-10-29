@@ -3,11 +3,11 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
 import { usePlanting } from '../planting/PlantingContext';
-import { residents } from './gardenResidents';
-import { safeSegment, WALK_NETWORK } from '../fairy/walkNetwork';
+import { onBirdFlight, residents } from './gardenResidents';
+import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CRITTERS, leaveVisit, nextGap, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, leaveVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -17,10 +17,12 @@ import {
 // A painted motion: frames in a grid (scripts/critters/video-frames.py), `w` × `h` each. A
 // walk: `ground` the row the paws stand on, `loop` the world units walked over all its frames.
 // A flight: `fps`, played in time. `rest`: frames of settling down (same cells), played while it
-// rests between legs, and backwards as far as `rise` (standing) to get up again. `trail`: a
-// painted petal it sheds behind it while it moves.
+// rests between legs (`always`, or when the leg `sits`), and backwards as far as `rise`
+// (standing) to get up again. `run`: a running stride (same cells), for a leg that `chase`s.
+// `trail`: a painted petal it sheds behind it while it moves.
 type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number;
-  rest?: { source: number; count: number; rise: number }; trail?: number };
+  rest?: { source: number; count: number; rise: number; always?: boolean };
+  run?: { source: number; columns: number; count: number; loop: number }; trail?: number };
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -32,17 +34,26 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // (scripts/critters/video-frames.py), every pose painted whole. `loop` is the ground their
   // planted paws cover in that stride, so they do not skid.
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
-  puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), frames: { columns: 6, count: 17, ground: 297, loop: 41.9 }, w: 420, h: 300 },
+  // The puppy also runs (a gallop clip) when it chases the bluebird and sits down where it caught
+  // up (a clip from running to sitting); all three share one crop, ground and scale.
+  puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), w: 418, h: 300, frames: { columns: 6, count: 17, ground: 275, loop: 41.8,
+    run: { source: require('@/assets/garden/critters/puppy-run.webp'), columns: 5, count: 15, loop: 181.5 },
+    rest: { source: require('@/assets/garden/critters/puppy-sit.webp'), count: 16, rise: 2 } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
   silktail: { source: require('@/assets/garden/spirits/silktail-run.webp'), w: 240, h: 180,
     frames: { columns: 8, count: 47, ground: 167, loop: 394, trail: require('@/assets/garden/spirits/silktail-petal.webp'),
-      rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24 } } },
+      rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24, always: true } } },
 };
 const REST_FPS = 12;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
+// Where the puppy waits for a bird landing on `perch`: the path point nearest below it.
+const belowPerch = (perch: Point) => {
+  const under = { x: perch.x, y: perch.y + 80 };
+  return POINTS.reduce((best, p) => (Math.hypot(p.x - under.x, p.y - under.y) < Math.hypot(best.x - under.x, best.y - under.y) ? p : best));
+};
 
 // Schedules the visitors: one now and then until MAX_VISITORS are here, only while the Garden is
 // active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
@@ -53,6 +64,7 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
   const awaySince = useRef<number | null>(null);
+  const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
   const unplanted = useMemo(() => {
     const planted = new Set(placements.map(p => p.month));
@@ -96,7 +108,17 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
         return [planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current }) ?? visit];
       }));
     }, 150);
-    return () => { clearTimeout(timer); clearInterval(legs); };
+    // The bluebird takes off: about half the time the puppy runs after it.
+    chase.current = (to: Point) => {
+      const now = clock.value, goal = belowPerch(to);
+      setVisits(current => current.map(visit => {
+        if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead) return visit;
+        const pose = visitPose(visit, now);
+        return planChase({ visit, now, path: route({ x: pose.x, y: pose.y }, goal, isGardenGroundBlocked) }) ?? visit;
+      }));
+    };
+    const unwatch = onBirdFlight(flight => { if (Math.random() < CHASE_CHANCE) chase.current(flight.to); });
+    return () => { clearTimeout(timer); clearInterval(legs); unwatch(); };
   }, [active, clock]);
   // Development only: window.__gardenCritters.spawn('rabbit') brings one now; .visits lists them.
   useEffect(() => {
@@ -104,6 +126,8 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
       visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1) })),
       clear: () => setVisits([]),
+      // Send the puppy after the bluebird as if it had just taken off for `to`.
+      chase: (to: Point) => chase.current(to),
       unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
       spawn: (id: CritterId) => {
         for (let attempt = 0; attempt < 40; attempt++) {
@@ -143,15 +167,21 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: (pose.dx < 0 ? -1 : 1) * scale }, { scaleY: scale },
       { translateX: -w / 2 }, { translateY: -frames.ground }];
   }, [visit, scale, w, frames]);
+  const running = Boolean(visit.chase && frames.run);
+  const stride = running ? frames.run! : frames;
   const frame = useDerivedValue(() => {
-    const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / frames.loop;
-    return Math.floor((along - Math.floor(along)) * frames.count) % frames.count;
-  }, [visit, frames, reduced]);
-  // Resting between legs (with a rest sheet): settling down, sitting, then getting up again.
+    const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / stride.loop;
+    return Math.floor((along - Math.floor(along)) * stride.count) % stride.count;
+  }, [visit, stride, reduced]);
+  const runSheet = useImage(frames.run?.source ?? null);
+  // Resting between legs (with a rest sheet): settling down, sitting, then getting up again; or,
+  // getting up only (`rising`, before a chase).
   const restSheet = useImage(frames.rest?.source ?? null);
   const restFrame = useDerivedValue(() => {
     const rest = frames.rest, e = clock.value - visit.start;
     if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
+    if (visit.rising) return Math.max(rest.rise, rest.count - 1 - Math.floor(e / visit.lead * (rest.count - rest.rise)));
+    if (!rest.always && !visit.sits) return -1;
     if (reduced) return rest.count - 1;
     const settle = rest.count / REST_FPS, rise = (rest.count - rest.rise) / REST_FPS;
     if (e < settle) return Math.floor(e * REST_FPS);
@@ -173,7 +203,9 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     </Group>
     {frames.trail ? <PetalTrail visit={visit} clock={clock} source={frames.trail} reduced={!!reduced} /> : null}
     <Group transform={transform}>
-      <Group opacity={walkOpacity}><SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} /></Group>
+      <Group opacity={walkOpacity}>{running && runSheet
+        ? <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />
+        : <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />}</Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
     </Group>
   </Group>;
