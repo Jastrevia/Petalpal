@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollVie
   useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
-import { drawPetalCard, type PetalCardFace, type PetalToday } from '../../services/petalCardDraw';
+import { drawPetalCard, requestPetalReading, type PetalCardFace, type PetalReading, type PetalToday, type PetalTopic } from '../../services/petalCardDraw';
 import { PETAL_CARD_ART } from './petalCardArt';
 import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
@@ -18,18 +18,28 @@ const COPY = {
     no: 'No.', round: 'Round', turnOver: 'Turn it over', close: 'Close', today: "Today's petal card", drawing: 'Drawing…',
     failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose No. ${n} of today's deck`,
     share: 'Share', preparing: 'Preparing…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
-    shareFailed: "Couldn't share this time. Try again." },
+    shareFailed: "Couldn't share this time. Try again.", ask: 'What would you like to ask today?',
+    askSub: 'One question a day, then draw a card for it', upright: 'Upright', reversed: 'Reversed',
+    reading: 'The fairy’s reading', readingWait: 'The fairy is reading your card…',
+    readingConsent: 'Turn on AI processing in Privacy to see the fairy’s reading of your card.',
+    freeLeft: (n: number) => n === 0 ? 'That was your last free reading.' : `${n} free ${n === 1 ? 'reading' : 'readings'} left.`,
+    locked: 'Your free readings are used up. Unlocking the fairy’s readings for good is coming soon.' },
   'zh-Hans': { title: 'THE PETAL RING', sub: '转动花环，翻遍今天的整副牌，选一张', hint: '拖动转圈 · 点发光的那张',
     no: '第', round: '轮次', turnOver: '翻开它', close: '关闭', today: '今日花语卡', drawing: '正在抽牌…',
     failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张`,
     share: '分享', preparing: '正在准备…', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
-    shareFailed: '这次没有分享成功，再试一次。' },
+    shareFailed: '这次没有分享成功，再试一次。', ask: '今天想问什么？', askSub: '每天问一件事，再为它抽一张牌',
+    upright: '正位', reversed: '逆位', reading: '小花仙的解读', readingWait: '小花仙正在读这张牌…',
+    readingConsent: '在隐私设置里打开 AI 处理，就能看到小花仙对这张牌的解读。',
+    freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `免费解读还剩 ${n} 次。`,
+    locked: '免费的小花仙解读已经用完了。一次解锁、以后每天都能看的功能，马上就来。' },
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
+const READING_TRIES = 8;
 
-// The petal ring (design: the owner's loop ring): a few card places on a tilted ring with the
-// whole of today's deck flowing through them. One step brings the next card to the front, a
+// The petal ring (design: the owner's loop ring): first the owner picks today's topic, then a few
+// card places on a tilted ring carry the whole of today's deck flowing through them. One step brings the next card to the front, a
 // full turn the next batch, and after the last card the first comes round again. The deck order
 // stays on the server; tapping the front card sends its place and the server reveals the card.
 export function PetalRing({ visible, today, onClose }: { visible: boolean; today: PetalToday | null; onClose: () => void }) {
@@ -48,8 +58,10 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   // so spinning never re-renders the deck. React only hears when a new card reaches the front.
   const angle = useSharedValue(0), velocity = useSharedValue(0), dragging = useSharedValue(false), lastX = useSharedValue(0);
   const [front, setFront] = useState(0);
-  const [phase, setPhase] = useState<'spin' | 'drawing' | 'chosen' | 'revealed'>('spin');
+  const [phase, setPhase] = useState<'topic' | 'spin' | 'drawing' | 'chosen' | 'revealed'>('topic');
   const [face, setFace] = useState<PetalCardFace | null>(null);
+  const [topic, setTopic] = useState<{ id: PetalTopic | null; label: string | null }>({ id: null, label: null });
+  const [reading, setReading] = useState<PetalReading | null>(null);
   const [chosenNo, setChosenNo] = useState(0);
   const [error, setError] = useState('');
   const lift = useRef(new Animated.Value(0)).current, flip = useRef(new Animated.Value(0)).current;
@@ -70,18 +82,40 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   }, [phase, face, locale]);
   const share = () => { if (prepared) void sharePrepared(prepared).then(setShared); };
 
-  // Opening: show today's card straight away if it was drawn already, else spin in.
+  // Opening: show today's card straight away if it was drawn already, else ask for today's topic.
   useEffect(() => {
     if (!visible) return;
     lift.setValue(0); flip.setValue(0); setError('');
     if (today?.drawn?.card) {
       setFace(today.drawn.card); setChosenNo(mod(today.drawn.position, deckSize) + 1); setPhase('revealed');
+      setTopic({ id: today.drawn.topic, label: today.drawn.topicLabel }); setReading(today.drawn.reading ?? null);
       lift.setValue(1); flip.setValue(1);
     } else {
-      setFace(null); setPhase('spin');
-      angle.value = 0; velocity.value = -1.4; setFront(0);
+      setFace(null); setReading(null); setTopic({ id: null, label: null }); setPhase('topic');
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  function pickTopic(id: PetalTopic, label: string) {
+    setTopic({ id, label }); setPhase('spin');
+    angle.value = 0; velocity.value = -1.4; setFront(0);
+  }
+
+  // Once the card faces up, ask for its reading if this owner can have one. Another device may be
+  // writing it already (GENERATING): look again, at most READING_TRIES times. Anything unexpected
+  // (an error, the switch turned off) hides the reading; the card itself is never affected.
+  const tries = useRef(0);
+  useEffect(() => { tries.current = 0; }, [visible]);
+  useEffect(() => {
+    if (!visible || phase !== 'revealed' || !reading?.available || reading.needsConsent || reading.locked) return;
+    if (reading.status !== 'NONE' && reading.status !== 'GENERATING') return;
+    const hide = { available: true, needsConsent: false, status: 'FAILED' } as const;
+    if (++tries.current > READING_TRIES) { setReading(hide); return; }
+    let active = true;
+    const timer = setTimeout(() => {
+      void requestPetalReading().then(next => { if (active) setReading(next ?? { available: false }); })
+        .catch(() => { if (active) setReading(hide); });
+    }, reading.status === 'GENERATING' ? 4000 : 0);
+    return () => { active = false; clearTimeout(timer); };
+  }, [visible, phase, reading]);
 
   // Inertia and snapping, frame-rate independent, only while the ring is open and spinning.
   const step = size.step;
@@ -119,13 +153,14 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const frontNo = mod(front, deckSize) + 1;
 
   async function choose(place: number) {
-    if (phase !== 'spin' || Date.now() - lastDrag.current < 350) return;
+    if (phase !== 'spin' || !topic.id || Date.now() - lastDrag.current < 350) return;
     if (place !== front) { velocity.value = 0; angle.value = -place * size.step; return; }
     setPhase('drawing'); setError('');
     try {
-      const result = await drawPetalCard(mod(place, deckSize));
+      const result = await drawPetalCard(mod(place, deckSize), topic.id);
       if (!result?.card) throw new Error('No card');
       setFace(result.card); setChosenNo(mod(result.position, deckSize) + 1); setPhase('chosen');
+      setTopic({ id: result.topic, label: result.topicLabel }); setReading(result.reading ?? null);
       Animated.timing(lift, { toValue: 1, duration: 750, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true }).start();
     } catch { setError(copy.failed); setPhase('spin'); }
   }
@@ -148,8 +183,17 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
       <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
         <Text style={styles.closeText}>×</Text>
       </Pressable>
+      {phase === 'topic' ? <View style={styles.topics}>
+        <Text style={styles.title}>{copy.title}</Text>
+        <Text style={styles.ask}>{copy.ask}</Text>
+        <Text style={styles.sub}>{copy.askSub}</Text>
+        {(today?.topics ?? []).map(item => <Pressable key={item.id} accessibilityRole="button" onPress={() => pickTopic(item.id, item.label)}
+          style={({ pressed }) => [styles.topic, pressed && styles.pressed]}><Text style={styles.topicText}>{item.label}</Text></Pressable>)}
+      </View> : null}
+
       {showRing ? <View pointerEvents="none" style={styles.header}>
         <Text style={styles.title}>{copy.title}</Text>
+        {topic.label ? <Text style={styles.topicTag}>{topic.label}</Text> : null}
         <Text style={styles.sub}>{copy.sub}</Text>
         <View style={styles.counter}>
           <Text style={styles.counterText}>{copy.no} <Text style={styles.counterValue}>{frontNo}</Text> / {deckSize}</Text>
@@ -166,11 +210,13 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         })}
       </View> : null}
 
-      {!showRing ? <Animated.View style={[styles.big, { width: bigW, height: bigH, top: vh * 0.1,
+      {!showRing && phase !== 'topic' ? <Animated.View style={[styles.big, { width: bigW, height: bigH, top: vh * 0.1,
         transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [vh * 0.25, 0] }) },
           { scale: lift.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }) }, { perspective: 1200 }, { rotateY: turn }] }]}>
         <Animated.Image source={back} style={[styles.bigImage, { opacity: backFace }]} />
-        {face && PETAL_CARD_ART[face.id] ? <Animated.Image source={PETAL_CARD_ART[face.id]} style={[styles.bigImage, { opacity: frontFace }]} /> : null}
+        {/* A card without bundled art keeps its back rather than turning blank. */}
+        {face ? <Animated.Image source={PETAL_CARD_ART[face.id] ?? back}
+          style={[styles.bigImage, { opacity: frontFace }, face.reversed && PETAL_CARD_ART[face.id] !== undefined && styles.upsideDown]} /> : null}
       </Animated.View> : null}
 
       {phase === 'drawing' ? <ActivityIndicator style={styles.drawing} color="#E9CF8A" accessibilityLabel={copy.drawing} /> : null}
@@ -185,10 +231,21 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
       </View> : null}
 
       {phase === 'revealed' && face ? <ScrollView style={[styles.reveal, { top: vh * 0.1 + bigH + 12 }]} contentContainerStyle={styles.revealContent}>
-        <Text style={styles.kicker}>{copy.today}</Text>
+        <Text style={styles.kicker}>{topic.label ?? copy.today}</Text>
         <Text style={styles.cardName}>{face.name}</Text>
+        {face.keywords ? <Text style={styles.orientation}>{`${face.reversed ? copy.reversed : copy.upright} · ${face.keywords.join(locale === 'en' ? ', ' : '、')}`}</Text> : null}
         <Text style={styles.line}>{face.line}</Text>
         <Text style={styles.text}>{face.text}</Text>
+        {reading?.available && reading.status === 'READY' && reading.paragraphs?.length ? <View style={styles.reading}>
+          <Text style={styles.readingTitle}>{copy.reading}</Text>
+          {reading.paragraphs.map((paragraph, i) => <Text key={i} selectable style={styles.readingText}>{paragraph}</Text>)}
+          {typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
+        </View> : null}
+        {reading?.available && reading.locked ? <Text style={styles.lockedNote}>{copy.locked}</Text> : null}
+        {reading?.available && !reading.needsConsent && !reading.locked && (reading.status === 'NONE' || reading.status === 'GENERATING') ? <View style={styles.waitRow}>
+          <ActivityIndicator size="small" color="#E9CF8A" accessible={false} /><Text style={styles.text}>{copy.readingWait}</Text>
+        </View> : null}
+        {reading?.available && reading.needsConsent ? <Text style={styles.disclaimer}>{copy.readingConsent}</Text> : null}
         <Text style={styles.disclaimer}>{face.disclaimer}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={copy.share} accessibilityState={{ disabled: !prepared }} disabled={!prepared}
           onPress={share} style={({ pressed }) => [styles.secondary, !prepared && styles.waiting, pressed && styles.pressed]}>
@@ -249,6 +306,20 @@ const styles = StyleSheet.create({
   no: { textAlign: 'center', marginTop: 4, fontFamily: 'serif', color: '#E9CF8A' },
   big: { position: 'absolute', alignSelf: 'center', zIndex: 250 },
   bigImage: { position: 'absolute', width: '100%', height: '100%', borderRadius: 14 },
+  upsideDown: { transform: [{ rotate: '180deg' }] },
+  topics: { position: 'absolute', top: 70, left: 24, right: 24, alignItems: 'center', gap: 12, zIndex: 200 },
+  ask: { marginTop: 18, fontFamily: 'serif', fontSize: 22, color: '#F3DFA8', textAlign: 'center' },
+  topic: { alignSelf: 'stretch', maxWidth: 360, width: '100%', minHeight: 48, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
+    justifyContent: 'center', borderWidth: 1, borderColor: '#E9CF8A88', backgroundColor: '#1B154088' },
+  topicText: { fontFamily: 'serif', fontSize: 17, color: '#F6EDDB' },
+  topicTag: { marginTop: 8, fontFamily: 'serif', fontSize: 15, color: '#F3DFA8' },
+  orientation: { fontFamily: 'serif', fontSize: 13, letterSpacing: 1, color: '#E9CF8A', textAlign: 'center' },
+  reading: { alignSelf: 'stretch', marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderColor: '#E9CF8A44', gap: 10 },
+  readingTitle: { fontFamily: 'serif', fontSize: 15, letterSpacing: 2, color: '#E9CF8A', textAlign: 'center' },
+  readingText: { fontFamily: 'serif', fontSize: 15, lineHeight: 25, color: '#F1EAF9' },
+  lockedNote: { alignSelf: 'stretch', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderColor: '#E9CF8A44',
+    fontFamily: 'serif', fontSize: 14, lineHeight: 22, color: '#D8D0F0', textAlign: 'center' },
+  waitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   drawing: { position: 'absolute', alignSelf: 'center', bottom: 120 },
   error: { position: 'absolute', alignSelf: 'center', bottom: 90, color: '#F4B9C2', fontSize: 13 },
   hint: { position: 'absolute', bottom: 40, alignSelf: 'center', fontFamily: 'serif', fontSize: 12, color: '#9F96C8' },

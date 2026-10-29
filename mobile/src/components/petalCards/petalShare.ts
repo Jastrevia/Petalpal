@@ -11,8 +11,10 @@ import type { PetalCardFace } from '../../services/petalCardDraw';
 export const SHARE_SIZE = { width: 1080, height: 1350 };
 
 const COPY = {
-  en: { kicker: "TODAY'S PETAL CARD", caption: (name: string, line: string) => `Today's petal card from PetalPal: ${name} — “${line}”` },
-  'zh-Hans': { kicker: '今日花语卡', caption: (name: string, line: string) => `今天在 PetalPal 抽到的花语卡：${name}——「${line}」` },
+  en: { kicker: "TODAY'S PETAL CARD", reversed: 'Reversed',
+    caption: (name: string, line: string) => `Today's petal card from PetalPal: ${name} — “${line}”` },
+  'zh-Hans': { kicker: '今日花语卡', reversed: '逆位',
+    caption: (name: string, line: string) => `今天在 PetalPal 抽到的花语卡：${name}——「${line}」` },
 };
 
 export type PreparedShare = { file: File | null; caption: string };
@@ -65,7 +67,11 @@ export async function drawShareImage(face: PetalCardFace, art: number, locale: '
   c.shadowColor = '#F3DFA8AA'; c.shadowBlur = 48;
   c.beginPath(); c.roundRect(x, y, cw, ch, r); c.fillStyle = '#17123A'; c.fill();
   c.restore();
-  c.save(); c.beginPath(); c.roundRect(x, y, cw, ch, r); c.clip(); c.drawImage(image, x, y, cw, ch); c.restore();
+  // A reversed card lies upside down, as it came out of the deck.
+  c.save(); c.beginPath(); c.roundRect(x, y, cw, ch, r); c.clip();
+  if (face.reversed) { c.translate(x + cw / 2, y + ch / 2); c.rotate(Math.PI); c.drawImage(image, -cw / 2, -ch / 2, cw, ch); }
+  else c.drawImage(image, x, y, cw, ch);
+  c.restore();
   c.lineWidth = 3; c.strokeStyle = '#F3DFA8'; c.beginPath(); c.roundRect(x, y, cw, ch, r); c.stroke();
 
   const copy = COPY[locale];
@@ -75,7 +81,7 @@ export async function drawShareImage(face: PetalCardFace, art: number, locale: '
   c.fillText(copy.kicker, W / 2, 1022);
   if ('letterSpacing' in c) (c as unknown as { letterSpacing: string }).letterSpacing = '0px';
   c.fillStyle = '#F3DFA8'; c.font = `54px ${SERIF}`;
-  c.fillText(face.name, W / 2, 1092);
+  c.fillText(face.reversed ? `${face.name} · ${copy.reversed}` : face.name, W / 2, 1092);
   c.fillStyle = '#F6EDDB'; c.font = `italic 36px ${SERIF}`;
   wrap(c, face.line, 900).slice(0, 3).forEach((line, i) => c.fillText(line, W / 2, 1150 + i * 48));
   c.fillStyle = '#9F96C8'; c.font = `22px ${SERIF}`;

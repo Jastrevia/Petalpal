@@ -13,7 +13,8 @@ const routes = [
   ["PUT /api/fairy/moments/cover", "updateMany scopes the active Fairy to req.auth.userId; cover library ids only; body allowlist"],
   ["POST /api/fairy/check-in", "owner is req.auth.userId; empty body only; one check-in per local day under an advisory lock"],
   ["POST /api/fairy/closeness/tap", "owner is req.auth.userId; empty body only; capped per local day"],
-  ["POST /api/petal-cards/draw", "owner is req.auth.userId; position allowlist; one draw per local day under an advisory lock"],
+  ["POST /api/petal-cards/draw", "owner is req.auth.userId; position and topic allowlists; one draw per local day under an advisory lock"],
+  ["POST /api/petal-cards/reading", "owner is req.auth.userId; no body fields; today's own draw only; Premium or listed owner; at most two model attempts per draw under an advisory lock and the AI cost gate"],
   ["POST /api/redeem", "owner is req.auth.userId; code allowlist; hash-only lookup; failed guesses rate-limited; one claim per code and per account and batch under an advisory lock"],
   ["PUT /users/:userId/ai-consent", "requireOwnUser and boolean allowlist"],
   ["POST /events", "ownerId/userId rejected; create helper receives req.auth identity"],
@@ -43,7 +44,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 29);
+  assert.equal(routes.length, 30);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

@@ -65,7 +65,8 @@ import {
   listKeepsakes
 } from "./lib/fairy-closeness.js";
 import { petalCardsEnabledFor } from "./lib/petal-cards.js";
-import { drawPetalCard, petalDrawsForMonth, todaysPetalDraw } from "./lib/petal-card-draw.js";
+import { drawPetalCard, heavyCardsOn, PETAL_TOPIC_IDS, petalDrawsForMonth, todaysPetalDraw } from "./lib/petal-card-draw.js";
+import { petalReadingFor, requestPetalReading } from "./lib/petal-reading.js";
 import { listRedemptions, redeemCode, RedeemError } from "./lib/redeem-codes.js";
 import { fairyMomentCaptionsEnabled, fillFairyMomentCaptions } from "./lib/haiku-fairy-moment.js";
 import {
@@ -2005,17 +2006,39 @@ app.get("/api/flowers/today", async (req, res) => {
   }
 });
 
+// A drawn card carries its reading state (lib/petal-reading.js): whether this owner can have one, and how far it got.
+// The reading is extra: if its state cannot be read, the card is still shown, without one.
+async function petalReadingState(userId, drawId) {
+  try { return await petalReadingFor(prisma, { userId, drawId, now: new Date() }); }
+  catch (error) { logServerError("petal reading state error", error); return { available: false }; }
+}
+async function withPetalReading(userId, result) {
+  if (result?.drawn) result.drawn.reading = await petalReadingState(userId, result.drawn.id);
+  return result;
+}
 app.get("/api/petal-cards/today", petalDrawRoute("GET /api/petal-cards/today",
-  req => todaysPetalDraw(prisma, { userId: req.auth.userId, now: new Date() })));
+  // ?deck=full: an app that sends a topic and has art for all 78; an older app keeps its 69-card deck.
+  async req => withPetalReading(req.auth.userId, await todaysPetalDraw(prisma,
+    { userId: req.auth.userId, now: new Date(), heavy: req.query.deck === "full" && heavyCardsOn() }))));
 
-app.post("/api/petal-cards/draw", allowBodyFields(["position"]), (req, res, next) => {
-  const position = req.body?.position;
+app.post("/api/petal-cards/draw", allowBodyFields(["position", "topic"]), (req, res, next) => {
+  const { position, topic } = req.body ?? {};
   if (!Number.isInteger(position) || position < 0 || position > 100_000) {
     return res.status(400).json({ error: "position must be a whole number from 0" });
   }
+  // No topic: an app from before topics (lib/petal-card-draw.js draws it from the legacy deck).
+  if (topic !== undefined && !PETAL_TOPIC_IDS.includes(topic)) return res.status(400).json({ error: "topic must be one of the petal card topics" });
   next();
-}, petalDrawRoute("POST /api/petal-cards/draw",
-  req => drawPetalCard(prisma, { userId: req.auth.userId, position: req.body.position, now: new Date() })));
+}, petalDrawRoute("POST /api/petal-cards/draw", async req => {
+  const result = await drawPetalCard(prisma, { userId: req.auth.userId, position: req.body.position, topic: req.body.topic,
+    heavy: heavyCardsOn(), now: new Date() });
+  if (result) result.reading = await petalReadingState(req.auth.userId, result.id);
+  return result;
+}));
+
+// Today's tarot reading: written once (at most two model attempts) for Premium or listed owners.
+app.post("/api/petal-cards/reading", aiRateLimit, allowBodyFields([]), petalDrawRoute("POST /api/petal-cards/reading",
+  req => requestPetalReading(prisma, { userId: req.auth.userId, now: new Date() })));
 
 // Redemption codes (lib/redeem-codes.js). Wrong guesses are limited per account; a code
 // that works does not count against the limit.
