@@ -8,7 +8,8 @@ import { distance, type Network, type Point } from '../fairy/walkNetwork';
 
 // `silktail`, the Silktail Fox spirit, walks like the others but is not a random visitor: it comes
 // for a Journal milestone (when exactly is still to be designed), so it is left out of CRITTER_IDS.
-// Nor is the bluebird any more: it lives on the Garden's perches (spirits/Bluebird.tsx).
+// Nor are the bluebird and the butterfly any more: they live on the Garden's perches and stones
+// (spirits/Bluebird.tsx, Butterfly.tsx).
 export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail';
 export type CritterKind = 'flyer' | 'walker';
 export type CritterSpec = {
@@ -32,8 +33,9 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
   silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
 };
-export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird');
-export const MAX_VISITORS = 2;
+export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird' && id !== 'butterfly');
+// The rabbit, the hedgehog and the puppy can all be in at once.
+export const MAX_VISITORS = 3;
 // Seconds between one visitor arriving and the next.
 export const VISIT_GAP: [number, number] = [10, 35];
 export const FADE_SECONDS = 0.8;
@@ -61,7 +63,74 @@ export const burstLength = (id: CritterId) => CRITTERS[id].speed * RHYTHMS[id].c
 export type Visit = {
   key: number; id: CritterId; path: Point[]; start: number; duration: number; speed: number; rhythm: Rhythm;
   lead: number; fadeIn: boolean; walked: number;
+  // The lawn (month) a lawn animal plays on; `leaving`: fading out where it stands.
+  lawn?: number; leaving?: boolean;
 };
+
+// The rabbit and the hedgehog play only on lawns with no flowers yet, one animal to a lawn (and
+// the rabbit never on the butterfly's lawn). Once every lawn has flowers they walk the paths.
+export const LAWN_ANIMALS: readonly CritterId[] = ['rabbit', 'hedgehog'];
+export type LawnBounds = { minX: number; minY: number; maxX: number; maxY: number };
+export type Lawns = {
+  unplanted: readonly number[];
+  // Lawns another animal is on, per animal asking.
+  taken: (id: CritterId) => readonly number[];
+  isOn: (month: number, point: Point) => boolean;
+  bounds: (month: number) => LawnBounds;
+};
+// Kept from a lawn's edge (world units), so a body never hangs over the path or the water.
+export const LAWN_MARGIN = 16;
+
+const onLawn = (lawns: Lawns, month: number, p: Point) => {
+  if (!lawns.isOn(month, p)) return false;
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    if (!lawns.isOn(month, { x: p.x + Math.cos(a) * LAWN_MARGIN, y: p.y + Math.sin(a) * LAWN_MARGIN })) return false;
+  }
+  return true;
+};
+const segmentOnLawn = (lawns: Lawns, month: number, a: Point, b: Point) => {
+  const d = distance(a, b);
+  for (let s = 0; s <= d; s += 8) if (!onLawn(lawns, month, { x: a.x + (b.x - a.x) * s / (d || 1), y: a.y + (b.y - a.y) * s / (d || 1) })) return false;
+  return true;
+};
+
+// A stroll of 2–4 straight stretches inside one lawn, from `from` (where it is) when given.
+export function planLawnWalk(month: number, lawns: Lawns, random: () => number, from?: Point, stops = 2 + Math.floor(random() * 3)) {
+  const b = lawns.bounds(month);
+  let here: Point | null = from ?? null;
+  for (let attempt = 0; !here && attempt < 120; attempt++) {
+    const p = { x: b.minX + random() * (b.maxX - b.minX), y: b.minY + random() * (b.maxY - b.minY) };
+    if (onLawn(lawns, month, p)) here = p;
+  }
+  if (!here) return null;
+  const path = [here];
+  for (let i = 0; i < stops; i++) {
+    const at: Point = here;
+    let next: Point | null = null;
+    for (let attempt = 0; !next && attempt < 40; attempt++) {
+      const angle = random() * Math.PI * 2, d = 30 + random() * 170;
+      const p: Point = { x: at.x + Math.cos(angle) * d, y: at.y + Math.sin(angle) * d };
+      if (onLawn(lawns, month, p) && segmentOnLawn(lawns, month, at, p)) next = p;
+    }
+    if (!next) break;
+    path.push(next); here = next;
+  }
+  return path.length >= 2 ? path : null;
+}
+
+// A free unplanted lawn for `id`, or null.
+export function chooseLawn(id: CritterId, lawns: Lawns, random: () => number) {
+  const taken = lawns.taken(id), free = lawns.unplanted.filter(month => !taken.includes(month));
+  return free.length ? pick(free, random) : null;
+}
+
+// Fades out where it stands (its lawn has flowers now, or someone else's turn).
+export function leaveVisit(visit: Visit, now: number): Visit {
+  const here = visitPose(visit, now);
+  return { ...visit, path: [{ x: here.x, y: here.y }, { x: here.x, y: here.y }], start: now, lead: 0, duration: FADE_SECONDS, fadeIn: false, leaving: true,
+    walked: visit.walked + visitDistance(visit, now) };
+}
 
 const pick = <T,>(items: readonly T[], random: () => number) => items[Math.min(items.length - 1, Math.floor(random() * items.length))];
 const between = ([low, high]: readonly [number, number], random: () => number) => low + (high - low) * random();
@@ -118,27 +187,41 @@ export function planFlight(points: readonly Point[], spec: CritterSpec, random: 
   return path;
 }
 
-// The next visitor: someone not already in the Garden, with a route and how long it lasts.
-export function planVisit({ key, now, active, network, edges, points, random }: {
+// The next visitor: someone not already in the Garden (nor `excluded`), with a route and how
+// long it lasts. A lawn animal needs a free unplanted lawn while any lawn is unplanted.
+export function planVisit({ key, now, active, network, edges, points, random, lawns, excluded = [] }: {
   key: number; now: number; active: readonly Visit[]; network: Network; edges: Network['edges'];
-  points: readonly Point[]; random: () => number;
+  points: readonly Point[]; random: () => number; lawns?: Lawns; excluded?: readonly CritterId[];
 }): Visit | null {
   if (active.length >= MAX_VISITORS) return null;
-  const free = CRITTER_IDS.filter(id => !active.some(visit => visit.id === id));
+  const free = CRITTER_IDS.filter(id => !excluded.includes(id) && !active.some(visit => visit.id === id)
+    && !(lawns && LAWN_ANIMALS.includes(id) && lawns.unplanted.length && chooseLawn(id, lawns, () => 0) === null));
   if (!free.length) return null;
   const id = pick(free, random), spec = CRITTERS[id];
-  const path = spec.kind === 'walker' ? planWalk(network, edges, random) : planFlight(points, spec, random);
+  const lawn = lawns && LAWN_ANIMALS.includes(id) && lawns.unplanted.length ? chooseLawn(id, lawns, random) : null;
+  const path = lawn !== null && lawns ? planLawnWalk(lawn, lawns, random)
+    : spec.kind === 'walker' ? planWalk(network, edges, random) : planFlight(points, spec, random);
   if (!path || path.length < 2) return null;
   const rhythm = RHYTHMS[id];
-  return { key, id, path, start: now, duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, rhythm), speed: spec.speed, rhythm, lead: FADE_SECONDS, fadeIn: true, walked: 0 };
+  return { key, id, path, start: now, duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, rhythm), speed: spec.speed, rhythm,
+    lead: FADE_SECONDS, fadeIn: true, walked: 0, ...(lawn !== null ? { lawn } : {}) };
 }
 
 // A visitor's next leg once `visit` has ended: a rest where it stopped, then a new route from
 // there. Null when no route leads on (it then stays put and is asked again later).
-export function planNextLeg({ visit, now, network, edges, points, random }: {
-  visit: Visit; now: number; network: Network; edges: Network['edges']; points: readonly Point[]; random: () => number;
+export function planNextLeg({ visit, now, network, edges, points, random, lawns }: {
+  visit: Visit; now: number; network: Network; edges: Network['edges']; points: readonly Point[]; random: () => number; lawns?: Lawns;
 }): Visit | null {
   const spec = CRITTERS[visit.id], gone = visitDistance(visit, visit.start + visit.duration);
+  if (visit.lawn !== undefined && lawns) {
+    // On its lawn: stroll on from where it stopped; a planted lawn is left (leaveVisit).
+    const end = visitPose(visit, visit.start + visit.duration);
+    const path = planLawnWalk(visit.lawn, lawns, random, { x: end.x, y: end.y });
+    if (!path) return null;
+    const lead = between(REST[visit.id], random);
+    return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + gone,
+      duration: lead + travelSeconds(pathLength(path) / spec.speed, visit.rhythm) };
+  }
   // Where it stopped (walkers move in whole steps, so maybe short of the last point) and the
   // path point ahead of it: a walker finishes that segment, then strolls on from there.
   let ahead = visit.path.length - 1;
@@ -212,7 +295,7 @@ export function visitPose(visit: Visit, seconds: number) {
   'worklet';
   const elapsed = seconds - visit.start;
   const travel = Math.max(0, Math.min(visit.duration - visit.lead, elapsed - visit.lead));
-  const opacity = visit.fadeIn ? Math.max(0, Math.min(1, elapsed / FADE_SECONDS)) : 1;
+  const opacity = visit.leaving ? Math.max(0, 1 - elapsed / FADE_SECONDS) : visit.fadeIn ? Math.max(0, Math.min(1, elapsed / FADE_SECONDS)) : 1;
   let left = travelled(travel, visit.rhythm) * visit.speed;
   const path = visit.path;
   for (let i = 1; i < path.length; i++) {

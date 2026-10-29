@@ -23,6 +23,14 @@ const flowerBounds = Array.from({ length: 12 }, (_, i) => {
     minY:Math.min(...world.map(p=>p.y)), maxY:Math.max(...world.map(p=>p.y))};
 });
 
+// A month's lawn: its broad bounds (world units) and whether a point is on it.
+export const monthLawnBounds = (month: number) => flowerBounds[month - 1];
+export const isOnMonthLawn = (month: number, point: Point) => {
+  const b = flowerBounds[month - 1];
+  return point.x >= b.minX && point.x <= b.maxX && point.y >= b.minY && point.y <= b.maxY &&
+    isPointInApprovedMonthMaskWorld(month, point.x, point.y);
+};
+
 export function isGardenPlantable(point: Point): boolean {
   return flowerBounds.some(b => point.x >= b.minX && point.x <= b.maxX &&
     point.y >= b.minY && point.y <= b.maxY && isPointInApprovedMonthMaskWorld(b.month,point.x,point.y));

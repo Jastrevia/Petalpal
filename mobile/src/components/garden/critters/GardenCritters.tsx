@@ -1,11 +1,14 @@
 import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
-import { isGardenGroundBlocked } from '../fairy/gardenGround';
+import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
+import { usePlanting } from '../planting/PlantingContext';
+import { residents } from './gardenResidents';
 import { safeSegment, WALK_NETWORK } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CRITTERS, nextGap, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges, type CritterId, type Visit,
+  AWAY_SECONDS, burstLength, CRITTERS, leaveVisit, nextGap, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges,
+  type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
@@ -41,13 +44,30 @@ const REST_FPS = 12;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 
-// Schedules the visitors: one now and then until two are here, only while the Garden is active.
-// They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have gone.
+// Schedules the visitors: one now and then until MAX_VISITORS are here, only while the Garden is
+// active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
+// gone. The rabbit and the hedgehog keep to unplanted lawns (critterVisits.ts): when only one is
+// left, just one of them comes this session, picked when the Garden opens.
 export default memo(function GardenCritters({ clock, active }: { clock: SharedValue<number>; active: boolean }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
   const awaySince = useRef<number | null>(null);
+  const { placements, isGardenLoading } = usePlanting();
+  const unplanted = useMemo(() => {
+    const planted = new Set(placements.map(p => p.month));
+    return Array.from({ length: 12 }, (_, i) => i + 1).filter(month => !planted.has(month));
+  }, [placements]);
+  const excluded = useRef<CritterId[] | null>(null);
+  if (excluded.current === null && !isGardenLoading) excluded.current = unplanted.length === 1 ? [Math.random() < 0.5 ? 'rabbit' : 'hedgehog'] : [];
+  const lawns = useRef<Lawns>({ unplanted, isOn: isOnMonthLawn, bounds: monthLawnBounds, taken: id => {
+    const own = (other: CritterId) => visitsRef.current.filter(v => v.id === other && v.lawn !== undefined && !v.leaving).map(v => v.lawn!);
+    return id === 'rabbit' ? [...own('hedgehog'), ...(residents.lawns.butterfly ? [residents.lawns.butterfly] : [])] : id === 'hedgehog' ? own('rabbit') : [];
+  } });
+  lawns.current.unplanted = unplanted;
+  // Tell the butterfly where the lawn animals are.
+  residents.lawns.rabbit = visits.find(v => v.id === 'rabbit' && !v.leaving)?.lawn;
+  residents.lawns.hedgehog = visits.find(v => v.id === 'hedgehog' && !v.leaving)?.lawn;
   useEffect(() => {
     if (!active) { awaySince.current = Date.now(); return; }
     const left = awaySince.current !== null && Date.now() - awaySince.current >= AWAY_SECONDS * 1000;
@@ -55,20 +75,26 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
     if (left) { visitsRef.current = []; setVisits([]); }
     let timer: ReturnType<typeof setTimeout>;
     const arrive = () => {
-      const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
-        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random });
+      const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
+        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: excluded.current });
       if (visit) setVisits(current => [...current, visit]);
       timer = setTimeout(arrive, nextGap(Math.random) * 1000);
     };
     // The first visitor comes a few seconds after the Garden opens.
     timer = setTimeout(arrive, visitsRef.current.length ? nextGap(Math.random) * 1000 : 4000 + Math.random() * 6000);
-    // A visitor whose leg is over rests and sets off again (checked often, so the bluebird,
-    // which does not rest, flies straight on).
+    // A visitor whose leg is over rests and sets off again (checked often, so a flyer, which
+    // does not rest, flies straight on). A lawn animal whose lawn now has flowers (or the
+    // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
     const legs = setInterval(() => {
       const now = clock.value;
       if (!visitsRef.current.some(visit => now >= visit.start + visit.duration)) return;
-      setVisits(current => current.map(visit => (now < visit.start + visit.duration ? visit
-        : planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random }) ?? visit)));
+      setVisits(current => current.flatMap(visit => {
+        if (now < visit.start + visit.duration) return [visit];
+        if (visit.leaving) return [];
+        const lawn = visit.lawn;
+        if (lawn !== undefined && (!lawns.current.unplanted.includes(lawn) || lawns.current.taken(visit.id).includes(lawn))) return [leaveVisit(visit, now)];
+        return [planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current }) ?? visit];
+      }));
     }, 150);
     return () => { clearTimeout(timer); clearInterval(legs); };
   }, [active, clock]);
@@ -78,9 +104,10 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
       visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1) })),
       clear: () => setVisits([]),
+      unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
       spawn: (id: CritterId) => {
         for (let attempt = 0; attempt < 40; attempt++) {
-          const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random });
+          const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current });
           if (visit?.id === id) {
             setVisits(current => [...current, visit]);
             return true;

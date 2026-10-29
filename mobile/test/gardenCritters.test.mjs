@@ -37,7 +37,7 @@ test('flyers hop between dry path points, high above them', () => {
   }
 });
 
-test('at most two visitors, never the same one twice at once', () => {
+test('at most MAX_VISITORS visitors, never the same one twice at once', () => {
   const random = seeded(7);
   const active = [];
   for (let key = 1; key <= 5; key++) {
@@ -45,7 +45,7 @@ test('at most two visitors, never the same one twice at once', () => {
     if (active.length >= visits.MAX_VISITORS) assert.equal(visit, null);
     else { assert.ok(visit); assert.ok(!active.some(item => item.id === visit.id)); active.push(visit); }
   }
-  assert.equal(active.length, 2);
+  assert.equal(active.length, visits.MAX_VISITORS);
 });
 
 test('a visitor fades in, travels its whole path in its rhythm, and stays in sight', () => {
@@ -132,4 +132,63 @@ test('visitors stay: each leg rests where the last one stopped, then sets off on
 
 test('visitors go home only after the Garden has been away a good while', () => {
   assert.ok(visits.AWAY_SECONDS >= 5 * 60);
+});
+
+const ground = load('../fairy/gardenGround');
+const lawnsWith = (unplanted, taken = () => []) => ({ unplanted, taken, isOn: ground.isOnMonthLawn, bounds: ground.monthLawnBounds });
+
+test('the rabbit and the hedgehog stroll only inside an unplanted lawn, clear of its edge', () => {
+  for (let month = 1; month <= 12; month++) {
+    const lawns = lawnsWith([month]);
+    const path = visits.planLawnWalk(month, lawns, seeded(month));
+    assert.ok(path, `a stroll fits on lawn ${month}`);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i], d = Math.hypot(b.x - a.x, b.y - a.y);
+      for (let s = 0; s <= d; s += 4) {
+        const p = { x: a.x + (b.x - a.x) * s / d, y: a.y + (b.y - a.y) * s / d };
+        assert.ok(ground.isOnMonthLawn(month, p), `lawn ${month} stroll stays on the lawn`);
+      }
+    }
+  }
+});
+
+test('one animal to a lawn; planted lawns are off limits; with none left they walk the paths', () => {
+  const taken = { rabbit: [], hedgehog: [] };
+  const lawns = lawnsWith([3, 7], id => (id === 'rabbit' ? taken.hedgehog : taken.rabbit));
+  const random = seeded(11);
+  const active = [];
+  for (let key = 1; key <= 6 && active.length < visits.MAX_VISITORS; key++) {
+    const visit = visits.planVisit({ key, now: 0, active, network: WALK_NETWORK, edges, points, random, lawns });
+    if (!visit) continue;
+    active.push(visit);
+    if (visit.id === 'rabbit' || visit.id === 'hedgehog') {
+      assert.ok([3, 7].includes(visit.lawn), `${visit.id} is on an unplanted lawn`);
+      taken[visit.id] = [visit.lawn];
+    }
+  }
+  const rabbit = active.find(v => v.id === 'rabbit'), hedgehog = active.find(v => v.id === 'hedgehog');
+  if (rabbit && hedgehog) assert.notEqual(rabbit.lawn, hedgehog.lawn, 'never the same lawn');
+  // Every lawn planted: a lawn animal walks the paths instead.
+  let onPaths = null;
+  for (let seed = 1; !onPaths; seed++) {
+    const v = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: lawnsWith([]) });
+    if (v && v.id === 'rabbit') onPaths = v;
+  }
+  assert.equal(onPaths.lawn, undefined);
+  // Only one free lawn, already taken: the other lawn animal stays away.
+  const full = lawnsWith([5], () => [5]);
+  for (let seed = 1; seed < 40; seed++) {
+    const v = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: full });
+    assert.ok(!v || (v.id !== 'rabbit' && v.id !== 'hedgehog'), 'no lawn for it, so it does not come');
+  }
+});
+
+test('a lawn animal whose lawn gets flowers fades out where it stands', () => {
+  const lawns = lawnsWith([4]);
+  const path = visits.planLawnWalk(4, lawns, seeded(2));
+  const visit = { key: 1, id: 'rabbit', path, start: 0, duration: 20, speed: 138, rhythm: visits.RHYTHMS.rabbit, lead: 0.8, fadeIn: true, walked: 0, lawn: 4 };
+  const at = plain(visits.visitPose(visit, 5)), gone = visits.leaveVisit(visit, 5);
+  const start = plain(visits.visitPose(gone, 5)), end = plain(visits.visitPose(gone, 5 + visits.FADE_SECONDS));
+  assert.ok(Math.hypot(start.x - at.x, start.y - at.y) < 1e-6 && start.opacity === 1, 'fades from where it was');
+  assert.ok(end.opacity < 1e-9, 'gone after the fade');
 });
