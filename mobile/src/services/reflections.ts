@@ -10,6 +10,7 @@ export interface ReportSection {
   cardId?: string; name?: string; line?: string; text?: string; fact?: string | null; disclaimer?: string; reason?: string;
   type?: string; role?: string; items?: { text: string; sourceEventId: string; date?: string }[];
   quote?: { text: string; sourceEventId: string; date?: string } | null; evidence?: { sourceEventId: string; date: string }[];
+  reportVersion?: string;
 }
 export interface ThenNowSide { sourceEventId: string; date: string; quote: string }
 export interface SavedReport {
@@ -95,11 +96,12 @@ export interface ShortWeekly {
   side: string | null; question: string | null; support: string | null;
   thenAndNow: { then: ThenNowSide; now: ThenNowSide; count: number | null; phrase: string | null } | null;
   card: PetalCard | null;
-  // Weekly insights (backend weekly-short-v2 output, saved under the v1 contract): headline + cards.
+  // Weekly 2.0 (backend lib/insight-write.js, saved under the v1 contract): headline + insight cards.
   headline: string | null; insights: { main: Insight; secondary: Insight[] } | null;
 }
 export interface PetalCard { id: string; name: string; line: string; text: string; fact: string; disclaimer: string; reason: string | null }
-export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION';
+// TREND is Weekly 2.0's code-written fallback (backend lib/insight-compute.js).
+export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND';
 export interface Insight {
   type: InsightType; text: string; fact: string | null;
   items: { text: string; eventId: string }[]; quote: { text: string; eventId: string } | null;
@@ -119,11 +121,12 @@ export function shortWeekly(report: Pick<ReflectionReport, 'narrativeSections'>)
     side: find('SIDE_BY_SIDE')?.claim ?? null, question: find('QUESTION')?.claim ?? null, support: find('SUPPORT_RESOURCES')?.claim ?? null,
     thenAndNow: thenNow(find('THEN_AND_NOW')), card: petalCard(find('PETAL_CARD')), ...insightsOf(sections) };
 }
-const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION'];
+const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND'];
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
 const spanOf = (value?: { text?: unknown; sourceEventId?: unknown } | null) =>
   value && filled(value.text) && filled(value.sourceEventId) ? { text: value.text, eventId: value.sourceEventId } : null;
-// A malformed insight is skipped; without a valid main insight no insight (and no headline) shows.
+// A malformed insight is skipped; without a valid main insight no insight shows, and no headline unless it is a
+// Weekly 2.0 one (reportVersion weekly-2.0: always saved, e.g. "这周的花还在长" for a week with few entries).
 function insight(section: ReportSection): Insight | null {
   if (!INSIGHT_TYPES.includes(section.type as InsightType) || !filled(section.text) || !Array.isArray(section.evidence)) return null;
   const evidence = section.evidence.filter(item => filled(item?.sourceEventId) && DATE.test(item?.date ?? ''))
@@ -137,7 +140,7 @@ function insightsOf(sections: ReportSection[]) {
   const cards = sections.filter(section => section?.kind === 'INSIGHT');
   const main = cards.find(section => section.role === 'main'), headline = sections.find(section => section?.kind === 'HEADLINE');
   const first = main && insight(main);
-  if (!first) return { headline: null, insights: null };
+  if (!first) return { headline: headline?.reportVersion === 'weekly-2.0' && filled(headline.claim) ? headline.claim : null, insights: null };
   const secondary = cards.filter(section => section.role === 'secondary').map(insight).filter(item => item !== null).slice(0, 3);
   return { headline: filled(headline?.claim) ? headline.claim : null, insights: { main: first, secondary } };
 }

@@ -99,3 +99,16 @@ test('insights: a valid main insight brings the headline and up to three more; m
   }
   assert.equal(SHORT_COPY['zh-Hans'].whyCard, '为什么是这张');
 });
+
+// Weekly 2.0 (backend lib/insight-write.js): the code-only TREND insight shows like the others, and the 2.0
+// headline shows even with no insight (a week with fewer than three entries).
+test('Weekly 2.0: a TREND main insight, and the headline of a week with no insight', () => {
+  const trend = { kind: 'INSIGHT', claim: 'x', role: 'main', type: 'TREND', text: '前半周多是「迷茫」，后半周「疗愈」多了起来。', fact: null,
+    items: [], quote: null, evidence: [{ sourceEventId: 'event-0', date: '2026-09-14' }], template: true, ...meta };
+  const headline = { kind: 'HEADLINE', claim: '这周的花还在长', reportVersion: 'weekly-2.0', ...meta };
+  const read = list => plain(shortWeekly({ narrativeSections: [...sections, ...list] }));
+  assert.equal(read([headline, trend]).insights.main.type, 'TREND');
+  const growing = read([headline]);
+  assert.equal(growing.headline, '这周的花还在长'); assert.equal(growing.insights, null);
+  assert.equal(read([{ ...headline, reportVersion: undefined }]).headline, null, 'a v1 headline still needs its main insight');
+});

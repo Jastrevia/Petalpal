@@ -11,8 +11,8 @@ const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
 type Opened = { at: string; id: string } & ({ state: 'loading' } | { state: 'ready'; text: string } | { state: 'error' });
 
 // Rendering only: every part was chosen and validated on the backend; a hidden part simply is not saved.
-// With weekly insights: headline → main insight → mood curve → more insights → line of the week → petal card →
-// then and now → question. Without them the layout is the short report's.
+// With insights (Weekly 2.0): headline → main insight → mood curve → more insights → then and now (its "还有一件事") →
+// petal card → question. Without them the layout is the short report's (a 2.0 headline still shows first).
 export function ShortWeeklyReport({ short, interactive, onWrite }: { short: ShortWeekly; interactive: boolean; onWrite: () => void }) {
   const copy = SHORT_COPY[short.locale];
   const [opened, setOpened] = useState<Opened | null>(null);
@@ -97,6 +97,15 @@ export function ShortWeeklyReport({ short, interactive, onWrite }: { short: Shor
       <Text style={s.disclaimer}>{short.card.disclaimer}</Text>
     </View>
   </>;
+  const thenAndNow = short.thenAndNow && <>
+    <Text style={s.heading}>{copy.thenNow}</Text>
+    {([['then', short.thenAndNow.then], ['now', short.thenAndNow.now]] as const).map(([key, side]) => <View key={key} style={s.pair}>
+      <Text style={s.pairLabel}>{copy[key]} · {shortDate(side.date, short.locale)}</Text>
+      <Text selectable={interactive} style={s.pairQuote}>{`“${side.quote}”`}</Text>
+    </View>)}
+    {short.thenAndNow.count && short.thenAndNow.phrase
+      ? <Text selectable={interactive} style={s.small}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, short.locale)}</Text> : null}
+  </>;
   return <View testID="short-weekly-report">
     {insights ? <>
       {short.headline && <Text accessibilityRole="header" style={s.headline}>{short.headline}</Text>}
@@ -105,21 +114,15 @@ export function ShortWeeklyReport({ short, interactive, onWrite }: { short: Shor
       {insights.secondary.length > 0 && <Text style={s.heading}>{copy.more}</Text>}
       {insights.secondary.map((item, i) => insightCard(item, `more-${i}`, false))}
       {lineOfWeek}
+      {thenAndNow}
       {card}
     </> : <>
+      {short.headline && <Text accessibilityRole="header" style={s.headline}>{short.headline}</Text>}
       {lineOfWeek}
       {curve}
       {card}
       {short.side && <><Text style={s.heading}>{copy.side}</Text><Text selectable={interactive} style={s.body}>{short.side}</Text></>}
-    </>}
-    {short.thenAndNow && <>
-      <Text style={s.heading}>{copy.thenNow}</Text>
-      {([['then', short.thenAndNow.then], ['now', short.thenAndNow.now]] as const).map(([key, side]) => <View key={key} style={s.pair}>
-        <Text style={s.pairLabel}>{copy[key]} · {shortDate(side.date, short.locale)}</Text>
-        <Text selectable={interactive} style={s.pairQuote}>{`“${side.quote}”`}</Text>
-      </View>)}
-      {short.thenAndNow.count && short.thenAndNow.phrase
-        ? <Text selectable={interactive} style={s.small}>{thenNowCount(short.thenAndNow.count, short.thenAndNow.phrase, short.locale)}</Text> : null}
+      {thenAndNow}
     </>}
     {short.question && <>
       <Text style={s.heading}>{copy.question}</Text>
