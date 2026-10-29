@@ -10,13 +10,15 @@ import type { TreehousePlacement } from './TreehouseCalibrationEditor';
 // (several wingbeats, first frame = last), then TURN, the bird turning round in the air from
 // facing right to facing left through a front view, then FOLD, the bird opening out into a sheet
 // of letter paper that folds itself into a sealed envelope. One sheet, so one draw per frame.
-// Every LOOPS laps it glides down to the top of the mailbox while it folds, rests there as an
-// envelope, then unfolds (FOLD backwards) into the bird and flies on from where its lap starts. It flies one whole FLY loop along each side of its
+// Most of the time it is a sealed envelope resting beside the mailbox (REST seconds); then it
+// unfolds (FOLD backwards) into the bird, flies LOOPS laps, glides back down while it folds, and
+// rests again. The cycle starts as the envelope, so that is what the Garden opens on. In flight
+// it flies one whole FLY loop along each side of its
 // circuit, so it always reaches a turn in the pose the turn starts from; at the right end it
 // plays TURN, at the left end TURN mirrored (left to right). It never flips flat like a card.
 const ART = require('@/assets/garden/spirits/letterwing.webp');
 const FLY = { count: 62 }, TURN = { count: 26 }, FOLD = { count: 62 };
-const LOOPS = 2, REST = 14;
+const LOOPS = 2, REST = 80;
 const CELL = { w: 220, h: 150, columns: 11, fps: 12 };
 const STRAIGHT = FLY.count / CELL.fps, TURNING = TURN.count / CELL.fps, FOLDING = FOLD.count / CELL.fps;
 const LAP = 2 * (STRAIGHT + TURNING), CYCLE = LOOPS * LAP + 2 * FOLDING + REST;
@@ -27,7 +29,9 @@ const TURN_ARC = 0.7;
 // how far it has gone down to the mailbox (`rest`, 0 on the loop … 1 resting as an envelope).
 function circuit(seconds: number) {
   'worklet';
-  const c = ((seconds % CYCLE) + CYCLE) % CYCLE;
+  // Shifted so time 0 falls in the middle of a rest: the Garden opens on the envelope.
+  const shifted = seconds + LOOPS * LAP + FOLDING + REST / 2;
+  const c = ((shifted % CYCLE) + CYCLE) % CYCLE;
   if (c >= LOOPS * LAP) {
     // The visit starts where a lap starts (facing right, first flight frame = first fold frame).
     const v = c - LOOPS * LAP;
@@ -62,9 +66,9 @@ export default function Letterwing({ placement, clock, unread }: {
     const c = circuit(clock.value * rate);
     const rx = (unread ? 230 : 310) * k, ry = (unread ? 70 : 96) * k;
     const centreY = mailboxY - (unread ? 175 : 245) * k;
-    // Resting: the envelope, smaller than in flight, sits on the mailbox's roof (measured on screen
-    // in the Garden: treehouse 1035, 742 puts it there, just in front of the roof ridge).
-    const restX = placement.x + 1035 * k, restY = placement.y + 742 * k;
+    // Resting: the envelope, smaller than in flight, lies on the ground beside the mailbox, just
+    // right of its foot (treehouse 1095, 805, measured on screen in the Garden).
+    const restX = placement.x + 1095 * k, restY = placement.y + 805 * k;
     const x = (mailboxX + rx * Math.cos(c.angle)) * (1 - c.rest) + restX * c.rest;
     const y = (centreY + ry * Math.sin(c.angle)) * (1 - c.rest) + restY * c.rest;
     // The near half of the loop is a little larger; it banks gently on the straights.
@@ -74,6 +78,11 @@ export default function Letterwing({ placement, clock, unread }: {
       { scaleX: c.facing * depth * drawScale }, { scaleY: depth * drawScale },
       { translateX: -CELL.w / 2 }, { translateY: -CELL.h / 2 }];
   }, [k, mailboxX, mailboxY, drawScale, unread, rate, placement.x, placement.y]);
+  // Development only: window.__letterwing() is where it is now (Garden world units) and its state.
+  if (__DEV__ && typeof window !== 'undefined') (window as unknown as { __letterwing?: unknown }).__letterwing = () => {
+    const c = circuit(clock.value * rate), t = transform.value as { translateX?: number; translateY?: number }[];
+    return { x: t[0].translateX, y: t[1].translateY, rest: c.rest, flying: c.flying, frame: c.frame };
+  };
   if (!sheet) return null;
   return <Group transform={transform}>
     <SheetFrame sheet={sheet} frame={frame} columns={CELL.columns} count={FLY.count + TURN.count + FOLD.count} w={CELL.w} h={CELL.h} />
