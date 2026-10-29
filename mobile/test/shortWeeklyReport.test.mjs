@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
-const { shortWeekly, moodCurveLayout, moodIcon, SHORT_COPY, WEEKLY_SHORT, shortDate, thenNowCount } = loadPlantingModules()('../../../services/reflections');
+const { shortWeekly, moodCurveLayout, moodIcon, SHORT_COPY, WEEKLY_SHORT, shortDate, thenNowCount, bouquetLayout, MOOD_SPECIES } = loadPlantingModules()('../../../services/reflections');
 const { PRIMARY_MOODS } = loadPlantingModules()('../../../services/events');
 const plain = value => JSON.parse(JSON.stringify(value)); // values from the VM sandbox have foreign prototypes
 
@@ -31,7 +31,7 @@ test('short Weekly sections are read only from the short contract; older reports
   assert.equal(shortWeekly({ narrativeSections: [] }), null);
   const support = plain(shortWeekly({ narrativeSections: [{ kind: 'SUPPORT_RESOURCES', claim: 'You do not have to face this alone.', contractVersion: WEEKLY_SHORT, locale: 'en' }] }));
   assert.deepEqual({ ...support, support: !!support.support }, { locale: 'en', line: null, curve: null, side: null, question: null, support: true, thenAndNow: null, card: null,
-    headline: null, insights: null });
+    headline: null, insights: null, version2: false });
 });
 
 test('mood curve puts each day in its column, higher moods higher, and joins points in time order', () => {
@@ -85,7 +85,7 @@ test('insights: a valid main insight brings the headline and up to three more; m
     insight('secondary', 'MADE_UP'), insight('secondary', 'SAID_BEFORE', { evidence: [{ sourceEventId: 'event-0', date: 'Sep 14' }] }),
     insight('secondary', 'SMALL_GOODS', { items: [{ text: '只有一件。', sourceEventId: 'event-1' }] })]);
   assert.equal(short.headline, '写到妈妈的日子，多是亮的');
-  assert.deepEqual(short.insights.main, { type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
+  assert.deepEqual(short.insights.main, { index: 5, feedback: null, type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
     evidence: [{ eventId: 'event-0', date: '2026-09-14' }] });
   assert.deepEqual(short.insights.secondary.map(item => item.type), ['SMALL_GOODS', 'OPEN_QUESTION']);
   assert.deepEqual(short.insights.secondary[0].items.map(item => item.eventId), ['event-1', 'event-2']);
@@ -111,4 +111,23 @@ test('Weekly 2.0: a TREND main insight, and the headline of a week with no insig
   const growing = read([headline]);
   assert.equal(growing.headline, '这周的花还在长'); assert.equal(growing.insights, null);
   assert.equal(read([{ ...headline, reportVersion: undefined }]).headline, null, 'a v1 headline still needs its main insight');
+});
+
+// Weekly 2.0 first screen: the 2.0 marker, each insight's place and mark, and the bouquet's ground line.
+test('Weekly 2.0: version marker, insight marks, and a bouquet that never ranks moods', () => {
+  const insight = (role, extra = {}) => ({ kind: 'INSIGHT', claim: 'x', role, type: 'OPEN_QUESTION', text: 't', fact: null, items: [], quote: null,
+    evidence: [{ sourceEventId: 'event-0', date: '2026-09-14' }], ...meta, ...extra });
+  const short = plain(shortWeekly({ narrativeSections: [...sections, { kind: 'HEADLINE', claim: 'h', reportVersion: 'weekly-2.0', ...meta },
+    insight('main', { feedback: 'HIDDEN' }), insight('secondary', { feedback: 'INACCURATE' }), insight('secondary', { feedback: 'MADE_UP' })] }));
+  assert.equal(short.version2, true);
+  assert.deepEqual([short.insights.main, ...short.insights.secondary].map(item => [item.index, item.feedback]), [[5, 'HIDDEN'], [6, 'INACCURATE'], [7, null]]);
+  assert.equal(SHORT_COPY.en.inaccurate, 'Not right'); assert.equal(SHORT_COPY['zh-Hans'].hide, '隐藏');
+  assert.deepEqual(Object.keys(SHORT_COPY.en).sort(), Object.keys(SHORT_COPY['zh-Hans']).sort());
+  // Two flowers on Monday share its column side by side; Thursday's sits in its own column. Nothing has a height by mood.
+  const points = [{ date: days[0], mood: 'QUIET_BLOOM', level: 1, sourceEventId: 'a' }, { date: days[0], mood: 'SUNNY_BLOOM', level: 3, sourceEventId: 'b' },
+    { date: days[3], mood: 'FIRE_BLOOM', level: 1, sourceEventId: 'c' }];
+  const placed = plain(bouquetLayout(days, points, 350, 44));
+  assert.deepEqual(placed.map(point => Math.round(point.x)), [0, 14, 153]);
+  assert.ok(placed.every(point => !('y' in point)));
+  assert.deepEqual(Object.keys(MOOD_SPECIES).sort(), [...PRIMARY_MOODS].sort());
 });

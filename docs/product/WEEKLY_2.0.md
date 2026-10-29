@@ -90,9 +90,20 @@
 - 每节仍标 `contractVersion: weekly-short-v1`，所以旧版 App 照样能读；新的 `HEADLINE`（带 `reportVersion: weekly-2.0` 和
   `insightType`）、`INSIGHT` 节旧版 App 会跳过。`INSIGHT` 节有 `type`、`role`、`text`、`fact`、`items`、`quote`、
   `evidence: [{ sourceEventId, date }]`，代码模板生成的带 `template: true`。删除 Event 时 `reportShowsEvent` 会查这些 id。
-- App（[ShortWeeklyReport.tsx](../../mobile/src/components/features/ShortWeeklyReport.tsx)、
-  [reflections.ts](../../mobile/src/services/reflections.ts)）：沿用第一阶段的版面，新增读 `TREND` 类型，
-  以及没有洞察时也显示 2.0 的标题（“这周的花还在长”）。
+- App 首屏（[ShortWeeklyReport.tsx](../../mobile/src/components/features/ShortWeeklyReport.tsx)、
+  [WeeklyBloom.tsx](../../mobile/src/components/features/WeeklyBloom.tsx)、[reflections.ts](../../mobile/src/services/reflections.ts)），
+  只对 2.0 周报（`HEADLINE.reportVersion` 为 `weekly-2.0`）且有洞察时：
+  1. **开报：** 先看到“你这周的花开了”和一朵手绘番红花苞（`assets/bond/checkin-bud.webp`），轻点后花苞淡出。
+  2. **本周花束**替代心情曲线：本周每条 Event 一朵花，用它在花园里真正长出的那种花（从花园读 `speciesCode`；
+     没种下、已删或读不到时按心情用固定的一种花）。按星期排开，**所有花站在同一条地平线上，不按心情分高低**；
+     同一天的几朵挨在一起。花一朵朵升起（每朵 360ms、错开 110ms、上移 8px），然后标题浮现，再显示其余部分。
+     点花看那天的原文。系统开了“减少动态效果”时没有花苞，直接显示。同一份周报在这次使用 App 期间只开一次。
+  3. 主洞察 → 次洞察（**左右滑动**，下一张露出一角）→ “还有一件事”（那时与现在）→ 花语卡 → 给下周的问题。
+  4. **不准确 / 隐藏：** 每条洞察右下角两个小字按钮。点了以后这一条收成一行（“谢谢，已记下，这条先收起来。”或
+     “已隐藏。”），可以“重新显示”。标记存在这份周报的那一节上（`feedback: INACCURATE | HIDDEN`，
+     `POST /ai/reports/weekly/:id/insights/:index/feedback`，只能改自己的周报，需要 Memory 授权），
+     随周报一起删除。同一周如果重新生成周报，标记不会保留。
+  没有 2.0 标题的旧洞察周报仍是第一阶段的版面；没有洞察时也会显示 2.0 的标题（“这周的花还在长”）。
 - 本地网页 `npm run web:local`：第 2 份周报（`w2`）由 2.0 渲染代码离线生成（合成 Event，没有模型）。
 
 ## 开关、版本和时间
@@ -109,7 +120,9 @@
 - [test/back/sonnet-weekly.test.js](../../test/back/sonnet-weekly.test.js)：真实 worker ＋ 假网关：名单内一次请求用 2.0 合约并保存；
   洞察不过时存代码模板版；提供方失败时也存模板版；名单外/格式错仍是短周报。
 - [test/back/ai-consent-lifecycle.test.js](../../test/back/ai-consent-lifecycle.test.js)：关闭 Memory 会删除抽取结果，清理失败时一起回滚。
-- [mobile/test/shortWeeklyReport.test.mjs](../../mobile/test/shortWeeklyReport.test.mjs)：`TREND` 主洞察、无洞察时的 2.0 标题。
+- [mobile/test/shortWeeklyReport.test.mjs](../../mobile/test/shortWeeklyReport.test.mjs)：`TREND` 主洞察、无洞察时的 2.0 标题、
+  2.0 标记和每条洞察的位置与标记、花束都在同一条地平线上。
+- `test/back/weekly-2.test.js` 的 insight feedback：只能标自己周报里的 INSIGHT 节，非法值拒绝，null 清除。
 
 ## 上线前还要做的事（都需要主人决定或批准）
 
@@ -121,6 +134,7 @@
 
 ## 还没做（提案里有，留到后面）
 
-- P1 的前端新首屏：开报仪式（花苞展开）、本周花束替代心情曲线、次洞察左右滑动、“不准确 / 隐藏”按钮。
+- 开报推送（周日晚 8 点“你这周的花开了”）；提案里“每片花瓣是一条 Event”的花苞，现在是花苞淡出后整束花升起；
+  “不准确”的标记还没有汇总成评估集，也还没有反过来影响下周选哪类主洞察。
 - 时间回声（向量检索）、第一次、身体信号、节律、反复的句式、线索更新；花语集、跟进线索、回答问题、给未来的信；月报和年鉴。
 - 用户屏蔽人名或主题。

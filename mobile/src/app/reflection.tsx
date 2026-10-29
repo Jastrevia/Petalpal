@@ -269,7 +269,7 @@ export default function Reflection() {
           <EmotionalSafetyNote />
           {shown === 'Summary' && (() => {
             const short = shortWeekly(detail);
-            if (short) return <ShortWeeklyReport short={short} interactive={interactive}
+            if (short) return <ShortWeeklyReport short={short} interactive={interactive} reportId={detail.id} reducedMotion={reducedMotion}
               onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
             const text = detail.summary || detail.narrativeSections?.map(item => item.claim).join('\n\n') || 'No written reflection is available for this saved report.';
             return <Text selectable={interactive} style={s.body}><Text style={[s.initial, { color: accent }]}>{text.slice(0, 1)}</Text>{text.slice(1)}</Text>;

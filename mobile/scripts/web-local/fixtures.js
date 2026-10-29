@@ -89,6 +89,14 @@
       if (!signedIn) return json({ error: 'Sign in to the local preview first' }, 401);
       if (p === '/auth/session') return json({ user });
       if (p === '/ai/reports/weekly/trigger' || p === '/ai/reports/monthly/trigger') return json({ error: 'Reflections are not written in the local preview' }, 409);
+      // Weekly 2.0 "不准确 / 隐藏": the mark stays on that insight of the preview report.
+      const feedback = p.match(/^\/ai\/reports\/weekly\/([^/]+)\/insights\/(\d+)\/feedback$/);
+      if (feedback && method === 'POST') {
+        const sections = SHORT_WEEKLY[feedback[1]], section = sections?.[Number(feedback[2])];
+        if (section?.kind !== 'INSIGHT') return json({ error: 'Insight not found' }, 404);
+        if (request.verdict) section.feedback = request.verdict; else delete section.feedback;
+        return json({ narrativeSections: sections });
+      }
       if (p === `/users/${friend}/flowers/ff1/support` && method === 'POST') { friendFlower.supportCount++; friendFlower.supportState = { supportedToday: true, canSupport: false }; return json(friendFlower); }
       if (p === `/users/${friend}/flowers/ff1/message` && method === 'POST') { friendFlower.messages.push({ id: 'm' + friendFlower.messages.length, text: request.text, userId: uid, authorUserId: uid, author: user.name }); return json(friendFlower); }
       if (p === `/users/me/blocks/${friend}`) { blocked = method === 'PUT'; return json({ success: true }); }

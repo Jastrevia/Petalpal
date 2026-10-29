@@ -1,0 +1,83 @@
+import { useEffect, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useAuth } from '../../services/auth';
+import { eventFlowers } from '../../services/events';
+import { bouquetLayout, MOOD_SPECIES, shortDate, type MoodPoint, type ShortLocale } from '../../services/reflections';
+import { clusterPicture } from '../garden/planting/flowerClusters';
+
+// Weekly 2.0 opening (docs/product/WEEKLY_2.0.md): a crocus bud, then the week's bouquet, one painted flower per Event.
+const BUD = require('@/assets/bond/checkin-bud.webp');
+export const FLOWER = 44;
+const GROUND = FLOWER * 1.3;
+
+// Each Event's own flower species, from the owner's Garden (read once per owner while the app runs).
+const speciesCache = new Map<string, Promise<Map<string, string>>>();
+export function useEventSpecies() {
+  const userId = useAuth().session?.user.id;
+  const [species, setSpecies] = useState<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    if (!speciesCache.has(userId)) {
+      const load = eventFlowers(userId).then(flowers => new Map(flowers.map(flower => [flower.sourceEventId!, flower.speciesCode])));
+      load.catch(() => speciesCache.delete(userId));
+      speciesCache.set(userId, load);
+    }
+    speciesCache.get(userId)!.then(map => { if (live) setSpecies(map); }, () => { if (live) setSpecies(new Map()); });
+    return () => { live = false; };
+  }, [userId]);
+  return species;
+}
+
+export function BudGate({ title, hint, fade, interactive, onOpen }: { title: string; hint: string; fade: Animated.Value; interactive: boolean; onOpen: () => void }) {
+  return <Animated.View style={[s.gate, { opacity: fade, transform: [{ scale: fade.interpolate({ inputRange: [0, 1], outputRange: [1.06, 1] }) }] }]}>
+    <Text style={s.eyebrow}>{title}</Text>
+    <Pressable testID="weekly-bud" accessibilityRole="button" accessibilityLabel={hint} disabled={!interactive} onPress={onOpen}
+      style={({ pressed }) => [s.bud, pressed && { transform: [{ scale: .97 }] }]}>
+      <Image source={BUD} contentFit="contain" style={s.budArt} accessible={false} />
+    </Pressable>
+    <Text style={s.hint}>{hint}</Text>
+  </Animated.View>;
+}
+
+// Flowers all stand on one ground line: no mood is drawn higher or lower than another.
+export function WeeklyBouquet({ days, points, locale, dayNames, species, rise, openId, interactive, onOpen }: {
+  days: string[]; points: MoodPoint[]; locale: ShortLocale; dayNames: readonly string[]; species: Map<string, string> | null;
+  rise: Animated.Value[]; openId: string | null; interactive: boolean; onOpen: (eventId: string) => void;
+}) {
+  const [width, setWidth] = useState(0);
+  const placed = width ? bouquetLayout(days, points, width, FLOWER) : [];
+  return <View>
+    <View testID="weekly-bouquet" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ height: GROUND }}>
+      <View style={s.ground} />
+      {placed.map((point, i) => {
+        const art = clusterPicture(species?.get(point.sourceEventId) ?? MOOD_SPECIES[point.mood], '', 'S');
+        const height = art ? Math.min(GROUND - 4, FLOWER * art.ratio) : FLOWER, value = rise[i];
+        return <Animated.View key={point.sourceEventId} style={[s.flower, { left: point.x, height: GROUND, opacity: value ?? 1,
+          transform: [{ translateY: value ? value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) : 0 }] }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={shortDate(point.date, locale)} disabled={!interactive}
+            onPress={() => onOpen(point.sourceEventId)} style={({ pressed }) => [s.flowerHit, pressed && { opacity: .75 }]}>
+            {art && <Image source={art.source} contentFit="contain" style={{ width: FLOWER, height }} accessible={false} />}
+          </Pressable>
+          {openId === point.sourceEventId && <View style={s.mark} />}
+        </Animated.View>;
+      })}
+    </View>
+    <View accessible={false} style={s.days}>{dayNames.map((day, i) => <Text key={i} style={s.day}>{day}</Text>)}</View>
+  </View>;
+}
+
+const s = StyleSheet.create({
+  gate: { alignItems: 'center', paddingVertical: 18, marginBottom: 8 },
+  eyebrow: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 13, letterSpacing: 2, marginBottom: 12 },
+  bud: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center' },
+  budArt: { width: 96, height: 96 },
+  hint: { fontFamily: 'Georgia', fontStyle: 'italic', color: '#654D30', fontSize: 14, marginTop: 10 },
+  ground: { position: 'absolute', left: 0, right: 0, bottom: 4, height: 1, backgroundColor: '#B8934A66' },
+  flower: { position: 'absolute', top: 0, width: FLOWER, justifyContent: 'flex-end' },
+  flowerHit: { minHeight: 44, justifyContent: 'flex-end', paddingBottom: 4 },
+  mark: { position: 'absolute', bottom: 0, left: FLOWER * .25, width: FLOWER * .5, height: 2, borderRadius: 1, backgroundColor: '#B8934A' },
+  days: { flexDirection: 'row', marginTop: 4, marginBottom: 8 },
+  day: { flex: 1, textAlign: 'center', fontFamily: 'Georgia', color: '#8B6C44', fontSize: 12 },
+});

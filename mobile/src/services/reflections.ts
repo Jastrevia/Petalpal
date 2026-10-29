@@ -10,7 +10,7 @@ export interface ReportSection {
   cardId?: string; name?: string; line?: string; text?: string; fact?: string | null; disclaimer?: string; reason?: string;
   type?: string; role?: string; items?: { text: string; sourceEventId: string; date?: string }[];
   quote?: { text: string; sourceEventId: string; date?: string } | null; evidence?: { sourceEventId: string; date: string }[];
-  reportVersion?: string;
+  reportVersion?: string; feedback?: string;
 }
 export interface ThenNowSide { sourceEventId: string; date: string; quote: string }
 export interface SavedReport {
@@ -97,12 +97,16 @@ export interface ShortWeekly {
   thenAndNow: { then: ThenNowSide; now: ThenNowSide; count: number | null; phrase: string | null } | null;
   card: PetalCard | null;
   // Weekly 2.0 (backend lib/insight-write.js, saved under the v1 contract): headline + insight cards.
-  headline: string | null; insights: { main: Insight; secondary: Insight[] } | null;
+  // `version2` marks a 2.0 report (its HEADLINE says so): it opens with the bud and shows the bouquet.
+  headline: string | null; insights: { main: Insight; secondary: Insight[] } | null; version2: boolean;
 }
 export interface PetalCard { id: string; name: string; line: string; text: string; fact: string; disclaimer: string; reason: string | null }
 // TREND is Weekly 2.0's code-written fallback (backend lib/insight-compute.js).
 export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND';
+export type InsightFeedback = 'INACCURATE' | 'HIDDEN';
 export interface Insight {
+  // `index` is the section's place in the saved report, which the feedback call names.
+  index: number; feedback: InsightFeedback | null;
   type: InsightType; text: string; fact: string | null;
   items: { text: string; eventId: string }[]; quote: { text: string; eventId: string } | null;
   evidence: { eventId: string; date: string }[];
@@ -127,22 +131,25 @@ const spanOf = (value?: { text?: unknown; sourceEventId?: unknown } | null) =>
   value && filled(value.text) && filled(value.sourceEventId) ? { text: value.text, eventId: value.sourceEventId } : null;
 // A malformed insight is skipped; without a valid main insight no insight shows, and no headline unless it is a
 // Weekly 2.0 one (reportVersion weekly-2.0: always saved, e.g. "这周的花还在长" for a week with few entries).
-function insight(section: ReportSection): Insight | null {
+function insight(section: ReportSection, index: number): Insight | null {
   if (!INSIGHT_TYPES.includes(section.type as InsightType) || !filled(section.text) || !Array.isArray(section.evidence)) return null;
   const evidence = section.evidence.filter(item => filled(item?.sourceEventId) && DATE.test(item?.date ?? ''))
     .map(item => ({ eventId: item.sourceEventId, date: item.date }));
   const items = (Array.isArray(section.items) ? section.items : []).map(spanOf).filter(item => item !== null);
   if (!evidence.length || (section.type === 'SMALL_GOODS' && items.length < 2)) return null;
-  return { type: section.type as InsightType, text: section.text, fact: filled(section.fact) ? section.fact : null, items,
+  const feedback = section.feedback === 'INACCURATE' || section.feedback === 'HIDDEN' ? section.feedback : null;
+  return { index, feedback, type: section.type as InsightType, text: section.text, fact: filled(section.fact) ? section.fact : null, items,
     quote: spanOf(section.quote), evidence };
 }
 function insightsOf(sections: ReportSection[]) {
-  const cards = sections.filter(section => section?.kind === 'INSIGHT');
-  const main = cards.find(section => section.role === 'main'), headline = sections.find(section => section?.kind === 'HEADLINE');
-  const first = main && insight(main);
-  if (!first) return { headline: headline?.reportVersion === 'weekly-2.0' && filled(headline.claim) ? headline.claim : null, insights: null };
-  const secondary = cards.filter(section => section.role === 'secondary').map(insight).filter(item => item !== null).slice(0, 3);
-  return { headline: filled(headline?.claim) ? headline.claim : null, insights: { main: first, secondary } };
+  const cards = sections.map((section, index) => ({ section, index })).filter(({ section }) => section?.kind === 'INSIGHT');
+  const main = cards.find(({ section }) => section.role === 'main'), headline = sections.find(section => section?.kind === 'HEADLINE');
+  const version2 = headline?.reportVersion === 'weekly-2.0';
+  const first = main && insight(main.section, main.index);
+  if (!first) return { headline: version2 && filled(headline.claim) ? headline.claim : null, insights: null, version2 };
+  const secondary = cards.filter(({ section }) => section.role === 'secondary').map(({ section, index }) => insight(section, index))
+    .filter(item => item !== null).slice(0, 3);
+  return { headline: filled(headline?.claim) ? headline.claim : null, insights: { main: first, secondary }, version2 };
 }
 // Matched on the backend; every field must be present or the card is not shown.
 function petalCard(section?: ReportSection): PetalCard | null {
@@ -187,13 +194,41 @@ export function moodCurveLayout(days: string[], points: MoodPoint[], width: numb
 }
 export const moodIcon = (mood: PrimaryMood) => PRIMARY_MOODS.indexOf(mood) + 1; // EventIllustration index, as in EventsPanel
 
+// Weekly 2.0 "不准确 / 隐藏" on one insight of the owner's own report; null clears the mark.
+export const setInsightFeedback = (reportId: string, index: number, verdict: InsightFeedback | null) =>
+  apiRequest<{ narrativeSections: ReportSection[] }>(`/ai/reports/weekly/${encodeURIComponent(reportId)}/insights/${index}/feedback`, 'POST', { verdict });
+
+// The bouquet: every Event of the week stands on one ground line in its day's column, side by side,
+// never higher or lower by mood. Flowers of one day stand together as a small bunch, overlapping a little.
+export function bouquetLayout(days: string[], points: MoodPoint[], width: number, size: number) {
+  const column = width / 7, perDay = new Map<string, number>(), seen = new Map<string, number>();
+  for (const point of points) perDay.set(point.date, (perDay.get(point.date) ?? 0) + 1);
+  return points.filter(point => days.includes(point.date)).map(point => {
+    const count = perDay.get(point.date) ?? 1, nth = seen.get(point.date) ?? 0;
+    const step = count > 1 ? Math.min(size * .5, column / count) : 0;
+    seen.set(point.date, nth + 1);
+    const x = (days.indexOf(point.date) + .5) * column + (nth - (count - 1) / 2) * step - size / 2;
+    return { ...point, x: Math.max(0, Math.min(width - size, x)) };
+  });
+}
+// A flower for an Event whose own flower is not known here (not planted, deleted, or not loaded): one
+// painted species per mood, chosen for its colour only.
+export const MOOD_SPECIES: Record<PrimaryMood, string> = { SUNNY_BLOOM: 'SUNFLOWER', GENTLE_BLOOM: 'PETUNIA', QUIET_BLOOM: 'BLUEBELL',
+  HEALING_BLOOM: 'CHAMOMILE', FIRE_BLOOM: 'POPPY', WONDER_BLOOM: 'ASTER', DRIFTING_BLOOM: 'LAVENDER', PEACEFUL_BLOOM: 'WHITE_ROSE' };
+
 export const SHORT_COPY = {
   en: { line: 'Line of the week', curve: 'Your week in moods', side: 'Side by side', thenNow: 'Then and now', then: 'Then', now: 'Now',
     question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card',
+    bloomed: 'Your flowers for this week have opened', tapBud: 'Tap the bud to open your week', bouquet: 'This week’s bouquet',
+    oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
+    undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.',
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
     question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张',
+    bloomed: '你这周的花开了', tapBud: '轻点花苞，打开这一周', bouquet: '本周花束',
+    oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
+    undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。',
     write: '写一写', open: '看完整记录', close: '收起', loading: '正在打开…',
     unavailable: '现在打不开这条记录。', support: '支持', days: ['一', '二', '三', '四', '五', '六', '日'] },
 } as const;
