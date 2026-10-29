@@ -102,13 +102,13 @@
         petalDrawn = { id: 'local-draw', position: request.position, drawnAt: new Date().toISOString(), topic: request.topic, topicLabel: label,
           card: { id: 'major-01', name: 'The Magician', line: 'What’s at hand is enough to begin.', text: 'A preview card: in the real app this is today\'s card from your deck.',
             reversed: true, keywords: ['scattered focus', 'holding back', 'misdirected effort'], disclaimer: 'For reflection only.' },
-          reading: { available: true, needsConsent: false, status: 'NONE' } };
+          reading: { available: true, needsConsent: false, locked: false, freeLeft: 3, status: 'NONE' } };
         return json({ created: true, locale: 'en', localDate, ...petalDrawn });
       }
       // The reading: a canned one after a short wait (the real one is written by the model on the server).
       if (p === '/api/petal-cards/reading' && method === 'POST') {
         if (!petalDrawn) return json({ error: 'Not found' }, 404);
-        petalDrawn.reading = { available: true, needsConsent: false, status: 'READY', paragraphs: [
+        petalDrawn.reading = { available: true, needsConsent: false, locked: false, freeLeft: 2, status: 'READY', paragraphs: [
           'The Magician reversed speaks of power that is there but scattered: the tools are on the table, yet your hands keep moving between them.',
           `For ${petalDrawn.topicLabel.toLowerCase()} today, the card suggests gathering yourself before you begin. Your quiet days this week may be helping you hear what matters.`,
           'Pick one small thing within reach and give it your whole attention for a while.'] };

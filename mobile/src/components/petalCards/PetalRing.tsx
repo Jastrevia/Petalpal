@@ -21,14 +21,18 @@ const COPY = {
     shareFailed: "Couldn't share this time. Try again.", ask: 'What would you like to ask today?',
     askSub: 'One question a day, then draw a card for it', upright: 'Upright', reversed: 'Reversed',
     reading: 'The fairy’s reading', readingWait: 'The fairy is reading your card…',
-    readingConsent: 'Turn on AI processing in Privacy to see the fairy’s reading of your card.' },
+    readingConsent: 'Turn on AI processing in Privacy to see the fairy’s reading of your card.',
+    freeLeft: (n: number) => n === 0 ? 'That was your last free reading.' : `${n} free ${n === 1 ? 'reading' : 'readings'} left.`,
+    locked: 'Your free readings are used up. Unlocking the fairy’s readings for good is coming soon.' },
   'zh-Hans': { title: 'THE PETAL RING', sub: '转动花环，翻遍今天的整副牌，选一张', hint: '拖动转圈 · 点发光的那张',
     no: '第', round: '轮次', turnOver: '翻开它', close: '关闭', today: '今日花语卡', drawing: '正在抽牌…',
     failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张`,
     share: '分享', preparing: '正在准备…', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
     shareFailed: '这次没有分享成功，再试一次。', ask: '今天想问什么？', askSub: '每天问一件事，再为它抽一张牌',
     upright: '正位', reversed: '逆位', reading: '小花仙的解读', readingWait: '小花仙正在读这张牌…',
-    readingConsent: '在隐私设置里打开 AI 处理，就能看到小花仙对这张牌的解读。' },
+    readingConsent: '在隐私设置里打开 AI 处理，就能看到小花仙对这张牌的解读。',
+    freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `免费解读还剩 ${n} 次。`,
+    locked: '免费的小花仙解读已经用完了。一次解锁、以后每天都能看的功能，马上就来。' },
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -101,7 +105,7 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const tries = useRef(0);
   useEffect(() => { tries.current = 0; }, [visible]);
   useEffect(() => {
-    if (!visible || phase !== 'revealed' || !reading?.available || reading.needsConsent) return;
+    if (!visible || phase !== 'revealed' || !reading?.available || reading.needsConsent || reading.locked) return;
     if (reading.status !== 'NONE' && reading.status !== 'GENERATING') return;
     const hide = { available: true, needsConsent: false, status: 'FAILED' } as const;
     if (++tries.current > READING_TRIES) { setReading(hide); return; }
@@ -235,8 +239,10 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         {reading?.available && reading.status === 'READY' && reading.paragraphs?.length ? <View style={styles.reading}>
           <Text style={styles.readingTitle}>{copy.reading}</Text>
           {reading.paragraphs.map((paragraph, i) => <Text key={i} selectable style={styles.readingText}>{paragraph}</Text>)}
+          {typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
         </View> : null}
-        {reading?.available && !reading.needsConsent && (reading.status === 'NONE' || reading.status === 'GENERATING') ? <View style={styles.waitRow}>
+        {reading?.available && reading.locked ? <Text style={styles.lockedNote}>{copy.locked}</Text> : null}
+        {reading?.available && !reading.needsConsent && !reading.locked && (reading.status === 'NONE' || reading.status === 'GENERATING') ? <View style={styles.waitRow}>
           <ActivityIndicator size="small" color="#E9CF8A" accessible={false} /><Text style={styles.text}>{copy.readingWait}</Text>
         </View> : null}
         {reading?.available && reading.needsConsent ? <Text style={styles.disclaimer}>{copy.readingConsent}</Text> : null}
@@ -311,6 +317,8 @@ const styles = StyleSheet.create({
   reading: { alignSelf: 'stretch', marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderColor: '#E9CF8A44', gap: 10 },
   readingTitle: { fontFamily: 'serif', fontSize: 15, letterSpacing: 2, color: '#E9CF8A', textAlign: 'center' },
   readingText: { fontFamily: 'serif', fontSize: 15, lineHeight: 25, color: '#F1EAF9' },
+  lockedNote: { alignSelf: 'stretch', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderColor: '#E9CF8A44',
+    fontFamily: 'serif', fontSize: 14, lineHeight: 22, color: '#D8D0F0', textAlign: 'center' },
   waitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   drawing: { position: 'absolute', alignSelf: 'center', bottom: 120 },
   error: { position: 'absolute', alignSelf: 'center', bottom: 90, color: '#F4B9C2', fontSize: 13 },

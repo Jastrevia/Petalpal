@@ -78,6 +78,8 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [`d${++ids}`, data.userId, data.localDate, data.position, data.cardId, data.topic, data.reversed])
     },
     petalCardReading: {
+      count: async ({ where }) => (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" WHERE "userId"=$1 AND "status"=$2
+        AND "drawId" <> $3`, [where.userId, where.status, where.drawId.not])).n,
       findUnique: ({ where }) => one(db, `SELECT * FROM "PetalCardReading" WHERE "drawId"=$1`, [where.drawId]),
       create: ({ data }) => one(db, `INSERT INTO "PetalCardReading" ("id","userId","drawId","locale","status","attempts","updatedAt")
         VALUES ($1,$2,$3,$4,$5,$6,now()) RETURNING *`, [`r${++ids}`, data.userId, data.drawId, data.locale, data.status, data.attempts]),
@@ -96,19 +98,20 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
     calls.push(JSON.parse(options.body));
     return response();
   };
-  const draw = (userId = "alice", position = 0, topic = "FORTUNE") => drawPetalCard(prisma, { userId, position, topic, heavy: true, now: NOW });
+  const draw = (userId = "alice", position = 0, topic = "FORTUNE", now = NOW) => drawPetalCard(prisma, { userId, position, topic, heavy: true, now });
   const reading = async drawId => one(pg, `SELECT "status","attempts","paragraphs" FROM "PetalCardReading" WHERE "drawId"=$1`, [drawId]);
   return { pg, prisma, calls, fetchImpl, draw, reading, respond: fn => { response = fn; } };
 }
-const ask = (f, env = enabled, userId = "alice") => requestPetalReading(f.prisma, { userId, env, now: NOW, fetchImpl: f.fetchImpl });
+const ask = (f, env = enabled, userId = "alice", now = NOW) => requestPetalReading(f.prisma, { userId, env, now, fetchImpl: f.fetchImpl });
+const day = n => new Date(NOW.getTime() + n * 86_400_000);
 const place = (userId, id) => dailyDeck(userId, "2026-10-30", { heavy: true }).indexOf(id);
 
 test("a listed owner's reading is written once from the card, its orientation, the topic and the week's moods", async (t) => {
   const f = await fixture(t);
   const at = place("alice", "major-13"), drawn = await f.draw("alice", at, "FORTUNE");
   assert.deepEqual(await petalReadingFor(f.prisma, { userId: "alice", drawId: drawn.id, env: enabled, now: NOW }),
-    { available: true, needsConsent: false, status: "NONE" });
-  assert.deepEqual(await ask(f), { available: true, needsConsent: false, status: "READY", paragraphs: ZH });
+    { available: true, needsConsent: false, locked: false, freeLeft: null, status: "NONE" });
+  assert.deepEqual(await ask(f), { available: true, needsConsent: false, locked: false, freeLeft: null, status: "READY", paragraphs: ZH });
   assert.equal(f.calls.length, 1);
   const input = JSON.parse(f.calls[0].messages[0].content);
   assert.deepEqual(input, { l: "zh-Hans", q: "FORTUNE", c: { n: "死神", o: reversedAt("alice", "2026-10-30", at) ? "reversed" : "upright",
@@ -155,23 +158,48 @@ test("a second try after a failure can succeed", async (t) => {
   assert.equal(f.calls.length, 2);
 });
 
-test("only Premium or listed owners, only with the switches, only with AI Processing", async (t) => {
+test("everyone gets three free readings, then only unlocked owners; a written reading stays", async (t) => {
   const f = await fixture(t);
-  await f.draw("bob", 1, "WORK");
-  assert.deepEqual(await ask(f, enabled, "bob"), { available: false }, "bob is neither listed nor Premium");
-  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED')`);
-  assert.deepEqual(await ask(f, enabled, "bob"), { available: false });
-  await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "status"='ACTIVE' WHERE "userId"='bob'`);
   f.respond(() => Response.json(native(EN)));
-  assert.equal((await ask(f, enabled, "bob")).status, "READY");
-
-  await f.draw("alice", 2, "PEOPLE");
+  const drawIds = [];
+  for (let n = 0; n < 3; n++) {
+    drawIds.push((await f.draw("bob", n, "WORK", day(n))).id);
+    const reading = await ask(f, enabled, "bob", day(n));
+    assert.equal(reading.status, "READY", `free reading ${n + 1}`);
+    assert.equal(reading.freeLeft, 2 - n, "the draw's own reading is not counted against it");
+  }
+  // A fourth day: locked, no call; the earlier readings still show.
+  const fourth = await f.draw("bob", 4, "LOVE", day(3));
   const calls = f.calls.length;
+  assert.deepEqual(await ask(f, enabled, "bob", day(3)), { available: true, needsConsent: false, locked: true, freeLeft: 0, status: "NONE" });
+  assert.equal(f.calls.length, calls);
+  assert.equal((await petalReadingFor(f.prisma, { userId: "bob", drawId: drawIds[0], env: enabled, now: day(3) })).status, "READY");
+  // Failed attempts never use up a free reading.
+  const failing = await fixture(t);
+  failing.respond(() => new Response("upstream", { status: 500 }));
+  await failing.draw("bob", 1, "WORK");
+  await ask(failing, enabled, "bob"); await ask(failing, enabled, "bob");
+  assert.equal((await petalReadingFor(failing.prisma, { userId: "bob", drawId: (await failing.draw("bob", 1, "WORK")).id, env: enabled, now: NOW })).freeLeft, 3);
+  // Unlocking (Premium, the one-time purchase) lifts the limit; an expired one does not.
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED')`);
+  assert.equal((await ask(f, enabled, "bob", day(3))).locked, true);
+  await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "status"='ACTIVE' WHERE "userId"='bob'`);
+  // The cost gate counts calls by the database's real day, where these simulated days all fall.
+  const unlocked = await ask(f, { ...enabled, AI_PETAL_READING_DAILY_LIMIT: "10" }, "bob", day(3));
+  assert.equal(unlocked.status, "READY");
+  assert.equal(unlocked.freeLeft, null);
+  assert.equal((await f.reading(fourth.id)).status, "READY");
+});
+
+test("only with the switches, only with AI Processing", async (t) => {
+  const f = await fixture(t);
+  await f.draw("alice", 2, "PEOPLE");
   assert.deepEqual(await ask(f, { ...enabled, AI_PETAL_READING_MODEL: undefined }), { available: false });
+  assert.deepEqual(await ask(f, { ...enabled, AI_PETAL_READING_MODEL: "claude-haiku-5-5" }), { available: false }, "only the Opus model");
   assert.equal(await ask(f, { ...enabled, PETAL_CARDS_OWNER_IDS: "bob" }), null, "petal cards off for alice");
   await f.pg.exec(`UPDATE "AiConsent" SET "aiProcessing"=false WHERE "userId"='alice'`);
-  assert.deepEqual(await ask(f), { available: true, needsConsent: true, status: "NONE" });
-  assert.equal(f.calls.length, calls, "no call without AI Processing");
+  assert.deepEqual(await ask(f), { available: true, needsConsent: true, locked: false, freeLeft: null, status: "NONE" });
+  assert.equal(f.calls.length, 0, "no call without AI Processing");
 });
 
 test("nothing drawn today: nothing to read", async (t) => {

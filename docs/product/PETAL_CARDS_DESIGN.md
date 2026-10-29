@@ -199,9 +199,13 @@ no model).
   place, like the deck). A reversed card shows upside down, with its reversed keywords; reversed
   means blocked, delayed or turned-inward energy, never bad luck. Every card has three upright and
   three reversed keywords ([lib/petal-card-keywords.js](../../lib/petal-card-keywords.js)).
-- **Free:** the card, its orientation and keywords, the prewritten line and text, the disclaimer.
-- **Premium (or `PETAL_READING_OWNER_IDS` during the beta):** the fairy's reading, three short
-  paragraphs by `claude-haiku-5-5` ([lib/petal-reading.js](../../lib/petal-reading.js)): what the
+- **Always:** the card, its orientation and keywords, the prewritten line and text, the disclaimer.
+- **The fairy's reading** (owner decision 2026-10-30): every owner gets **3 free readings** (only
+  written ones count; a failed attempt does not). After that it is locked until the owner unlocks it
+  for good with a one-time purchase, which sets `SubscriptionEntitlement` to `PREMIUM` + `ACTIVE`
+  (no purchase flow exists yet; the locked note says it is coming). Owners in
+  `PETAL_READING_OWNER_IDS` are never limited. A reading already written stays visible. The reading
+  is three short paragraphs by `claude-opus-5-5` ([lib/petal-reading.js](../../lib/petal-reading.js)): what the
   card means in this orientation, what it suggests for the topic today and in the days ahead (as
   tendencies, never certain outcomes), and one gentle thing to keep in mind. Input: the card, its
   orientation, keywords and copy, the topic, and, only while Personalization is on, how often each
@@ -210,11 +214,14 @@ no model).
   no digits, at most one question, content safety, and banned words for certainty, fate, death,
   illness, money and advice. A reading that fails is not shown; each draw gets at most two model
   calls, then the reading section is hidden. The disclaimer is the card's own, added by code.
-- **Switches:** `AI_PETAL_READING_MODEL=claude-haiku-5-5` turns readings on;
-  `AI_PETAL_READING_DAILY_LIMIT=0` stops them (default 3 a day per owner). Needs AI Processing.
+- **Switches:** `AI_PETAL_READING_MODEL=claude-opus-5-5` turns readings on;
+  `AI_PETAL_READING_DAILY_LIMIT=0` stops them (default 3 calls a day per owner). Needs AI Processing.
+  Cost: about $0.02 a reading (Opus 5.5, effort low; 30 s gateway timeout). Each call reserves up to
+  about $0.05 against `AI_USER_DAILY_USD_LIMIT`, so that limit must allow it.
 - API: `GET /api/petal-cards/today` adds `topics` and, on a drawn card, `topic`, `reversed`,
   `keywords` and `reading`; `POST /api/petal-cards/draw {position, topic}`;
   `POST /api/petal-cards/reading {}` writes today's reading if it can and returns its state
-  (`NONE`, `GENERATING`, `READY` with `paragraphs`, or `FAILED`).
+  (`NONE`, `GENERATING`, `READY` with `paragraphs`, or `FAILED`), with `freeLeft` (null once
+  unlocked) and `locked` (free readings used up).
 - Migration `202610300001_petal_tarot` (draw `topic` and `reversed`, the `PetalCardReading` table);
   run it by hand before the backend deploy.

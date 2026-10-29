@@ -10,8 +10,10 @@ export interface PetalCardFace {
   id: string; name: string; line: string; text: string; disclaimer: string; reversed?: boolean; keywords?: string[] | null;
 }
 // Whether this owner can have a reading of today's card, and how far it got. FAILED: hidden.
+// freeLeft: free readings left (null once unlocked); locked: the free ones are used up.
 export type PetalReading = { available: false } | {
-  available: true; needsConsent: boolean; status: 'NONE' | 'GENERATING' | 'READY' | 'FAILED'; paragraphs?: string[];
+  available: true; needsConsent: boolean; locked?: boolean; freeLeft?: number | null;
+  status: 'NONE' | 'GENERATING' | 'READY' | 'FAILED'; paragraphs?: string[];
 };
 export interface PetalDrawn {
   id: string; position: number; drawnAt: string; topic: PetalTopic | null; topicLabel: string | null; card: PetalCardFace | null;
