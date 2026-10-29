@@ -11,7 +11,8 @@ In Chinese copy the fairy is 小花仙.
 ## Position
 
 - A mood-image mirror inside the journaling app, called **petal cards** (花语卡), not "tarot".
-- Never prediction, fortune, luck, good/bad omens. Apple lists fortune-telling apps as a saturated
+- Never prediction, fortune, luck, good/bad omens. (2026-10-30: the daily draw now reads as tarot,
+  topics include 今日运势, and readings may speak of tendencies; still never certain outcomes. See the last section.) Apple lists fortune-telling apps as a saturated
   category (App Review Guideline 4.3), so this stays a feature of PetalPal, not a standalone oracle.
 - Disclaimer on every card: for self-reflection only; not a prediction or a substitute for counselling.
 
@@ -176,3 +177,39 @@ After the calendar check-in the owner spins the **petal ring** and picks one car
 - API: `GET /api/petal-cards/today` (deck size, back, today's card if drawn),
   `POST /api/petal-cards/draw {position}`; `GET /api/fairy/check-ins` adds `petalCards` for the month.
 - Migration `202610230003_petal_card_draw` (run it by hand before the backend deploy).
+
+## Daily tarot: topics, reversed cards and the reading (owner decision 2026-10-30)
+
+The daily draw now reads as tarot. The Weekly report card is unchanged (69 cards, code rules,
+no model).
+
+- **The whole deck.** The ring deals all 78 cards, the 9 heavy ones included, each with prewritten
+  copy that reads its traditional meaning gently (Death: an ending that makes room). Heavy cards
+  are still never matched to a Weekly report. The 9 paintings must be bundled
+  (`scripts/compress-petal-cards.mjs`) before release; their copy is checked against them then.
+- **A topic first.** Before spinning, the owner picks one of five topics, once a day:
+  今日运势 / Today’s fortune, 接下来的方向 / The way ahead, 感情 / Love, 工作与学习 / Work & study,
+  人际关系 / People around you. No money or health topics.
+- **Upright or reversed.** About a third of each day's places lie reversed (seeded per owner, day and
+  place, like the deck). A reversed card shows upside down, with its reversed keywords; reversed
+  means blocked, delayed or turned-inward energy, never bad luck. Every card has three upright and
+  three reversed keywords ([lib/petal-card-keywords.js](../../lib/petal-card-keywords.js)).
+- **Free:** the card, its orientation and keywords, the prewritten line and text, the disclaimer.
+- **Premium (or `PETAL_READING_OWNER_IDS` during the beta):** the fairy's reading, three short
+  paragraphs by `claude-haiku-5-5` ([lib/petal-reading.js](../../lib/petal-reading.js)): what the
+  card means in this orientation, what it suggests for the topic today and in the days ahead (as
+  tendencies, never certain outcomes), and one gentle thing to keep in mind. Input: the card, its
+  orientation, keywords and copy, the topic, and, only while Personalization is on, how often each
+  Garden mood was chosen over the last 7 days. Never Event or Journal text.
+- **Checked by code:** three paragraphs, language, length (zh 100–280 characters, en 60–190 words),
+  no digits, at most one question, content safety, and banned words for certainty, fate, death,
+  illness, money and advice. A reading that fails is not shown; each draw gets at most two model
+  calls, then the reading section is hidden. The disclaimer is the card's own, added by code.
+- **Switches:** `AI_PETAL_READING_MODEL=claude-haiku-5-5` turns readings on;
+  `AI_PETAL_READING_DAILY_LIMIT=0` stops them (default 3 a day per owner). Needs AI Processing.
+- API: `GET /api/petal-cards/today` adds `topics` and, on a drawn card, `topic`, `reversed`,
+  `keywords` and `reading`; `POST /api/petal-cards/draw {position, topic}`;
+  `POST /api/petal-cards/reading {}` writes today's reading if it can and returns its state
+  (`NONE`, `GENERATING`, `READY` with `paragraphs`, or `FAILED`).
+- Migration `202610300001_petal_tarot` (draw `topic` and `reversed`, the `PetalCardReading` table);
+  run it by hand before the backend deploy.

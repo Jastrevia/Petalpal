@@ -55,6 +55,7 @@ model User {
   fairyKeepsakeGrants     FairyKeepsakeGrant[]
   fairyClosenessAwards    FairyClosenessAward[]
   petalCardDraws          PetalCardDraw[]
+  petalCardReadings       PetalCardReading[]
   redeemCodeClaims        RedeemCodeClaim[]
   dailyFlowerQuotas       DailyFlowerQuota[]
   events                  Event[]
@@ -405,11 +406,37 @@ model PetalCardDraw {
   localDate String   @db.VarChar(10)
   position  Int
   cardId    String   @db.VarChar(32)
+  /// What the owner asked about (lib/petal-card-draw.js PETAL_TOPICS); null for draws made before topics.
+  topic     String?  @db.VarChar(16)
+  reversed  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reading PetalCardReading?
 
   @@unique([userId, localDate])
+}
+
+/// A model-written reading of one daily draw (lib/petal-reading.js), for Premium or listed owners:
+/// the card, its orientation and the chosen topic, plus the last week's mood counts when
+/// Personalization is on (never Event or Journal text). `status` is GENERATING, READY or FAILED;
+/// at most PETAL_READING_MAX_ATTEMPTS model calls per draw. Goes with the draw and the account.
+model PetalCardReading {
+  id         String   @id @default(cuid())
+  userId     String
+  drawId     String   @unique
+  locale     String   @db.VarChar(8)
+  status     String   @db.VarChar(16)
+  attempts   Int      @default(1)
+  paragraphs Json     @default("[]")
+  model      String?  @db.VarChar(64)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draw PetalCardDraw @relation(fields: [drawId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /// A redeemed code (lib/redeem-codes.js): the code's SHA-256, never the code. Each code once,

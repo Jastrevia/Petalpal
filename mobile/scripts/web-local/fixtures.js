@@ -28,6 +28,8 @@
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
+  const petalTopics = [['FORTUNE', 'Today’s fortune'], ['DIRECTION', 'The way ahead'], ['LOVE', 'Love'], ['WORK', 'Work & study'],
+    ['PEOPLE', 'People around you']].map(([id, label]) => ({ id, label }));
   let redemptions = [];
   const journals = [[3, 'A slow morning with tea and the window open.'], [12, 'Walked home the long way.'], [35, 'Started a new notebook.']]
     .map(([offset, content], i) => ({ id: 'c' + i, localDate: day(offset), createdAt: day(offset) + 'T18:00:00.000Z',
@@ -93,7 +95,25 @@
       if (answer && method === 'POST') { incomingRequests = incomingRequests.filter(item => item.id !== answer[1]); return json({ message: 'Done' }, 200, 400); }
       // Our Bond and today's petal card, so the calendar check-in and the petal ring can be tried.
       const localDate = new Date().toISOString().slice(0, 10);
-      if (p === '/api/petal-cards/draw' && method === 'POST') { petalDrawn = { position: request.position, drawnAt: new Date().toISOString(), card: { id: 'major-01', name: 'The Magician', line: 'You already hold what you need.', text: 'A preview card: in the real app this is today\'s card from your deck.', disclaimer: 'For reflection only.' } }; return json({ created: true, locale: 'en', localDate, ...petalDrawn }); }
+      // Today's draw asks a topic first; the preview card lies reversed so the upside-down art can be checked.
+      if (p === '/api/petal-cards/draw' && method === 'POST') {
+        const label = petalTopics.find(topic => topic.id === request.topic)?.label;
+        if (!label) return json({ error: 'topic must be one of the petal card topics' }, 400);
+        petalDrawn = { id: 'local-draw', position: request.position, drawnAt: new Date().toISOString(), topic: request.topic, topicLabel: label,
+          card: { id: 'major-01', name: 'The Magician', line: 'What’s at hand is enough to begin.', text: 'A preview card: in the real app this is today\'s card from your deck.',
+            reversed: true, keywords: ['scattered focus', 'holding back', 'misdirected effort'], disclaimer: 'For reflection only.' },
+          reading: { available: true, needsConsent: false, status: 'NONE' } };
+        return json({ created: true, locale: 'en', localDate, ...petalDrawn });
+      }
+      // The reading: a canned one after a short wait (the real one is written by the model on the server).
+      if (p === '/api/petal-cards/reading' && method === 'POST') {
+        if (!petalDrawn) return json({ error: 'Not found' }, 404);
+        petalDrawn.reading = { available: true, needsConsent: false, status: 'READY', paragraphs: [
+          'The Magician reversed speaks of power that is there but scattered: the tools are on the table, yet your hands keep moving between them.',
+          `For ${petalDrawn.topicLabel.toLowerCase()} today, the card suggests gathering yourself before you begin. Your quiet days this week may be helping you hear what matters.`,
+          'Pick one small thing within reach and give it your whole attention for a while.'] };
+        return json(petalDrawn.reading, 200, 1500);
+      }
       // Redemption codes: any well-formed code works once here (the real codes live on the server).
       if (p === '/api/redeem' && method === 'POST') {
         if (String(request.code || '').replace(/[\s-]/g, '').length !== 20) return json({ error: 'Invalid code', code: 'INVALID_CODE' }, 400, 300);
@@ -183,7 +203,7 @@
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
         collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
-      if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: 69, back: 'lilac', drawn: petalDrawn });
+      if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: 78, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });
       if (p === `/users/${friend}/flowers/ff1`) return json(friendFlower);
