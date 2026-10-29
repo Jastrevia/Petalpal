@@ -119,14 +119,17 @@ only with `allowPartial` ([test/back/ai-p0.integration.test.js](test/back/ai-p0.
   widens to the same window for this contract only. Event deletion looks at short reports whose
   period ends after the Event and starts up to 35 days later.
 
-- **Weekly insights** (opt-in `WEEKLY_INSIGHTS_OWNER_IDS`, [lib/insight-compute.js](lib/insight-compute.js),
-  [docs/product/WEEKLY_INSIGHTS_V1.md](docs/product/WEEKLY_INSIGHTS_V1.md)): read the same five-week source fence as
+- **Weekly 2.0** (opt-in `WEEKLY_INSIGHTS_OWNER_IDS`, [lib/insight-compute.js](lib/insight-compute.js),
+  [docs/product/WEEKLY_2.0.md](docs/product/WEEKLY_2.0.md)): read the same five-week source fence as
   "then and now" (no new window). An Event's week index (0 this week, 1–4 earlier) compares its account-timezone
   local date with the Monday `periodKey`s reached by four `previousWeeklyPeriod` steps, so DST weeks stay exact; it
   only weights freshness. "Later" and "after" mean a later `occurredAt`; an open question counts as answered only by
   an Event before `periodEndUtc`. Evidence dates shown are local dates. No clock read, no new boundary, trigger or
-  idempotency key. IMPLEMENTED; the unit tests run in `UTC` only
-  ([test/back/weekly-insights.test.js](test/back/weekly-insights.test.js)).
+  idempotency key. "Last week's main insight" is the saved report of `previousWeeklyPeriod` (its `HEADLINE.insightType`).
+  The per-Event extraction (`EventInsightExtraction`) is not time-based: it runs once after the Event's memory is saved,
+  and is used only while the Event text is unchanged; `sourceUpdatedAt` is stored for that check, never compared with a
+  clock. The backfill script's default `since` (90 days before now) only chooses which Events to queue. IMPLEMENTED; the
+  unit tests run in `UTC` only ([test/back/weekly-2.test.js](test/back/weekly-2.test.js)).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads

@@ -21,7 +21,7 @@ model interpreting feelings. Fewer model-written words also means less "AI voice
 | Then and now | Retrieval + code | An earlier entry about the same thing (≥ 7 days apart), both exact quotes in date order; only factual counts ("the third time this month you wrote about not sleeping") |
 | A question for you | Model, 1 sentence | A question, never advice; its button starts a new Event |
 | Petal card (optional, built 2026-10-21, `PETAL_CARDS_OWNER_IDS`) | Code only, after the mood curve | [PETAL_CARDS_DESIGN.md](PETAL_CARDS_DESIGN.md) |
-| Weekly insights (optional, built 2026-10-29, `WEEKLY_INSIGHTS_OWNER_IDS`) | Code finds, model phrases, code verifies | Replace "side by side" with a headline and up to four fact-based insight cards: [WEEKLY_INSIGHTS_V1.md](WEEKLY_INSIGHTS_V1.md) |
+| Weekly 2.0 (optional, built 2026-10-29, `WEEKLY_INSIGHTS_OWNER_IDS`) | Code finds, model phrases, code verifies | Replaces the line of the week and "side by side" with a headline and up to four fact-based insight cards: [WEEKLY_2.0.md](WEEKLY_2.0.md) |
 
 Mood curve levels (display only, never shown as labels): Sunny high; Peaceful, Gentle, Wonder,
 Healing middle; Quiet, Drifting, Fire low. Points are the user's own flowers.

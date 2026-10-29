@@ -13,7 +13,8 @@ import { buildWeeklyReflectionPacket, validateWeeklyReflection, weeklyReportProv
 import { REFLECTION_V2, REFLECTION_V2_INSTRUCTIONS } from "../../lib/reflection-v2.js";
 import { GATEWAY_TASK_LIMITS } from "../../lib/ai-gateway-config.js";
 import { WEEKLY_RETROSPECTIVE_INSTRUCTIONS, WEEKLY_NARRATIVE_THREAD_INSTRUCTIONS } from "../../lib/weekly-editorial.js";
-import { WEEKLY_INSIGHTS, WEEKLY_INSIGHTS_INSTRUCTIONS, WEEKLY_SHORT, WEEKLY_SHORT_INSTRUCTIONS } from "../../lib/weekly-short.js";
+import { WEEKLY_SHORT, WEEKLY_SHORT_INSTRUCTIONS } from "../../lib/weekly-short.js";
+import { WEEKLY_2, WEEKLY_2_INSTRUCTIONS } from "../../lib/insight-write.js";
 import { exemplars as threadExemplars } from "../../experiments/weekly-narrative-thread-v1/fixtures.mjs";
 import { corpus as editorialCorpus, targets as editorialTargets } from "../../experiments/weekly-editorial-quality-v1/fixtures.mjs";
 
@@ -928,8 +929,8 @@ test("petal card owner list: a listed short-report owner gets a card after the m
   }
 });
 
-// Weekly insights (docs/product/WEEKLY_INSIGHTS_V1.md) on top of the short report, injected responses only.
-test("insights owner list: one request with the insights contract; a failing insight saves exactly the short report", async t => {
+// Weekly 2.0 (docs/product/WEEKLY_2.0.md) for owners on WEEKLY_INSIGHTS_OWNER_IDS, injected responses only.
+test("Weekly 2.0 owner list: one request with the 2.0 contract; a failing insight or a failed call saves the code-template report", async t => {
   const settings = { ...enabled, AI_WEEKLY_REFLECTION_CONTRACT: REFLECTION_V2.WEEKLY, AI_WEEKLY_SHORT_OWNER_IDS: "alice" };
   const insightsFixture = async () => {
     const f = await fixture(t, { locale: "zh-CN", count: 3 });
@@ -937,31 +938,42 @@ test("insights owner list: one request with the insights contract; a failing ins
     return f;
   };
   const respond = (f, text) => f.respond(packet => {
-    const goods = packet.candidates?.find(candidate => candidate.type === "SMALL_GOODS");
-    return Response.json(native({ ...shortOutput(packet), version: packet.version, locale: packet.locale,
-      ...(packet.version === WEEKLY_INSIGHTS ? { insights: goods ? [{ candidate: goods.id, role: "main", text,
-        picks: goods.quotes.slice(0, 2).map(quote => quote.id) }] : [] } : {}) }));
+    if (packet.version !== WEEKLY_2) return Response.json(native(shortOutput(packet)));
+    const goods = packet.candidates.find(candidate => candidate.type === "SMALL_GOODS");
+    return Response.json(native({ version: WEEKLY_2, locale: packet.locale, headline: "这周的晴朗来自小事", question: "下周你想留意哪一件小事？",
+      insights: goods ? [{ id: goods.id, role: "main", text, evidence_ids: goods.evidence, picks: goods.quotes.slice(0, 2).map(quote => quote.id) }] : [] }));
   });
   const f = await insightsFixture();
   respond(f, "这周你记下了这些小事。");
   const result = await f.run({ ...settings, WEEKLY_INSIGHTS_OWNER_IDS: "bob,alice" });
   assert.equal(result.succeeded, true, result.error?.stack); assert.equal(f.calls.length, 1);
   const { body, packet } = f.calls[0];
-  assert.equal(body.system, WEEKLY_INSIGHTS_INSTRUCTIONS); assert.equal(packet.version, WEEKLY_INSIGHTS);
-  assert.deepEqual(packet.include, ["line", "sideBySide", "question", "insights"]);
+  assert.equal(body.system, WEEKLY_2_INSTRUCTIONS); assert.equal(packet.version, WEEKLY_2);
+  assert.ok(packet.candidates.some(candidate => candidate.type === "SMALL_GOODS"));
   assert.ok(Buffer.byteLength(JSON.stringify(body)) + 1024 <= GATEWAY_TASK_LIMITS.WEEKLY_REPORT.input);
   assert.doesNotMatch(JSON.stringify(packet), /alice|event-\d|memory-\d|sourceFence|BLOOM|score/);
   const saved = (await f.rows("WeeklyReport"))[0].document;
-  assert.deepEqual(saved.narrativeSections.map(section => section.kind), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "LINE_OF_WEEK", "QUESTION"]);
-  assert.equal(saved.narrativeSections[0].claim, "这周的 2 件小好事");
+  assert.deepEqual(saved.narrativeSections.map(section => section.kind), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "QUESTION"]);
+  assert.equal(saved.narrativeSections[0].claim, "这周的晴朗来自小事"); assert.equal(saved.narrativeSections[0].template, false);
+  assert.equal(saved.narrativeSections[1].items.length, 2);
   assert.ok(saved.narrativeSections.every(section => section.contractVersion === WEEKLY_SHORT), "older apps still read the report");
-  assert.equal((await f.rows("AIEvidence")).length, packet.evidence.length);
 
+  // A failing insight is dropped; the code template stands in. Never the old short report.
   const failing = await insightsFixture();
   respond(failing, "你应该多画画。");
   assert.equal((await failing.run({ ...settings, WEEKLY_INSIGHTS_OWNER_IDS: "alice" })).succeeded, true);
-  assert.deepEqual((await failing.rows("WeeklyReport"))[0].document.narrativeSections.map(section => section.kind),
-    ["LINE_OF_WEEK", "MOOD_CURVE", "SIDE_BY_SIDE", "QUESTION"]);
+  const fallback = (await failing.rows("WeeklyReport"))[0].document.narrativeSections;
+  assert.deepEqual(fallback.map(section => section.kind), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "QUESTION"]);
+  assert.ok(fallback[0].template && fallback[1].template && fallback[3].template);
+
+  // The provider fails: the week is still saved, from code templates, with no provider.
+  const down = await insightsFixture();
+  down.respond(() => new Response("unavailable", { status: 500 }));
+  const downResult = await down.run({ ...settings, WEEKLY_INSIGHTS_OWNER_IDS: "alice" });
+  assert.equal(downResult.succeeded, true, `${downResult.error?.code} ${downResult.error?.stack}`);
+  const downSaved = (await down.rows("WeeklyReport"))[0].document;
+  assert.deepEqual(downSaved.narrativeSections.map(section => section.kind), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "QUESTION"]);
+  assert.ok(downSaved.narrativeSections.every(section => section.template !== false));
 
   for (const list of [undefined, "bob", "alice;bob"]) {
     const off = await insightsFixture();
