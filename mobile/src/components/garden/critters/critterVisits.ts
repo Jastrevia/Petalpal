@@ -8,6 +8,7 @@ import { distance, type Network, type Point } from '../fairy/walkNetwork';
 
 // `silktail`, the Silktail Fox spirit, walks like the others but is not a random visitor: it comes
 // for a Journal milestone (when exactly is still to be designed), so it is left out of CRITTER_IDS.
+// Nor is the bluebird any more: it lives on the Garden's perches (spirits/Bluebird.tsx).
 export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail';
 export type CritterKind = 'flyer' | 'walker';
 export type CritterSpec = {
@@ -31,7 +32,7 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
   silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
 };
-export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail');
+export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird');
 export const MAX_VISITORS = 2;
 // Seconds between one visitor arriving and the next.
 export const VISIT_GAP: [number, number] = [10, 35];
