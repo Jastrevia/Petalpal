@@ -54,7 +54,7 @@ sinking before mixed, then steady. The hash is `sha256("petal-card:v1:<owner>:<p
 
 Low week, Quiet ×4 and Drifting ×1 early, Healing ×2 late → dominant Quiet, arc lifting → **The Star**.
 Card line: 难过之后，一点点亮起来。 Card text: 大星星挂在夜空，小花仙跪在池边，把两只罐子里的水慢慢倒出来。不急，也不用马上变好。
-Fact line (code): 这周你 4 次选了「安静」，周五到周日有 2 次「治愈」。 (The card asks no question; the report keeps its
+Fact line (code): 这周你 4 次选了「低落」，周五到周日有 2 次「治愈」。 (The card asks no question; the report keeps its
 one model question.)
 
 ## In the short Weekly report (beta, 2026-10-21)

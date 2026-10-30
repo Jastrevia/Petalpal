@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { readEvent } from '../../services/events';
 import { moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, thenNowCount, type Insight, type InsightFeedback,
@@ -7,7 +7,7 @@ import { moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, t
 import { petalCardArt } from '../petalCards/petalCardArt';
 import { EventIllustration } from './EventIllustration';
 import { useAppLocale } from '../../services/locale';
-import { BudGate, MoodPetalChart, useBloom, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
+import { MoodPetalChart, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
@@ -20,10 +20,10 @@ export type ReportPart = 'left' | 'right' | 'all';
 // Rendering only: every part was chosen and validated on the backend; a hidden part simply is not saved.
 // Labels and dates follow the app language; the report's own sentences stay as saved.
 // Weekly 2.0 (docs/product/WEEKLY_2.0.md) is one spread of the book. Left page (`part` left): the date and headline
-// (after the bloom) over the week's bouquet (tap a flower for that day's words) and the 8-mood petal chart. Right page
-// (`part` right): main insight → more insights, side by side to swipe → "还有一件事" (then and now) → petal card → the
-// question → the report link. It opens on a bud alone; tapping it raises the bouquet, then the headline, then the right
-// page. A 2.0 week with no insights shows only its headline and a gentle question. Phones (`part` all) put both pages in
+// over the week's bouquet (tap a flower for that day's words) and the 8-mood petal chart. Right page (`part` right):
+// main insight → more insights, side by side to swipe → "还有一件事" (then and now) → petal card → the question → the
+// report link. It shows at once (no opening animation). A 2.0 week with no insights shows only its headline and a gentle
+// question. Phones (`part` all) put both pages in
 // one flow. Text never scrolls: what does not fit on a page turns to the next (Paged). The safety note and disclaimers
 // live in the third book on the shelf, not here.
 // Older reports: with insights, the same order around the mood curve; without, the short report's layout.
@@ -37,10 +37,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   const [width, setWidth] = useState(0);
   const request = useRef(0);
   useEffect(() => () => { request.current += 1; }, []);
-  // ---- Weekly 2.0 opening (shared by both pages) ----
-  const ceremony = short.version2 && !!short.insights;
   const points = short.curve?.points ?? [];
-  const { bloomed, bloom, bud, fan, headline: headlineIn, rest: restIn, rise } = useBloom(reportId ?? '', points.length, { enabled: ceremony, reducedMotion });
   const species = useEventSpecies();
   // ---- 不准确 / 隐藏 ----
   const [marks, setMarks] = useState<Record<number, InsightFeedback | null>>({});
@@ -179,7 +176,6 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
     </>}
     {short.support && <><Text style={s.heading}>{copy.support}</Text><Text accessibilityRole="alert" style={s.body}>{short.support}</Text></>}
   </>;
-  const fadeRise = (value: Animated.Value) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] });
 
   if (short.version2) {
     // Weekly 2.0 is written on the paper itself: no boxes, only painted vignettes, serif type and gold hairlines. Every
@@ -260,26 +256,21 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
       left = [{ key: 'head', node: head }, ...(question ? [{ key: 'question', node: question }] : [])];
       right = [];
-    } else if (!bloomed) {
-      left = [{ key: 'bud', node: <BudGate title={copy.bloomed} hint={copy.tapBud} fade={bud} fan={fan} moods={points.map(point => point.mood)}
-        interactive={interactive} onOpen={bloom} /> }];
-      right = [];
     } else {
-      const fade = (node: ReactNode, value = restIn) => <Animated.View style={fadeRise(value)}>{node}</Animated.View>;
-      left = [{ key: 'head', node: fade(head, headlineIn) }];
+      left = [{ key: 'head', node: head }];
       if (short.curve) {
         left.push({ key: 'bouquet', node: <View style={v.block}>
           {eyebrow(copy.bouquet)}
-          <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species} rise={rise}
+          <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species}
             openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
           {panel('bouquet')}
         </View> });
-        left.push({ key: 'moods', node: fade(<View style={v.block}>{eyebrow(copy.moodChart)}
-          <MoodPetalChart points={points} names={copy.moods} label={copy.moodChart} width={210} /></View>) });
+        left.push({ key: 'moods', node: <View style={v.block}>{eyebrow(copy.moodChart)}
+          <MoodPetalChart points={points} names={copy.moods} label={copy.moodChart} width={210} /></View> });
       }
-      right = [{ key: 'main', node: fade(entry(insights.main, 'main', true)) }];
-      if (insights.secondary.length) right.push({ key: 'more', node: fade(<>{rule}{pages(insights.secondary)}</>) });
-      if (short.thenAndNow) right.push({ key: 'oneMore', node: fade(<>
+      right = [{ key: 'main', node: entry(insights.main, 'main', true) }];
+      if (insights.secondary.length) right.push({ key: 'more', node: <>{rule}{pages(insights.secondary)}</> });
+      if (short.thenAndNow) right.push({ key: 'oneMore', node: <>
         {rule}
         <View style={v.entryHead}>
           <View style={{ flex: 1 }}>
@@ -293,8 +284,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           </View>
           <View style={v.art}>{art('oneMore', 50, WEEKLY_ART.oneMore)}</View>
         </View>
-      </>) });
-      if (short.card && cardArt) right.push({ key: 'card', node: fade(<>
+      </> });
+      if (short.card && cardArt) right.push({ key: 'card', node: <>
         {rule}
         {eyebrow(copy.card)}
         <View style={s.card}>
@@ -305,9 +296,9 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           {short.card.reason && <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>}
           <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>
         </View>
-      </>) });
-      if (question) right.push({ key: 'question', node: fade(<>{rule}{question}</>) });
-      if (report) right.push({ key: 'report', node: fade(report) });
+      </> });
+      if (question) right.push({ key: 'question', node: <>{rule}{question}</> });
+      if (report) right.push({ key: 'report', node: report });
     }
     if (part === 'left') return <Paged blocks={left} testID="weekly-left-page" copy={copy} />;
     if (part === 'right') return <Paged blocks={right} testID="weekly-right-page" copy={copy} />;

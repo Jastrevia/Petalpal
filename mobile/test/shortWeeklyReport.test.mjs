@@ -10,7 +10,7 @@ const days = ['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-1
 const meta = { contractVersion: WEEKLY_SHORT, locale: 'zh-Hans' };
 const sections = [
   { kind: 'LINE_OF_WEEK', claim: '那个下午很安静。', evidenceRefs: [{ sourceEventId: 'event-0', sourceMemoryId: 'memory-0' }], ...meta },
-  { kind: 'MOOD_CURVE', claim: '周一到周四：安静 2 次。', days, evidenceRefs: [], ...meta, points: [
+  { kind: 'MOOD_CURVE', claim: '周一到周四：低落 2 次。', days, evidenceRefs: [], ...meta, points: [
     { date: '2026-09-14', mood: 'QUIET_BLOOM', level: 1, sourceEventId: 'event-0' },
     { date: '2026-09-14', mood: 'SUNNY_BLOOM', level: 3, sourceEventId: 'event-1' },
     { date: '2026-09-17', mood: 'QUIET_BLOOM', level: 1, sourceEventId: 'event-2' },
@@ -63,7 +63,7 @@ test('then and now keeps both quotes and dates; a count appears only with its ph
 
 test('petal card is read only when every field is present', () => {
   const card = { kind: 'PETAL_CARD', claim: '难过之后，一点点亮起来。', cardId: 'major-17', name: '星星', line: '难过之后，一点点亮起来。',
-    text: '大星星挂在夜空。', fact: '这周你 4 次选了「安静」。', disclaimer: '花语卡只是陪你回看自己。', evidenceRefs: [], ...meta };
+    text: '大星星挂在夜空。', fact: '这周你 4 次选了「低落」。', disclaimer: '花语卡只是陪你回看自己。', evidenceRefs: [], ...meta };
   assert.equal(shortWeekly({ narrativeSections: sections }).card, null);
   assert.deepEqual(plain(shortWeekly({ narrativeSections: [...sections, card] }).card),
     { id: 'major-17', name: '星星', line: card.line, text: card.text, fact: card.fact, disclaimer: card.disclaimer, reason: null });
@@ -103,7 +103,7 @@ test('insights: a valid main insight brings the headline and up to three more; m
 // Weekly 2.0 (backend lib/insight-write.js): the code-only TREND insight shows like the others, and the 2.0
 // headline shows even with no insight (a week with fewer than three entries).
 test('Weekly 2.0: a TREND main insight, and the headline of a week with no insight', () => {
-  const trend = { kind: 'INSIGHT', claim: 'x', role: 'main', type: 'TREND', text: '前半周多是「飘忽」，后半周「治愈」多了起来。', fact: null,
+  const trend = { kind: 'INSIGHT', claim: 'x', role: 'main', type: 'TREND', text: '前半周多是「迷茫」，后半周「治愈」多了起来。', fact: null,
     items: [], quote: null, evidence: [{ sourceEventId: 'event-0', date: '2026-09-14' }], template: true, ...meta };
   const headline = { kind: 'HEADLINE', claim: '这周的花还在长', reportVersion: 'weekly-2.0', ...meta };
   const read = list => plain(shortWeekly({ narrativeSections: [...sections, ...list] }));

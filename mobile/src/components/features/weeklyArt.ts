@@ -1,7 +1,6 @@
 // Weekly 2.0 paintings (FLUX.2 klein, vintage botanical watercolour after assets/reflection/botanical.png; the paper is
 // lifted out so they sit on the book's own page). Decorative only: every word and button stays in React Native.
 export const WEEKLY_ART = {
-  bud: require('@/assets/reflection/weekly/bud.webp'),
   ground: require('@/assets/reflection/weekly/ground.webp'),
   oneMore: require('@/assets/reflection/weekly/one-more.webp'),
   question: require('@/assets/reflection/weekly/question.webp'),
@@ -23,5 +22,5 @@ export const PETAL_ART: Record<string, number> = {
   DRIFTING_BLOOM: require('@/assets/reflection/weekly/petals/drifting.webp'), PEACEFUL_BLOOM: require('@/assets/reflection/weekly/petals/peaceful.webp'),
 };
 // Width / height of each picture, so a fixed height never stretches it.
-export const ART_RATIO: Record<string, number> = { bud: 335 / 450, ground: 1050 / 600, oneMore: 163 / 216, question: 202 / 216,
+export const ART_RATIO: Record<string, number> = { ground: 1050 / 600, oneMore: 163 / 216, question: 202 / 216,
   SAID_BEFORE: 212 / 216, HIDDEN_LINK: 174 / 216, SMALL_GOODS: 185 / 216, OPEN_QUESTION: 119 / 216, TREND: 171 / 216, ECHO: 180 / 216, petal: 75 / 150 };

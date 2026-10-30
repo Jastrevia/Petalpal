@@ -13,8 +13,8 @@ import { ui } from './FeatureUI';
 import { EventIllustration } from './EventIllustration';
 
 const MOODS_ZH: Record<PrimaryMood, string> = {
-  SUNNY_BLOOM: '晴朗', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '安静', HEALING_BLOOM: '治愈',
-  FIRE_BLOOM: '热烈', WONDER_BLOOM: '惊喜', DRIFTING_BLOOM: '飘忽', PEACEFUL_BLOOM: '平和',
+  SUNNY_BLOOM: '开心', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '低落', HEALING_BLOOM: '治愈',
+  FIRE_BLOOM: '愤怒', WONDER_BLOOM: '好奇', DRIFTING_BLOOM: '迷茫', PEACEFUL_BLOOM: '平静',
 };
 const COPY = {
   en: {
