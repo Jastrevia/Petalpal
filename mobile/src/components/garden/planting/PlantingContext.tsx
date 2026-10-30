@@ -231,7 +231,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         month,
         worldX,
         worldY,
-        existingPlacements: placements,
+        existingPlacements: placements.filter(p => p.flowerId !== targetFlower?.flowerId),
         flowerName,
         speciesCode,
       });
@@ -259,7 +259,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         } catch (error) { setDetailError((error as Error).message); return; }
       }
       const journal = backendMode ? undefined : findJournalEntry(flower.flowerId, flower.journalEntryId);
-      // Pick initial preview at calibrated month centroid or fallback
+      // The record starts at the month centroid; there is no preview until the owner taps the lawn.
       const centroid = getApprovedMonthCentroid(flower.month);
       const fullRecord: FlowerPlacementRecord = {
         id: flower.id || `flower-${flower.flowerId}`,
@@ -290,43 +290,22 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       };
 
       setTargetFlower(fullRecord);
-      setPreviewCoords({ worldX: centroid.x, worldY: centroid.y });
+      setPreviewCoords(null);
+      setValidationResult(null);
       setActiveMode('planting');
       setSelectedFlower(null);
       detailVersion.current++; detailWorking.current = false; setIsDetailWorking(false);
-
-      // Validate at initial centroid
-      const res = validateFlowerPlacement({
-        flowerId: fullRecord.flowerId,
-        month: fullRecord.month,
-        worldX: centroid.x,
-        worldY: centroid.y,
-        existingPlacements: placements,
-        flowerName: fullRecord.flowerName,
-        speciesCode: fullRecord.speciesCode,
-      });
-      setValidationResult(res);
     },
-    [placements, gardenOwnerUserId, session, backendMode]
+    [gardenOwnerUserId, session, backendMode]
   );
 
   const updatePreview = useCallback(
     (worldX: number, worldY: number) => {
       if (!targetFlower || activeMode === 'normal') return;
       setPreviewCoords({ worldX, worldY });
-
-      const res = validateFlowerPlacement({
-        flowerId: targetFlower.flowerId,
-        month: targetFlower.month,
-        worldX,
-        worldY,
-        existingPlacements: placements,
-        flowerName: targetFlower.flowerName,
-        speciesCode: targetFlower.speciesCode,
-      });
-      setValidationResult(res);
+      setValidationResult(validateAt(worldX, worldY, targetFlower.month, targetFlower.flowerName, targetFlower.speciesCode));
     },
-    [activeMode, targetFlower, placements]
+    [activeMode, targetFlower, validateAt]
   );
 
   const confirmPlacement = useCallback(async (): Promise<boolean> => {

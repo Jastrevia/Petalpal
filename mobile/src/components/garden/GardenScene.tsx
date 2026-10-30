@@ -81,7 +81,7 @@ import {
 import { getFlowerPlacementDefinition } from './planting/flowerFootprintConfig';
 import { MONTH_CENTROIDS, MONTH_REGION_METAS } from './planting/plantingRegionData';
 import { getApprovedMonthCentroid } from './planting/approvedPlantingMasks';
-import { FlowerPlacementRecord } from './planting/plantingPersistence';
+import { FlowerPlacementRecord, awaitsPlanting } from './planting/plantingPersistence';
 import { useLocalSearchParams } from 'expo-router';
 import GardenReferenceLayer from './GardenReferenceLayer';
 import NativeLandCalibrationEditor from './NativeLandCalibrationEditor';
@@ -329,7 +329,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const placementsRef = useRef(placements);
   useEffect(() => {
     activeModeRef.current = activeMode;
-    placementsRef.current = placements;
+    // Taps reach planted flowers and lawns only; an unplanted Event flower is not in the Garden yet.
+    placementsRef.current = placements.filter(p => !awaitsPlanting(p));
   }, [activeMode, placements]);
 
   const searchParams = useLocalSearchParams<{
@@ -569,6 +570,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     cameraX.value = viewport.width / 2 - baseX - (GARDEN_WORLD_BOUNDS.x + GARDEN_WORLD_BOUNDS.width / 2) * fit * minimum;
     cameraY.value = viewport.height / 2 - baseY - (GARDEN_WORLD_BOUNDS.y + GARDEN_WORLD_BOUNDS.height / 2) * fit * minimum;
   }, [viewport.width, viewport.height, fit, baseX, baseY, cameraX, cameraY, cameraZoom]);
+  const checkCamera = useMemo(() => ({ x: cameraX, y: cameraY, zoom: cameraZoom, baseX, baseY, fit }),
+    [cameraX, cameraY, cameraZoom, baseX, baseY, fit]);
   const sceneElement = useRef<View>(null);
   // Web fallback: a restored session can mount the scene without a non-zero
   // onLayout event, leaving fit at 0 and no canvas. Measure the element directly.
@@ -702,6 +705,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   }),[focusCoords,cameraZoom,selectedFlower]);
 
   const focusCalendarFlower = (flower: typeof placements[number]) => {
+    // An Event flower not planted yet is planted from here: tap its lawn, then ✓.
+    if (awaitsPlanting(flower)) { void startPlanting({ ...flower, flowerName: flower.flowerName || '' }); return; }
     const duration = calendarReducedMotion ? 0 : 500;
     cameraZoom.value = withTiming(1.8, { duration });
     cameraX.value = withTiming(viewport.width / 2 - baseX - flower.worldX * fit * 1.8, { duration });
@@ -1649,7 +1654,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         canChangeFixture={activeMode==='normal'} metadata={{realParentCount:placements.length,renderedParentCount:drawnPlanting.placements.length,
           viewport,waterfallVersion,growthV11:useMonthlyGrowth,previewMode,environmentEnabled,worldPhase:worldTime.phase}}/>}
       {/* Planting Placement Controls Banner & Action Bar */}
-      {!readOnly && fixtureParents===null&&<PlantingPlacementControls />}
+      {!readOnly && fixtureParents===null&&<PlantingPlacementControls camera={checkCamera} />}
 
       {/* Flower Detail Modal */}
       {fixtureParents===null && <FlowerDetailModal />}

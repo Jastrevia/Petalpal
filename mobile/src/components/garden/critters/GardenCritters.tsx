@@ -3,6 +3,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
 import { usePlanting } from '../planting/PlantingContext';
+import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
 import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
@@ -67,7 +68,7 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
   const unplanted = useMemo(() => {
-    const planted = new Set(placements.map(p => p.month));
+    const planted = new Set(placements.filter(p => !awaitsPlanting(p)).map(p => p.month));
     return Array.from({ length: 12 }, (_, i) => i + 1).filter(month => !planted.has(month));
   }, [placements]);
   const excluded = useRef<CritterId[] | null>(null);
