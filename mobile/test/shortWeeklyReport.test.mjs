@@ -31,7 +31,7 @@ test('short Weekly sections are read only from the short contract; older reports
   assert.equal(shortWeekly({ narrativeSections: [] }), null);
   const support = plain(shortWeekly({ narrativeSections: [{ kind: 'SUPPORT_RESOURCES', claim: 'You do not have to face this alone.', contractVersion: WEEKLY_SHORT, locale: 'en' }] }));
   assert.deepEqual({ ...support, support: !!support.support }, { locale: 'en', line: null, curve: null, side: null, question: null, support: true, thenAndNow: null, card: null,
-    headline: null, insights: null, version2: false });
+    headline: null, insights: null, version2: false, threads: [], answer: null, letters: [], unlock: null, cardIndex: null });
 });
 
 test('mood curve puts each day in its column, higher moods higher, and joins points in time order', () => {
@@ -85,7 +85,7 @@ test('insights: a valid main insight brings the headline and up to three more; m
     insight('secondary', 'MADE_UP'), insight('secondary', 'SAID_BEFORE', { evidence: [{ sourceEventId: 'event-0', date: 'Sep 14' }] }),
     insight('secondary', 'SMALL_GOODS', { items: [{ text: '只有一件。', sourceEventId: 'event-1' }] })]);
   assert.equal(short.headline, '写到妈妈的日子，多是亮的');
-  assert.deepEqual(short.insights.main, { index: 5, feedback: null, type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
+  assert.deepEqual(short.insights.main, { index: 5, feedback: null, subject: null, type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
     evidence: [{ eventId: 'event-0', date: '2026-09-14' }] });
   assert.deepEqual(short.insights.secondary.map(item => item.type), ['SMALL_GOODS', 'OPEN_QUESTION']);
   assert.deepEqual(short.insights.secondary[0].items.map(item => item.eventId), ['event-1', 'event-2']);
@@ -138,4 +138,34 @@ test('Weekly 2.0: version marker, insight marks, and a bouquet that never ranks 
   assert.ok(busy.filter(point => point.row === 1).every(point => point.lift > 0 && point.size < busy[4].size));
   assert.equal(new Set(busy.map(point => `${point.x}:${point.row}`)).size, 5, 'no two flowers in the same place');
   assert.deepEqual(Object.keys(MOOD_SPECIES).sort(), [...PRIMARY_MOODS].sort());
+});
+
+test('闭环 sections: threads, one answer, letters, the unlock line and the card index; malformed ones are skipped', () => {
+  const head = { kind: 'HEADLINE', claim: '这周的花还在长', reportVersion: 'weekly-2.0', evidenceRefs: [], ...meta };
+  const short = shortWeekly({ narrativeSections: [head,
+    { kind: 'UNLOCK', claim: '一周写下 3 条，就能看到这周的洞察。', ...meta },
+    { kind: 'THREAD', claim: '你在跟进的“跑步”：这周写到 1 次。', word: '跑步', count: 1, evidence: [{ sourceEventId: 'e1', date: '2026-09-15' }, { sourceEventId: 'e2', date: 'bad' }], ...meta },
+    { kind: 'THREAD', claim: '坏的', word: '', count: 1, evidence: [], ...meta },
+    { kind: 'ANSWER', claim: 'a', question: '下周你想留意什么？', quote: { text: '我想留意风。', sourceEventId: 'e1', date: '2026-09-15' }, ...meta },
+    { kind: 'LETTER', claim: '记得看海。', text: '记得看海。', writtenOn: '2026-08-01', ...meta },
+    { kind: 'PETAL_CARD', claim: 'x', ...meta },
+    { kind: 'QUESTION', claim: '这周有哪一刻，你想记下来？', ...meta }] });
+  assert.deepEqual(plain(short.threads), [{ word: '跑步', count: 1, claim: '你在跟进的“跑步”：这周写到 1 次。', evidence: [{ eventId: 'e1', date: '2026-09-15' }] }]);
+  assert.deepEqual(plain(short.answer), { question: '下周你想留意什么？', quote: { text: '我想留意风。', eventId: 'e1', date: '2026-09-15' } });
+  assert.deepEqual(plain(short.letters), [{ text: '记得看海。', writtenOn: '2026-08-01' }]);
+  assert.equal(short.unlock, '一周写下 3 条，就能看到这周的洞察。');
+  assert.equal(short.cardIndex, 6);
+  assert.equal(SHORT_COPY['zh-Hans'].follow, '跟进');
+});
+
+test('回答问题: the pending answer is taken once and expires after 30 minutes', () => {
+  const { startAnswer, pendingAnswer, takeAnswer, clearAnswer } = loadPlantingModules()('../../../services/questionAnswer');
+  startAnswer('w1', '问？');
+  assert.equal(pendingAnswer().reportId, 'w1');
+  assert.equal(takeAnswer().question, '问？');
+  assert.equal(takeAnswer(), null);
+  startAnswer('w2', '问？');
+  assert.equal(pendingAnswer(Date.now() + 31 * 60_000), null);
+  startAnswer('w3', '问？'); clearAnswer();
+  assert.equal(pendingAnswer(), null);
 });

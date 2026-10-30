@@ -142,6 +142,16 @@ trigger's target week either side of it; a last-minute Event outside the cutoff
   week starts, each pair at least 30 × 24 hours apart by `occurredAt`; dates shown are local dates. An earlier Event
   outside the five-week window is added to the fence by id (`sourceFence.echoSources`). IMPLEMENTED; the
   unit tests run in `UTC` only ([test/back/weekly-2.test.js](test/back/weekly-2.test.js)).
+  **闭环 (M2, [lib/insight-loop.js](lib/insight-loop.js)):** a **future letter**'s `deliverOn` is an account-timezone
+  local date, validated against "today" = `localDateForInstant(now, User.timezone)` at write time: tomorrow up to
+  366 days ahead. It is due in the Weekly whose week (Monday `periodKey` … `periodKey + 6` local days) contains it, or
+  in a later Weekly if no saved report since `deliverOn − 6` days carried it (a report rewritten for the same week keeps
+  it). It can be withdrawn while `deliverOn` is still after today, so it can never be withdrawn once its week's report
+  can be written (Sunday 23:59). `writtenOn` is the local date of `createdAt`. A **thread** counts only in Weeklies whose
+  `periodEndUtc` is after the thread was created; it counts this week's Events (same source fence). An **answer** is an
+  Event created (`createdAt`) after the report it answers was saved; it is quoted only in a later week's report
+  (`periodKey` comparison). The "1 week, 3 entries" unlock line is the existing threshold, not a time rule. IMPLEMENTED;
+  tests run in `UTC` only ([test/back/insight-loop.test.js](test/back/insight-loop.test.js)).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads

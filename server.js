@@ -103,6 +103,7 @@ import {
 import { PrivateEventRepository } from "./lib/ai-events.js";
 import { PrismaMemoryRepository } from "./lib/event-memory.js";
 import { PrivateReportRepository } from "./lib/report-foundation.js";
+import { InsightLoopRepository } from "./lib/insight-loop.js";
 import { requireLockedMemoryConsent } from "./lib/semantic-retrieval.js";
 import {
   REPORT_NARRATIVE_GENERATION_VERSION,
@@ -2519,6 +2520,43 @@ app.post("/ai/reports/weekly/:reportId/insights/:index/feedback", async (req, re
     throw error;
   }
 });
+
+// Weekly 2.0 闭环 (lib/insight-loop.js, docs/product/WEEKLY_2.0.md): 花语集, 跟进线索, 回答问题, 给未来的信, 屏蔽.
+// Owner comes from authentication only; every route needs Memory consent.
+const insightLoop = new InsightLoopRepository(prisma);
+async function insightLoopRoute(req, res, fields, run) {
+  const body = req.body ?? {};
+  if (Object.keys(req.query).length || Object.keys(body).some(key => !fields.includes(key)) || fields.some(key => !Object.hasOwn(body, key))) {
+    return res.status(400).json({ error: "Unsupported request" });
+  }
+  try {
+    const result = await run(body);
+    if (result === null || result === false) return res.status(404).json({ error: "Not found" });
+    return res.json(result);
+  } catch (error) {
+    if (error?.code === "INSIGHT_LOOP_INVALID") return res.status(400).json({ error: "Unsupported request" });
+    if (error?.code === "INSIGHT_LOOP_LIMIT") return res.status(409).json({ error: "Limit reached", code: "INSIGHT_LOOP_LIMIT" });
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI processing is not currently authorized" });
+    throw error;
+  }
+}
+const loopIndex = value => /^\d{1,2}$/.test(value) ? Number(value) : -1;
+app.post("/ai/reports/weekly/:reportId/insights/:index/keep", (req, res) => !validId(req.params.reportId) ? res.status(400).json({ error: "Unsupported request" })
+  : insightLoopRoute(req, res, ["kept"], body => insightLoop.keep({ identity: req.auth, reportId: req.params.reportId, index: loopIndex(req.params.index), kept: body.kept })));
+app.post("/ai/reports/weekly/:reportId/insights/:index/follow", (req, res) => !validId(req.params.reportId) ? res.status(400).json({ error: "Unsupported request" })
+  : insightLoopRoute(req, res, [], () => insightLoop.follow({ identity: req.auth, reportId: req.params.reportId, index: loopIndex(req.params.index) })));
+app.delete("/ai/insight-threads/:threadId", (req, res) => !validId(req.params.threadId) ? res.status(400).json({ error: "Unsupported request" })
+  : insightLoopRoute(req, res, [], () => insightLoop.unfollow({ identity: req.auth, threadId: req.params.threadId })));
+app.post("/ai/reports/weekly/:reportId/answer", (req, res) => !validId(req.params.reportId) ? res.status(400).json({ error: "Unsupported request" })
+  : insightLoopRoute(req, res, ["eventId"], body => validId(body.eventId)
+    ? insightLoop.answer({ identity: req.auth, reportId: req.params.reportId, eventId: body.eventId }) : Promise.reject(Object.assign(new Error(), { code: "INSIGHT_LOOP_INVALID" }))));
+app.post("/ai/future-letters", (req, res) => insightLoopRoute(req, res, ["text", "deliverOn"],
+  body => insightLoop.writeLetter({ identity: req.auth, text: body.text, deliverOn: body.deliverOn })));
+app.delete("/ai/future-letters/:letterId", (req, res) => !validId(req.params.letterId) ? res.status(400).json({ error: "Unsupported request" })
+  : insightLoopRoute(req, res, [], () => insightLoop.withdrawLetter({ identity: req.auth, letterId: req.params.letterId })));
+app.put("/ai/insight-mutes", (req, res) => insightLoopRoute(req, res, ["word", "muted"],
+  body => insightLoop.mute({ identity: req.auth, word: body.word, muted: body.muted })));
+app.get("/ai/insight-collection", (req, res) => insightLoopRoute(req, res, [], () => insightLoop.collection({ identity: req.auth })));
 
 app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
   const allowedBodyFields = new Set(["localDate"]);

@@ -221,7 +221,7 @@ test("fallback: with nothing valid the report is built from code templates, neve
   // Fewer than three Events: "这周的花还在长", no insights and no model call needed.
   const few = weekly2Packet(input({ current: CURRENT.slice(0, 2) }));
   assert.equal(few.needsModel, false);
-  assert.deepEqual(kinds(render(few, null, input({ current: CURRENT.slice(0, 2) }))), ["HEADLINE", "MOOD_CURVE", "QUESTION"]);
+  assert.deepEqual(kinds(render(few, null, input({ current: CURRENT.slice(0, 2) }))), ["HEADLINE", "MOOD_CURVE", "UNLOCK", "QUESTION"]);
   assert.equal(render(few, null, input({ current: CURRENT.slice(0, 2) })).sections[0].claim, "这周的花还在长");
   assert.throws(() => render(built, { ...answer(built), version: WEEKLY_SHORT }), { code: "REPORT_NARRATIVE_GROUNDING_FAILED" });
 });

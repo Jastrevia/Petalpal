@@ -983,7 +983,7 @@ test("Weekly 2.0 owner list: one request with the 2.0 contract; a failing insigh
   assert.equal(thinResult.succeeded, true, `${thinResult.error?.code} ${thinResult.error?.stack}`); assert.equal(thin.calls.length, 0);
   const thinSaved = (await thin.rows("WeeklyReport"))[0].document;
   assert.equal(thinSaved.narrativeStatus, "GENERATED");
-  assert.deepEqual(thinSaved.narrativeSections.map(section => section.kind), ["HEADLINE", "MOOD_CURVE", "QUESTION"]);
+  assert.deepEqual(thinSaved.narrativeSections.map(section => section.kind), ["HEADLINE", "MOOD_CURVE", "UNLOCK", "QUESTION"]);
   assert.equal(thinSaved.narrativeSections[0].claim, "这周的花还在长");
 
   for (const list of [undefined, "bob", "alice;bob"]) {
