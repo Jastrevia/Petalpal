@@ -159,6 +159,15 @@ trigger's target week either side of it; a last-minute Event outside the cutoff
   window will hold before next week's own entries). **身体信号** and **反复的句式** use the existing five-week window and
   this week only. No clock read beyond the existing report time; tests: [test/back/weekly-m3.test.js](test/back/weekly-m3.test.js)
   (Vancouver DST parts of the day; the rest in `UTC`).
+- **Monthly 2.0** (opt-in `MONTHLY_INSIGHTS_OWNER_IDS`, [lib/monthly-insights.js](lib/monthly-insights.js)): uses the existing
+  Monthly period (`monthlyPeriodFor`, account timezone) and its existing fence (this month + `previousMonthlyPeriod`). Garden days
+  are the month's local dates (`addLocalDays` from `YYYY-MM-01` while the prefix matches); an Event's day is
+  `localDateForInstant(occurredAt)`. The month's Weeklies are those whose Monday `periodKey` is a local date in the month.
+  A thread counts this month's Events whose local date is on or after that week's `periodKey + 7` days. **Auto-schedule**
+  (`AI_MONTHLY_AUTO_SCHEDULE_OWNER_IDS`, off by default): at each run, an owner's due month is `previousMonthlyPeriod` of the
+  owner's current local month, i.e. last month from local 00:00 on the 1st; the job key is the trigger's
+  (`MONTHLY_REPORT:YYYY-MM:<version>`), so a month is written once. Tests: [test/back/report-schedule.test.js](test/back/report-schedule.test.js)
+  (Vancouver vs Honolulu at `2026-11-01T07:30Z`), [test/back/monthly-2.test.js](test/back/monthly-2.test.js) (`UTC`).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads

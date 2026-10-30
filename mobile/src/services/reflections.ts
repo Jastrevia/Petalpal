@@ -225,6 +225,55 @@ export const moodIcon = (mood: PrimaryMood) => PRIMARY_MOODS.indexOf(mood) + 1; 
 export const setInsightFeedback = (reportId: string, index: number, verdict: InsightFeedback | null) =>
   apiRequest<{ narrativeSections: ReportSection[] }>(`/ai/reports/weekly/${encodeURIComponent(reportId)}/insights/${index}/feedback`, 'POST', { verdict });
 
+// ---- Monthly 2.0 (backend lib/monthly-insights.js, code-written; MONTH_HEADLINE.reportVersion monthly-2.0) ----
+type Ref = { text: string; date: string; eventId: string };
+export interface Monthly2 {
+  headline: string; question: string | null;
+  garden: { claim: string; days: string[]; dayMoods: { date: string; mood: PrimaryMood | null }[]; points: { date: string; mood: PrimaryMood; eventId: string }[] } | null;
+  spread: { periodKey: string; cardId: string; name: string; line: string | null; headline: string | null; role: 'start' | 'turn' | 'now' }[];
+  changes: { word: string; claim: string; then: Ref; now: Ref }[];
+  threads: { type: string; keyword: string; count: number; line: string; quote: Ref }[];
+  goods: { text: string; count: number; date: string; eventId: string }[];
+  people: { word: string; count: number; mood: string; moodCount: number }[];
+}
+const refOf = (value?: { quote?: unknown; text?: unknown; date?: unknown; sourceEventId?: unknown } | null): Ref | null => {
+  const text = filled(value?.quote) ? value!.quote : filled(value?.text) ? value!.text : null;
+  return text && filled(value?.sourceEventId) && DATE.test(String(value?.date ?? '')) ? { text, date: value!.date as string, eventId: value!.sourceEventId as string } : null;
+};
+export function monthly2(report: Pick<ReflectionReport, 'narrativeSections'>): Monthly2 | null {
+  const sections = (Array.isArray(report.narrativeSections) ? report.narrativeSections : []) as (ReportSection & Record<string, any>)[];
+  const head = sections.find(section => section?.kind === 'MONTH_HEADLINE');
+  if (head?.reportVersion !== 'monthly-2.0' || !filled(head.claim)) return null;
+  const of = (kind: string) => sections.filter(section => section?.kind === kind);
+  const g = of('MONTH_GARDEN')[0];
+  const garden = g && Array.isArray(g.days) && Array.isArray(g.dayMoods) ? { claim: g.claim, days: g.days.filter((day: unknown) => DATE.test(String(day))),
+    dayMoods: g.dayMoods.filter((day: any) => DATE.test(String(day?.date))).map((day: any) => ({ date: day.date as string, mood: PRIMARY_MOODS.includes(day.mood) ? day.mood as PrimaryMood : null })),
+    points: (Array.isArray(g.points) ? g.points : []).filter((point: any) => PRIMARY_MOODS.includes(point?.mood) && filled(point?.sourceEventId))
+      .map((point: any) => ({ date: point.date as string, mood: point.mood as PrimaryMood, eventId: point.sourceEventId as string })) } : null;
+  const spread = (of('MONTH_SPREAD')[0]?.cards ?? []).filter((card: any) => filled(card?.cardId) && filled(card?.name))
+    .map((card: any) => ({ periodKey: card.periodKey, cardId: card.cardId, name: card.name, line: filled(card.line) ? card.line : null,
+      headline: filled(card.headline) ? card.headline : null, role: ['start', 'turn', 'now'].includes(card.role) ? card.role : 'turn' }));
+  const changes = of('MONTH_CHANGE').map(section => ({ word: section.word, claim: section.claim, then: refOf(section.then), now: refOf(section.now) }))
+    .filter((item): item is Monthly2['changes'][number] => filled(item.word) && !!item.then && !!item.now);
+  const threads = (of('MONTH_THREADS')[0]?.items ?? []).map((item: any) => ({ type: item?.type, keyword: item?.keyword, count: item?.count, line: item?.line, quote: refOf(item?.quote) }))
+    .filter((item: any): item is Monthly2['threads'][number] => filled(item.keyword) && filled(item.line) && Number.isInteger(item.count) && !!item.quote);
+  const goods = (of('MONTH_GOODS')[0]?.items ?? []).filter((item: any) => filled(item?.text) && Number.isInteger(item?.count))
+    .map((item: any) => ({ text: item.text, count: item.count, date: item.date, eventId: item.sourceEventId }));
+  const people = (of('MONTH_PEOPLE')[0]?.people ?? []).filter((item: any) => filled(item?.word) && Number.isInteger(item?.count) && filled(item?.mood))
+    .map((item: any) => ({ word: item.word, count: item.count, mood: item.mood, moodCount: item.moodCount }));
+  return { headline: head.claim, question: of('MONTH_QUESTION')[0]?.claim ?? null, garden, spread, changes, threads, goods, people };
+}
+export const MONTHLY_COPY = {
+  en: { garden: 'This month’s garden', spread: 'This month’s spread', roles: { start: 'Start', turn: 'Turn', now: 'Now' }, change: 'What changed',
+    lastMonth: 'Last month', thisMonth: 'This month', threads: 'Threads this month', goods: 'Small good things', times: (n: number) => `×${n}`,
+    people: 'People this month', show: 'Show', hide: 'Hide', peopleLine: (n: number, mood: string, k: number) => `${n} entries · ${mood} ${k}`,
+    question: 'A question for next month', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], empty: 'No entry' },
+  'zh-Hans': { garden: '本月花园', spread: '本月牌阵', roles: { start: '开始', turn: '转折', now: '现在' }, change: '变化对照',
+    lastMonth: '上个月', thisMonth: '这个月', threads: '线索追踪', goods: '本月好事清单', times: (n: number) => `${n} 次`,
+    people: '本月的人', show: '展开', hide: '收起', peopleLine: (n: number, mood: string, k: number) => `${n} 条 · 『${mood}』${k} 条`,
+    question: '给下个月的问题', days: ['一', '二', '三', '四', '五', '六', '日'], empty: '没有记录' },
+} as const;
+
 // ---- Weekly 2.0 闭环 (backend lib/insight-loop.js). Owner comes from the session; every call needs Memory on. ----
 const weeklyPath = (reportId: string) => `/ai/reports/weekly/${encodeURIComponent(reportId)}`;
 // 花语集: keep (or let go of) one insight or petal card section of the owner's report.

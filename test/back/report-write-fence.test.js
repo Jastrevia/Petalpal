@@ -117,10 +117,11 @@ test("Event deletion takes owner/source locks before report discovery even witho
     async $queryRawUnsafe(sql) { steps.push(sql.includes('"AiConsent"') ? "consent lock" : "source lock"); return []; },
     event: { async findFirst() { steps.push("event"); return { id: "event-1" }; }, async deleteMany() { steps.push("delete"); } },
     aiEvidence: { async findMany() { steps.push("discover"); return []; } },
-    weeklyReport: { async findMany() { steps.push("mood curve"); return []; } }
+    weeklyReport: { async findMany() { steps.push("mood curve"); return []; } },
+    monthlyReport: { async findMany() { steps.push("month garden"); return []; } }
   };
   await new PrivateEventRepository({ async $transaction(fn) { return fn(tx); } }).deleteEventAndAffectedReports({ identity: { userId: "alice" }, eventId: "event-1" });
-  assert.deepEqual(steps, ["consent lock", "source lock", "event", "discover", "mood curve", "delete"]);
+  assert.deepEqual(steps, ["consent lock", "source lock", "event", "discover", "mood curve", "month garden", "delete"]);
 });
 
 test("heartbeat/completion/failure cannot act on a newer same-ID worker attempt", async () => {

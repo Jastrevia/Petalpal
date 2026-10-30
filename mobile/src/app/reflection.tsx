@@ -5,9 +5,10 @@ import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanRespo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWorldTime } from '../components/garden/world-time';
-import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
+import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, monthly2, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
 import { ShortWeeklyReport } from '../components/features/ShortWeeklyReport';
 import { PetalCollection } from '../components/features/PetalCollection';
+import { MonthlyReport2 } from '../components/features/MonthlyReport2';
 import { useAppLocale } from '../services/locale';
 
 // The shelf's books: Weekly, Monthly, the third one, notes about the reflections (safety note, disclaimers), and the
@@ -301,14 +302,20 @@ export default function Reflection() {
           left: -(bookLeft + area.left + (side === 'right' ? pageWidth : 0)), top: -(bookTop + area.top) }} />
     </View>;
 
-  // A Weekly 2.0 report is one spread of the book, without the three tabs (components/features/ShortWeeklyReport.tsx).
+  // A Weekly 2.0 report (components/features/ShortWeeklyReport.tsx) or a Monthly 2.0 one (MonthlyReport2.tsx) is one
+  // spread of the book, without the three tabs.
   const weekly2Of = (report: SavedReport | null) => {
-    const detail = report?.type === 'weekly' ? details[report.id] : null, short = detail ? shortWeekly(detail) : null;
-    return detail && short?.version2 ? { detail, short } : null;
+    const detail = report ? details[report.id] : null;
+    if (detail && report?.type === 'monthly') { const month = monthly2(detail); return month ? { detail, short: null, month } : null; }
+    const short = detail && report?.type === 'weekly' ? shortWeekly(detail) : null;
+    return detail && short?.version2 ? { detail, short, month: null } : null;
   };
   const weekly2Page = (report: SavedReport, part: 'left' | 'right' | 'all', interactive: boolean) => {
     const found = weekly2Of(report)!, label = weekLabel(report.periodKey, lang);
-    return <ShortWeeklyReport short={found.short} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
+    if (found.month) return <MonthlyReport2 month={found.month} part={part} interactive={interactive}
+      date={heading(report, lang) + (report.status === 'PARTIAL' ? t.inProgress : '')}
+      report={interactive ? <View style={{ marginTop: 8 }}><AiOutputReport kind="monthly" outputId={found.detail.id} linkStyle={s.quietLink} title={t.reportOutput} /></View> : null} />;
+    return <ShortWeeklyReport short={found.short!} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
       date={{ eyebrow: lang === 'en' ? label.title.toUpperCase() : label.title, range: label.range + (report.status === 'PARTIAL' ? t.inProgress : '') }}
       report={interactive ? <View style={{ marginTop: 8 }}><AiOutputReport kind="weekly" outputId={found.detail.id} linkStyle={s.quietLink} title={t.reportOutput} /></View> : null}
       onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
@@ -395,7 +402,7 @@ export default function Reflection() {
   function rightFace(report: SavedReport | null, interactive = false) {
     const detail = report && !notes ? details[report.id] ?? null : null, spread = notes ? null : weekly2Of(report);
     // Weekly 2.0, right page: the insights, petal card and question (blank paper until the bud is opened).
-    if (spread && report && spread.short.insights) return <View key={report.id} style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
+    if (spread && report && (spread.month || spread.short?.insights)) return <View key={report.id} style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
       {weekly2Page(report, 'right', interactive)}
     </View>;
     return <View style={{ flex: compact ? undefined : 1, minHeight: 0, alignItems: 'center', paddingLeft: compact ? 0 : 18, paddingTop: compact ? 15 : 0, paddingBottom: compact ? 0 : artHeight * .045 }}>

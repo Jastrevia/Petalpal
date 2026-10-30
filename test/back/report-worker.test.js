@@ -777,3 +777,19 @@ test('deterministic contradiction fails Weekly/Monthly before report or evidence
     assert.equal(prisma.state.weeklyReports.length, 0); assert.equal(prisma.state.monthlyReports.length, 0); assert.equal(prisma.state.evidence.length, 0);
   }
 });
+
+test("Monthly 2.0 owners: the worker writes the Monthly in code, with no provider call and no cost reservation", async () => {
+  const prisma = createReportPrisma();
+  const job = reportJob(AI_JOB_TYPES.MONTHLY_REPORT, "2026-09");
+  const worker = createProductionAiWorker({ prisma, embeddingProvider: embeddingProvider(), semanticRetrieval: semanticRetrieval(prisma),
+    reportNarrativeProvider: { async generateNarrative() { throw new Error("Monthly 2.0 must not call a provider"); } },
+    reportNarrativeTimeoutMs: 100, logger: { error() {} }, retryDelayMs: 0, env: { MONTHLY_INSIGHTS_OWNER_IDS: "*" } });
+  worker.repository = jobRepository(job, prisma);
+  const result = await worker.runOnce({ now: new Date("2026-10-02T00:00:00Z") });
+  assert.equal(result.succeeded, true, result.error?.stack);
+  const saved = prisma.state.monthlyReports[0];
+  assert.equal(saved.narrativeStatus, "GENERATED");
+  assert.equal(saved.narrativeSections[0].kind, "MONTH_HEADLINE");
+  assert.equal(saved.narrativeSections[0].reportVersion, "monthly-2.0");
+  assert.equal(saved.narrativeSections.some(section => section.kind === "MONTH_GARDEN"), true);
+});

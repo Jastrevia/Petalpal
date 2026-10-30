@@ -441,7 +441,7 @@ const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
 // One page of the book: blocks laid out once, split into pages that fit the page's height (a block never splits; a
 // block taller than the page scrolls on its own page). Other pages' blocks stay laid out but hidden, so they keep their
 // measured place; "‹ 1 / 2 ›" turns.
-function Paged({ blocks, testID, copy }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy }) {
+export function Paged({ blocks, testID, copy }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy }) {
   const [height, setHeight] = useState(0);
   // Block heights only: positions are their running sum (on the web a block's measured y is not updated when a block
   // above it changes height).

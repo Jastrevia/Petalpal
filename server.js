@@ -92,7 +92,7 @@ import {
   weeklyReportPeriodStatus
 } from "./lib/ai-periods.js";
 import { createProductionAiWorker } from "./lib/ai-worker.js";
-import { scheduleWeeklyReports } from "./lib/report-schedule.js";
+import { scheduleMonthlyReports, scheduleWeeklyReports } from "./lib/report-schedule.js";
 import {
   aiJobDispatchAllowed,
   aiJobServiceAuthorized,
@@ -375,7 +375,7 @@ app.get("/internal/ai-jobs/dispatchable", async (req, res) => {
 app.post("/internal/ai-jobs/schedule-weekly", async (req, res) => {
   if (Object.keys(req.body).length || Object.keys(req.query).length) return res.status(400).json({ error: "Invalid schedule request" });
   try {
-    const jobs = await scheduleWeeklyReports({ prisma });
+    const jobs = [...await scheduleWeeklyReports({ prisma }), ...await scheduleMonthlyReports({ prisma })];
     return res.json({ jobs: jobs.filter(job => aiJobDispatchAllowed(job)).map(job => ({ jobId: job.id })) });
   } catch {
     return res.status(503).json({ error: "Weekly schedule unavailable" });

@@ -168,6 +168,7 @@ async function fixture(t, { locale = "zh-CN", count = 4, previousCount = 1 } = {
       },
       weeklyReport: { findMany: async () => [] }, // no Weekly reports in this Monthly fixture
       monthlyReport: {
+        findMany: async () => [], // no Monthly 2.0 report shows the Event
         deleteMany: async ({ where }) => query('DELETE FROM "MonthlyReport" WHERE "ownerId"=$1 AND "id"=ANY($2)', where.ownerId, where.id.in),
         findFirst: async ({ where }) => {
           const row = report((await query('SELECT * FROM "MonthlyReport" WHERE "ownerId"=$1 AND "periodKey"=$2', where.ownerId, where.periodKey))[0]);

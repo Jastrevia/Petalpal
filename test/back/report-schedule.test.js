@@ -56,3 +56,18 @@ test("the batch cap, the owner list and a consent withdrawn in between are respe
   const withdrawn = fake({ users: users.slice(0, 2), consent: id => id !== "u0" });
   assert.deepEqual((await scheduleWeeklyReports({ prisma: withdrawn.db, now: NOW, env: { AI_WEEKLY_AUTO_SCHEDULE_OWNER_IDS: "*" } })).map(job => job.ownerId), ["u1"]);
 });
+
+test("Monthly 2.0 owners on the monthly list get last month's job from the 1st in their own timezone; others never", async () => {
+  const { scheduleMonthlyReports, monthlyScheduleOwners } = await import("../../lib/report-schedule.js");
+  assert.equal(monthlyScheduleOwners({}), null);
+  // 2026-11-01T07:30Z: already 1 November in Vancouver (00:30 PDT) and New York, still 31 October in Honolulu.
+  const now = new Date("2026-11-01T07:30:00Z");
+  const users = [{ id: "alice", timezone: "America/Vancouver" }, { id: "bob", timezone: "Pacific/Honolulu" }, { id: "carol", timezone: "America/New_York" }];
+  const run = fake({ users });
+  const jobs = await scheduleMonthlyReports({ prisma: run.db, now, env: { AI_MONTHLY_AUTO_SCHEDULE_OWNER_IDS: "*", MONTHLY_INSIGHTS_OWNER_IDS: "alice,bob" } });
+  assert.deepEqual(run.created.map(job => [job.ownerId, job.jobType, job.resourceId]).sort(), [["alice", "MONTHLY_REPORT", "2026-10"], ["bob", "MONTHLY_REPORT", "2026-09"]],
+    "carol is not on Monthly 2.0 (her Monthly would be a paid call); bob's October is not over yet");
+  assert.equal(jobs.length, 2);
+  assert.deepEqual(await scheduleMonthlyReports({ prisma: run.db, now, env: { AI_MONTHLY_AUTO_SCHEDULE_OWNER_IDS: "*", MONTHLY_INSIGHTS_OWNER_IDS: "alice,bob" } }), [], "never twice");
+  assert.deepEqual(await scheduleMonthlyReports({ prisma: fake({ users }).db, now, env: { MONTHLY_INSIGHTS_OWNER_IDS: "*" } }), [], "off by default");
+});
