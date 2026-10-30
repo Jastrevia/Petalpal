@@ -5,6 +5,8 @@ import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from '../components/garden/planting/plantingPersistence';
+import { answerQuestion } from '../services/reflections';
+import { takeAnswer } from '../services/questionAnswer';
 
 // Existing Event orchestration, kept independent of the replaceable panel.
 export function useEventJournal(onGardenChanged?: () => void) {
@@ -46,6 +48,9 @@ export function useEventJournal(onGardenChanged?: () => void) {
       const created = await createEvent(pending.current!.content, mood, pending.current!.key);
       if (!mounted.current) return;
       pending.current = null; setResult(created); setContent('');
+      // 回答问题: this Event answers the Weekly question the owner chose to answer; a failed link only loses the quote.
+      const answering = takeAnswer();
+      if (answering) void answerQuestion(answering.reportId, created.event.id).catch(() => undefined);
       // POST can omit sourceEvent. Read the owner Garden projection before showing
       // the new Flower, including already-completed emotion enrichment.
       await refresh();

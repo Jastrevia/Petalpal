@@ -31,7 +31,7 @@ test('short Weekly sections are read only from the short contract; older reports
   assert.equal(shortWeekly({ narrativeSections: [] }), null);
   const support = plain(shortWeekly({ narrativeSections: [{ kind: 'SUPPORT_RESOURCES', claim: 'You do not have to face this alone.', contractVersion: WEEKLY_SHORT, locale: 'en' }] }));
   assert.deepEqual({ ...support, support: !!support.support }, { locale: 'en', line: null, curve: null, side: null, question: null, support: true, thenAndNow: null, card: null,
-    headline: null, insights: null, version2: false });
+    headline: null, insights: null, version2: false, threads: [], answer: null, letters: [], unlock: null, cardIndex: null });
 });
 
 test('mood curve puts each day in its column, higher moods higher, and joins points in time order', () => {
@@ -85,7 +85,7 @@ test('insights: a valid main insight brings the headline and up to three more; m
     insight('secondary', 'MADE_UP'), insight('secondary', 'SAID_BEFORE', { evidence: [{ sourceEventId: 'event-0', date: 'Sep 14' }] }),
     insight('secondary', 'SMALL_GOODS', { items: [{ text: '只有一件。', sourceEventId: 'event-1' }] })]);
   assert.equal(short.headline, '写到妈妈的日子，多是亮的');
-  assert.deepEqual(short.insights.main, { index: 5, feedback: null, type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
+  assert.deepEqual(short.insights.main, { index: 5, feedback: null, subject: null, type: 'HIDDEN_LINK', text: 'HIDDEN_LINK text', fact: '这五周有 3 条记录写到“妈妈”。', items: [], quote: null,
     evidence: [{ eventId: 'event-0', date: '2026-09-14' }] });
   assert.deepEqual(short.insights.secondary.map(item => item.type), ['SMALL_GOODS', 'OPEN_QUESTION']);
   assert.deepEqual(short.insights.secondary[0].items.map(item => item.eventId), ['event-1', 'event-2']);
@@ -138,4 +138,62 @@ test('Weekly 2.0: version marker, insight marks, and a bouquet that never ranks 
   assert.ok(busy.filter(point => point.row === 1).every(point => point.lift > 0 && point.size < busy[4].size));
   assert.equal(new Set(busy.map(point => `${point.x}:${point.row}`)).size, 5, 'no two flowers in the same place');
   assert.deepEqual(Object.keys(MOOD_SPECIES).sort(), [...PRIMARY_MOODS].sort());
+});
+
+test('闭环 sections: threads, one answer, letters, the unlock line and the card index; malformed ones are skipped', () => {
+  const head = { kind: 'HEADLINE', claim: '这周的花还在长', reportVersion: 'weekly-2.0', evidenceRefs: [], ...meta };
+  const short = shortWeekly({ narrativeSections: [head,
+    { kind: 'UNLOCK', claim: '一周写下 3 条，就能看到这周的洞察。', ...meta },
+    { kind: 'THREAD', claim: '你在跟进的“跑步”：这周写到 1 次。', word: '跑步', count: 1, evidence: [{ sourceEventId: 'e1', date: '2026-09-15' }, { sourceEventId: 'e2', date: 'bad' }], ...meta },
+    { kind: 'THREAD', claim: '坏的', word: '', count: 1, evidence: [], ...meta },
+    { kind: 'ANSWER', claim: 'a', question: '下周你想留意什么？', quote: { text: '我想留意风。', sourceEventId: 'e1', date: '2026-09-15' }, ...meta },
+    { kind: 'LETTER', claim: '记得看海。', text: '记得看海。', writtenOn: '2026-08-01', ...meta },
+    { kind: 'PETAL_CARD', claim: 'x', ...meta },
+    { kind: 'QUESTION', claim: '这周有哪一刻，你想记下来？', ...meta }] });
+  assert.deepEqual(plain(short.threads), [{ word: '跑步', count: 1, claim: '你在跟进的“跑步”：这周写到 1 次。', evidence: [{ eventId: 'e1', date: '2026-09-15' }] }]);
+  assert.deepEqual(plain(short.answer), { question: '下周你想留意什么？', quote: { text: '我想留意风。', eventId: 'e1', date: '2026-09-15' } });
+  assert.deepEqual(plain(short.letters), [{ text: '记得看海。', writtenOn: '2026-08-01' }]);
+  assert.equal(short.unlock, '一周写下 3 条，就能看到这周的洞察。');
+  assert.equal(short.cardIndex, 6);
+  assert.equal(SHORT_COPY['zh-Hans'].follow, '跟进');
+});
+
+test('回答问题: the pending answer is taken once and expires after 30 minutes', () => {
+  const { startAnswer, pendingAnswer, takeAnswer, clearAnswer } = loadPlantingModules()('../../../services/questionAnswer');
+  startAnswer('w1', '问？');
+  assert.equal(pendingAnswer().reportId, 'w1');
+  assert.equal(takeAnswer().question, '问？');
+  assert.equal(takeAnswer(), null);
+  startAnswer('w2', '问？');
+  assert.equal(pendingAnswer(Date.now() + 31 * 60_000), null);
+  startAnswer('w3', '问？'); clearAnswer();
+  assert.equal(pendingAnswer(), null);
+});
+
+test('M3 insight types are read with their labels; SELF_TALK keeps no subject to follow', () => {
+  const head = { kind: 'HEADLINE', claim: '这是你第一次写到面试。', reportVersion: 'weekly-2.0', ...meta };
+  const ev = [{ sourceEventId: 'e1', date: '2026-09-15' }];
+  const short = shortWeekly({ narrativeSections: [head,
+    { kind: 'INSIGHT', type: 'FIRST_TIME', role: 'main', text: '这是你第一次写到“面试”。', subject: '面试', evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'SELF_TALK', role: 'secondary', text: '这周你写了 3 次“我是不是太……”。', subject: null, evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'RHYTHM', role: 'secondary', text: 'r', evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'BODY_SIGNAL', role: 'secondary', text: 'b', subject: '睡眠', evidence: ev, ...meta }] });
+  assert.equal(short.insights.main.type, 'FIRST_TIME');
+  assert.deepEqual(short.insights.secondary.map(item => [item.type, item.subject]), [['SELF_TALK', null], ['RHYTHM', null], ['BODY_SIGNAL', '睡眠']]);
+  assert.equal(SHORT_COPY['zh-Hans'].types.SELF_TALK, '反复的句式');
+});
+
+test('Monthly 2.0: read only with its headline version; every part checked; malformed parts skipped', () => {
+  const { monthly2 } = loadPlantingModules()('../../../services/reflections');
+  const sections = [{"kind":"MONTH_HEADLINE","reportVersion":"monthly-2.0","contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[],"claim":"写到“面试”时，这个月不一样了"},{"kind":"MONTH_GARDEN","claim":"这个月有 7 天写了记录，一共 7 条。","days":["2026-10-01","2026-10-02","2026-10-03","2026-10-04","2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-10","2026-10-11","2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20","2026-10-21","2026-10-22","2026-10-23","2026-10-24","2026-10-25","2026-10-26","2026-10-27","2026-10-28","2026-10-29","2026-10-30","2026-10-31"],"dayMoods":[{"date":"2026-10-01","mood":null},{"date":"2026-10-02","mood":"PEACEFUL_BLOOM"},{"date":"2026-10-03","mood":null},{"date":"2026-10-04","mood":null},{"date":"2026-10-05","mood":"SUNNY_BLOOM"},{"date":"2026-10-06","mood":null},{"date":"2026-10-07","mood":null},{"date":"2026-10-08","mood":null},{"date":"2026-10-09","mood":"PEACEFUL_BLOOM"},{"date":"2026-10-10","mood":null},{"date":"2026-10-11","mood":null},{"date":"2026-10-12","mood":null},{"date":"2026-10-13","mood":null},{"date":"2026-10-14","mood":null},{"date":"2026-10-15","mood":"GENTLE_BLOOM"},{"date":"2026-10-16","mood":null},{"date":"2026-10-17","mood":null},{"date":"2026-10-18","mood":null},{"date":"2026-10-19","mood":null},{"date":"2026-10-20","mood":null},{"date":"2026-10-21","mood":"SUNNY_BLOOM"},{"date":"2026-10-22","mood":null},{"date":"2026-10-23","mood":"QUIET_BLOOM"},{"date":"2026-10-24","mood":null},{"date":"2026-10-25","mood":null},{"date":"2026-10-26","mood":null},{"date":"2026-10-27","mood":"HEALING_BLOOM"},{"date":"2026-10-28","mood":null},{"date":"2026-10-29","mood":null},{"date":"2026-10-30","mood":null},{"date":"2026-10-31","mood":null}],"points":[{"date":"2026-10-02","mood":"PEACEFUL_BLOOM","sourceEventId":"o-1"},{"date":"2026-10-05","mood":"SUNNY_BLOOM","sourceEventId":"o-2"},{"date":"2026-10-09","mood":"PEACEFUL_BLOOM","sourceEventId":"o-3"},{"date":"2026-10-15","mood":"GENTLE_BLOOM","sourceEventId":"o-4"},{"date":"2026-10-21","mood":"SUNNY_BLOOM","sourceEventId":"o-5"},{"date":"2026-10-23","mood":"QUIET_BLOOM","sourceEventId":"o-6"},{"date":"2026-10-27","mood":"HEALING_BLOOM","sourceEventId":"o-7"}],"contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_SPREAD","claim":"权杖三：说过想跑步，后来也写到了 圣杯二：写到妈妈的日子，你常是温柔的 圣杯三：这周让你开心的，是很小的事。","cards":[{"periodKey":"2026-10-05","cardId":"wands-03","name":"权杖三","line":"等自己种下的东西。","headline":"说过想跑步，后来也写到了","insightType":null,"role":"start"},{"periodKey":"2026-10-12","cardId":"cups-02","name":"圣杯二","line":"","headline":"写到妈妈的日子，你常是温柔的","insightType":null,"role":"turn"},{"periodKey":"2026-10-19","cardId":"cups-03","name":"圣杯三","line":"","headline":"这周让你开心的，是很小的事。","insightType":null,"role":"now"}],"contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_CHANGE","word":"面试","numbers":[2,2,2,2],"then":{"sourceEventId":"s-2","date":"2026-09-10","quote":"准备面试到半夜。"},"now":{"sourceEventId":"o-3","date":"2026-10-09","quote":"第二轮面试，聊得很开心。"},"claim":"上个月写到“面试”的 2 条里，有 2 条是『愤怒』；这个月的 2 条里，有 2 条是『平静』。","contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_THREADS","claim":"“我想每天早上跑步。” 这个月之后有 1 条写到“跑步”。","items":[{"type":"SAID_BEFORE","keyword":"跑步","count":1,"quote":{"text":"我想每天早上跑步。","sourceEventId":"s-4","date":"2026-09-28"},"evidence":[{"sourceEventId":"o-5","date":"2026-10-21"}],"line":"这个月之后有 1 条写到“跑步”。"}],"contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_GOODS","claim":"这个月的小好事：阳光很好。 楼下的面包店送了我一块蛋糕。 早上去跑步了。 妈妈寄来了月饼。 第二轮面试，聊得很开心。 和妈妈打了电话。 喝了一杯热可可。 今天的面试很顺利。","items":[{"text":"阳光很好。","count":2,"sourceEventId":"o-3","date":"2026-10-09"},{"text":"楼下的面包店送了我一块蛋糕。","count":1,"sourceEventId":"o-7","date":"2026-10-27"},{"text":"早上去跑步了。","count":1,"sourceEventId":"o-5","date":"2026-10-21"},{"text":"妈妈寄来了月饼。","count":1,"sourceEventId":"o-4","date":"2026-10-15"},{"text":"第二轮面试，聊得很开心。","count":1,"sourceEventId":"o-3","date":"2026-10-09"},{"text":"和妈妈打了电话。","count":1,"sourceEventId":"o-2","date":"2026-10-05"},{"text":"喝了一杯热可可。","count":1,"sourceEventId":"o-2","date":"2026-10-05"},{"text":"今天的面试很顺利。","count":1,"sourceEventId":"o-1","date":"2026-10-02"}],"contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_PEOPLE","claim":"“妈妈”：2 条，其中『温柔』1 条。","people":[{"word":"妈妈","count":2,"mood":"温柔","moodCount":1,"evidence":[{"sourceEventId":"o-2","date":"2026-10-05"},{"sourceEventId":"o-4","date":"2026-10-15"}]}],"contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[]},{"kind":"MONTH_QUESTION","contractVersion":"monthly-2.0","locale":"zh-Hans","evidenceRefs":[],"aggregateRefs":[],"claim":"下个月写到“面试”的时候，你想留意什么？"}];
+  const month = monthly2({ narrativeSections: sections });
+  assert.equal(month.headline, '写到“面试”时，这个月不一样了');
+  assert.equal(month.garden.days.length, 31);
+  assert.deepEqual(plain(month.spread.map(card => card.role)), ['start', 'turn', 'now']);
+  assert.equal(month.changes[0].then.text, '准备面试到半夜。');
+  assert.equal(month.threads[0].keyword, '跑步');
+  assert(month.goods.length >= 2 && month.people.length >= 1 && month.question);
+  assert.equal(monthly2({ narrativeSections: sections.map(section => section.kind === 'MONTH_HEADLINE' ? { ...section, reportVersion: 'x' } : section) }), null);
+  const broken = monthly2({ narrativeSections: sections.map(section => section.kind === 'MONTH_CHANGE' ? { ...section, then: { quote: 'q' } } : section) });
+  assert.equal(broken.changes.length, 0);
 });

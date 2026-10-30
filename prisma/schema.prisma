@@ -61,6 +61,11 @@ model User {
   events                  Event[]
   eventMemories           EventMemory[]
   eventInsightExtractions EventInsightExtraction[]
+  insightKeeps            InsightKeep[]
+  insightThreads          InsightThread[]
+  questionAnswers         QuestionAnswer[]
+  futureLetters           FutureLetter[]
+  insightMutes            InsightMute[]
   weeklyReports           WeeklyReport[]
   monthlyReports          MonthlyReport[]
   yearlyReports           YearlyReport[]
@@ -583,6 +588,7 @@ model Event {
   owner    User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   memory   EventMemory?
   insightExtraction EventInsightExtraction?
+  questionAnswer    QuestionAnswer?
   aiJobs   AiJob[]
   evidence AiEvidence[]
   flower   Flower?
@@ -661,6 +667,81 @@ model EventInsightExtraction {
   @@index([ownerId])
 }
 
+/// Weekly 2.0 花语集 (docs/product/WEEKLY_2.0.md): an insight or petal card the owner kept. Only a pointer to that section
+/// of the saved report (no copied text), so it goes when the report goes.
+model InsightKeep {
+  id             String   @id @default(cuid())
+  ownerId        String
+  weeklyReportId String
+  sectionIndex   Int
+  kind           String   @db.VarChar(16)
+  cardId         String?  @db.VarChar(32)
+  createdAt      DateTime @default(now())
+
+  owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  weeklyReport WeeklyReport @relation(fields: [weeklyReportId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([ownerId, weeklyReportId, sectionIndex])
+  @@index([ownerId, createdAt])
+}
+
+/// Weekly 2.0 跟进线索: a word from one of the owner's insights that each later Weekly counts (at most 3 active).
+model InsightThread {
+  id          String    @id @default(cuid())
+  ownerId     String
+  word        String    @db.VarChar(64)
+  insightType String    @db.VarChar(24)
+  createdAt   DateTime  @default(now())
+  endedAt     DateTime?
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, endedAt])
+}
+
+/// Weekly 2.0 回答问题: an Event the owner wrote to answer a Weekly report's question; the next Weekly quotes it.
+model QuestionAnswer {
+  id             String   @id @default(cuid())
+  ownerId        String
+  eventId        String   @unique
+  weeklyReportId String
+  createdAt      DateTime @default(now())
+
+  owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  event        Event        @relation(fields: [eventId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  weeklyReport WeeklyReport @relation(fields: [weeklyReportId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([eventId, ownerId])
+  @@index([ownerId, weeklyReportId])
+}
+
+/// Weekly 2.0 给未来的信: one sentence the owner wrote to a later self, shown in the Weekly of the week holding deliverOn
+/// (an account-timezone local date); withdrawable until then.
+model FutureLetter {
+  id          String    @id @default(cuid())
+  ownerId     String
+  text        String    @db.VarChar(280)
+  deliverOn   String    @db.VarChar(10)
+  createdAt   DateTime  @default(now())
+  withdrawnAt DateTime?
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, deliverOn])
+}
+
+/// Weekly 2.0 屏蔽: a word (a name or topic) the owner asked insights never to use.
+model InsightMute {
+  id        String   @id @default(cuid())
+  ownerId   String
+  word      String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, word])
+}
+
 model EventMemoryEmbedding {
   eventMemoryId String
   ownerId       String
@@ -703,6 +784,8 @@ model WeeklyReport {
 
   owner    User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   evidence AiEvidence[]
+  keeps    InsightKeep[]
+  answers  QuestionAnswer[]
 
   @@unique([id, ownerId])
   @@unique([ownerId, periodKey])

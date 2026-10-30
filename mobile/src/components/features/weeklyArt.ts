@@ -13,6 +13,11 @@ export const INSIGHT_ART: Record<string, number> = {
   OPEN_QUESTION: require('@/assets/reflection/weekly/open-question.webp'),
   TREND: require('@/assets/reflection/weekly/trend.webp'),
   ECHO: require('@/assets/reflection/weekly/echo.webp'),
+  // M3: a first snowdrop, a tied sprig of chamomile and lavender, a morning glory open and closed, an unfurling fern.
+  FIRST_TIME: require('@/assets/reflection/weekly/first-time.webp'),
+  BODY_SIGNAL: require('@/assets/reflection/weekly/body-signal.webp'),
+  RHYTHM: require('@/assets/reflection/weekly/rhythm.webp'),
+  SELF_TALK: require('@/assets/reflection/weekly/self-talk.webp'),
 };
 // One painted crocus petal per mood (the same petal recoloured), for the opening bud.
 export const PETAL_ART: Record<string, number> = {
@@ -23,4 +28,5 @@ export const PETAL_ART: Record<string, number> = {
 };
 // Width / height of each picture, so a fixed height never stretches it.
 export const ART_RATIO: Record<string, number> = { ground: 1050 / 600, oneMore: 163 / 216, question: 202 / 216,
-  SAID_BEFORE: 212 / 216, HIDDEN_LINK: 174 / 216, SMALL_GOODS: 185 / 216, OPEN_QUESTION: 119 / 216, TREND: 171 / 216, ECHO: 180 / 216, petal: 75 / 150 };
+  SAID_BEFORE: 212 / 216, HIDDEN_LINK: 174 / 216, SMALL_GOODS: 185 / 216, OPEN_QUESTION: 119 / 216, TREND: 171 / 216, ECHO: 180 / 216,
+  FIRST_TIME: 173 / 216, BODY_SIGNAL: 112 / 216, RHYTHM: 179 / 216, SELF_TALK: 108 / 216, petal: 75 / 150 };
