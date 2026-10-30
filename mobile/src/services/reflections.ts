@@ -274,6 +274,19 @@ export const MONTHLY_COPY = {
     question: '给下个月的问题', days: ['一', '二', '三', '四', '五', '六', '日'], empty: '没有记录' },
 } as const;
 
+// ---- 花语年鉴 (backend lib/almanac.js): built by code when opened, never stored ----
+export interface Almanac {
+  year: number; title: string; summary: string; entries: number; daysWritten: number;
+  months: { month: string; entries: number; days: { date: string; mood: PrimaryMood | null; sourceEventId: string | null }[] }[];
+  echo: { word: string; count: number; months: number; line: string; first: { text: string; date: string; sourceEventId: string };
+    last: { text: string; date: string; sourceEventId: string } } | null;
+  firsts: { word: string; date: string; sourceEventId: string }[];
+  goods: { text: string; count: number; date: string; sourceEventId: string }[];
+  card: { cardId: string; name: string; line: string; count: number; reasons: { periodKey: string; reason: string | null }[] } | null;
+}
+export const loadAlmanacYears = (signal?: AbortSignal) => apiRequest<{ years: number[]; opensOn: string }>('/ai/almanac', 'GET', undefined, { signal });
+export const loadAlmanac = (year: number, signal?: AbortSignal) => apiRequest<Almanac>(`/ai/almanac/${year}`, 'GET', undefined, { signal });
+
 // ---- Weekly 2.0 闭环 (backend lib/insight-loop.js). Owner comes from the session; every call needs Memory on. ----
 const weeklyPath = (reportId: string) => `/ai/reports/weekly/${encodeURIComponent(reportId)}`;
 // 花语集: keep (or let go of) one insight or petal card section of the owner's report.

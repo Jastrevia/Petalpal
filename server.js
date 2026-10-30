@@ -104,6 +104,7 @@ import { PrivateEventRepository } from "./lib/ai-events.js";
 import { PrismaMemoryRepository } from "./lib/event-memory.js";
 import { PrivateReportRepository } from "./lib/report-foundation.js";
 import { InsightLoopRepository } from "./lib/insight-loop.js";
+import { AlmanacRepository } from "./lib/almanac.js";
 import { requireLockedMemoryConsent } from "./lib/semantic-retrieval.js";
 import {
   REPORT_NARRATIVE_GENERATION_VERSION,
@@ -2557,6 +2558,27 @@ app.delete("/ai/future-letters/:letterId", (req, res) => !validId(req.params.let
 app.put("/ai/insight-mutes", (req, res) => insightLoopRoute(req, res, ["word", "muted"],
   body => insightLoop.mute({ identity: req.auth, word: body.word, muted: body.muted })));
 app.get("/ai/insight-collection", (req, res) => insightLoopRoute(req, res, [], () => insightLoop.collection({ identity: req.auth })));
+
+// 花语年鉴 (lib/almanac.js): built by code when opened, never stored; owner from authentication, Memory consent required.
+const almanacs = new AlmanacRepository(prisma);
+app.get("/ai/almanac", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Unsupported request" });
+  try { return res.json(await almanacs.years({ identity: req.auth })); }
+  catch (error) {
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI processing is not currently authorized" });
+    throw error;
+  }
+});
+app.get("/ai/almanac/:year", async (req, res) => {
+  if (Object.keys(req.query).length || !/^\d{4}$/.test(req.params.year)) return res.status(400).json({ error: "Unsupported request" });
+  try { return res.json(await almanacs.almanac({ identity: req.auth, year: Number(req.params.year) })); }
+  catch (error) {
+    if (error?.code === "ALMANAC_INVALID") return res.status(400).json({ error: "Unsupported request" });
+    if (error?.code === "ALMANAC_NOT_YET") return res.status(409).json({ error: "This year's almanac opens on 25 December", code: "ALMANAC_NOT_YET" });
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI processing is not currently authorized" });
+    throw error;
+  }
+});
 
 app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
   const allowedBodyFields = new Set(["localDate"]);

@@ -168,6 +168,12 @@ trigger's target week either side of it; a last-minute Event outside the cutoff
   owner's current local month, i.e. last month from local 00:00 on the 1st; the job key is the trigger's
   (`MONTHLY_REPORT:YYYY-MM:<version>`), so a month is written once. Tests: [test/back/report-schedule.test.js](test/back/report-schedule.test.js)
   (Vancouver vs Honolulu at `2026-11-01T07:30Z`), [test/back/monthly-2.test.js](test/back/monthly-2.test.js) (`UTC`).
+- **花语年鉴** ([lib/almanac.js](lib/almanac.js)): computed on read, never stored. The year runs from local midnight on 1 January
+  (`monthlyPeriodFor({ year, month: 1 })`) to local midnight on the next 1 January; an Event belongs to the year of its
+  `localDateForInstant(occurredAt)`. The current year opens when the account-timezone local date reaches `YYYY-12-25`
+  (one clock read per request, the request time); earlier years always. Its Weeklies are those whose Monday `periodKey`
+  is in the year; a "first time" is shown on its evidence's local date. Tests: [test/back/almanac.test.js](test/back/almanac.test.js)
+  (Tokyo at `2026-12-24T14:00Z` vs `15:30Z`).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads

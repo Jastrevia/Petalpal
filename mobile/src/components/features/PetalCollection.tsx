@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { keepSection, loadCollection, setMute, SHORT_COPY, shortDate, unfollowThread, weekLabel, withdrawLetter, writeLetter,
+import { keepSection, loadAlmanacYears, loadCollection, setMute, SHORT_COPY, shortDate, unfollowThread, weekLabel, withdrawLetter, writeLetter,
   type PetalCollection as Collection } from '../../services/reflections';
 import { useAppLocale } from '../../services/locale';
+import { AlmanacView } from './AlmanacView';
 
 // The cream book on the pavilion shelf (Weekly 2.0 闭环, backend lib/insight-loop.js): every petal card the Weekly
 // reports drew with each week's "why this card" stacked, the insights the owner kept, the threads they follow, letters
 // to a later self and the words kept out of insights. Never "N more to collect". Written on the paper, no boxes.
 const COPY = {
-  en: { title: 'Petal collection', cards: 'Petal cards', kept: 'Kept', insights: 'Insights you kept', letGo: 'Let go',
+  en: { title: 'Petal collection', almanac: 'Almanac', almanacOf: (year: number) => `${year} in flowers`, cards: 'Petal cards', kept: 'Kept', insights: 'Insights you kept', letGo: 'Let go',
     threads: 'Threads you follow', threadsNote: 'Follow an insight from a Weekly reflection; each Weekly then tells you how the thread went. Up to three.',
     letters: 'Letters to a later you', letterHint: 'One sentence for a later week…', send: 'Send', withdraw: 'Withdraw',
     due: (date: string) => `Arrives the week of ${date}`, arrived: (date: string) => `Arrived ${date}`,
@@ -17,7 +18,7 @@ const COPY = {
     mutesNote: 'Insights never use these words, and lines that carry them are left out.',
     empty: 'Nothing here yet. Cards and kept insights gather here week by week.', failed: 'That didn’t save. Try again in a moment.',
     loadFailed: 'The collection can’t be opened right now.', retry: 'Try again' },
-  'zh-Hans': { title: '花语集', cards: '花语卡', kept: '已收藏', insights: '收藏的洞察', letGo: '放下',
+  'zh-Hans': { title: '花语集', almanac: '花语年鉴', almanacOf: (year: number) => `${year} 花语年鉴`, cards: '花语卡', kept: '已收藏', insights: '收藏的洞察', letGo: '放下',
     threads: '你在跟进的线', threadsNote: '在周报的洞察下点“跟进”，之后每份周报都会说说这条线的新动静。最多 3 条。',
     letters: '给未来的信', letterHint: '写一句话给之后的自己……', send: '寄出', withdraw: '撤回',
     due: (date: string) => `会在 ${date} 那周的周报里出现`, arrived: (date: string) => `已在 ${date} 送达`,
@@ -38,6 +39,10 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [note, setNote] = useState('');
   const [letter, setLetter] = useState(''), [later, setLater] = useState(1), [word, setWord] = useState('');
+  // 花语年鉴: the years that can be opened (this year's from 25 December); one open at a time, in place of the collection.
+  const [years, setYears] = useState<number[]>([]), [year, setYear] = useState<number | null>(null);
+  useEffect(() => { const controller = new AbortController();
+    loadAlmanacYears(controller.signal).then(found => setYears(found.years)).catch(() => undefined); return () => controller.abort(); }, []);
   const load = useCallback(async (signal?: AbortSignal) => {
     setState('loading');
     try { const next = await loadCollection(signal); setBook(next); setState('ready'); }
@@ -61,9 +66,14 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
       : <><Text style={c.text}>{t.loadFailed}</Text>{link(t.retry, () => void load())}</>}
   </View>;
   const empty = !book.cards.length && !book.insights.length;
+  if (year !== null) return <View style={{ flex: 1, minHeight: 0 }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 18 }}><AlmanacView year={year} onBack={() => setYear(null)} headingSize={headingSize} /></ScrollView>
+  </View>;
   return <View style={{ flex: 1, minHeight: 0 }}>
     <Text accessibilityRole="header" style={[c.title, { fontSize: headingSize }]}>{t.title}</Text>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 18 }} keyboardShouldPersistTaps="handled">
+      {years.length > 0 && <>{eyebrow(t.almanac)}
+        <View style={c.chips}>{years.map(item => <View key={item}>{link(t.almanacOf(item), () => setYear(item))}</View>)}</View>{rule}</>}
       {!!note && <Text accessibilityRole="alert" style={c.text}>{note}</Text>}
       {empty && <Text style={c.text}>{t.empty}</Text>}
       {book.cards.length > 0 && <>{eyebrow(t.cards)}
