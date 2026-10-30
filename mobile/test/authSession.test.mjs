@@ -262,6 +262,7 @@ test('Phase 1 auth gate separates loading, signed-out, verification, profile and
     'expo-router': { router: { replace: (path) => replaced.push(path) }, usePathname: () => '/' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) },
     '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },
+    '../services/deviceReset': { devVariant: false }, './features/DeviceReset': { DeviceResetButton: 'DeviceResetButton' },
     'react-native': { ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView',
       Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View',
       Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } },

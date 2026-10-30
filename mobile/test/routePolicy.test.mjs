@@ -4,7 +4,11 @@ import { loadPlantingModules } from './loadPlantingModules.mjs';
 
 function runtime(path, development = false, signedIn = true) {
   let mounts = 0; const navigation = [];
-  const react = { useEffect() {}, useState: value => [value, () => {}], useRef: current => ({ current }) };
+  const effects = [], stateWrites = [];
+  // Context reads whatever the nearest Provider above set: render() below calls a parent before its children.
+  const react = { useEffect: fn => { effects.push(fn); }, useState: value => [typeof value === 'function' ? value() : value, next => stateWrites.push(next)], useRef: current => ({ current }),
+    createContext: value => { const context = { value, Provider: ({ value: next, children }) => { context.value = next; return children; } }; return context; },
+    useContext: context => context.value };
   const Pass = ({ children }) => children;
   const Stack = Object.assign(() => { mounts++; return 'ROUTED_SCREEN'; }, { Screen: () => null });
   const NativeTabs = Object.assign(() => { mounts++; return 'ROUTED_SCREEN'; }, { Trigger: Object.assign(Pass, { Label: Pass, Icon: () => null }) });
@@ -41,7 +45,7 @@ function runtime(path, development = false, signedIn = true) {
     if (typeof element.type === 'function') return render(element.type(element.props));
     nodes.push(element); return render(element.props?.children);
   }
-  return { load, render, nodes, navigation, mounts: () => mounts };
+  return { load, render, nodes, navigation, effects, stateWrites, mounts: () => mounts };
 }
 const previews = ['/treehouse-test', '/swing-test', '/moon-bed-test', '/water-test', '/waterfall-test', '/tea-set-test', '/dev/backend-qa', '/explore',
   '/player-preview', '/flower-effects-test', '/fairy-test', '/fairy-swing-test', '/fairy-sprite-test',
@@ -57,9 +61,16 @@ test('real Garden/Fairy/history/feature/visit routes remain production-accessibl
     const r = runtime(path); assert.match(r.render(r.load('../../../app/_layout').default()), /ROUTED_SCREEN/);
   }
 });
-test('unauthenticated direct links never mount routes in development or production', () => {
-  for (const development of [false, true]) for (const path of ['/treehouse-test', '/garden-test', '/feature/fairy']) {
-    const r = runtime(path, development, false); assert.match(r.render(r.load('../../../app/_layout').default()), /INVITATION_SIGN_IN/); assert.equal(r.mounts(), 0);
+test('signed out, direct links to account or preview routes never mount and ask for an account instead', () => {
+  for (const development of [false, true]) for (const path of ['/treehouse-test', '/garden-test', '/feature/fairy', '/journal', '/mailbox', '/reflection', '/garden-history', '/visit/fixture']) {
+    const r = runtime(path, development, false); assert.doesNotMatch(r.render(r.load('../../../app/_layout').default()), /ROUTED_SCREEN/); assert.equal(r.mounts(), 0);
+    r.effects.forEach(effect => effect()); assert.equal(r.stateWrites.includes(true), true, `${path} asks for an account`);
+  }
+});
+test('guest mode opens only the Garden and the treehouse, and shows no sign-in form until asked', () => {
+  for (const path of ['/', '/bookhouse']) {
+    const r = runtime(path, false, false), page = r.render(r.load('../../../app/_layout').default());
+    assert.match(page, /ROUTED_SCREEN/); assert.doesNotMatch(page, /INVITATION_SIGN_IN/);
   }
 });
 test('unknown and nested preview paths fail closed; no preview fixtures in production catalog', () => {

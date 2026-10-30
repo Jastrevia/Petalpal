@@ -58,7 +58,9 @@
     "test:phone": "node ./scripts/phone-smoke.mjs",
     "lint": "expo lint",
     "test:integration": "node --test test/applicationIntegration.test.mjs",
-    "build:web": "expo export --platform web"
+    "build:web": "expo export --platform web",
+    "ios:device": "node ./scripts/ios-device.mjs --env development --configuration Debug",
+    "ios:device:release": "node ./scripts/ios-device.mjs --env usability-test --configuration Release"
   },
   "private": true
 }

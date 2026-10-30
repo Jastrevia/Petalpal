@@ -13,6 +13,8 @@ import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlower
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GuestContext, type Guest } from '../services/guest';
+import { devVariant } from '../services/deviceReset';
+import { DeviceResetButton } from './features/DeviceReset';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -98,7 +100,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         try { await auth.login(address, secret); } finally { setInvitationSignIn(false); }
       }}
       onForgotPassword={auth.resetPassword}
-      authError={auth.error} authMessage={auth.message} footer={<PrivacyLinks />} />{backToGarden}</View>);
+      authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />{backToGarden}</View>);
   }
   if (auth.loading) return <View style={styles.loading}>
     <ActivityIndicator color="#365b42" accessibilityLabel="Loading session" />

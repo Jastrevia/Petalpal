@@ -1,3 +1,5 @@
+import { devVariant } from '../../services/deviceReset';
+import { DeviceResetButton } from './DeviceReset';
 import { PrivacyAndSupport } from './PrivacyAndSupport';
 import { AiPrivacySettings } from './AiPrivacySettings';
 import { ReportLanguageSettings } from './ReportLanguageSettings';
@@ -144,6 +146,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
       catch { setError(copy.signOutFailed); }
       finally { setBusy(false); }
     }} />
+    {devVariant ? <DeviceResetButton /> : null}
   </View>;
   const message = (locale === 'zh-Hans' ? messagesZh : messages)[feature.id]
     || (locale === 'zh-Hans' ? ['花园里的新角落', '这个功能暂时还不能用。'] : ['A new corner of your Garden', 'This feature is not available yet.']);
