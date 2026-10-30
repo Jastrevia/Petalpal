@@ -86,11 +86,13 @@ import {
   localDateForInstant,
   monthlyPeriodFor,
   previousMonthlyPeriod,
-  previousWeeklyPeriod,
   reportPeriodStatus,
-  weeklyPeriodForLocalDate
+  latestReadyWeeklyPeriod,
+  weeklyPeriodForLocalDate,
+  weeklyReportPeriodStatus
 } from "./lib/ai-periods.js";
 import { createProductionAiWorker } from "./lib/ai-worker.js";
+import { scheduleWeeklyReports } from "./lib/report-schedule.js";
 import {
   aiJobDispatchAllowed,
   aiJobServiceAuthorized,
@@ -366,6 +368,16 @@ app.get("/internal/ai-jobs/dispatchable", async (req, res) => {
     return res.json({ jobs: await listDispatchableAiJobs(prisma) });
   } catch {
     return res.status(503).json({ error: "Dispatch reconciliation unavailable" });
+  }
+});
+// Weekly reports written by the server from Sunday 23:59 local (lib/report-schedule.js); the cron sends the jobs on.
+app.post("/internal/ai-jobs/schedule-weekly", async (req, res) => {
+  if (Object.keys(req.body).length || Object.keys(req.query).length) return res.status(400).json({ error: "Invalid schedule request" });
+  try {
+    const jobs = await scheduleWeeklyReports({ prisma });
+    return res.json({ jobs: jobs.filter(job => aiJobDispatchAllowed(job)).map(job => ({ jobId: job.id })) });
+  } catch {
+    return res.status(503).json({ error: "Weekly schedule unavailable" });
   }
 });
 app.post("/internal/ai-jobs/:id/execute", async (req, res) => {
@@ -2489,6 +2501,25 @@ app.get("/ai/reports/:reportType/:reportId", async (req, res) => {
   }
 });
 
+// Weekly 2.0: the owner marks one insight of their own Weekly report "INACCURATE" or "HIDDEN" (null clears it).
+app.post("/ai/reports/weekly/:reportId/insights/:index/feedback", async (req, res) => {
+  const index = /^\d{1,2}$/.test(req.params.index) ? Number(req.params.index) : -1;
+  if (!validId(req.params.reportId) || Object.keys(req.query).length || Object.keys(req.body ?? {}).some(key => key !== "verdict")
+      || !Object.hasOwn(req.body ?? {}, "verdict")) {
+    return res.status(400).json({ error: "Send only the verdict for one insight of your Weekly report" });
+  }
+  try {
+    const sections = await new PrivateReportRepository(prisma).setWeeklyInsightFeedback({ identity: req.auth,
+      reportId: req.params.reportId, index, verdict: req.body.verdict });
+    if (!sections) return res.status(404).json({ error: "Insight not found" });
+    return res.json({ narrativeSections: sections });
+  } catch (error) {
+    if (error?.code === "INSIGHT_FEEDBACK_INVALID") return res.status(400).json({ error: "Send only the verdict for one insight of your Weekly report" });
+    if (error?.code === "AI_FORBIDDEN") return res.status(403).json({ error: "AI processing is not currently authorized" });
+    throw error;
+  }
+});
+
 app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
   const allowedBodyFields = new Set(["localDate"]);
   if (Object.keys(req.body).some((field) => !allowedBodyFields.has(field)) || Object.keys(req.query).length > 0) {
@@ -2506,10 +2537,11 @@ app.post("/ai/reports/weekly/trigger", aiRateLimit, async (req, res) => {
     const now = new Date();
     let period;
     try {
+      // From Sunday 23:59 local the trigger writes this week; before then, last week (time.md §3).
       period = req.body.localDate === undefined
-        ? previousWeeklyPeriod(weeklyPeriodForLocalDate(localDateForInstant(now, owner.timezone), owner.timezone))
+        ? latestReadyWeeklyPeriod(now, owner.timezone)
         : weeklyPeriodForLocalDate(req.body.localDate, owner.timezone);
-      reportPeriodStatus(period.periodEndUtc, now);
+      weeklyReportPeriodStatus(period, now);
     } catch (error) {
       return res.status(400).json({ error: error.message });
     }

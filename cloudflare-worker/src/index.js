@@ -464,6 +464,17 @@ export default {
     for (const message of batch.messages) await executeQueuedJob(message, env);
   },
   async scheduled(_event, env) {
+    // Weekly reports the server writes from Sunday 23:59 local (off unless the backend's owner list is set).
+    const schedule = await fetch(executorUrl(env, "/internal/ai-jobs/schedule-weekly"), {
+      method: "POST", headers: { Authorization: `Bearer ${env.AI_JOB_EXECUTOR_TOKEN}`, "Content-Type": "application/json" },
+      body: "{}", signal: AbortSignal.timeout(120_000)
+    });
+    if (schedule.ok) {
+      const scheduled = await schedule.json();
+      if (Array.isArray(scheduled?.jobs) && scheduled.jobs.length <= 25 && scheduled.jobs.every(job => validJobEnvelope(job))) {
+        for (const job of scheduled.jobs) await env.AI_JOB_QUEUE.send({ jobId: job.jobId });
+      }
+    }
     const response = await fetch(executorUrl(env, "/internal/ai-jobs/dispatchable"), {
       headers: { Authorization: `Bearer ${env.AI_JOB_EXECUTOR_TOKEN}` },
       signal: AbortSignal.timeout(120_000)

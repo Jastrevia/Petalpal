@@ -60,6 +60,7 @@ model User {
   dailyFlowerQuotas       DailyFlowerQuota[]
   events                  Event[]
   eventMemories           EventMemory[]
+  eventInsightExtractions EventInsightExtraction[]
   weeklyReports           WeeklyReport[]
   monthlyReports          MonthlyReport[]
   yearlyReports           YearlyReport[]
@@ -581,6 +582,7 @@ model Event {
 
   owner    User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   memory   EventMemory?
+  insightExtraction EventInsightExtraction?
   aiJobs   AiJob[]
   evidence AiEvidence[]
   flower   Flower?
@@ -633,6 +635,30 @@ model EventMemory {
   @@unique([id, ownerId])
   @@index([ownerId, eventDate])
   @@index([ownerId, memoryType])
+}
+
+/// Weekly 2.0 fact spans for one Event (lib/insight-extract.js; docs/product/WEEKLY_2.0.md): people,
+/// places, activities, plans, own questions, self-talk, body signals and small good things, each with
+/// the exact text and its [start, end) offsets in Event.content. Made once per Event (Haiku through the
+/// AI Gateway when configured, else code rules); goes with the Event and the account.
+model EventInsightExtraction {
+  id                String   @id @default(cuid())
+  ownerId           String
+  sourceEventId     String   @unique
+  extractionVersion String   @db.VarChar(32)
+  status            String   @db.VarChar(16)
+  sensitive         Boolean  @default(false)
+  spans             Json     @default("[]")
+  model             String?  @db.VarChar(64)
+  sourceUpdatedAt   DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner       User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceEvent Event @relation(fields: [sourceEventId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([sourceEventId, ownerId])
+  @@index([ownerId])
 }
 
 model EventMemoryEmbedding {
@@ -856,6 +882,7 @@ enum AIJobType {
   EMBEDDING_GENERATION
   WEEKLY_REPORT
   MONTHLY_REPORT
+  INSIGHT_EXTRACTION
 }
 
 enum AIJobStatus {

@@ -67,15 +67,20 @@ executor claims it; it does not wait for any period boundary.
   (`AI_WEEK_START = "MONDAY"`). `periodKey` is the Monday's local date
   (`YYYY-MM-DD`). `periodStartUtc`/`periodEndUtc` are those local midnights
   converted to UTC (`localMidnightToUtc`); the end is exclusive.
-- **Complete vs open:** `reportPeriodStatus(periodEndUtc, asOf)` returns
-  `COMPLETE` when `periodEndUtc ≤ asOf`. Otherwise it throws
-  `AI_REPORT_PERIOD_OPEN` ("Production AI reports may only be generated for
-  closed periods"). `allowPartial` exists in the helper but no production
-  caller passes it.
-- **Which week the trigger targets:** without a body it targets the **previous**
-  week relative to the current local date
-  (`previousWeeklyPeriod(weeklyPeriodForLocalDate(today))`). With
-  `{ "localDate": "YYYY-MM-DD" }` it targets the week containing that date.
+- **Ready from Sunday 23:59 (owner decision 2026-10-29):** a Weekly may be written from one minute before its
+  week ends: `weeklyReadyAt(period) = periodEndUtc − 60 s`, i.e. Sunday 23:59 in the account timezone (DST weeks
+  included, since `periodEndUtc` is already the local Monday midnight). `weeklyReportPeriodStatus(period, asOf)`
+  returns `COMPLETE` from then and otherwise throws `AI_REPORT_PERIOD_OPEN`. Monthly keeps the plain closed-period
+  rule `reportPeriodStatus(periodEndUtc, asOf)`. `allowPartial` exists in the helper but no production caller passes it.
+- **The week's boundaries do not move.** A report written before Monday 00:00 reads this week's Events only up to its
+  own moment (`weeklySourceEnd(period, asOf)`, saved as `sourceFence.cutoffUtc`), and its write fence checks the same
+  range, so an Event saved in that last minute while the report is being written never makes it stale. Such an Event
+  still belongs to the week; it is simply not in a report written before it. Deleting it removes a report only if the
+  report shows it (`reportShowsEvent`).
+- **Which week the trigger targets:** without a body, the newest ready week (`latestReadyWeeklyPeriod(now, tz)`):
+  this week from Sunday 23:59 local, otherwise last week. With
+  `{ "localDate": "YYYY-MM-DD" }` it targets the week containing that date. The app's `lastClosedWeekKey`
+  (`mobile/src/services/reflections.ts`) uses the same Sunday 23:59 rule on the device clock.
   The only accepted body field is `localDate`; the owner comes from
   authentication. An open period returns **400** before any consent check or
   job creation.
@@ -94,6 +99,9 @@ executor claims it; it does not wait for any period boundary.
 **TESTED BEHAVIOR:** Sunday→Monday boundary and contiguous weeks; the 167-hour
 2026-03-08 Vancouver spring-forward week; open-period rejection and `PARTIAL`
 only with `allowPartial` ([test/back/ai-p0.integration.test.js](test/back/ai-p0.integration.test.js)).
+Ready at Sunday 23:59:00 and not at 23:58:59 in Vancouver, including the fall-back and spring-forward weeks; the
+trigger's target week either side of it; a last-minute Event outside the cutoff
+([test/back/weekly-ready.test.js](test/back/weekly-ready.test.js)).
 
 ### Short Weekly report mood curve (opt-in `weekly-short-v1`, default OFF)
 
@@ -117,7 +125,23 @@ only with `allowPartial` ([test/back/ai-p0.integration.test.js](test/back/ai-p0.
   steps, so DST weeks stay exact). A pair's two Events are at least 7 × 24 hours apart by
   `occurredAt`; dates shown are each Event's account-timezone local date. The source fence
   widens to the same window for this contract only. Event deletion looks at short reports whose
-  period ends after the Event and starts up to 35 days later.
+  period ends after the Event (a Weekly 2.0 time echo can quote an Event from up to a year before); each is deleted only
+  if it actually shows the Event (`reportShowsEvent`).
+
+- **Weekly 2.0** (opt-in `WEEKLY_INSIGHTS_OWNER_IDS`, [lib/insight-compute.js](lib/insight-compute.js),
+  [docs/product/WEEKLY_2.0.md](docs/product/WEEKLY_2.0.md)): read the same five-week source fence as
+  "then and now" (no new window). An Event's week index (0 this week, 1–4 earlier) compares its account-timezone
+  local date with the Monday `periodKey`s reached by four `previousWeeklyPeriod` steps, so DST weeks stay exact; it
+  only weights freshness. "Later" and "after" mean a later `occurredAt`; an open question counts as answered only by
+  an Event before `periodEndUtc`. Evidence dates shown are local dates. No clock read, no new boundary, trigger or
+  idempotency key. "Last week's main insight" is the saved report of `previousWeeklyPeriod` (its `HEADLINE.insightType`).
+  The per-Event extraction (`EventInsightExtraction`) is not time-based: it runs once after the Event's memory is saved,
+  and is used only while the Event text is unchanged; `sourceUpdatedAt` is stored for that check, never compared with a
+  clock. The backfill script's default `since` (90 days before now) only chooses which Events to queue.
+  **Time echo** (`lib/insight-echo.js`): this week's Events against the owner's Events from up to 365 days before the
+  week starts, each pair at least 30 × 24 hours apart by `occurredAt`; dates shown are local dates. An earlier Event
+  outside the five-week window is added to the fence by id (`sourceFence.echoSources`). IMPLEMENTED; the
+  unit tests run in `UTC` only ([test/back/weekly-2.test.js](test/back/weekly-2.test.js)).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads
@@ -308,10 +332,14 @@ capability exists. Treat those variables as inert.
 - **Memory, hosted TEST:** NOT SUPPORTED. Manual mode, and the TEST guard
   forbids dispatch and executor credentials; only the owner-run one-shot
   runner executes memory jobs.
-- **Weekly/Monthly scheduling:** NOT SUPPORTED anywhere. The cron only
-  re-dispatches existing jobs. Weekly jobs are created only by the
-  authenticated `POST /ai/reports/weekly/trigger` and Monthly jobs only by
-  `POST /ai/reports/monthly/trigger` (§4).
+- **Weekly scheduling (IMPLEMENTED, off by default):** the production cron first calls
+  `POST /internal/ai-jobs/schedule-weekly` (executor token), which queues one WEEKLY_REPORT job per consenting owner
+  on `AI_WEEKLY_AUTO_SCHEDULE_OWNER_IDS` (ids or `*`) whose newest ready week (Sunday 23:59 local) has no job yet,
+  at most 25 per run, with the trigger's own job key, so the trigger and the schedule never write a week twice
+  ([lib/report-schedule.js](lib/report-schedule.js), [test/back/report-schedule.test.js](test/back/report-schedule.test.js)).
+  The cron sends those jobs to the Queue, then re-dispatches as before. With a 20-minute cron a report is written
+  within about 20 minutes after Sunday 23:59 (or when the owner opens the book, whichever is first).
+- **Monthly scheduling:** NOT SUPPORTED. Monthly jobs are created only by `POST /ai/reports/monthly/trigger` (§4).
 
 ## 7. Developer time simulation — PROPOSED (not implemented)
 

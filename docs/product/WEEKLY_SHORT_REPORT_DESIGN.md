@@ -21,6 +21,7 @@ model interpreting feelings. Fewer model-written words also means less "AI voice
 | Then and now | Retrieval + code | An earlier entry about the same thing (≥ 7 days apart), both exact quotes in date order; only factual counts ("the third time this month you wrote about not sleeping") |
 | A question for you | Model, 1 sentence | A question, never advice; its button starts a new Event |
 | Petal card (optional, built 2026-10-21, `PETAL_CARDS_OWNER_IDS`) | Code only, after the mood curve | [PETAL_CARDS_DESIGN.md](PETAL_CARDS_DESIGN.md) |
+| Weekly 2.0 (optional, built 2026-10-29, `WEEKLY_INSIGHTS_OWNER_IDS`) | Code finds, model phrases, code verifies | Replaces the line of the week and "side by side" with a headline and up to four fact-based insight cards: [WEEKLY_2.0.md](WEEKLY_2.0.md) |
 
 Mood curve levels (display only, never shown as labels): Sunny high; Peaceful, Gentle, Wonder,
 Healing middle; Quiet, Drifting, Fire low. Points are the user's own flowers.
@@ -60,7 +61,9 @@ Enable with `AI_WEEKLY_REFLECTION_CONTRACT=weekly-short-v1` (Sonnet provider). C
 
 Open items for the owner:
 
-- zh-Hans mood names confirmed by the owner (2026-10-20): 晴朗 平静 温柔 好奇 疗愈 安静 迷茫 火焰.
+- zh-Hans mood names (owner, 2026-10-29: what each mood really means, the same on the Events screen, in reports and in the Garden):
+  开心 平静 温柔 好奇 治愈 低落 迷茫 愤怒 (Sunny, Peaceful, Gentle, Wonder, Healing, Quiet, Drifting, Fire).
+  Earlier saved reports keep the names they were written with (晴朗 平静 温柔 好奇 疗愈 安静 迷茫 火焰).
 - A week with fewer than two selectable Events stays "insufficient evidence" (no curve-only report yet).
 - Hosted TEST only allows the v2 contract (`lib/integration-environment.js`); live acceptance needs that
   gate widened under a separately approved task, then paid inference approval.
