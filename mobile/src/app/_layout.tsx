@@ -13,6 +13,8 @@ import AppTabs from '@/components/app-tabs';
 import { FeedbackDraftProvider, GlobalHelpFeedback } from '../components/feedback';
 import { WorldTimeProvider } from '@/components/garden/world-time';
 import { keepWebPageInPlace } from '../services/webPageGuard';
+import { guestRouteAllowed, useGuest } from '../services/guest';
+import { useEffect } from 'react';
 
 // Partner login/entrance preview host: DEV-only, so production keeps its plain Stack.
 const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> = __DEV__
@@ -32,6 +34,11 @@ export default function Layout() {
 
 function RoutedContent() {
   const pathname = usePathname();
+  const guest = useGuest();
+  // A guest who reaches an account page (a link, a notification) is asked for an account instead of seeing it.
+  const blocked = Boolean(guest) && !guestRouteAllowed(pathname);
+  useEffect(() => { if (blocked) guest?.requestAccount(); }, [blocked, guest]);
+  if (blocked) return null;
   return <ProductionRouteGate pathname={pathname}><TabLayout /></ProductionRouteGate>;
 }
 

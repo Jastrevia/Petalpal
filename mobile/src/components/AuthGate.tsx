@@ -10,6 +10,9 @@ import { LoginPreviewPage } from './auth/LoginPreviewPage';
 import { AVATAR_IDS, DEFAULT_AVATAR } from './avatars/avatarArt';
 import { UserAvatar } from './avatars/UserAvatar';
 import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
+import { router, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GuestContext, type Guest } from '../services/guest';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -24,6 +27,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Sign-in from the invitation page keeps that page on screen while the account opens.
   const [invitationSignIn, setInvitationSignIn] = useState(false);
   const busy = useRef(false);
+  // Guest mode: signed out, the Garden opens first; the sign-in / create-account pages show only once the guest
+  // reaches something that needs an account (or taps a nav item), with a way back to the Garden.
+  const [accountScreen, setAccountScreen] = useState(false);
+  const guest = useRef<Guest>({ requestAccount: () => setAccountScreen(true) }).current;
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const checkVerification = useRef(auth.checkVerification);
   checkVerification.current = auth.checkVerification;
 
@@ -68,16 +77,28 @@ export function AuthGate({ children }: { children: ReactNode }) {
   </View>;
 
   if (auth.phase === 'signedIn' && auth.session) return <>{children}</>;
+  const guestMode = auth.phase === 'signedOut' && !auth.loading && !(auth.identity && auth.error);
+  // From guest mode the account pages lie over the Garden, which stays loaded underneath for the way back (the tree
+  // around `children` is the same with or without the page, so React keeps the Garden mounted).
+  const overGarden = (page: ReactNode) => guestMode ? <GuestContext.Provider value={guest}><View style={{ flex: 1 }}>
+    {children}{page ? <View style={StyleSheet.absoluteFill}>{page}</View> : null}</View></GuestContext.Provider> : page;
+  if (guestMode && !accountScreen) return overGarden(null);
+  // Only while signing in or creating an account from guest mode; verification and profile steps keep the card.
+  const backToGarden = mode === 'signIn' || mode === 'register' ? (auth.phase === 'signedOut' && !working ? <Pressable accessibilityRole="button"
+    accessibilityLabel="Back to the Garden" hitSlop={12} onPress={() => { setAccountScreen(false); setMode('signIn'); if (pathname !== '/') router.replace('/'); }}
+    style={[styles.backToGarden, { top: insets.top + 10, left: insets.left + 12 }]}>
+    <Text style={styles.backToGardenText}>‹ {/^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale) ? '回到花园' : 'Back to the Garden'}</Text>
+  </Pressable> : null) : null;
   // Signed out: the partner's invitation card is the sign-in screen (real Firebase sign-in).
   // Registration, verification, profile and session-retry keep the card below.
   if (mode === 'signIn' && (auth.phase === 'signedOut' || (invitationSignIn && auth.loading)) && !(auth.identity && auth.error)) {
-    return <LoginPreviewPage onCreateAccount={() => { setMode('register'); setPassword(''); setConfirmation(''); }}
+    return overGarden(<View style={{ flex: 1 }}><LoginPreviewPage onCreateAccount={() => { setMode('register'); setPassword(''); setConfirmation(''); }}
       onSignIn={async (address, secret) => {
         setInvitationSignIn(true);
         try { await auth.login(address, secret); } finally { setInvitationSignIn(false); }
       }}
       onForgotPassword={auth.resetPassword}
-      authError={auth.error} authMessage={auth.message} footer={<PrivacyLinks />} />;
+      authError={auth.error} authMessage={auth.message} footer={<PrivacyLinks />} />{backToGarden}</View>);
   }
   if (auth.loading) return <View style={styles.loading}>
     <ActivityIndicator color="#365b42" accessibilityLabel="Loading session" />
@@ -87,7 +108,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const verification = auth.phase === 'verificationPending';
   const profile = auth.phase === 'profileRequired';
   const registering = mode === 'register';
-  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  return overGarden(<KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page}>
       <View style={styles.card} testID="auth-card">
         <Text style={styles.brand}>PetalPal</Text>
@@ -134,10 +155,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <PrivacyLinks />
       </View>
     </ScrollView>
-  </KeyboardAvoidingView>;
+    {backToGarden}
+  </KeyboardAvoidingView>);
 }
 
 const styles = StyleSheet.create({
+  backToGarden: { position: 'absolute', zIndex: 50, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
+  backToGardenText: { fontFamily: 'serif', fontSize: 15, color: '#254E46' },
   root: { flex: 1, backgroundColor: '#eff4e9' },
   loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },
   page: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.four },

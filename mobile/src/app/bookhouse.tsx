@@ -15,6 +15,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { boundCamera, focusCamera, zoomCamera, type ShelfCamera } from '../components/bookhouse/shelfCamera';
 import { EngravedYear, ShelfMotif } from '../components/bookhouse/EngravedYear';
 import { useAuth } from '../services/auth';
+import { useGuest } from '../services/guest';
 import { daysInMonth, journalYears, MONTHS, monthKey, openableMonths, readJournals, savePrivateJournal, updatePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
 import { readEvent } from '../services/events';
 import { loadGardenPlacements } from '../components/garden/planting/gardenHydration';
@@ -29,6 +30,9 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 
 export default function Bookhouse() {
   const { session } = useAuth();
+  // Guest mode (services/guest.tsx): the treehouse is to look at; writing or reading history asks for an account.
+  const guest = useGuest();
+  const needsAccount = () => { if (session || !guest) return false; guest.requestAccount(); return true; };
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
@@ -266,7 +270,7 @@ export default function Bookhouse() {
                   selectedEntry?.journal ? null :
                   month && isToday(month.year, month.month, day) ? <View style={{ marginTop: 20, gap: 8, alignItems: 'flex-start' }}>
                     <Text style={[s.body, { color: '#725C42' }]}>Nothing written today yet.</Text>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => setEditor({ text: '' })} style={s.smallButton}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => needsAccount() || setEditor({ text: '' })} style={s.smallButton}>
                       <Text style={[s.body, { color: '#5B3F26', textDecorationLine: 'underline' }]}>Write today’s journal  →</Text></Pressable>
                   </View> :
                   <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.'}</Text>}
@@ -284,7 +288,7 @@ export default function Bookhouse() {
               style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '13%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
               <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Read in full ⤢</Text></Pressable>}
             {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Edit this journal"
-              onPress={() => setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content })}
+              onPress={() => needsAccount() || setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content })}
               style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '32%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
               <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Edit ✎</Text></Pressable>}
             {month && <View style={s.tabs}>{MONTHS.map((label, i) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Read ${label} ${month.year}`}
@@ -307,8 +311,8 @@ export default function Bookhouse() {
             </Pressable>)}</ScrollView>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
           <View style={s.actions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => setEditor({ text: '' })} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Flower History" onPress={() => setHistory(true)} style={s.action}><BookhouseArt index={14} width={45} height={52} /><Text style={s.actionText}>Flower{ '\n' }History  →</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => needsAccount() || setEditor({ text: '' })} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Flower History" onPress={() => needsAccount() || setHistory(true)} style={s.action}><BookhouseArt index={14} width={45} height={52} /><Text style={s.actionText}>Flower{ '\n' }History  →</Text></Pressable>
           </View>
         </View>
         </Animated.View>
