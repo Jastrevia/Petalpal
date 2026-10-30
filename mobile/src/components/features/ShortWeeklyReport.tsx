@@ -56,17 +56,19 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   const [kept, setKept] = useState<Set<number>>(new Set());
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [loopNote, setLoopNote] = useState<{ index: number; text: string } | null>(null);
+  // Keyed by plain values: the parent rebuilds `short` on every render.
+  const cardIndex = short.cardIndex, cardId = short.card?.id ?? null;
   useEffect(() => {
     if (!canMark) return;
     const controller = new AbortController();
     loadCollection(controller.signal).then(book => {
       setKept(new Set([...book.insights.filter(item => item.reportId === reportId).map(item => item.index),
-        ...(short.cardIndex !== null && short.card && book.cards.some(card => card.cardId === short.card!.id && card.kept &&
-          card.appearances.some(item => item.reportId === reportId)) ? [short.cardIndex] : [])]));
+        ...(cardIndex !== null && cardId && book.cards.some(card => card.cardId === cardId && card.kept &&
+          card.appearances.some(item => item.reportId === reportId)) ? [cardIndex] : [])]));
       setFollowed(new Set(book.threads.map(thread => thread.word)));
     }).catch(() => undefined);
     return () => controller.abort();
-  }, [canMark, reportId, short.cardIndex, short.card]);
+  }, [canMark, reportId, cardIndex, cardId]);
   async function keep(index: number) {
     if (!reportId) return;
     const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); on ? copy.add(index) : copy.delete(index); return copy; });

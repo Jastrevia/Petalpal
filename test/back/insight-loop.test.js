@@ -226,3 +226,13 @@ test("不准确 summary: per-type counts only, no text or ids", async () => {
     TREND: { shown: 1, main: 1, template: 0, inaccurate: 0, hidden: 0, inaccurateRate: 0 } });
   assert.equal(JSON.stringify(summary).includes("私密"), false);
 });
+
+test("letters: an impossible date is a 400, and twenty delivered letters never crowd out a new one", async () => {
+  const { loop } = seeded();
+  await assert.rejects(loop.writeLetter({ identity: alice, text: "hi", deliverOn: "2026-13-45" }), { code: "INSIGHT_LOOP_INVALID" });
+  const db = fakeDb();
+  for (let i = 0; i < 25; i++) db.tables.futureLetter.push({ id: `old-${i}`, ownerId: "alice", text: "old", deliverOn: `2025-0${1 + (i % 8)}-1${i % 9}`, withdrawnAt: null, createdAt: new Date("2025-01-01") });
+  db.tables.futureLetter.push({ id: "new", ownerId: "alice", text: "new", deliverOn: "2026-09-16", withdrawnAt: null, createdAt: new Date("2026-08-01") });
+  const context = await weeklyLoopContext(db.prisma, "alice", PERIOD, []);
+  assert.deepEqual(context.letters.map(letter => letter.id), ["new"]);
+});

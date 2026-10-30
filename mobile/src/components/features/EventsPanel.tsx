@@ -84,7 +84,8 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
     </View> : null}
     <EmotionalSafetyNote text={journal.content} />
 
-    {answering && !saved ? <View style={styles.answering}>
+    {/* Re-read: saving the answer takes it, so the next Event is not shown as an answer. */}
+    {answering && !saved && pendingAnswer() ? <View style={styles.answering}>
       <Text style={styles.text}>{copy.answering(answering.question)}</Text>
       <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { clearAnswer(); setAnswering(null); }}>
         <Text style={styles.answeringDrop}>{copy.notAnswering}</Text>
