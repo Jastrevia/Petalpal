@@ -63,12 +63,17 @@ test('Weekly reflections are named by week of month and the last closed week is 
   const service = load('../../../services/reflections');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 19, 10)), '2026-10-12', 'Monday: the week that just ended');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23)), '2026-10-05', 'Sunday: the current week is still open');
+  assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23, 58, 59)), '2026-10-05', 'Sunday 23:58: not yet');
+  assert.equal(service.lastClosedWeekKey(new Date(2026, 9, 18, 23, 59)), '2026-10-12', 'Sunday 23:59: this week can be written');
   assert.equal(service.lastClosedWeekKey(new Date(2026, 10, 2, 0, 5)), '2026-10-26');
   assert.deepEqual({ ...service.weekLabel('2026-10-12') }, { title: 'October · Week 2', chip: 'Oct · Week 2', range: 'Oct 12 – 18' });
   assert.deepEqual({ ...service.weekLabel('2026-09-28') }, { title: 'September · Week 4', chip: 'Sep · Week 4', range: 'Sep 28 – Oct 4' });
   assert.equal(service.weekLabel('2026-10-05').title, 'October · Week 1');
   assert.equal(service.weekLabel('2026-03-30').title, 'March · Week 5');
   assert.equal(service.weekLabel('not-a-date').title, 'not-a-date');
+  // Chinese readers get Chinese labels (the app language, not the report's).
+  assert.deepEqual({ ...service.weekLabel('2026-10-12', 'zh-Hans') }, { title: '10月 · 第2周', chip: '10月 · 第2周', range: '10月12日 – 18日' });
+  assert.equal(service.weekLabel('2026-09-28', 'zh-Hans').range, '9月28日 – 10月4日');
 });
 
 test('Create last month POSTs an empty body to the Monthly trigger and words outcomes by month', async () => {
@@ -88,6 +93,9 @@ test('Create last month POSTs an empty body to the Monthly trigger and words out
   assert.equal(service.weeklyTriggerOutcome({ ...ready, report: null }, undefined, 'month').message,
     'Last month didn’t have enough moments for a written reflection.');
   assert.equal(service.weeklyTriggerOutcome(ready).message, 'Last week’s reflection is ready.', 'Weekly wording is unchanged');
+  assert.equal(service.weeklyTriggerOutcome(ready, undefined, 'week', 'zh-Hans').message, '上周的周报写好了。');
+  assert.equal(service.weeklyTriggerOutcome(undefined, new Error('Server said no'), 'month', 'zh-Hans').message, '上个月的月报没能写出来。',
+    'the server’s English message is not shown to Chinese readers');
   assert.equal(service.lastClosedMonthKey(new Date(2026, 9, 26)), '2026-09');
   assert.equal(service.lastClosedMonthKey(new Date(2027, 0, 1, 0, 5)), '2026-12');
 });

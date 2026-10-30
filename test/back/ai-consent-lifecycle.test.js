@@ -20,6 +20,7 @@ async function fixture(t){
  CREATE TABLE "EventMemoryEmbedding" ("eventMemoryId" text,"ownerId" text,"embedding" text,FOREIGN KEY("eventMemoryId","ownerId") REFERENCES "EventMemory" ON DELETE CASCADE);
  CREATE TABLE "WeeklyReport" ("id" text,"ownerId" text,"summary" text,PRIMARY KEY("id","ownerId"));
  CREATE TABLE "MonthlyReport" (LIKE "WeeklyReport" INCLUDING ALL);CREATE TABLE "YearlyReport" (LIKE "WeeklyReport" INCLUDING ALL);
+ CREATE TABLE "EventInsightExtraction" ("id" text PRIMARY KEY,"ownerId" text,"sourceEventId" text,"spans" json,FOREIGN KEY("sourceEventId","ownerId") REFERENCES "Event" ON DELETE CASCADE);
  CREATE TABLE "AIEvidence" ("id" text,"ownerId" text,"sourceMemoryId" text,FOREIGN KEY("sourceMemoryId","ownerId") REFERENCES "EventMemory" ON DELETE CASCADE);
  CREATE TABLE "AIJob" ("id" text PRIMARY KEY,"ownerId" text,"jobType" "AIJobType","resourceId" text,"eventId" text,"idempotencyKey" text,"status" text,"attemptCount" integer,"lockedAt" timestamp(3),"lockedBy" text,"leaseExpiresAt" timestamp,"completedAt" timestamp,"lastError" text);
  CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY);
@@ -32,6 +33,7 @@ async function fixture(t){
   await db.query(`INSERT INTO "EventMemoryEmbedding" VALUES ($1,$2,'synthetic vector')`,['memory-'+owner,owner]);
   for(const table of ['WeeklyReport','MonthlyReport','YearlyReport'])await db.query(`INSERT INTO "${table}" VALUES ($1,$2,'synthetic report')`,['report-'+owner,owner]);
   await db.query('INSERT INTO "AIEvidence" VALUES ($1,$2,$3)',['evidence-'+owner,owner,'memory-'+owner]);
+  await db.query(`INSERT INTO "EventInsightExtraction" VALUES ($1,$2,$3,'[]')`,['extraction-'+owner,owner,'event-'+owner]);
   await db.query(`INSERT INTO "AIJob" VALUES ($1,$2,'WEEKLY_REPORT','2026-09-14',NULL,'WEEKLY_REPORT:2026-09-14:v1','RUNNING',1,'2000-01-02','old-worker','2099-01-01',NULL,NULL)`,['job-'+owner,owner]);
  }
  let fail=null;
@@ -39,7 +41,7 @@ async function fixture(t){
  aiConsent:{async upsert({where,update}){const row=(await db.query(`UPDATE "AiConsent" SET "termsVersion"=$2,"aiProcessing"=$3,"personalization"=$4,"memoryEnabled"=$5,"grantedAt"=$6,"revokedAt"=$7,"updatedAt"=$8 WHERE "userId"=$1 RETURNING *`,[where.userId,update.termsVersion,update.aiProcessing,update.personalization,update.memoryEnabled,update.grantedAt,update.revokedAt,update.updatedAt])).rows[0];return row;}},
  aiJob:{async updateMany({where,data}){return {count:(await db.query(`UPDATE "AIJob" SET "status"=$2,"completedAt"=$3,"lockedAt"=NULL,"lockedBy"=NULL,"leaseExpiresAt"=NULL,"lastError"=$4 WHERE "ownerId"=$1 AND "status" IN ('PENDING','RUNNING') RETURNING "id"`,[where.ownerId,data.status,data.completedAt,data.lastError])).rows.length};}},
  event:{async findFirst({where}){return (await db.query('SELECT * FROM "Event" WHERE "id"=$1 AND "ownerId"=$2',[where.id,where.ownerId])).rows[0]||null;}}};
- for(const [model,table] of Object.entries({weeklyReport:'WeeklyReport',monthlyReport:'MonthlyReport',yearlyReport:'YearlyReport',aiEvidence:'AIEvidence',eventMemory:'EventMemory'})){
+ for(const [model,table] of Object.entries({weeklyReport:'WeeklyReport',monthlyReport:'MonthlyReport',yearlyReport:'YearlyReport',aiEvidence:'AIEvidence',eventMemory:'EventMemory',eventInsightExtraction:'EventInsightExtraction'})){
   tx[model]={async deleteMany({where}){if(fail===model)throw new Error('synthetic cleanup failure');return {count:(await db.query(`DELETE FROM "${table}" WHERE "ownerId"=$1 RETURNING *`,[where.ownerId])).rows.length};},
    async findFirst({where}){return (await db.query(`SELECT * FROM "${table}" WHERE "ownerId"=$1 AND "id"=$2`,[where.ownerId,where.id])).rows[0]||null;},
    async findMany({where}){return (await db.query(`SELECT * FROM "${table}" WHERE "ownerId"=$1`,[where.ownerId])).rows;}};
@@ -59,18 +61,18 @@ test('revoke gates every memory/report read even when legacy derived rows remain
 });
 test('transactional revoke removes all derived rows, preserves sources/other owner/tombstones, and is idempotent',async t=>{
  const f=await fixture(t);await f.set(false);await f.set(false);
- for(const table of ['EventMemory','EventMemoryEmbedding','AIEvidence','WeeklyReport','MonthlyReport','YearlyReport']){assert.equal(await f.count(table),0);assert.equal(await f.count(table,'bob'),1);}
+ for(const table of ['EventMemory','EventMemoryEmbedding','AIEvidence','WeeklyReport','MonthlyReport','YearlyReport','EventInsightExtraction']){assert.equal(await f.count(table),0);assert.equal(await f.count(table,'bob'),1);}
  assert.equal(await f.count('Event'),1);assert.equal(await f.count('Event','bob'),1);
  const rows=(await f.db.query('SELECT * FROM "AIJob" ORDER BY "ownerId"')).rows;assert.equal(rows[0].status,'CANCELLED');assert.equal(rows[1].status,'RUNNING');
  assert.equal((await f.db.query('SELECT * FROM "AuditEvent"')).rows.length,1);
  assert((await new PrismaMemoryRepository(f.prisma).getMemoryById({identity:{userId:'bob'},memoryId:'memory-bob'})));
 });
 test('every cleanup-stage failure rolls consent/job/deletions back together',async t=>{
- for(const model of ['weeklyReport','monthlyReport','yearlyReport','aiEvidence','eventMemory']){
+ for(const model of ['weeklyReport','monthlyReport','yearlyReport','aiEvidence','eventMemory','eventInsightExtraction']){
   const f=await fixture(t);f.fail(model);await assert.rejects(f.set(false),/synthetic cleanup failure/);
   assert.equal((await f.db.query(`SELECT * FROM "AiConsent" WHERE "userId"='alice'`)).rows[0].memoryEnabled,true);
   assert.equal((await f.db.query(`SELECT * FROM "AIJob" WHERE "ownerId"='alice'`)).rows[0].status,'RUNNING');
-  for(const table of ['EventMemory','EventMemoryEmbedding','AIEvidence','WeeklyReport','MonthlyReport','YearlyReport'])assert.equal(await f.count(table),1);
+  for(const table of ['EventMemory','EventMemoryEmbedding','AIEvidence','WeeklyReport','MonthlyReport','YearlyReport','EventInsightExtraction'])assert.equal(await f.count(table),1);
  }
 });
 test('regrant exposes no old state, fresh eligible memory may be regenerated',async t=>{

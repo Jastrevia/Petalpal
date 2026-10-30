@@ -72,7 +72,7 @@ test("mood curve uses account-timezone days, the user's own moods and a factual 
   const texts = dates.map((_, i) => `Entry ${i + 1}.`);
   const outside = { id: "event-prior", occurredAt: +new Date("2026-09-14T06:59:00Z"), primaryGardenMood: "SUNNY_BLOOM", memory: null };
   for (const [locale, line] of [["en", "Mon–Thu: Quiet 2 times, Drifting once. Fri–Sun: Healing 2 times."],
-    ["zh-Hans", "周一到周四：安静 2 次、迷茫 1 次。周五到周日：疗愈 2 次。"]]) {
+    ["zh-Hans", "周一到周四：低落 2 次、迷茫 1 次。周五到周日：治愈 2 次。"]]) {
     const curve = weeklyMoodCurve(input(locale, { texts, dates, moods, period, timezone: "America/Vancouver", extraSources: [outside] }));
     assert.equal(curve.claim, line);
     assert.deepEqual(curve.days, ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"]);
@@ -167,8 +167,8 @@ test("deleting an Event removes a short Weekly report whose mood curve shows it,
   };
   const result = await new PrivateEventRepository({ $transaction: fn => fn(tx) })
     .deleteEventAndAffectedReports({ identity: { userId: "alice" }, eventId: "event-1" });
-  // Reports up to five weeks later can still quote it in "then and now".
-  assert.deepEqual(where, { ownerId: "alice", periodStartUtc: { lte: new Date("2026-10-21T12:00:00Z") }, periodEndUtc: { gt: occurredAt } });
+  // Any later report can still show it ("then and now" up to five weeks later, a Weekly 2.0 echo up to a year).
+  assert.deepEqual(where, { ownerId: "alice", periodEndUtc: { gt: occurredAt } });
   assert.deepEqual(deleted, ["weekly-short"]);
   assert.deepEqual(result.deletedReports, { weekly: 1, monthly: 0, yearly: 0 });
 });
@@ -271,14 +271,14 @@ test("petal card: the design's lifting week, and fact lines for a shift and a mi
     assert.equal(card.arc, "LIFTING");
     assert.ok(ARC_CARDS.LIFTING.includes(card.cardId));
     assert.equal(card.fact, locale === "en" ? "You chose Quiet 4 times this week; Fri–Sun had Healing twice."
-      : "这周你 4 次选了「安静」，周五到周日有 2 次「疗愈」。");
+      : "这周你 4 次选了「低落」，周五到周日有 2 次「治愈」。");
   }
   const sameMood = render("zh-Hans", [Q, D, H, H], [days[0], days[2], days[5], days[6]]);
-  assert.equal(sameMood.fact, "这周你 2 次选了「疗愈」，都在周五到周日。");
+  assert.equal(sameMood.fact, "这周你 2 次选了「治愈」，都在周五到周日。");
   assert.equal(render("en", [Q, D, H, H], [days[0], days[2], days[5], days[6]]).fact, "You chose Healing twice this week, all on Fri–Sun.");
   const mixed = render("zh-Hans", [S, Q, W, F, F], [days[0], days[2], days[4], days[5], days[6]]);
   assert.equal(mixed.arc, "MIXED");
-  assert.equal(mixed.fact, "这周你选了 4 种心情，最多的是「火焰」，2 次。");
+  assert.equal(mixed.fact, "这周你选了 4 种心情，最多的是「愤怒」，2 次。");
   assert.equal(render("en", [S, Q, W, F, F], [days[0], days[2], days[4], days[5], days[6]]).fact,
     "You chose 4 different moods this week, Fire most often (twice).");
 });
