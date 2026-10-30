@@ -6,9 +6,18 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
+import { clusterFootprintRadius } from './flowerClusters';
 import { useAppLocale } from '../../../services/locale';
+
+/** The Garden camera, to keep the ✓ under the ghost while the view moves. */
+export interface PlantingCamera {
+  x: SharedValue<number>; y: SharedValue<number>; zoom: SharedValue<number>;
+  baseX: number; baseY: number; fit: number;
+}
+const CHECK_SIZE = 48;
 
 const ZH_MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 // The validator's English messages, in Chinese (placementValidator.ts).
@@ -31,7 +40,38 @@ function zhFeedback(text: string) {
   return known[text] ?? text;
 }
 
-export default function PlantingPlacementControls() {
+// The ✓ sits just below the ghost's planting point and follows it through camera moves.
+function PlantCheck({ camera, worldX, worldY, month, enabled, saving, label, onPress }: {
+  camera: PlantingCamera; worldX: number; worldY: number; month: number;
+  enabled: boolean; saving: boolean; label: string; onPress: () => void;
+}) {
+  const { x, y, zoom, baseX, baseY, fit } = camera;
+  const radius = clusterFootprintRadius(month);
+  const position = useAnimatedStyle(() => {
+    const scale = fit * zoom.value;
+    return { transform: [
+      { translateX: baseX + x.value + worldX * scale - CHECK_SIZE / 2 },
+      { translateY: baseY + y.value + (worldY + radius) * scale + 8 },
+    ] };
+  }, [worldX, worldY, radius, baseX, baseY, fit]);
+  return (
+    <Animated.View pointerEvents="box-none" style={[styles.checkAnchor, position]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: !enabled || saving, busy: saving }}
+        onPress={onPress}
+        disabled={!enabled || saving}
+        hitSlop={8}
+        style={({ pressed }) => [styles.checkButton, !enabled && styles.checkDisabled, pressed && enabled && styles.buttonPressed]}
+      >
+        {saving ? <ActivityIndicator size="small" color="#234A3F" /> : <Text style={styles.checkMark}>✓</Text>}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+export default function PlantingPlacementControls({ camera }: { camera?: PlantingCamera }) {
   const {
     activeMode,
     targetFlower,
@@ -52,9 +92,11 @@ export default function PlantingPlacementControls() {
   const monthName = zh ? ZH_MONTHS[targetFlower.month - 1] ?? `${targetFlower.month} 月` : meta?.monthName || `Month ${targetFlower.month}`;
 
   const isValid = validationResult?.isValid ?? false;
-  const feedback = validationResult?.userFeedback ? (zh ? zhFeedback(validationResult.userFeedback) : validationResult.userFeedback) : zh
-    ? `点${monthName}花园里的位置来种。`
-    : `Tap in the ${monthName} garden to place.`;
+  // Nothing is planted until ✓: first a tap on the lawn shows the ghost there.
+  const feedback = !previewCoords || !validationResult?.userFeedback
+    ? (zh ? `点一下${monthName}花园里你想种的地方。` : `Tap the spot in the ${monthName} garden where it should grow.`)
+    : isValid ? (zh ? '点 ✓ 就种在这里。' : 'Tap ✓ to plant it here.')
+    : zh ? zhFeedback(validationResult.userFeedback) : validationResult.userFeedback;
 
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
@@ -72,13 +114,13 @@ export default function PlantingPlacementControls() {
         <View
           style={[
             styles.feedbackPill,
-            isValid ? styles.feedbackValid : styles.feedbackInvalid,
+            previewCoords && !isValid && styles.feedbackInvalid,
           ]}
         >
           <Text
             style={[
               styles.feedbackText,
-              isValid ? styles.feedbackTextValid : styles.feedbackTextInvalid,
+              previewCoords && !isValid && styles.feedbackTextInvalid,
             ]}
           >
             {feedback}
@@ -96,6 +138,19 @@ export default function PlantingPlacementControls() {
         )}
       </View>
 
+      {camera && previewCoords && camera.fit > 0 && (
+        <PlantCheck
+          camera={camera}
+          worldX={previewCoords.worldX}
+          worldY={previewCoords.worldY}
+          month={targetFlower.month}
+          enabled={isValid}
+          saving={isSaving}
+          label={zh ? '种在这里' : 'Plant here'}
+          onPress={() => { void confirmPlacement(); }}
+        />
+      )}
+
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         <Pressable
@@ -108,25 +163,6 @@ export default function PlantingPlacementControls() {
           ]}
         >
           <Text style={styles.cancelButtonText}>{zh ? '取消' : 'Cancel'}</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={confirmPlacement}
-          disabled={!isValid || isSaving}
-          style={({ pressed }) => [
-            styles.confirmButton,
-            (!isValid || isSaving) && styles.confirmButtonDisabled,
-            pressed && isValid && styles.buttonPressed,
-          ]}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.confirmButtonText}>
-              {zh ? '种在这里' : 'Plant Here'}
-            </Text>
-          )}
         </Pressable>
       </View>
     </View>
@@ -178,22 +214,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 12,
-  },
-  feedbackValid: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#F2ECDD',
+    borderWidth: 1,
+    borderColor: '#C9A96E66',
   },
   feedbackInvalid: {
-    backgroundColor: '#FEE2E2',
+    borderColor: '#D9A0B0',
   },
   feedbackText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  feedbackTextValid: {
-    color: '#15803D',
+    color: '#234A3F',
   },
   feedbackTextInvalid: {
-    color: '#B91C1C',
+    color: '#7A4A58',
   },
   foreverText: {
     marginTop: 6,
@@ -233,27 +267,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#475569',
   },
-  confirmButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 24,
-    backgroundColor: '#16A34A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
+  checkAnchor: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  checkButton: {
+    width: CHECK_SIZE,
+    height: CHECK_SIZE,
+    borderRadius: CHECK_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2ECDD',
+    borderWidth: 2,
+    borderColor: '#C9A96E',
+    shadowColor: '#183530',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
     shadowRadius: 5,
     elevation: 4,
   },
-  confirmButtonDisabled: {
-    backgroundColor: '#94A3B8',
+  checkDisabled: {
+    opacity: 0.45,
   },
-  confirmButtonText: {
-    fontSize: 15,
+  checkMark: {
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#234A3F',
   },
   buttonPressed: {
     opacity: 0.75,
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.97 }],
   },
 });

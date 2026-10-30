@@ -569,6 +569,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     cameraX.value = viewport.width / 2 - baseX - (GARDEN_WORLD_BOUNDS.x + GARDEN_WORLD_BOUNDS.width / 2) * fit * minimum;
     cameraY.value = viewport.height / 2 - baseY - (GARDEN_WORLD_BOUNDS.y + GARDEN_WORLD_BOUNDS.height / 2) * fit * minimum;
   }, [viewport.width, viewport.height, fit, baseX, baseY, cameraX, cameraY, cameraZoom]);
+  const checkCamera = useMemo(() => ({ x: cameraX, y: cameraY, zoom: cameraZoom, baseX, baseY, fit }),
+    [cameraX, cameraY, cameraZoom, baseX, baseY, fit]);
   const sceneElement = useRef<View>(null);
   // Web fallback: a restored session can mount the scene without a non-zero
   // onLayout event, leaving fit at 0 and no canvas. Measure the element directly.
@@ -1649,7 +1651,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         canChangeFixture={activeMode==='normal'} metadata={{realParentCount:placements.length,renderedParentCount:drawnPlanting.placements.length,
           viewport,waterfallVersion,growthV11:useMonthlyGrowth,previewMode,environmentEnabled,worldPhase:worldTime.phase}}/>}
       {/* Planting Placement Controls Banner & Action Bar */}
-      {!readOnly && fixtureParents===null&&<PlantingPlacementControls />}
+      {!readOnly && fixtureParents===null&&<PlantingPlacementControls camera={checkCamera} />}
 
       {/* Flower Detail Modal */}
       {fixtureParents===null && <FlowerDetailModal />}

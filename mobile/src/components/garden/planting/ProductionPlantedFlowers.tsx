@@ -46,11 +46,15 @@ export function ProductionPlantedFlowers({depthPass='all'}:{depthPass?:FlowerDep
   runtimeAudit.render('ProductionPlantedFlowers');
   const {placements,activeMode,targetFlower,previewCoords,validationResult,showDevFootprints,showDevHitboxes,
     accountTimeZone,gardenOwnerUserId,currentUserId}=usePlanting();
-  const planted=useMemo(()=>placements.filter(p=>flowerInDepthPass(p.month,depthPass)),[placements,depthPass]);
-  // The unconfirmed Plant preview is drawn on its own and never joins the planted bed.
+  // While a flower is being planted, it shows only as the ghost where the owner tapped.
+  const plantingId=activeMode==='planting'?targetFlower?.flowerId:undefined;
+  const planted=useMemo(()=>placements.filter(p=>flowerInDepthPass(p.month,depthPass)&&p.flowerId!==plantingId),
+    [placements,depthPass,plantingId]);
+  // The unconfirmed ghost is drawn on its own and never joins the planted bed.
   const pending=useMemo(()=>activeMode==='planting'&&targetFlower&&previewCoords&&flowerInDepthPass(targetFlower.month,depthPass)
     ?[{...targetFlower,...previewCoords}]:[],[activeMode,targetFlower,previewCoords,depthPass]);
-  const color=validationResult?.isValid?'#22c55e':'#ef4444';
+  // Gold for a good spot; a soft rose (never an alarm red) where it can't grow.
+  const color=validationResult?.isValid?'#C9A96E':'#D9A0B0';
   // The partner's mood effects, today only and on the owner's own Garden (account timezone).
   const own=!gardenOwnerUserId||gardenOwnerUserId===currentUserId;
   const moodFlowers=useMemo(()=>own?planted.filter(p=>(p.sourceType||p.sourceEventId)&&hasClusterArt(p.speciesCode,p.flowerName)):[],
@@ -58,11 +62,11 @@ export function ProductionPlantedFlowers({depthPass='all'}:{depthPass?:FlowerDep
   return <Group>
     <GardenMoodEffectsLayer flowers={moodFlowers} timeZone={accountTimeZone} part="behind"/>
     <ClusterBed flowers={planted} cacheStatic/>
-    {pending.length>0&&<Group opacity={validationResult?.isValid ? .92 : .65}><ClusterBed flowers={pending}/></Group>}
+    {pending.length>0&&<Group opacity={validationResult?.isValid ? .6 : .32}><ClusterBed flowers={pending}/></Group>}
     <GardenMoodEffectsLayer flowers={moodFlowers} timeZone={accountTimeZone} part="front"/>
     {pending.map(p=><Group key="preview-ring">
-      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)+4} color={color} opacity={.2}/>
-      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)} color={color} style="stroke" strokeWidth={2.5}/>
+      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)+4} color={color} opacity={.18}/>
+      <Circle cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)} color={color} opacity={.85} style="stroke" strokeWidth={2}/>
     </Group>)}
     {__DEV__&&(showDevFootprints||showDevHitboxes)&&planted.map(p=><Circle key={p.id}
       cx={p.worldX} cy={p.worldY} r={clusterFootprintRadius(p.month)} color="#38bdf8" style="stroke" strokeWidth={1}/>)}
