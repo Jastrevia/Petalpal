@@ -15,7 +15,7 @@ const BOOKS: Book[] = ['weekly', 'monthly', 'notes'];
 // Every label on this screen follows the app language; saved reflections keep their own words.
 const CHROME = {
   en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'About' }, unit: { weekly: 'week', monthly: 'month' },
-    reportOutput: 'Report final output', notesTitle: 'About these reflections', notes: [
+    reportOutput: 'Report final output', pick: 'Choose a book from the shelf', notesTitle: 'About these reflections', notes: [
       'Your petal card is only a way to look back at yourself. It is not a prediction, and it cannot replace professional help.',
       'Every number and every quote in a reflection is found by the app in your own entries; AI only words them, and any sentence that does not match what you wrote is left out.',
       'Don’t want to see an insight? Tap Hide under it. If something in a reflection seems wrong, report it at the end of that reflection.'],
@@ -34,7 +34,7 @@ const CHROME = {
     close: 'Close Reflections', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
     kept: 'Your reflections, kept here.' },
   'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于' }, unit: { weekly: '周', monthly: '月' },
-    reportOutput: '举报最终内容', notesTitle: '关于这些回看', notes: [
+    reportOutput: '举报最终内容', pick: '从书架上取一本书', notesTitle: '关于这些回看', notes: [
       '花语卡只是陪你回看自己，不是预测，也不能代替专业的帮助。',
       '回看里的每个数字、每句原话，都是程序从你自己的记录里找出来的；AI 只负责把它们说通顺，和你写过的话对不上的句子不会出现。',
       '不想看到某一条，可以点它下面的「隐藏」。觉得哪份回看有问题，可以在那份回看的最后举报。'],
@@ -89,9 +89,23 @@ export default function Reflection() {
     animation.start(); return () => animation.stop();
   }, [night, reducedMotion, lighting]);
   const [type, setType] = useState<ReportType>('weekly');
-  const [notes, setNotes] = useState(false);
-  const openBook = (book: Book) => { if (book === 'notes') setNotes(true); else { setNotes(false); setType(book); } };
-  const onBook = (book: Book) => book === 'notes' ? notes : !notes && type === book;
+  // The pavilion opens with every book on the shelf. Tapping one pulls it out, carries it to the desk and opens it
+  // (the green book is Weekly, the blue Monthly, the purple one the notes about them).
+  const [open, setOpen] = useState<Book | null>(null);
+  const notes = open === 'notes';
+  const onBook = (book: Book) => open === book;
+  const [flying, setFlying] = useState<Book | null>(null);
+  const flight = useRef(new Animated.Value(0)).current, reveal = useRef(new Animated.Value(0)).current;
+  function openBook(book: Book) {
+    if (flying || book === open) return;
+    if (book !== 'notes') setType(book);
+    if (reducedMotion) { reveal.setValue(1); setOpen(book); return; }
+    setOpen(null); setFlying(book); flight.setValue(0); reveal.setValue(0);
+    Animated.timing(flight, { toValue: 1, duration: 760, easing: Easing.inOut(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(() => {
+      setOpen(book); setFlying(null);
+      Animated.timing(reveal, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start();
+    });
+  }
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   // One page per period, oldest first. null = the newest page.
@@ -243,6 +257,9 @@ export default function Reflection() {
   const accent = type === 'weekly' ? '#55704A' : '#3B5F8C', bookInk = type === 'weekly' ? '#34472F' : '#2A4466';
   // Shelf spines cropped from the same painted art (1000-wide units, rows 138–318): the phone's Weekly/Monthly switch.
   const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 } };
+  // A book's place on the painted shelf, in scene points (the art is 1000 units wide; its shelf row runs 138–318).
+  const spineRect = (item: Book) => { const k = sceneWidth / 1000;
+    return { left: shelf[item].x * k, top: 138 * k, width: shelf[item].w * k, height: 180 * k }; };
   const shelfSpine = (item: Book, h: number) => {
     const { x, w } = shelf[item], k = h / 180;
     return <View style={{ width: w * k, height: h, overflow: 'hidden', borderRadius: 2 }}>
@@ -304,11 +321,6 @@ export default function Reflection() {
     </View>;
     return <View style={{ flex: 1, minHeight: 0, paddingRight: compact ? 0 : 30, flexDirection: wide ? 'row' : 'column', gap: wide ? 22 : 0 }}>
       <View style={wide ? { width: '42%', minHeight: 0 } : undefined}>
-      {compact && <View style={s.shelf}>{BOOKS.map(item => <Pressable key={item} accessibilityRole="tab"
-        accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)} accessibilityLabel={t.shelf(item)}
-        disabled={!interactive || !!turning} onPress={() => openBook(item)} style={[s.shelfItem, { opacity: onBook(item) ? 1 : .62 }]}>
-        <View style={[s.shelfSpine, onBook(item) && s.shelfSpineOn]}>{shelfSpine(item, wide ? 32 : 48)}</View>
-        <Text style={[s.small, onBook(item) && [s.shelfTextOn, { borderColor: '#B8934A' }]]}>{t.book[item]}</Text></Pressable>)}</View>}
       {notes && interactive ? (wide ? null : notesPage) : <>
       {!spread && <>
       <Text accessibilityRole="header" style={[s.heading, compact && { color: bookInk }, { fontSize: compact ? 22 : Math.max(21, Math.min(27, sceneWidth * .026)) }]}>{t.title(type)}</Text>
@@ -406,10 +418,35 @@ export default function Reflection() {
       </View>
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)} hitSlop={6}
         style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
-      {!compact && BOOKS.map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)} accessibilityLabel={t.shelf(item)} disabled={!!turning} onPress={() => openBook(item)} style={{ position: 'absolute', left: sceneWidth * (.561 + i * .094), top: artHeight * .075, width: sceneWidth * .086, height: artHeight * .17, alignItems: 'center', paddingTop: artHeight * .042 }}>
-        <Text style={{ fontFamily: 'Georgia', fontSize: Math.max(12, sceneWidth * .018), color: '#EAD6AA', textShadowColor: '#42301C', textShadowRadius: 2, borderBottomWidth: onBook(item) ? 1 : 0, borderColor: '#DCC49588', paddingBottom: 4 }}>{t.book[item]}</Text>
-      </Pressable>)}
-      <View testID="reflection-book" style={{ position: 'absolute', top: bookTop, left: bookLeft, width: bookWidth, height: bookHeight }}>
+      {/* The painted books on the shelf are the controls; the one that is out leaves a gap. Drawn before the open book,
+          which covers them where the two overlap. */}
+      {BOOKS.map(item => {
+        const rect = spineRect(item), out = onBook(item) || flying === item;
+        return <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)}
+          accessibilityLabel={t.shelf(item)} disabled={!!turning || !!flying} onPress={() => openBook(item)} hitSlop={{ left: 8, right: 8 }}
+          style={({ pressed }) => [{ position: 'absolute', ...rect }, pressed && { transform: [{ translateY: -3 }] }]}>
+          {out && <View pointerEvents="none" style={s.shelfGap} />}
+        </Pressable>;
+      })}
+      {flying && (() => {
+        // The book leaves the shelf, crosses to the desk growing larger, and fades as the open book unfolds there.
+        const rect = spineRect(flying), dx = bookLeft + bookWidth / 2 - (rect.left + rect.width / 2), dy = bookTop + bookHeight / 2 - (rect.top + rect.height / 2);
+        const grow = Math.min(2.6, bookHeight / rect.height * .7);
+        return <Animated.View pointerEvents="none" style={{ position: 'absolute', ...rect, zIndex: 5, opacity: flight.interpolate({ inputRange: [0, .85, 1], outputRange: [1, 1, 0] }),
+          transform: [{ translateY: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [0, -rect.height * .25, dy] }) },
+            { translateX: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [0, 0, dx] }) },
+            { scale: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [1, 1.05, grow] }) },
+            { rotate: flight.interpolate({ inputRange: [0, .2, 1], outputRange: ['0deg', '-4deg', '0deg'] }) }] }}>
+          {shelfSpine(flying, rect.height)}
+        </Animated.View>;
+      })()}
+      {/* Before a book is taken: a quiet line on the painted book's open pages. */}
+      {!open && !flying && <View pointerEvents="none" style={{ position: 'absolute', top: artHeight * .53, left: sceneWidth * .2, width: sceneWidth * .74,
+        alignItems: 'center' }}>
+        <Text style={[s.pick, { fontSize: Math.max(13, Math.min(17, sceneWidth * .02)) }]}>{t.pick}</Text>
+      </View>}
+      {open && <Animated.View testID="reflection-book" style={{ position: 'absolute', top: bookTop, left: bookLeft, width: bookWidth, height: bookHeight,
+        opacity: reveal, transform: [{ scaleX: reveal.interpolate({ inputRange: [0, 1], outputRange: [.55, 1] }) }] }}>
         {!compact && !notes && !weekly2Of(selected) && <View style={{ position: 'absolute', left: '-6%', top: '10%', gap: 6, zIndex: 2 }}>
           {(['Summary', 'Topics', 'Patterns'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: section === item, disabled: !selected || !details[selected.id] || !!turning }} aria-selected={section === item} disabled={!selected || !details[selected.id] || !!turning} onPress={() => setSection(item)} style={[s.edgeTab, { backgroundColor: ['#BBC09A', '#E1C49A', '#DCA9A0'][i], opacity: section === item ? 1 : .88 }]}><Text style={s.small}>{t.tabs[item]}</Text></Pressable>)}
         </View>}
@@ -476,7 +513,7 @@ export default function Reflection() {
           <Pressable testID="reflection-next-page" accessibilityRole="button" accessibilityLabel={t.next(type)}
             disabled={!!turning || atEnd} onPress={() => void turn(1)} style={[s.turn, { opacity: atEnd ? .35 : 1 }]}><Text style={s.arrow}>›</Text></Pressable>
         </View>}
-      </View>
+      </Animated.View>}
     </View>
   </ScrollView>
   {/* Outside the ScrollView: × stays in the corner however far the page is scrolled. */}
@@ -493,6 +530,8 @@ const s = StyleSheet.create({
   topic: { alignItems: 'center', minWidth: 70, maxWidth: 125, padding: 5 },
   edgeTab: { width: 83, minHeight: 49, justifyContent: 'center', alignItems: 'center', borderRadius: 4, borderWidth: 1, borderColor: '#9F805866', shadowColor: '#372412', shadowOpacity: .18, shadowRadius: 2, shadowOffset: { width: 1, height: 2 } },
   notesText: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: '#4D3B28' },
+  shelfGap: { position: 'absolute', left: 0, top: 6, right: 0, bottom: 0, backgroundColor: '#1E140C', opacity: .82, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  pick: { fontFamily: 'Georgia', fontStyle: 'italic', letterSpacing: .5, textAlign: 'center', color: '#5E4B33' },
   quietLink: { fontFamily: 'Georgia', fontSize: 12, color: '#8C7556', textDecorationLine: 'underline' },
   note: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 17, lineHeight: 25, color: '#775633', textAlign: 'center', padding: 9 },
   caption: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, color: '#8B6C44', paddingVertical: 16, textAlign: 'center' },
@@ -524,11 +563,6 @@ const s = StyleSheet.create({
   fox: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(150,104,48,.05)', boxShadow: '0 0 26px 14px rgba(150,104,48,.07)' },
   // Aged paper: hinge shadow at the spine and a warm, worn edge all round.
   aged: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, boxShadow: 'inset 14px 0 14px -8px rgba(70,42,16,.45), inset 0 0 36px rgba(128,86,38,.34)' },
-  shelf: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 10, flexWrap: 'wrap' },
-  shelfItem: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, minHeight: 44 },
-  shelfSpine: { borderRadius: 2, boxShadow: '1px 2px 3px rgba(40,25,10,.35)' },
-  shelfSpineOn: { transform: [{ translateY: -3 }], boxShadow: '1px 5px 6px rgba(40,25,10,.45)' },
-  shelfTextOn: { color: '#3A2C1C', borderBottomWidth: 1, paddingBottom: 2 },
   ribbon: { position: 'absolute', top: 0, right: 9, width: 14, zIndex: 1, shadowColor: '#3B2414', shadowOpacity: .25, shadowRadius: 2, shadowOffset: { width: 1, height: 1 } },
   ribbonBody: { width: 14, height: 70, backgroundColor: '#A55E63' },
   ribbonTailLeft: { width: 0, height: 0, borderTopWidth: 11, borderTopColor: '#A55E63', borderRightWidth: 7, borderRightColor: 'transparent' },
