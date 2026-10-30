@@ -246,7 +246,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         </View>
         {item.quote && !item.text.includes(item.quote.text) && <Text selectable={interactive} style={v.text}>{`“${item.quote.text}”`}</Text>}
         {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={[v.text, v.good]}>{thing.text}</Text>)}
-        {item.fact && <Text selectable={interactive} style={v.text}>{item.fact}</Text>}
+        {/* The code-written fact line is what the sentence above was checked against; shown again it only repeats it. */}
         {dates(item, at)}
         {panel(at)}
         {canMark && <View style={v.marks}>
