@@ -156,7 +156,7 @@ test("compute: thresholds per module, code-written facts, priority picks the mai
 
 test("rendering: headline, main insight, bouquet, secondary insights, petal card by the main type, question", () => {
   const built = weekly2Packet(input()), result = render(built, answer(built), input(), true);
-  assert.deepEqual(kinds(result), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "INSIGHT", "INSIGHT", "INSIGHT", "PETAL_CARD", "QUESTION"]);
+  assert.deepEqual(kinds(result), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "INSIGHT", "INSIGHT", "INSIGHT", "UNLOCK", "PETAL_CARD", "QUESTION"]);
   assert.ok(result.sections.every(section => section.contractVersion === WEEKLY_SHORT), "older app builds still read the report");
   const [headline, main] = result.sections;
   assert.equal(headline.claim, "说过想跑步，后来也写到了"); assert.equal(headline.template, false); assert.equal(headline.reportVersion, WEEKLY_2);
@@ -209,7 +209,7 @@ test("fallback: with nothing valid the report is built from code templates, neve
   allBad.insights = allBad.insights.map(item => ({ ...item, text: "你应该多休息。" }));
   for (const output of [allBad, null]) {
     const result = render(built, output, input(), true);
-    assert.deepEqual(kinds(result), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "PETAL_CARD", "QUESTION"]);
+    assert.deepEqual(kinds(result), ["HEADLINE", "INSIGHT", "MOOD_CURVE", "UNLOCK", "PETAL_CARD", "QUESTION"]);
     assert.equal(result.sections[0].claim, templateHeadline(built.candidates[0], "zh-Hans"));
     assert.equal(result.sections[1].template, true);
     assert.equal(result.sections[1].text, built.candidates[0].fact, "the template is the code-written fact line");

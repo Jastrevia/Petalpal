@@ -115,7 +115,7 @@ export interface ShortWeekly {
 }
 export interface PetalCard { id: string; name: string; line: string; text: string; fact: string; disclaimer: string; reason: string | null }
 // TREND is Weekly 2.0's code-written fallback (backend lib/insight-compute.js).
-export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND' | 'ECHO';
+export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND' | 'ECHO' | 'FIRST_TIME' | 'BODY_SIGNAL' | 'RHYTHM' | 'SELF_TALK';
 export type InsightFeedback = 'INACCURATE' | 'HIDDEN';
 export interface Insight {
   // `index` is the section's place in the saved report, which the feedback call names.
@@ -152,7 +152,7 @@ function loopOf(sections: ReportSection[]) {
     letters: of('LETTER').filter(section => filled(section.text)).map(section => ({ text: section.text!, writtenOn: DATE.test(section.writtenOn ?? '') ? section.writtenOn! : null })),
     unlock: of('UNLOCK')[0]?.claim ?? null, cardIndex: card >= 0 ? card : null };
 }
-const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND', 'ECHO'];
+const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND', 'ECHO', 'FIRST_TIME', 'BODY_SIGNAL', 'RHYTHM', 'SELF_TALK'];
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
 const spanOf = (value?: { text?: unknown; sourceEventId?: unknown } | null) =>
   value && filled(value.text) && filled(value.sourceEventId) ? { text: value.text, eventId: value.sourceEventId } : null;
@@ -282,7 +282,8 @@ export const SHORT_COPY = {
     keep: 'Keep', kept: 'Kept', follow: 'Follow', following: 'Following', threadLimit: 'You already follow three threads. Let one go in the Petal collection first.',
     threads: 'Threads you follow', answered: 'Your answer', letter: 'A letter from you', letterFrom: (date: string) => `Written on ${date}`,
     types: { SAID_BEFORE: 'Something you said', HIDDEN_LINK: 'A quiet link', SMALL_GOODS: 'Small good things',
-      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo' },
+      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo', FIRST_TIME: 'A first time',
+      BODY_SIGNAL: 'What your body said', RHYTHM: 'A rhythm', SELF_TALK: 'Words that came back' },
     // The names the Events screen shows when a mood is chosen.
     moods: { SUNNY_BLOOM: 'Sunny', GENTLE_BLOOM: 'Gentle', QUIET_BLOOM: 'Quiet', HEALING_BLOOM: 'Healing', FIRE_BLOOM: 'Fire',
       WONDER_BLOOM: 'Wonder', DRIFTING_BLOOM: 'Drifting', PEACEFUL_BLOOM: 'Peaceful' }, moodChart: 'Moods this week', pageOf: 'Page', page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
@@ -295,7 +296,8 @@ export const SHORT_COPY = {
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
     keep: '收藏', kept: '已收藏', follow: '跟进', following: '跟进中', threadLimit: '你已经在跟进 3 条线了，先在花语集里放下一条。',
     threads: '你在跟进的线', answered: '你的回答', letter: '你写给自己的信', letterFrom: (date: string) => `写于${date}`,
-    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声' },
+    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声',
+      FIRST_TIME: '第一次', BODY_SIGNAL: '身体信号', RHYTHM: '节律', SELF_TALK: '反复的句式' },
     moods: { SUNNY_BLOOM: '开心', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '低落', HEALING_BLOOM: '治愈', FIRE_BLOOM: '愤怒',
       WONDER_BLOOM: '好奇', DRIFTING_BLOOM: '迷茫', PEACEFUL_BLOOM: '平静' }, moodChart: '这周的心情', pageOf: '页',
     page: '洞察', previousCard: '上一条', nextCard: '下一条',

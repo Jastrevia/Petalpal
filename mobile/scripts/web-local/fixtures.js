@@ -46,6 +46,12 @@
     w2.splice(at, 0, { kind: 'THREAD', claim: '你在跟进的“跑步”：这周写到 2 次。', threadId: 't1', word: '跑步', count: 2, evidence: ev ? [ev] : [], ...meta },
       ...(ev ? [{ kind: 'ANSWER', claim: 'a', question: '这周有哪一刻，你想记下来？', quote: { text: '早上跑步了五公里。', sourceEventId: ev.sourceEventId, date: ev.date }, ...meta }] : []),
       { kind: 'LETTER', claim: '希望你还在每天早上跑步。', letterId: 'l0', text: '希望你还在每天早上跑步。', writtenOn: '2026-09-01', deliverOn: '2026-10-21', ...meta });
+    // M3 types on the secondary pages (synthetic).
+    const last = w2.findIndex(section => section.kind === 'INSIGHT' && section.role === 'main');
+    w2.splice(last + 1, 0, { kind: 'INSIGHT', type: 'FIRST_TIME', role: 'secondary', text: '这是你第一次写到“面试”。', fact: null, subject: '面试', items: [],
+      quote: null, evidence: ev ? [ev] : [], template: true, ...meta },
+      { kind: 'INSIGHT', type: 'BODY_SIGNAL', role: 'secondary', text: '这五周有 3 条记录写到睡眠，你都选了『迷茫』。', fact: null, subject: '睡眠', items: [],
+      quote: null, evidence: ev ? [ev] : [], template: true, ...meta });
     SHORT_WEEKLY.w0.splice(SHORT_WEEKLY.w0.findIndex(section => section.kind === 'QUESTION'), 0, { kind: 'UNLOCK', claim: '一周写下 3 条，就能看到这周的洞察。', needed: 3, ...meta }); }
   const loop = { keeps: [], threads: [{ id: 't1', word: '跑步', insightType: 'SAID_BEFORE', createdAt: '2026-10-01T00:00:00Z' }],
     letters: [{ id: 'l1', text: '下个月记得去看海。', deliverOn: '2026-11-20', createdAt: '2026-10-20T00:00:00Z' }], mutes: ['前任'], next: 2 };

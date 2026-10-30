@@ -152,6 +152,13 @@ trigger's target week either side of it; a last-minute Event outside the cutoff
   Event created (`createdAt`) after the report it answers was saved; it is quoted only in a later week's report
   (`periodKey` comparison). The "1 week, 3 entries" unlock line is the existing threshold, not a time rule. IMPLEMENTED;
   tests run in `UTC` only ([test/back/insight-loop.test.js](test/back/insight-loop.test.js)).
+  **M3 modules:** **第一次** needs the owner's earliest Event `occurredAt` to be ≥ 28 × 24 hours before `periodStartUtc`,
+  and checks earlier Events by `occurredAt < periodStartUtc` (all history). **节律** reads this week and the three before
+  (week index ≤ 3) and buckets each Event by its **local hour in the account timezone** (`Intl.DateTimeFormat`, so DST
+  days keep wall-clock hours): 5–11, 11–17, 17–22, 22–5. Its unlock line counts week index ≤ 2 (what next week's
+  window will hold before next week's own entries). **身体信号** and **反复的句式** use the existing five-week window and
+  this week only. No clock read beyond the existing report time; tests: [test/back/weekly-m3.test.js](test/back/weekly-m3.test.js)
+  (Vancouver DST parts of the day; the rest in `UTC`).
 
 **TESTED BEHAVIOR:** the `2026-11-16` Vancouver week (after the 2026-11-01 DST change) looks
 back to `2026-10-19T07:00Z`; an earlier Event five days before is not paired; a worker run reads

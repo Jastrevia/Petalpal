@@ -169,3 +169,16 @@ test('回答问题: the pending answer is taken once and expires after 30 minute
   startAnswer('w3', '问？'); clearAnswer();
   assert.equal(pendingAnswer(), null);
 });
+
+test('M3 insight types are read with their labels; SELF_TALK keeps no subject to follow', () => {
+  const head = { kind: 'HEADLINE', claim: '这是你第一次写到面试。', reportVersion: 'weekly-2.0', ...meta };
+  const ev = [{ sourceEventId: 'e1', date: '2026-09-15' }];
+  const short = shortWeekly({ narrativeSections: [head,
+    { kind: 'INSIGHT', type: 'FIRST_TIME', role: 'main', text: '这是你第一次写到“面试”。', subject: '面试', evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'SELF_TALK', role: 'secondary', text: '这周你写了 3 次“我是不是太……”。', subject: null, evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'RHYTHM', role: 'secondary', text: 'r', evidence: ev, ...meta },
+    { kind: 'INSIGHT', type: 'BODY_SIGNAL', role: 'secondary', text: 'b', subject: '睡眠', evidence: ev, ...meta }] });
+  assert.equal(short.insights.main.type, 'FIRST_TIME');
+  assert.deepEqual(short.insights.secondary.map(item => [item.type, item.subject]), [['SELF_TALK', null], ['RHYTHM', null], ['BODY_SIGNAL', '睡眠']]);
+  assert.equal(SHORT_COPY['zh-Hans'].types.SELF_TALK, '反复的句式');
+});

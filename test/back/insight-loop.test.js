@@ -185,7 +185,7 @@ test("weekly: threads count this week's mentions, an answer and due letters appe
   assert.equal(sections.find(section => section.kind === "LETTER").text, "希望你还在跑步。");
   assert.equal(reportShowsEvent(sections.filter(section => section.kind === "THREAD"), "c-3"), true);
   assert.equal(reportShowsEvent(sections.filter(section => section.kind === "ANSWER"), "c-2"), true);
-  assert.equal(sections.some(section => section.kind === "UNLOCK"), false, "a full week shows no threshold line");
+  assert.deepEqual(sections.filter(section => section.kind === "UNLOCK").map(section => section.module), ["RHYTHM"], "a full week shows only the next cumulative threshold");
 });
 
 test("weekly: a muted word removes candidates, threads and answers that carry it; a short week shows the real threshold", () => {
