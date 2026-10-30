@@ -7,7 +7,7 @@ import { usePlanting } from './PlantingContext';
 import { flowerInDepthPass, type FlowerDepthPass } from '../flowerOcclusion';
 import GardenStaticPicture from '../GardenStaticPicture';
 import { clusterDrawing, clusterFootprintRadius, hasClusterArt } from './flowerClusters';
-import type { FlowerPlacementRecord } from './plantingPersistence';
+import { awaitsPlanting, type FlowerPlacementRecord } from './plantingPersistence';
 
 const ClusterLoader = memo(function ClusterLoader({ source, onLoad }: { source: number; onLoad: (source: number, image: SkImage) => void }) {
   const image = useImage(source);
@@ -46,9 +46,10 @@ export function ProductionPlantedFlowers({depthPass='all'}:{depthPass?:FlowerDep
   runtimeAudit.render('ProductionPlantedFlowers');
   const {placements,activeMode,targetFlower,previewCoords,validationResult,showDevFootprints,showDevHitboxes,
     accountTimeZone,gardenOwnerUserId,currentUserId}=usePlanting();
-  // While a flower is being planted, it shows only as the ghost where the owner tapped.
+  // While a flower is being planted, it shows only as the ghost where the owner tapped; an Event
+  // flower nobody has planted yet is not drawn at all.
   const plantingId=activeMode==='planting'?targetFlower?.flowerId:undefined;
-  const planted=useMemo(()=>placements.filter(p=>flowerInDepthPass(p.month,depthPass)&&p.flowerId!==plantingId),
+  const planted=useMemo(()=>placements.filter(p=>flowerInDepthPass(p.month,depthPass)&&p.flowerId!==plantingId&&!awaitsPlanting(p)),
     [placements,depthPass,plantingId]);
   // The unconfirmed ghost is drawn on its own and never joins the planted bed.
   const pending=useMemo(()=>activeMode==='planting'&&targetFlower&&previewCoords&&flowerInDepthPass(targetFlower.month,depthPass)

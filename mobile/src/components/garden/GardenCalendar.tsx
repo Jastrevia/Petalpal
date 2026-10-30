@@ -3,7 +3,7 @@ import { AppState, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Te
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanelTheme } from '../features/PanelTheme';
 import { usePlanting } from './planting/PlantingContext';
-import type { FlowerPlacementRecord } from './planting/plantingPersistence';
+import { awaitsPlanting, type FlowerPlacementRecord } from './planting/plantingPersistence';
 
 import { calendarDateKey as dateKey, calendarRecordDay, calendarToday } from './calendarDates';
 import { useAuth } from '../../services/auth';
@@ -100,7 +100,7 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
             {checkedDays.get(selected) ? <Text style={[popupLabel, { fontSize: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: popup.rule }]}>
               <Text style={{ color: '#B486D8' }}>✿ </Text>{bondCopy.dayCheckIn(checkedDays.get(selected)!.keepsakes[0]?.name ?? '', checkedDays.get(selected)!.points)}
             </Text> : null}
-            {isGardenLoading ? <Text style={popupLabel}>Loading Garden…</Text> : gardenError ? <Text style={popupLabel}>{gardenError}</Text> : !(days.get(selected)?.length) ? <Text style={popupLabel}>No flowers or events for this day.</Text> : days.get(selected)!.map(flower => <Pressable key={flower.flowerId} accessibilityRole="button" accessibilityLabel={`Focus ${flower.flowerName}`} onPress={() => { setOpen(false); onFocusFlower(flower); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: popup.rule, ...focus }}><Text style={popupLabel}>{flower.flowerName} · {flower.sourceType === 'EVENT' ? 'Event' : 'Flower'}</Text><Text style={[popupLabel, { fontSize: 12, color: popup.muted }]}>View in Garden</Text></Pressable>)}
+            {isGardenLoading ? <Text style={popupLabel}>Loading Garden…</Text> : gardenError ? <Text style={popupLabel}>{gardenError}</Text> : !(days.get(selected)?.length) ? <Text style={popupLabel}>No flowers or events for this day.</Text> : days.get(selected)!.map(flower => <Pressable key={flower.flowerId} accessibilityRole="button" accessibilityLabel={`${awaitsPlanting(flower) ? 'Plant' : 'Focus'} ${flower.flowerName}`} onPress={() => { setOpen(false); onFocusFlower(flower); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: popup.rule, ...focus }}><Text style={popupLabel}>{flower.flowerName} · {flower.sourceType === 'EVENT' ? 'Event' : 'Flower'}</Text><Text style={[popupLabel, { fontSize: 12, color: popup.muted }]}>{awaitsPlanting(flower) ? 'Plant in Garden' : 'View in Garden'}</Text></Pressable>)}
             {__DEV__ && <View style={{ borderTopWidth: 1, borderColor: popup.rule, marginTop: 16, paddingTop: 12, gap: 12 }}>
               <Text style={[popupLabel, { fontSize: 11, color: popup.muted }]}>DEV preview date only · does not change report timing on the server.</Text>
               <Pressable accessibilityRole="button" style={focus} onPress={() => { const [y, m, d] = selected.split('-').map(Number); setSimulated(new Date(y, m - 1, d)); }}><Text style={popupLabel}>Use selected day for preview</Text></Pressable>

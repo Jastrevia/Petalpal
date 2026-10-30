@@ -26,6 +26,11 @@ export interface FlowerPlacementRecord extends FlowerPlacement {
   messages?: FlowerMessage[];
 }
 
+/** An Event flower that has no spot yet: it joins the Garden only when its owner plants it with ✓. */
+export function awaitsPlanting(flower: Pick<FlowerPlacementRecord, 'placementOrigin' | 'sourceType'>) {
+  return flower.placementOrigin === 'FALLBACK' && flower.sourceType === 'EVENT';
+}
+
 // PetalPal private-store registry: placements include derived emotions/details.
 // Theme/background, calibration/masks and Firebase SDK persistence are excluded.
 const LEGACY_KEY = nativeSecurityEnabled ? 'petalpal_native_security_test_placements_v1' : 'petalpal_flower_placements_v1';

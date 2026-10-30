@@ -157,15 +157,18 @@ test('the ✓ appears only under a tapped ghost, follows it, and is the only way
     validationResult: { isValid: false, userFeedback: 'Choose a grassy spot.' } });
   let button = nodes(view.check).find(n => n.type === 'Pressable');
   assert.equal(button.props.disabled, true);
-  assert.ok(button.props.style({ pressed: false }).flat().some(style => style && style.width >= 44));
+  // A small 36pt circle whose touch area still reaches at least 44pt.
+  const small = button.props.style({ pressed: false }).flat().find(style => style && style.width);
+  assert.ok(small.width <= 40 && small.width + 2 * button.props.hitSlop >= 44);
 
   view = controls({ ...base, previewCoords: { worldX: 1000, worldY: 600 },
     validationResult: { isValid: true, userFeedback: 'Ready to plant!' } });
   button = nodes(view.check).find(n => n.type === 'Pressable');
+  const circle = button.props.style({ pressed: false }).flat().find(style => style && style.width);
   assert.equal(button.props.disabled, false); assert.equal(button.props.accessibilityLabel, 'Plant here');
   // Centred under the ghost's planting point in screen space (base + camera + world × fit × zoom).
   const [{ translateX }, { translateY }] = view.check.props.style[1].transform;
-  assert.equal(translateX, 5 + 10 + 1000 * 0.5 * 2 - 24);
+  assert.equal(translateX, 5 + 10 + 1000 * 0.5 * 2 - circle.width / 2);
   assert.ok(translateY > 7 + 20 + 600 * 0.5 * 2);
   button.props.onPress(); await Promise.resolve();
   assert.equal(confirmed, 1);
@@ -190,9 +193,24 @@ test('while planting, the flower is drawn only as its ghost, never also at a pre
   };
   assert.deepEqual(render({ placements: [own, other], activeMode: 'normal', targetFlower: null, previewCoords: null }),
     [[['new', 900], ['other', 950]]]);
+  // An unplanted Event flower is not drawn; an unplanted check-in flower keeps its preview spot.
+  const event = { ...own, id: 'f-event', flowerId: 'event', sourceType: 'EVENT', worldX: 700 };
+  const daily = { ...own, id: 'f-daily', flowerId: 'daily', sourceType: 'DAILY', worldX: 800 };
+  assert.deepEqual(render({ placements: [event, daily, other], activeMode: 'normal', targetFlower: null, previewCoords: null }),
+    [[['daily', 800], ['other', 950]]]);
   assert.deepEqual(render({ placements: [own, other], activeMode: 'planting', targetFlower: own, previewCoords: null }),
     [[['other', 950]]]);
   assert.deepEqual(render({ placements: [own, other], activeMode: 'planting', targetFlower: own,
     previewCoords: { worldX: 1000, worldY: 560 }, validationResult: { isValid: true } }),
     [[['other', 950]], [['new', 1000]]]);
+});
+
+test('an Event flower nobody has planted yet stays out of the Garden; check-in flowers keep their spot', () => {
+  const load = loadPlantingModules();
+  const { awaitsPlanting } = load('plantingPersistence');
+  assert.equal(awaitsPlanting({ placementOrigin: 'FALLBACK', sourceType: 'EVENT' }), true);
+  for (const flower of [{ placementOrigin: 'SERVER', sourceType: 'EVENT' }, { placementOrigin: 'FALLBACK', sourceType: 'DAILY' },
+    { placementOrigin: 'FALLBACK', sourceType: 'HISTORICAL' }, { placementOrigin: 'FALLBACK', sourceType: 'SOCIAL' }]) {
+    assert.equal(awaitsPlanting(flower), false);
+  }
 });

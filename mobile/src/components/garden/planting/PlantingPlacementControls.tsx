@@ -17,7 +17,9 @@ export interface PlantingCamera {
   x: SharedValue<number>; y: SharedValue<number>; zoom: SharedValue<number>;
   baseX: number; baseY: number; fit: number;
 }
-const CHECK_SIZE = 48;
+// A calm 36pt ✓; its touch area still reaches 44pt and more through hitSlop.
+const CHECK_SIZE = 36;
+const CHECK_SLOP = 6;
 
 const ZH_MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 // The validator's English messages, in Chinese (placementValidator.ts).
@@ -51,7 +53,7 @@ function PlantCheck({ camera, worldX, worldY, month, enabled, saving, label, onP
     const scale = fit * zoom.value;
     return { transform: [
       { translateX: baseX + x.value + worldX * scale - CHECK_SIZE / 2 },
-      { translateY: baseY + y.value + (worldY + radius) * scale + 8 },
+      { translateY: baseY + y.value + (worldY + radius) * scale + CHECK_SLOP },
     ] };
   }, [worldX, worldY, radius, baseX, baseY, fit]);
   return (
@@ -62,7 +64,7 @@ function PlantCheck({ camera, worldX, worldY, month, enabled, saving, label, onP
         accessibilityState={{ disabled: !enabled || saving, busy: saving }}
         onPress={onPress}
         disabled={!enabled || saving}
-        hitSlop={8}
+        hitSlop={CHECK_SLOP}
         style={({ pressed }) => [styles.checkButton, !enabled && styles.checkDisabled, pressed && enabled && styles.buttonPressed]}
       >
         {saving ? <ActivityIndicator size="small" color="#234A3F" /> : <Text style={styles.checkMark}>✓</Text>}
@@ -279,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F2ECDD',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#C9A96E',
     shadowColor: '#183530',
     shadowOffset: { width: 0, height: 2 },
@@ -291,8 +293,8 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   checkMark: {
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
     color: '#234A3F',
   },
