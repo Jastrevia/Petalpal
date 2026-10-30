@@ -2,7 +2,7 @@
 
 This stage uses free signing from a normal Apple ID (Xcode **Personal Team**) to install **PetalPal Dev** on iPhones. There is no paid developer account and no TestFlight. The later beta path is at the end of this document and in [ios/TESTFLIGHT.md](ios/TESTFLIGHT.md).
 
-**Current status:** the configuration has been checked by generating the iOS project, but no build has run on an iPhone yet, because the development Mac has no Xcode. Follow the first build below before you schedule testers.
+**Current status:** the Release build runs on an iPhone 15 Pro and feels smooth there after the texture budget fix (see [MOBILE.md](../MOBILE.md)). Older iPhones have not been tested, so try one before you hand it to a tester.
 
 ## What you need
 
@@ -13,7 +13,7 @@ This stage uses free signing from a normal Apple ID (Xcode **Personal Team**) to
 | Apple ID | Xcode → Settings → Accounts → **+**. Any free Apple ID works |
 | CocoaPods | `brew install cocoapods` |
 | Node.js | 22.13 or later |
-| iPhone | iOS 16.4 or later (the app's minimum). Xcode 27 can only run on iOS 17 or later |
+| iPhone | iOS 17 or later with Xcode 27 (the app's own minimum is iOS 16.4). Newer iPhones are safer: the app uses about 1.65 GB of memory on an iPhone 15 Pro |
 
 Xcode 27 meets Expo's stated minimum, but we have not confirmed that SDK 57 builds with it. If the first build fails, look there first.
 
@@ -25,6 +25,18 @@ Xcode 27 meets Expo's stated minimum, but we have not confirmed that SDK 57 buil
 - **Each install needs the iPhone connected to the Mac.** After that the app runs without the Mac until it expires.
 - **Apple describes this signing as for devices you own**, so testers should use our phones.
 - **One bundle ID belongs to one Apple ID.** If a second person signs builds, they set their own ID in the `.env.ios.*` file, for example `PETALPAL_IOS_DEV_BUNDLE_ID=com.yourname.petalpal.dev`.
+
+## First-build problems we hit
+
+| Symptom | Fix |
+|---|---|
+| `Developer Mode disabled` | Turn it on as in the first-install steps, then rebuild |
+| Certificate exists but `0 valid identities` | Install Apple's [WWDR G3 intermediate](https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer) into the login keychain |
+| Many keychain password prompts | Run `security set-key-partition-list -S apple-tool:,apple: -s ~/Library/Keychains/login.keychain-db` once |
+| `No device UDID or name matching`, error code 70, or install interrupted | The cable connection dropped. Use an Apple cable directly in the Mac, and keep the iPhone unlocked |
+| `profile has not been explicitly trusted` | Trust your Apple ID under VPN & Device Management |
+
+The command doesn't exit after the app launches, because it keeps showing logs. Press Ctrl+C once the app is open.
 
 ## What this build cannot test
 

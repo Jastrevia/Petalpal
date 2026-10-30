@@ -864,3 +864,8 @@ Guest mode: signed out, the app opens into the Garden with no server reads (loca
 ## iPhone usability testing on free signing (branch `feat/ios-beta`, not released)
 
 `EXPO_PUBLIC_APP_VARIANT=dev` builds **PetalPal Dev** (`com.jastrevia.petalpal.dev`, scheme `petalpal-dev`), which installs beside the store app and adds a device reset entry; store builds refuse it. `npm run ios:device` and `npm run ios:device:release` read only `.env.ios.development` and `.env.ios.usability-test` (git-ignored) and need Xcode 26.4 or later. Steps and limits: [docs/usability-testing.md](docs/usability-testing.md). Generated-project configuration checked; not yet built on a device.
+
+### Native Garden texture budget (2026-10-30, measured on iPhone 15 Pro, Release, iOS device)
+
+Time Profiler showed the main thread saturated, about 93% of it re-decoding PNGs per frame through `SkImage_Lazy`, because the Garden's textures did not fit the GPU resource cache and were evicted each frame. Raising the limit to 512 MB did not help; 1.5 GB did. `patches/@shopify+react-native-skia+2.6.2.patch` (applied by `postinstall`, patch-package) now sets the limit to a quarter of device memory, clamped to 512 MB–1.5 GB. Idle Garden after the change: main thread about 35% (was about 100%), thermal state Fair (was Serious to Critical), physical footprint about 1.65 GB. Devices with less memory, and movement, pan and zoom frame rates, are not measured; on a smaller budget the re-decoding could return. Upgrading Skia needs the patch reviewed, since a version mismatch makes `npm install` report it. The bundle's images decode to about 1.9 GB in total, so reducing what is drawn at once is the next memory work.
+

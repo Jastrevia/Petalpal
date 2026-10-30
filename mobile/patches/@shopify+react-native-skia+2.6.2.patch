@@ -1,0 +1,18 @@
+diff --git a/node_modules/@shopify/react-native-skia/apple/MetalContext.mm b/node_modules/@shopify/react-native-skia/apple/MetalContext.mm
+index dd79e2a..e613e9b 100644
+--- a/node_modules/@shopify/react-native-skia/apple/MetalContext.mm
++++ b/node_modules/@shopify/react-native-skia/apple/MetalContext.mm
+@@ -34,5 +34,13 @@ MetalContext::MetalContext() {
+   _directContext = GrDirectContexts::MakeMetal(backendContext);
+   if (_directContext == nullptr) {
+     RNSkia::RNSkLogger::logToConsole("Couldn't create a Skia Metal Context");
++    return;
+   }
++  // PetalPal: the Garden's textures do not fit Skia's default budget, so each
++  // frame evicted and re-decoded PNGs on the main thread (measured on iPhone 15
++  // Pro: 93% of it at 512 MB, gone at 1.5 GB). A ceiling that fills on demand,
++  // not an allocation: a quarter of the device's memory, 512 MB to 1.5 GB.
++  const uint64_t quarter = [NSProcessInfo processInfo].physicalMemory / 4;
++  const uint64_t floorBytes = 512ull * 1024 * 1024, ceilingBytes = 1536ull * 1024 * 1024;
++  _directContext->setResourceCacheLimit((size_t)MIN(ceilingBytes, MAX(floorBytes, quarter)));
+ }

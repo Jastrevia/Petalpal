@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import { buildEnvironment, xcodeProblem } from '../scripts/ios-device.mjs';
+import { buildEnvironment, withoutDevelopmentTeam, xcodeProblem } from '../scripts/ios-device.mjs';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
 
 const require = createRequire(import.meta.url);
@@ -67,6 +67,20 @@ test('Xcode check matches Expo SDK 57', () => {
   assert.match(xcodeProblem('Xcode 26.3'), /26\.4/);
   assert.equal(xcodeProblem('Xcode 26.4\nBuild version 1'), null);
   assert.equal(xcodeProblem('Xcode 27.2'), null);
+});
+
+test('each device build lets Expo choose the team, so an expired free profile can be renewed', () => {
+  const project = '\t\t\t\tCODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = "ABCDE12345";\n\t\t\t\tDEVELOPMENT_TEAM = ABCDE12345;\n\t\t\t\tENABLE_BITCODE = NO;\n';
+  assert.equal(withoutDevelopmentTeam(project), '\t\t\t\tCODE_SIGN_STYLE = Automatic;\n\t\t\t\tENABLE_BITCODE = NO;\n');
+});
+
+test('native Skia sizes its Garden texture budget to the device, so frames do not re-decode images', () => {
+  const dir = new URL('../patches/', import.meta.url), name = fs.readdirSync(dir).find(file => file.startsWith('@shopify+react-native-skia+'));
+  assert.equal(name, `@shopify+react-native-skia+${require('@shopify/react-native-skia/package.json').version}.patch`, 'matches the installed Skia');
+  const patch = fs.readFileSync(new URL(name, dir), 'utf8');
+  assert.match(patch, /^\+.*physicalMemory \/ 4/m);
+  assert.match(patch, /^\+.*512ull \* 1024 \* 1024, ceilingBytes = 1536ull \* 1024 \* 1024/m);
+  assert.match(patch, /^\+.*setResourceCacheLimit\(\(size_t\)MIN\(ceilingBytes, MAX\(floorBytes, quarter\)\)\)/m);
 });
 
 function resetModule(env, fakes) {

@@ -34,7 +34,8 @@ export function buildEnvironment(fileValues, inherited, envName) {
   const clean = Object.fromEntries(Object.entries(inherited).filter(([key]) =>
     !key.startsWith('EXPO_PUBLIC_') && !['EAS_BUILD_PROFILE', 'PETALPAL_STORE_BUILD', 'PETALPAL_IOS_BUNDLE_ID'].includes(key)));
   const publicValues = Object.fromEntries(Object.entries(fileValues).filter(([key]) => key.startsWith('EXPO_PUBLIC_') || key === 'PETALPAL_IOS_DEV_BUNDLE_ID'));
-  return { ...clean, ...publicValues, EXPO_PUBLIC_APP_VARIANT: 'dev', EXPO_NO_DOTENV: '1' };
+  // CocoaPods needs a UTF-8 locale, which a shell started outside Terminal may not set.
+  return { ...clean, ...publicValues, LANG: inherited.LANG || 'en_US.UTF-8', EXPO_PUBLIC_APP_VARIANT: 'dev', EXPO_NO_DOTENV: '1' };
 }
 
 export function xcodeProblem(versionText) {
@@ -44,6 +45,10 @@ export function xcodeProblem(versionText) {
   if (major < XCODE_MINIMUM[0] || (major === XCODE_MINIMUM[0] && minor < XCODE_MINIMUM[1])) return `Expo SDK 57 needs Xcode ${XCODE_MINIMUM.join('.')} or later; found ${major}.${minor}.`;
   return null;
 }
+
+// Expo only lets Xcode create or renew a provisioning profile when it picks the team itself, not when the project already
+// names one, and a free profile expires every 7 days. So every build starts with no team in the generated project.
+export const withoutDevelopmentTeam = project => project.replace(/^[ \t]*DEVELOPMENT_TEAM = [^;\n]*;\n/gm, '');
 
 function run(command, args, env, cwd = root) {
   const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
@@ -74,6 +79,11 @@ function main() {
     try { run('npx', ['expo', 'prebuild', '--platform', 'ios', '--clean'], env); }
     finally { fs.writeFileSync(manifest, saved); }
     fs.writeFileSync(stamp, `${bundleId}\n`);
+  }
+  const pbxproj = fs.readdirSync(path.join(root, 'ios')).find(name => name.endsWith('.xcodeproj'));
+  if (pbxproj) {
+    const file = path.join(root, 'ios', pbxproj, 'project.pbxproj');
+    fs.writeFileSync(file, withoutDevelopmentTeam(fs.readFileSync(file, 'utf8')));
   }
   // EXPO_PUBLIC_ values are inlined and Metro's cache can keep old ones, so a Release build starts from an empty cache.
   // A Debug build keeps one cache per environment, for speed.
