@@ -29,12 +29,16 @@ export type RibbonMotionStrength = 'soft' | 'medium' | 'strong';
 const HANGING_DECOR_PIVOT = { x: 650, y: 205 };
 // Derived from the glass regions in lanterns.png after applying its approved
 // registration (x: 80, y: 60, scale: 0.834) into Swing design coordinates.
-const LEFT_LANTERN_LIGHT = { x: 220, y: 581 };
-const RIGHT_LANTERN_LIGHT = { x: 1110, y: 447 };
+export const LEFT_LANTERN_LIGHT = { x: 220, y: 581 };
+export const RIGHT_LANTERN_LIGHT = { x: 1110, y: 447 };
+export const LEFT_ARCH_LIGHT = { x: 220, y: 550 };
+export const RIGHT_ARCH_LIGHT = { x: 1110, y: 425 };
+export const LEFT_GROUND_LIGHT = { x: 225, y: 1015 };
+export const RIGHT_GROUND_LIGHT = { x: 1115, y: 1015 };
 // Glass-only contours in the registered Swing design space. Re-rendering the
 // lantern pixels inside these clips preserves their painted texture and metalwork.
-const LEFT_LANTERN_GLASS = 'M 184 530 L 257 530 L 257 632 L 184 635 Z';
-const RIGHT_LANTERN_GLASS = 'M 1060 394 L 1156 394 L 1156 498 L 1060 500 Z';
+export const LEFT_LANTERN_GLASS = 'M 184 530 L 257 530 L 257 632 L 184 635 Z';
+export const RIGHT_LANTERN_GLASS = 'M 1060 394 L 1156 394 L 1156 498 L 1060 500 Z';
 const LANTERN_LIGHT_MATRIX = [
   1.1, 0, 0, 0, 0,
   0, 0.65, 0, 0, 0,
@@ -179,6 +183,62 @@ function ProceduralLanternOuterGlow({ x, y }: { x: number; y: number }) {
   );
 }
 
+function ProceduralGroundGlow({ x, y }: { x: number; y: number }) {
+  return (
+    <Group transform={[{ scaleY: 0.33 }]} origin={{ x, y }}>
+      <Circle cx={x} cy={y} r={120}>
+        <RadialGradient c={{ x, y }} r={120}
+          colors={['rgba(255, 200, 120, 0.22)', 'rgba(242, 168, 72, 0.08)', 'rgba(242, 168, 72, 0)']}
+          positions={[0, 0.5, 1]} />
+        <Blur blur={14} />
+      </Circle>
+    </Group>
+  );
+}
+
+function ProceduralArchGlow({ x, y }: { x: number; y: number }) {
+  return (
+    <Circle cx={x} cy={y} r={165}>
+      <RadialGradient c={{ x, y }} r={165}
+        colors={['rgba(255, 200, 120, 0.20)', 'rgba(245, 175, 75, 0.07)', 'rgba(240, 160, 60, 0)']}
+        positions={[0, 0.45, 1]} />
+      <Blur blur={20} />
+    </Circle>
+  );
+}
+
+function ProceduralLanternHalo({ x, y }: { x: number; y: number }) {
+  return (
+    <Circle cx={x} cy={y} r={95}>
+      <RadialGradient c={{ x, y }} r={95}
+        colors={[
+          'rgba(255, 208, 124, 0.45)',
+          'rgba(255, 185, 85, 0.20)',
+          'rgba(242, 165, 65, 0.05)',
+          'rgba(242, 165, 65, 0)',
+        ]}
+        positions={[0, 0.35, 0.70, 1]} />
+      <Blur blur={10} />
+    </Circle>
+  );
+}
+
+function ProceduralLanternCore({ x, y, r = 44 }: { x: number; y: number; r?: number }) {
+  return (
+    <Circle cx={x} cy={y} r={r}>
+      <RadialGradient c={{ x, y }} r={r}
+        colors={[
+          '#FFF5DC',
+          '#FFC878',
+          'rgba(255, 175, 65, 0.25)',
+          'rgba(255, 175, 65, 0)',
+        ]}
+        positions={[0, 0.35, 0.75, 1]} />
+      <Blur blur={5} />
+    </Circle>
+  );
+}
+
 function ProceduralLanternInnerLight({
   image, clip,
 }: { image: LoadedImage; clip: string }) {
@@ -269,10 +329,30 @@ export default function SwingEntity({
   const lanternGlowOpacity = useSharedValue(lanternLightingEnabled ? 1 : 0);
   useEffect(() => {
     lanternGlowOpacity.value = withTiming(lanternLightingEnabled ? 1 : 0, {
-      duration: lanternLightingEnabled ? 1000 : 800,
+      duration: reducedMotion ? 0 : lanternLightingEnabled ? 1200 : 900,
       easing: Easing.inOut(Easing.ease),
     });
-  }, [lanternGlowOpacity, lanternLightingEnabled]);
+  }, [lanternGlowOpacity, lanternLightingEnabled, reducedMotion]);
+
+  const lightBreathPhase = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(lightBreathPhase);
+    lightBreathPhase.value = 0;
+    if (lanternLightingEnabled && !reducedMotion) {
+      lightBreathPhase.value = withRepeat(
+        withTiming(2 * Math.PI, { duration: 6000, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        false,
+      );
+    }
+    return () => cancelAnimation(lightBreathPhase);
+  }, [lanternLightingEnabled, lightBreathPhase, reducedMotion]);
+
+  const effectiveGlowOpacity = useDerivedValue(() => {
+    if (lanternGlowOpacity.value <= 0.001) return 0;
+    const breath = 0.97 + 0.03 * Math.sin(lightBreathPhase.value);
+    return lanternGlowOpacity.value * breath;
+  });
 
   const frame = useProductionImage(require('@/assets/garden/landmarks/swing/frame-static.png'));
   const decor = useProductionImage(require('@/assets/garden/landmarks/swing/hanging-decor.png'));
@@ -303,7 +383,7 @@ export default function SwingEntity({
   return (
     <Group transform={[{ translateX: x }, { translateY: y }, { scale }]}>
       {(mode === 'all' || mode === 'lantern-glow') && (
-        <Group opacity={lanternGlowOpacity}>
+        <Group opacity={effectiveGlowOpacity}>
           <ProceduralLanternOuterGlow {...LEFT_LANTERN_LIGHT} />
           <ProceduralLanternOuterGlow {...RIGHT_LANTERN_LIGHT} />
         </Group>
@@ -340,11 +420,27 @@ export default function SwingEntity({
       } : {})}>
         <RegisteredLayer image={decor.image} name="hanging-decor" mode={mode} />
       </Group>
+      {/* Restrained warm glow onto immediately surrounding wooden arch, flowers, and ground */}
+      {(mode === 'all' || mode === 'lantern-glow') && (
+        <Group opacity={effectiveGlowOpacity} blendMode="screen">
+          <ProceduralGroundGlow x={LEFT_GROUND_LIGHT.x} y={LEFT_GROUND_LIGHT.y} />
+          <ProceduralGroundGlow x={RIGHT_GROUND_LIGHT.x} y={RIGHT_GROUND_LIGHT.y} />
+          <ProceduralArchGlow x={LEFT_ARCH_LIGHT.x} y={LEFT_ARCH_LIGHT.y} />
+          <ProceduralArchGlow x={RIGHT_ARCH_LIGHT.x} y={RIGHT_ARCH_LIGHT.y} />
+        </Group>
+      )}
+
       <RegisteredLayer image={lanterns.image} name="lanterns" mode={mode} />
       {(mode === 'all' || mode === 'lantern-glow') && (
-        <Group opacity={lanternGlowOpacity}>
+        <Group opacity={effectiveGlowOpacity}>
           <ProceduralLanternInnerLight image={lanterns.image} clip={LEFT_LANTERN_GLASS} />
           <ProceduralLanternInnerLight image={lanterns.image} clip={RIGHT_LANTERN_GLASS} />
+          <Group blendMode="screen">
+            <ProceduralLanternHalo x={LEFT_LANTERN_LIGHT.x} y={LEFT_LANTERN_LIGHT.y} />
+            <ProceduralLanternHalo x={RIGHT_LANTERN_LIGHT.x} y={RIGHT_LANTERN_LIGHT.y} />
+            <ProceduralLanternCore x={LEFT_LANTERN_LIGHT.x} y={LEFT_LANTERN_LIGHT.y} r={42} />
+            <ProceduralLanternCore x={RIGHT_LANTERN_LIGHT.x} y={RIGHT_LANTERN_LIGHT.y} r={44} />
+          </Group>
         </Group>
       )}
 
