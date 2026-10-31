@@ -10,6 +10,7 @@ import { useAppLocale } from '../../services/locale';
 import { startAnswer } from '../../services/questionAnswer';
 import { MoodPetalChart, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
+import { ShareCardButton } from './ShareCard';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
 // One Event open at a time, under the part (`at`) that opened it.
@@ -357,10 +358,15 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           {short.card.reason && <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>}
           <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>
         </View>
+
+        {interactive && <ShareCardButton card={short.card} headline={short.headline} week={date ? `${date.eyebrow} ${date.range}`.trim() : ''}
+          locale={lang} linkStyle={v.link} />}
+
         {canMark && short.cardIndex !== null && <View style={v.marks}>
           {quiet(kept.has(short.cardIndex) ? copy.kept : copy.keep, () => void keep(short.cardIndex!), kept.has(short.cardIndex))}
         </View>}
         {loopNote && loopNote.index === short.cardIndex && <Text accessibilityRole="alert" style={v.text}>{loopNote.text}</Text>}
+ 
       </> });
       if (question) right.push({ key: 'question', node: <>{rule}{question}</> });
       if (report) right.push({ key: 'report', node: report });

@@ -250,6 +250,7 @@ test('Phase 1 failed Firebase sign-out cannot restore a terminally invalidated a
 
 test('Phase 1 auth gate separates loading, signed-out, verification, profile and authenticated controls', async () => {
   let auth = { phase: 'initializing', loading: true, session: null, identity: null, error: '', message: '' };
+  const replaced = [];
   const hooks = hookHarness(); const nodes = (tree) => Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object'
     ? [tree, ...nodes(tree.props?.children)] : [];
   const text = (tree) => nodes(tree).filter((n) => n.type === 'Text').map((n) => n.props.children).flat().join(' ');
@@ -258,15 +259,27 @@ test('Phase 1 auth gate separates loading, signed-out, verification, profile and
     './auth/LoginPreviewPage': { LoginPreviewPage: 'LoginPreviewPage' },
     '../constants/theme': { Fonts: { sans: 'sans', rounded: 'rounded' }, Spacing: { two: 8, three: 16, four: 24 } },
     'expo-splash-screen': { hideAsync: async () => {} },
+    'expo-router': { router: { replace: (path) => replaced.push(path) }, usePathname: () => '/' },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) },
+    '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },
+    '../services/deviceReset': { devVariant: false }, './features/DeviceReset': { DeviceResetButton: 'DeviceResetButton' },
     'react-native': { ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView',
       Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View',
-      Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles } },
+      Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } },
   });
   const gate = load('../../../components/AuthGate'); let tree = hooks.mount(() => gate.AuthGate({ children: 'real-app' }));
   assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0); assert.doesNotMatch(text(tree), /Sign in|Sign out/i);
-  // Signed out: the invitation page signs in through the real auth provider and keeps the policy links.
+  // Signed out: guest mode shows the app itself (the Garden) with no sign-in form, until an account is asked for.
   const logins = [];
   auth = { ...auth, phase: 'signedOut', loading: false, login: async (...values) => { logins.push(values); } }; tree = hooks.render();
+  const guest = nodes(tree).find((n) => n.type === 'GuestProvider');
+  assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
+  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0);
+  guest.props.value.requestAccount(); tree = hooks.render();
+  // Then the invitation page lies over the still-mounted app, signs in through the real auth provider and keeps the policy links.
+  assert.ok(nodes(tree).includes('real-app') || JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
+  const back = nodes(tree).find((n) => n.props?.accessibilityLabel === 'Back to the Garden');
+  assert.ok(back);
   const invitation = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
   assert.ok(invitation); assert.ok(invitation.props.footer); assert.doesNotMatch(text(tree), /Sign out/i);
   await invitation.props.onSignIn('fixture@example.test', 'synthetic password');

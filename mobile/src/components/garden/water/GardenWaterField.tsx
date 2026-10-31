@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { useDerivedValue } from 'react-native-reanimated';
 import { useWaterTopFlow, type WaterTopFlow } from './WaterTopAssembly';
 import { WATER_WAVE_SKSL } from './waterWaveShader';
+import { GARDEN_WATER_COLOR } from '../gardenMapLayout';
 
 // A colored mineral bed seen through clear aqua, rather than relief added over
 // an opaque cyan wash. The original shore-distance map controls transmission;
@@ -184,7 +185,11 @@ export default function GardenWaterField({ image, active, animated = true, flow 
     displayP3, seconds: clock.enabled ? clock.seconds.value : 0,
   }), [displayP3, clock.enabled, clock.seconds]);
   const base = material ?? image;
-  if (!FIELD || !floor || !shore || !wet) return <Image image={base} x={0} y={0} width={2400} height={1800} fit="fill" />;
+  // While the field's textures load: the solid water colour under the base painting, as the scene drew before.
+  if (!FIELD || !floor || !shore || !wet) return <>
+    <Rect x={-2400} y={-2400} width={7200} height={6600} color={GARDEN_WATER_COLOR} />
+    <Image image={base} x={0} y={0} width={2400} height={1800} fit="fill" />
+  </>;
   return <Rect x={-2400} y={-2400} width={7200} height={6600}>
     <Shader source={FIELD} uniforms={uniforms}>
       <ImageShader image={floor} rect={{ x: 0, y: 0, width: 2400, height: 1800 }} fit="fill" tx="mirror" ty="mirror" />

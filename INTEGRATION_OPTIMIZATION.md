@@ -62,6 +62,10 @@ All values below are milliseconds. H calls some values “frame” timings but d
 
 Shoreline (`abf310de`), matched warm runs in the same browser/scene at DPR 2: p50/p90/p95 **50.0/66.6/66.7→49.9/50.5/50.9 ms**. Some runs still reached ~67 ms. Early conditions missing from H must remain **UNKNOWN**, not backfilled with later viewport/hardware data. Neither baseline covers cold loading or guarantees a <40 ms p95.
 
+### Native iOS texture budget (D, 2026-10-30)
+
+First physical-device measurement: iPhone 15 Pro, Release, free signing, idle Garden, Time Profiler. Texture cache eviction forced PNG re-decoding every frame (about 93% of a saturated main thread, hangs near 0.8 s, thermal Serious to Critical). 512 MB did not change it; 1.5 GB did. Retained: native limit of a quarter of device memory, clamped to 512 MB–1.5 GB. After: main thread about 35%, thermal Fair, footprint about 1.65 GB. Limits: one device, idle camera, short runs; no presented-frame measurement, and no devices under 6 GB tested. Details in [MOBILE.md](MOBILE.md).
+
 ## 3. PR #34 and Stage 1 results
 
 **Measurement vocabulary:** WebGL draw calls count submissions per scene redraw, not displayed frames. RAF callback intervals measure scheduling cadence, not FPS. JS/Skia CPU durations exclude unmeasured GPU work and may overlap. GPU elapsed queries include command-stream execution/scheduling within their scope; fences add queueing/polling delay. Headless compositor swap events do not establish physical scanout. Never invert callback intervals, draws, flushes or GPU queries and label the result “presented FPS.”

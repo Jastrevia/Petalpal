@@ -5,6 +5,7 @@ coverage/
 .env.*
 !.env.example
 !.env.auth-e2e.example
+!.env.ios.*.example
 .env.auth-e2e.local
 .auth-e2e-state.local.json
 

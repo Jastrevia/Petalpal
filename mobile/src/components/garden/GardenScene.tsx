@@ -1427,8 +1427,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           <PlantingProvider value={drawnPlanting}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
-            {/* 1. Solid fallback */}
-            <Rect x={-2400} y={-2400} width={7200} height={6600} color={GARDEN_WATER_COLOR} />
+            {/* 1. Solid fallback, only while the water field is not drawn: the field fills this same rectangle opaquely
+                (and draws its own backdrop while its textures load), so drawing both repainted the whole screen twice. */}
+            {!(perf.Water && waterBaseVisible && calmBaseImage) && <Rect x={-2400} y={-2400} width={7200} height={6600} color={GARDEN_WATER_COLOR} />}
 
             {/* 2. Calm water base */}
             {perf.Water && waterBaseVisible && calmBaseImage && (
