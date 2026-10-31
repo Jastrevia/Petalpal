@@ -8,16 +8,16 @@ const { scheduleAction, scheduleRest, wanderTarget, wanderPause, USER_HOLD_MS, R
 const { FairyNavigation } = load('../fairy/FairyNavigation');
 const { WALK_NETWORK, WALK_START, distance } = load('../fairy/walkNetwork');
 const { mailboxApproachAnchor } = load('../fairy/mailboxDestination');
-const { treehouseInteriorAnchor, treehouseTap } = load('../fairy/treehouseDestination');
+const { treehouseInteriorAnchor } = load('../fairy/treehouseDestination');
 
 const plain = value => JSON.parse(JSON.stringify(value)); // VM-realm objects
-const base = { navState: 'idle', position: WALK_START, mailboxStand: mailboxApproachAnchor, placed: true, now: 1_000_000,
+const base = { navState: 'idle', placed: true, now: 1_000_000,
   userAt: 0, idleSince: 1_000_000, pauseMs: 10_000, retryAt: 0 };
 const act = (rest, change = {}) => scheduleAction({ ...base, rest, ...change });
 
 test('every server state maps to a place in the Garden', () => {
   assert.deepEqual(['TEA_TIME', 'SWINGING', 'SLEEPING', 'IN_TREEHOUSE', 'AT_MAILBOX', 'IDLE'].map(scheduleRest),
-    ['tea', 'swing', 'moon', 'treehouse', 'mailbox', 'path']);
+    ['tea', 'swing', 'moon', 'path', 'path', 'path'], 'she never goes into the treehouse or to the mailbox by herself');
   assert.equal(scheduleRest('SOMETHING_NEW'), null);
   assert.equal(scheduleRest(undefined), null);
 });
@@ -28,11 +28,6 @@ test('opening the Garden places her; later changes send her there; settled means
   assert.equal(act('tea', { navState: 'drinkingTea' }), 'wait');
   assert.equal(act('swing', { navState: 'drinkingTea' }), 'go');
   assert.equal(act('moon', { navState: 'sleepingOnMoonBed' }), 'wait');
-  assert.equal(act('swing', { navState: 'insideTreehouse' }), 'leaveTreehouse');
-  assert.equal(act('treehouse', { navState: 'insideTreehouse' }), 'wait');
-  // The mailbox is a place to stand, never the letter sequence.
-  assert.equal(act('mailbox', { position: mailboxApproachAnchor }), 'wait');
-  assert.equal(act('mailbox'), 'go');
 });
 
 test('travel, letters and a recent tap are never interrupted', () => {
@@ -112,22 +107,35 @@ test('on her own she only ever stands on dry ground: never the pond stepping sto
   assert.doesNotMatch(source, /wanderTarget\(WALK_NETWORK\.nodes/, 'the schedule never picks from the unfiltered network');
 });
 
-test('a tap on the treehouse takes her straight in and opens the Bookhouse, with no extra step', () => {
-  for (const state of ['idle', 'walking', 'sittingOnSwing', 'drinkingTea', 'flyingToTreehouse']) assert.equal(treehouseTap(state, true), 'enter');
-  assert.equal(treehouseTap('enteringTreehouse', true), 'openOnEntry');
-  assert.equal(treehouseTap('insideTreehouse', true), 'openBookhouse');
-  // Without a Bookhouse (a friend's Garden, previews) the tap still sends her in or calls her out.
-  assert.equal(treehouseTap('idle', false), 'enter');
-  assert.equal(treehouseTap('insideTreehouse', false), 'callOut');
-  assert.equal(treehouseTap('enteringTreehouse', false), 'callOut');
+test('a tap on the treehouse or the mailbox opens it straight away, and she stays out of it', () => {
   const scene = fs.readFileSync(new URL('../src/components/garden/GardenScene.tsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(scene, /accessibilityLabel="Open Bookhouse"|accessibilityLabel="Return from treehouse"/);
-  assert.match(scene, /onTreehouseEntered=\{\(\) => \{[^}]*if \(bookhouseOnEntry\.current\) \{ bookhouseOnEntry\.current = false; onOpenBookhouse\?\.\(\); \}/);
+  assert.doesNotMatch(scene, /call her out|叫她出来|fairy-treehouse-hint|\? \(\) => fairyRef\.current\?\.visitMailbox|bookhouseOnEntry/);
+  assert.match(scene, /tapMailbox\.current = \(\) => \{ if \(!readOnly\) onMailboxOpened\?\.\(\); \}/);
+  assert.match(scene, /tapTreehouse\.current = \(\) => \{ if \(!readOnly\) onOpenBookhouse\?\.\(\); \}/);
+});
+
+test('with no day from the server she still strolls, and soon', () => {
+  const { FIRST_STROLL_MS, RUNTIME_WAIT_MS } = load('../fairy/fairySchedule');
+  assert.ok(FIRST_STROLL_MS <= 3000 && RUNTIME_WAIT_MS <= 5000);
+  const source = fs.readFileSync(new URL('../src/components/garden/fairy/useFairySchedule.ts', import.meta.url), 'utf8');
+  assert.match(source, /scheduleRest\(runtime\.currentState\)\) \|\| 'path'/);
+  assert.equal(act('path', { idleSince: base.now - FIRST_STROLL_MS, pauseMs: FIRST_STROLL_MS }), 'wander');
+});
+
+test('she walks twice as fast, and settling onto a seat is as fast as her flight', () => {
+  const { WALK_SPEED, FLIGHT_SPEED } = load('../fairy/FairyNavigation');
+  assert.equal(WALK_SPEED, 0.22);
+  const nav = new FairyNavigation();
+  assert.equal(nav.move({ x: 0, y: 0 }, () => false, true), true);
+  for (let i = 0; i < 4000 && nav.state !== 'aligningToSwing'; i++) nav.update(16, () => false);
+  assert.equal(nav.state, 'aligningToSwing');
+  const path = nav.alignment.reduce((sum, p, i, all) => i ? sum + distance(all[i - 1], p) : 0, 0);
+  assert.ok(nav.duration <= Math.max(300, path / FLIGHT_SPEED) + 1);
 });
 
 test('she flies across the Garden quickly (owner feedback: flights felt slow)', () => {
   const { FLIGHT_SPEED, MIN_FLIGHT_MS } = load('../fairy/FairyNavigation');
-  assert.ok(FLIGHT_SPEED >= 0.3 && MIN_FLIGHT_MS <= 700);
+  assert.ok(FLIGHT_SPEED > 0.3 && MIN_FLIGHT_MS <= 700);
   const fairy = new FairyNavigation();
   assert.equal(fairy.move({ x: 0, y: 0 }, () => false, true), true);
   assert.equal(fairy.state, 'flyingToSwing');

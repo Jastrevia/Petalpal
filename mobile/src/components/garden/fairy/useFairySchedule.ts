@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { useFairyRuntime } from '../../../services/fairyRuntime';
 import type { FairyHandle } from './GardenFairy';
-import { mailboxApproachAnchor } from './mailboxDestination';
-import { RETRY_MS, scheduleAction, scheduleRest, standableNodes, wanderPause, wanderTarget } from './fairySchedule';
+import { FIRST_STROLL_MS, RETRY_MS, RUNTIME_WAIT_MS, scheduleAction, scheduleRest, standableNodes, wanderPause, wanderTarget } from './fairySchedule';
 import { isGardenGroundBlocked } from './gardenGround';
 import { WALK_NETWORK } from './walkNetwork';
 
@@ -14,9 +13,11 @@ const STANDABLE = standableNodes(WALK_NETWORK.nodes, isGardenGroundBlocked);
 // call the Garden makes whenever the user sends her somewhere, which holds the schedule off a minute.
 export function useFairySchedule(fairyRef: RefObject<FairyHandle | null>, enabled: boolean) {
   const runtime = useFairyRuntime();
-  const rest = enabled && runtime?.gardenSchedule === true ? scheduleRest(runtime.currentState) : null;
-  const memory = useRef({ placed: false, userAt: 0, idleSince: 0, pauseMs: wanderPause(Math.random), retryAt: 0, lastState: '' });
+  // No day to follow (no first flower yet, offline, guest) or a state this build does not know: she strolls.
+  const rest = !enabled ? null : (runtime?.gardenSchedule === true && scheduleRest(runtime.currentState)) || 'path';
+  const memory = useRef({ placed: false, startedAt: 0, userAt: 0, idleSince: 0, pauseMs: wanderPause(Math.random), retryAt: 0, lastState: '' });
   const restRef = useRef(rest); restRef.current = rest;
+  const hasDay = useRef(false); hasDay.current = runtime?.gardenSchedule === true;
   useEffect(() => { if (!rest) memory.current.placed = false; }, [rest]);
   useEffect(() => {
     if (!rest) return;
@@ -24,20 +25,21 @@ export function useFairySchedule(fairyRef: RefObject<FairyHandle | null>, enable
       const fairy = fairyRef.current, current = restRef.current;
       if (!fairy || !current) return;
       const m = memory.current, now = Date.now(), navState = fairy.getState();
+      // Opening the Garden: give her day a moment to arrive, so she appears where she should be.
+      m.startedAt ||= now;
+      if (!m.placed && !hasDay.current && now - m.startedAt < RUNTIME_WAIT_MS) return;
       if (navState !== m.lastState) {
-        if (navState === 'idle') { m.idleSince = now; m.pauseMs = wanderPause(Math.random); }
+        if (navState === 'idle' && m.lastState) { m.idleSince = now; m.pauseMs = wanderPause(Math.random); }
         m.lastState = navState;
       }
-      const action = scheduleAction({ rest: current, navState, position: fairy.getPosition(), mailboxStand: mailboxApproachAnchor,
+      const action = scheduleAction({ rest: current, navState,
         placed: m.placed, now, userAt: m.userAt, idleSince: m.idleSince, pauseMs: m.pauseMs, retryAt: m.retryAt });
       let started: boolean;
       if (action === 'place') {
         started = fairy.place(current, current === 'path' ? wanderTarget(STANDABLE, NOWHERE, Math.random, [0, Infinity]) ?? undefined : undefined);
-        m.placed = started; m.idleSince = now;
-      } else if (action === 'leaveTreehouse') started = fairy.returnFromTreehouse();
-      else if (action === 'go') {
-        started = current === 'tea' ? fairy.visitTea() : current === 'swing' ? fairy.visitSwing() : current === 'moon' ? fairy.visitMoonBed()
-          : current === 'treehouse' ? fairy.visitTreehouse() : fairy.move(mailboxApproachAnchor);
+        m.placed = started; m.idleSince = now; m.pauseMs = FIRST_STROLL_MS;
+      } else if (action === 'go') {
+        started = current === 'tea' ? fairy.visitTea() : current === 'swing' ? fairy.visitSwing() : fairy.visitMoonBed();
       } else if (action === 'wander') {
         // Dry ground only; a point she cannot reach right now is retried with another.
         started = false;

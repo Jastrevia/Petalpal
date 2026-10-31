@@ -15,6 +15,8 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { boundCamera, focusCamera, zoomCamera, type ShelfCamera } from '../components/bookhouse/shelfCamera';
 import { EngravedYear, ShelfMotif } from '../components/bookhouse/EngravedYear';
 import { useAuth } from '../services/auth';
+import { useAppLocale } from '../services/locale';
+import { flowerNameText } from '../services/flowerNames';
 import { useGuest } from '../services/guest';
 import { daysInMonth, journalYears, MONTHS, monthKey, openableMonths, readJournals, savePrivateJournal, updatePrivateJournal, type JournalCheckIn } from '../services/bookhouse';
 import { readEvent } from '../services/events';
@@ -28,7 +30,62 @@ const serif = Platform.select({ ios: 'Georgia', web: 'Georgia', default: 'serif'
 const moodName = (mood: string) => { const word = mood.replace('_BLOOM', '').toLowerCase(); return word.charAt(0).toUpperCase() + word.slice(1); };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unable to load your book. Please try again.';
 
+const ZH: Record<string, string> = {
+  'Your private pages': '你的私密书页',
+  'Choose a saved month.': '选一个写过的月份。',
+  'A page waiting for a memory': '这一页在等一段回忆',
+  'Private journal': '私密日记',
+  'Retry journals': '重新加载日记',
+  'Nothing written today yet.': '今天还没有写。',
+  'No journal saved for this day.': '这一天没有保存日记。',
+  'Your saved journals are waiting on the shelves.': '你保存的日记都在书架上等你。',
+  'Your first private journal will open a month on these shelves.': '写下第一篇私密日记后，书架上就会打开那个月。',
+  'Earlier years': '更早的年份',
+  'Later years': '更近的年份',
+  'Journal updated.': '日记已更新。',
+  'Private journal saved.': '私密日记已保存。',
+  'Flower History': '花的历史',
+  'Only for you · not sent to AI or saved as an Event memory': '只属于你 · 不会发送给 AI，也不会存成事件记忆',
+  'Close without saving': '不保存并关闭',
+  'Close New Journal': '关闭新日记',
+  'Transcribing…': '正在转成文字…',
+  'Preparing microphone…': '正在准备麦克风…',
+  'Done': '完成',
+  'Cancel': '取消',
+  'Saving…': '正在保存…',
+  'Save changes': '保存修改',
+  'Save private journal': '保存私密日记',
+  'A moment to keep…': '留住这一刻…',
+  'Close journal': '关闭日记',
+  'Retry flower history': '重新加载花的历史',
+  'Your Garden has no flowers yet.': '你的花园还没有花。',
+  'No messages received.': '还没有收到留言。',
+  'No written entry attached.': '没有附带文字。',
+  'Close Treehouse': '关闭树屋',
+  'Open journal': '打开日记',
+  'Lifts the journal so you can read it full screen': '拿起日记，全屏阅读',
+  'Read journal full screen': '全屏阅读日记',
+  'Edit this journal': '编辑这篇日记',
+  "Write today's journal": '写今天的日记',
+  'New Journal': '新日记',
+  'Done recording': '结束录音',
+  'Cancel voice input': '取消语音输入',
+  'Dictate private journal': '语音写日记',
+  'Record up to three minutes, then review before saving': '最多录三分钟，保存前可以再看一遍',
+  'Previous journal entry': '上一篇日记',
+  'Next journal entry': '下一篇日记',
+  'Planted': '种下于',
+  'Created': '创建于',
+};
+const MOOD_ZH: Record<string, string> = { SUNNY_BLOOM: '开心', PEACEFUL_BLOOM: '平静', GENTLE_BLOOM: '温柔', WONDER_BLOOM: '好奇', HEALING_BLOOM: '治愈', QUIET_BLOOM: '低落', DRIFTING_BLOOM: '迷茫', FIRE_BLOOM: '愤怒' };
+// One language on every page of the book: English text is the key, zh-Hans owners read the table.
+function useBookCopy() {
+  const locale = useAppLocale(), zh = locale === 'zh-Hans';
+  return { zh, locale, t: (text: string) => zh ? ZH[text] ?? text : text, month: (number: number) => zh ? `${number}月` : MONTHS[number - 1] };
+}
+
 export default function Bookhouse() {
+  const { t, month: monthText, zh } = useBookCopy();
   const { session } = useAuth();
   // Guest mode (services/guest.tsx): the treehouse is to look at; writing or reading history asks for an account.
   const guest = useGuest();
@@ -222,7 +279,7 @@ export default function Bookhouse() {
                         style={{ width: bookWidth, height: bookHeight, opacity: canOpen ? 1 : .78 }}>
                         <BookhouseArt index={(i + index * 2) % 12} width={bookWidth} height={bookHeight} />
                         <Text style={{ position: 'absolute', top: bookHeight * .22, alignSelf: 'center', color: '#3B3525', backgroundColor: '#F7E4BEED', paddingHorizontal: 1,
-                          fontFamily: serif, fontSize: sceneWidth * .018, borderRadius: 1 }}>{label}</Text>
+                          fontFamily: serif, fontSize: sceneWidth * .018, borderRadius: 1 }}>{monthText(i + 1)}</Text>
                         {available.has(monthKey(year, i + 1)) && <View style={{ position: 'absolute', bottom: 0, right: bookWidth * .18, height: 8, width: 3, backgroundColor: '#DAB478' }} />}
                       </Pressable>
                     </Animated.View>;
@@ -251,49 +308,49 @@ export default function Bookhouse() {
             <View style={s.pages}>
               <View pointerEvents={introVisible ? 'auto' : 'none'} aria-hidden={!introVisible} accessibilityElementsHidden={!introVisible} importantForAccessibility={introVisible ? 'auto' : 'no-hide-descendants'} style={[s.leftPage, { opacity: introVisible ? 1 : 0 }]}>
                 <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={compactBook} style={{ alignSelf: 'stretch', flex: 1 }} contentContainerStyle={{ alignItems: 'center', gap: compactBook ? 2 : 6 }}>
-                <Text style={[s.bookTitle, { fontSize: compactBook ? 17 : 27 }]}>{month ? `${MONTHS[month.month - 1]} ${month.year}` : 'Your private pages'}</Text>
+                <Text style={[s.bookTitle, { fontSize: compactBook ? 17 : 27 }]}>{month ? (zh ? `${month.year}年${month.month}月` : `${MONTHS[month.month - 1]} ${month.year}`) : t('Your private pages')}</Text>
                 <View style={[s.coverPlaceholder, compactBook && { flex: undefined, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minHeight: 0, marginTop: 2 }]}>{selectedEntry?.journal && session ? <JournalCover key={selectedEntry.journal.id} userId={session.user.id} journalId={selectedEntry.journal.id} size={compactBook ? 60 : 125} /> : <BookhouseArt index={14} width={compactBook ? 60 : 125} height={compactBook ? 66 : 140} />}</View>
                 <View style={s.bookDivider} />
-                <Text style={s.bookCaption}>{month ? `Day ${day}` : 'Choose a saved month.'}</Text>
-                {!!month && <Text style={s.bookCaption}>{dayEntries.length ? `${dayEntries.length} private ${dayEntries.length === 1 ? 'entry' : 'entries'}` : 'A page waiting for a memory'}</Text>}
-                {!compactBook && dayEntries.length <= 1 && <Text style={[s.keepsake, { fontSize: sceneWidth >= 700 ? 23 : 16 }]}>Small moments{'\n'}still matter. ♡</Text>}
+                <Text style={s.bookCaption}>{month ? (zh ? `${day}日` : `Day ${day}`) : t('Choose a saved month.')}</Text>
+                {!!month && <Text style={s.bookCaption}>{dayEntries.length ? (zh ? `${dayEntries.length} 篇私密日记` : `${dayEntries.length} private ${dayEntries.length === 1 ? 'entry' : 'entries'}`) : t('A page waiting for a memory')}</Text>}
+                {!compactBook && dayEntries.length <= 1 && <Text style={[s.keepsake, { fontSize: sceneWidth >= 700 ? 23 : 16 }]}>{zh ? '小小的瞬间\n也很重要 ♡' : 'Small moments\nstill matter. ♡'}</Text>}
                 {dayEntries.length > 1 && <View style={s.entrySelector}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Previous journal entry" disabled={entryIndex === 0} onPress={() => setEntryIndex(i => i - 1)} style={[s.smallButton, { opacity: entryIndex === 0 ? .3 : 1 }]}><Text style={s.body}>‹</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('Previous journal entry')} disabled={entryIndex === 0} onPress={() => setEntryIndex(i => i - 1)} style={[s.smallButton, { opacity: entryIndex === 0 ? .3 : 1 }]}><Text style={s.body}>‹</Text></Pressable>
                   <Text style={s.bookCaption}>{entryIndex + 1} / {dayEntries.length}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Next journal entry" disabled={entryIndex >= dayEntries.length - 1} onPress={() => setEntryIndex(i => i + 1)} style={[s.smallButton, { opacity: entryIndex >= dayEntries.length - 1 ? .3 : 1 }]}><Text style={s.body}>›</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('Next journal entry')} disabled={entryIndex >= dayEntries.length - 1} onPress={() => setEntryIndex(i => i + 1)} style={[s.smallButton, { opacity: entryIndex >= dayEntries.length - 1 ? .3 : 1 }]}><Text style={s.body}>›</Text></Pressable>
                 </View>}
                 </ScrollView>
               </View>
               <View style={[s.rightPage, { paddingHorizontal: compactBook ? 8 : 24 }]}>
-                {!selectedEntry?.journal && <View style={s.pageHeader}><Text style={s.bookCaption}>Private journal</Text><Text style={s.bookCaption}>{month ? `${MONTHS[month.month - 1]} ${day}` : ''}</Text></View>}
-                {loading ? <ActivityIndicator color="#725332" /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={reload} style={s.smallButton}><Text>Retry journals</Text></Pressable></> :
+                {!selectedEntry?.journal && <View style={s.pageHeader}><Text style={s.bookCaption}>{t('Private journal')}</Text><Text style={s.bookCaption}>{month ? (zh ? `${month.month}月${day}日` : `${MONTHS[month.month - 1]} ${day}`) : ''}</Text></View>}
+                {loading ? <ActivityIndicator color="#725332" /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={reload} style={s.smallButton}><Text>{t('Retry journals')}</Text></Pressable></> :
                   selectedEntry?.journal ? null :
                   month && isToday(month.year, month.month, day) ? <View style={{ marginTop: 20, gap: 8, alignItems: 'flex-start' }}>
-                    <Text style={[s.body, { color: '#725C42' }]}>Nothing written today yet.</Text>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Write today's journal" onPress={() => needsAccount() || setEditor({ text: '' })} style={s.smallButton}>
-                      <Text style={[s.body, { color: '#5B3F26', textDecorationLine: 'underline' }]}>Write today’s journal  →</Text></Pressable>
+                    <Text style={[s.body, { color: '#725C42' }]}>{t('Nothing written today yet.')}</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel={t("Write today's journal")} onPress={() => needsAccount() || setEditor({ text: '' })} style={s.smallButton}>
+                      <Text style={[s.body, { color: '#5B3F26', textDecorationLine: 'underline' }]}>{zh ? '写今天的日记  →' : 'Write today’s journal  →'}</Text></Pressable>
                   </View> :
-                  <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.'}</Text>}
+                  <Text style={[s.body, { marginTop: 20, color: '#725C42' }]}>{t(month ? 'No journal saved for this day.' : available.size ? 'Your saved journals are waiting on the shelves.' : 'Your first private journal will open a month on these shelves.')}</Text>}
               </View>
             </View>
-            {!loading && !error && selectedEntry?.journal && !compactBook && <JournalPages night={lit} key={selectedEntry.id} text={selectedEntry.journal.content} textStyle={pageTextStyle} onIntroChange={setIntroVisible} bookWidth={pageSize.width} bookHeight={pageSize.height} inset={24} date={month ? `${MONTHS[month.month - 1]} ${day}` : ''} />}
+            {!loading && !error && selectedEntry?.journal && !compactBook && <JournalPages night={lit} key={selectedEntry.id} text={selectedEntry.journal.content} textStyle={pageTextStyle} onIntroChange={setIntroVisible} bookWidth={pageSize.width} bookHeight={pageSize.height} inset={24} date={month ? (zh ? `${month.month}月${day}日` : `${MONTHS[month.month - 1]} ${day}`) : ''} />}
             {/* Phones: the book is too small for pages, so tapping it lifts the journal onto one full-screen sheet. */}
-            {!loading && !error && selectedEntry?.journal && compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Open journal" accessibilityHint="Lifts the journal so you can read it full screen"
+            {!loading && !error && selectedEntry?.journal && compactBook && <Pressable accessibilityRole="button" accessibilityLabel={t('Open journal')} accessibilityHint={t('Lifts the journal so you can read it full screen')}
               onPress={() => setReader(true)} style={[StyleSheet.absoluteFill, { left: '50%', paddingTop: bookHeight * .15, paddingBottom: bookHeight * .18, paddingRight: '12%', paddingLeft: 6, zIndex: 2 }]}>
-              <View style={s.pageHeader}><Text style={s.bookCaption}>{month ? `${MONTHS[month.month - 1]} ${day}` : ''}</Text></View>
+              <View style={s.pageHeader}><Text style={s.bookCaption}>{month ? (zh ? `${month.month}月${day}日` : `${MONTHS[month.month - 1]} ${day}`) : ''}</Text></View>
               <Text numberOfLines={6} style={[pageTextStyle, { opacity: .85 }]}>{selectedEntry.journal.content}</Text>
               <Text style={[s.bookCaption, { marginTop: 'auto', color: '#7B5A36' }]}>Tap to open ⤢</Text>
             </Pressable>}
-            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Read journal full screen" onPress={() => setReader(true)}
+            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel={t('Read journal full screen')} onPress={() => setReader(true)}
               style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '13%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
               <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Read in full ⤢</Text></Pressable>}
-            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel="Edit this journal"
+            {!loading && !error && selectedEntry?.journal && !compactBook && <Pressable accessibilityRole="button" accessibilityLabel={t('Edit this journal')}
               onPress={() => needsAccount() || setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content })}
               style={{ position: 'absolute', zIndex: 3, top: bookHeight * .06, right: '32%', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F4E5C3E6', borderWidth: 1, borderColor: '#C9A86F' }}>
               <Text style={[s.bookCaption, { color: '#5B3F26' }]}>Edit ✎</Text></Pressable>}
             {month && <View style={s.tabs}>{MONTHS.map((label, i) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Read ${label} ${month.year}`}
               disabled={!openable.has(monthKey(month.year, i + 1))} accessibilityState={{ selected: month.month === i + 1, disabled: !openable.has(monthKey(month.year, i + 1)) }}
-              onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: openable.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{label}</Text></Pressable>)}</View>}
+              onPress={() => openMonth(month.year, i + 1)} style={[s.monthTab, { opacity: openable.has(monthKey(month.year, i + 1)) ? 1 : .55, backgroundColor: month.month === i + 1 ? '#E8BFB2' : '#E2CAA6' }]}><Text style={s.tabText}>{monthText(i + 1)}</Text></Pressable>)}</View>}
           </Animated.View>
           </View>
           <View style={{ height: bookHeight - coverBaseline }} />
@@ -301,7 +358,7 @@ export default function Bookhouse() {
             <Text style={s.writtenLabel}>{journalDays.length ? '✎ You wrote on' : '✎ No journals this month yet'}</Text>
             {journalDays.map(n => <Pressable key={n} accessibilityRole="button" accessibilityLabel={`Read journal from ${MONTHS[month.month - 1]} ${n}`}
               onPress={() => { setDay(n); setReader(false); }} style={[s.writtenChip, day === n && s.writtenChipOn]}>
-              <Text style={[s.writtenChipText, day === n && { color: '#513B2A' }]}>{MONTHS[month.month - 1]} {n}</Text></Pressable>)}
+              <Text style={[s.writtenChipText, day === n && { color: '#513B2A' }]}>{zh ? `${month.month}月${n}日` : `${MONTHS[month.month - 1]} ${n}`}</Text></Pressable>)}
           </View>}
           {month && <ScrollView ref={dayRow} horizontal style={{ flexGrow: 0, height: 58 }} showsHorizontalScrollIndicator contentContainerStyle={s.days}>{Array.from({ length: daysInMonth(month.year, month.month) }, (_, i) => i + 1).map(n =>
             <Pressable key={n} accessibilityRole="button" accessibilityLabel={`Day ${n}${journalDays.includes(n) ? ', has a journal' : ''}${isToday(month.year, month.month, n) ? ', today' : ''}`} accessibilityState={{ selected: day === n }} onPress={() => setDay(n)}
@@ -311,8 +368,8 @@ export default function Bookhouse() {
             </Pressable>)}</ScrollView>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
           <View style={s.actions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="New Journal" onPress={() => needsAccount() || setEditor({ text: '' })} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>New{ '\n' }Journal  →</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Flower History" onPress={() => needsAccount() || setHistory(true)} style={s.action}><BookhouseArt index={14} width={45} height={52} /><Text style={s.actionText}>Flower{ '\n' }History  →</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('New Journal')} onPress={() => needsAccount() || setEditor({ text: '' })} style={s.action}><BookhouseArt index={13} width={45} height={52} /><Text style={s.actionText}>{zh ? '新日记  →' : 'New\nJournal  →'}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('Flower History')} onPress={() => needsAccount() || setHistory(true)} style={s.action}><BookhouseArt index={14} width={45} height={52} /><Text style={s.actionText}>{zh ? '花的历史  →' : 'Flower\nHistory  →'}</Text></Pressable>
           </View>
         </View>
         </Animated.View>
@@ -322,16 +379,16 @@ export default function Bookhouse() {
     {(focusedYear !== null || years.length > 6) && <View style={[s.focusTools, { top: insets.top + 8 }]}>
       {focusedYear !== null && <Pressable accessibilityRole="button" onPress={() => { setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>← All Years</Text></Pressable>}
       {years.length > 6 && <>
-        <Pressable accessibilityRole="button" disabled={yearOffset === 0} onPress={() => { setYearOffset(Math.max(0, yearOffset - 6)); setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>Earlier years</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={yearOffset + 6 >= years.length} onPress={() => { setYearOffset(yearOffset + 6); setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>Later years</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={yearOffset === 0} onPress={() => { setYearOffset(Math.max(0, yearOffset - 6)); setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>{t('Earlier years')}</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={yearOffset + 6 >= years.length} onPress={() => { setYearOffset(yearOffset + 6); setFocusedYear(null); sceneScroll.current?.scrollTo({ y: 0, animated: false }); }} style={s.smallButton}><Text style={s.cream}>{t('Later years')}</Text></Pressable>
       </>}
     </View>}
     {/* Always in the same corner, whatever is scrolled: back to the Garden. */}
-    <Pressable accessibilityRole="button" accessibilityLabel="Close Treehouse" onPress={leave} hitSlop={6}
+    <Pressable accessibilityRole="button" accessibilityLabel={t('Close Treehouse')} onPress={leave} hitSlop={6}
       style={[s.close, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
     {editor && session && <JournalEditor userId={session.user.id} existing={editor.id ? { id: editor.id, text: editor.text } : undefined} onClose={() => setEditor(false)}
-      onSaved={async edited => { setEditor(false); setNotice(edited ? 'Journal updated.' : 'Private journal saved.'); await reload(); }} />}
-    {reader && selectedEntry?.journal && <JournalReader text={selectedEntry.journal.content} night={lit} date={month ? `${MONTHS[month.month - 1]} ${day}, ${month.year}` : ''} onClose={() => setReader(false)}
+      onSaved={async edited => { setEditor(false); setNotice(t(edited ? 'Journal updated.' : 'Private journal saved.')); await reload(); }} />}
+    {reader && selectedEntry?.journal && <JournalReader text={selectedEntry.journal.content} night={lit} date={month ? (zh ? `${month.year}年${month.month}月${day}日` : `${MONTHS[month.month - 1]} ${day}, ${month.year}`) : ''} onClose={() => setReader(false)}
       onEdit={() => { setReader(false); setEditor({ id: selectedEntry.journal!.id, text: selectedEntry.journal!.content }); }} />}
     {history && session && <FlowerHistory userId={session.user.id} timezone={session.user.timezone || 'UTC'} onClose={() => setHistory(false)} />}
   </Animated.View></GestureHandlerRootView>;
@@ -348,6 +405,7 @@ function Sheet({ title, onClose, children, theme }: { title: string; onClose: ()
 function JournalEditor({ userId, existing, onClose, onSaved }: {
   userId: string; existing?: { id: string; text: string }; onClose: () => void; onSaved: (edited: boolean) => Promise<void>;
 }) {
+  const { t, zh } = useBookCopy();
   const [text, setText] = useState(existing?.text ?? '');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const saving = useRef(false);
   const voice = useEventVoiceInput(text, setText, busy, 2000, 'journal');
@@ -364,38 +422,39 @@ function JournalEditor({ userId, existing, onClose, onSaved }: {
     finally { saving.current = false; setBusy(false); }
   };
   // Written on the lifted page: one tall sheet with room to keep going.
-  return <ImmersivePaper title={existing ? 'Edit Journal ✎' : 'New Journal ❧'} subtitle="Only for you · not sent to AI or saved as an Event memory" closeLabel={existing ? 'Close without saving' : 'Close New Journal'}
+  return <ImmersivePaper title={zh ? (existing ? '编辑日记 ✎' : '新日记 ❧') : (existing ? 'Edit Journal ✎' : 'New Journal ❧')} subtitle={t('Only for you · not sent to AI or saved as an Event memory')} closeLabel={t(existing ? 'Close without saving' : 'Close New Journal')}
     onClose={() => { if (!busy) onClose(); }} footer={<>
       {voice.active && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <Text accessibilityLiveRegion="polite" style={paperCaption}>{voice.phase === 'recording' ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…'}</Text>
-        {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel="Done recording" onPress={() => void voice.done()} style={s.smallButton}><Text style={paperBody}>Done</Text></Pressable>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Cancel voice input" onPress={() => void voice.cancel()} style={s.smallButton}><Text style={paperBody}>Cancel</Text></Pressable>
+        <Text accessibilityLiveRegion="polite" style={paperCaption}>{voice.phase === 'recording' ? `${zh ? '录音中' : 'Recording'} ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : t(voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…')}</Text>
+        {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel={t('Done recording')} onPress={() => void voice.done()} style={s.smallButton}><Text style={paperBody}>{t('Done')}</Text></Pressable>}
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Cancel voice input')} onPress={() => void voice.cancel()} style={s.smallButton}><Text style={paperBody}>{t('Cancel')}</Text></Pressable>
       </View>}
       {!!voice.error && <Text accessibilityRole="alert" style={paperBody}>{voice.error}</Text>}
       {!!voice.overflow && <Text selectable style={paperBody}>{voice.overflow}</Text>}
       {!!error && <Text accessibilityRole="alert" style={paperBody}>{error}</Text>}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Text style={[paperCaption, { flex: 1 }]}>{text.length} / 2000 · saved privately for you</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dictate private journal" accessibilityHint="Record up to three minutes, then review before saving"
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Dictate private journal')} accessibilityHint={t('Record up to three minutes, then review before saving')}
           disabled={busy || voice.active} accessibilityState={{ disabled: busy || voice.active }} onPress={() => void voice.start()}
           style={{ width: 48, height: 48, opacity: busy || voice.active ? .5 : 1 }}>
           <Image accessible={false} source={require('../../assets/events/microphone.png')} style={{ width: 48, height: 48 }} resizeMode="contain" />
         </Pressable>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Save private journal" disabled={busy || voice.active || !text.trim()} onPress={save}
-        style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{busy ? 'Saving…' : existing ? 'Save changes' : 'Save private journal'}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Save private journal')} disabled={busy || voice.active || !text.trim()} onPress={save}
+        style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{t(busy ? 'Saving…' : existing ? 'Save changes' : 'Save private journal')}</Text></Pressable>
     </>}>
     <EmotionalSafetyNote text={text} />
-    <TextInput accessibilityLabel="Private journal" placeholder="A moment to keep…" placeholderTextColor="#A08562" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy} autoFocus
+    <TextInput accessibilityLabel={t('Private journal')} placeholder={t('A moment to keep…')} placeholderTextColor="#A08562" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy} autoFocus
       style={[immersiveText, { flex: 1, minHeight: 200, textAlignVertical: 'top', padding: 0, backgroundColor: 'transparent', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : {}) }]} />
   </ImmersivePaper>;
 }
 
 // Reading a saved journal on the lifted page: the whole entry on one scrolling sheet.
 function JournalReader({ text, date, night, onClose, onEdit }: { text: string; date: string; night?: boolean; onClose: () => void; onEdit: () => void }) {
-  return <ImmersivePaper title={date || 'Private journal'} subtitle="Private journal" closeLabel="Close journal" night={night} onClose={onClose}
-    footer={<Pressable accessibilityRole="button" accessibilityLabel="Edit this journal" onPress={onEdit}
-      style={[s.save, { backgroundColor: '#5B7A62' }]}><Text style={[s.cream, { fontSize: 17 }]}>✎  Edit this journal</Text></Pressable>}>
+  const { t, zh } = useBookCopy();
+  return <ImmersivePaper title={date || t('Private journal')} subtitle={t('Private journal')} closeLabel={t('Close journal')} night={night} onClose={onClose}
+    footer={<Pressable accessibilityRole="button" accessibilityLabel={t('Edit this journal')} onPress={onEdit}
+      style={[s.save, { backgroundColor: '#5B7A62' }]}><Text style={[s.cream, { fontSize: 17 }]}>{zh ? '✎  编辑这篇日记' : '✎  Edit this journal'}</Text></Pressable>}>
     <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator>
       <Text selectable style={immersiveText}>{text}</Text>
     </ScrollView>
@@ -403,6 +462,7 @@ function JournalReader({ text, date, night, onClose, onEdit }: { text: string; d
 }
 
 function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone: string; onClose: () => void }) {
+  const { t, zh, locale } = useBookCopy();
   const [flowers, setFlowers] = useState<FlowerPlacementRecord[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [detail, setDetail] = useState<{ id: string; content: string; messages: string[]; supports: number; secondary: string[] } | null>(null);
   const [detailError, setDetailError] = useState(''); const [detailBusy, setDetailBusy] = useState<string | null>(null);
@@ -421,15 +481,15 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
         messages: (source.messages || []).map(m => `${m.author || m.senderName || 'Friend'}: ${m.text}`), supports: source.supportCount, secondary: event?.secondaryEmotions || flower.secondaryEmotions || [] });
     } catch (e) { if (request === version.current) setDetailError(errorMessage(e)); } finally { if (request === version.current) setDetailBusy(null); }
   };
-  return <Sheet title="Flower History" onClose={onClose}>
-    {loading ? <ActivityIndicator /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={load}><Text>Retry flower history</Text></Pressable></> : !flowers.length ? <Text style={s.body}>Your Garden has no flowers yet.</Text> : flowers.map(flower => <View key={flower.flowerId} style={s.historyEntry}>
+  return <Sheet title={t('Flower History')} onClose={onClose}>
+    {loading ? <ActivityIndicator /> : error ? <><Text accessibilityRole="alert" style={s.body}>{error}</Text><Pressable accessibilityRole="button" onPress={load}><Text>{t('Retry flower history')}</Text></Pressable></> : !flowers.length ? <Text style={s.body}>{t('Your Garden has no flowers yet.')}</Text> : flowers.map(flower => <View key={flower.flowerId} style={s.historyEntry}>
       <Pressable accessibilityRole="button" accessibilityLabel={`Read flower ${flower.flowerName} ${flower.flowerId}`} onPress={() => inspect(flower)} style={{ minHeight: 48 }}>
-        <Text style={s.title}>{flower.flowerName}</Text><Text style={s.caption}>{moodName(flower.mood || '')} · {flower.sourceType || 'Flower'}</Text>
-        <Text style={s.caption}>{flower.placementOrigin !== 'FALLBACK' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
+        <Text style={s.title}>{flowerNameText(flower.flowerName ?? '', locale)}</Text><Text style={s.caption}>{zh ? MOOD_ZH[flower.mood || ''] ?? '' : moodName(flower.mood || '')} · {zh ? (flower.sourceType === 'EVENT' ? '事件' : '花') : flower.sourceType || 'Flower'}</Text>
+        <Text style={s.caption}>{t(flower.placementOrigin !== 'FALLBACK' ? 'Planted' : 'Created')} {new Date(flower.plantedDate).toLocaleDateString(zh ? 'zh-CN' : undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
       </Pressable>
       {detailBusy === flower.flowerId && <ActivityIndicator />}
-      {detail?.id === flower.flowerId && <View style={{ gap: 8 }}><Text selectable style={s.body}>{detail.content || 'No written entry attached.'}</Text><Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>
-        {detail.messages.length ? detail.messages.map((message, i) => <Text key={i} style={s.body}>{message}</Text>) : <Text style={s.caption}>No messages received.</Text>}</View>}
+      {detail?.id === flower.flowerId && <View style={{ gap: 8 }}><Text selectable style={s.body}>{detail.content || t('No written entry attached.')}</Text><Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>
+        {detail.messages.length ? detail.messages.map((message, i) => <Text key={i} style={s.body}>{message}</Text>) : <Text style={s.caption}>{t('No messages received.')}</Text>}</View>}
     </View>)}
     {!!detailError && <Text accessibilityRole="alert" style={s.body}>{detailError}</Text>}
   </Sheet>;

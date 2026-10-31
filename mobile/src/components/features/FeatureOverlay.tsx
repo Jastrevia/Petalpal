@@ -4,7 +4,7 @@ import { PrivacyAndSupport } from './PrivacyAndSupport';
 import { AiPrivacySettings } from './AiPrivacySettings';
 import { ReportLanguageSettings } from './ReportLanguageSettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,9 +62,10 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const [addingFriend, setAddingFriend] = useState(false);
   // The ⓘ beside the Events title unfolds what an Event is.
   const [eventsIntro, setEventsIntro] = useState(false);
+  const scroller = useRef<ScrollView>(null), contentHeight = useRef(0);
   const locale = useAppLocale();
   const closeLabel = OVERLAY_COPY[locale].close;
-  useEffect(() => { setAddingFriend(false); setEventsIntro(false); }, [feature?.id]);
+  useEffect(() => { setAddingFriend(false); setEventsIntro(false); contentHeight.current = 0; }, [feature?.id]);
   if (!feature) return null;
   const title = FEATURE_LABELS[locale][feature.id] ?? feature.label;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -93,7 +94,11 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
           </Pressable>
         </View>
         </> : null}
-        <ScrollView style={[styles.scroll, feature.id === 'events' && styles.eventsScroll]} contentContainerStyle={[styles.content, feature.id === 'events' && styles.eventsContent]} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroller} onContentSizeChange={(_width, height) => {
+          // A saved Event's flower appears below the fold: bring it, its share switch and Plant into view.
+          if (feature.id === 'events' && contentHeight.current && height - contentHeight.current > 120) scroller.current?.scrollToEnd({ animated: true });
+          contentHeight.current = height;
+        }} style={[styles.scroll, feature.id === 'events' && styles.eventsScroll]} contentContainerStyle={[styles.content, feature.id === 'events' && styles.eventsContent]} keyboardShouldPersistTaps="handled">
           <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings} eventsIntro={eventsIntro}
             addingFriend={addingFriend} onAddFriend={() => setAddingFriend(true)} onCloseAddFriend={() => setAddingFriend(false)} />
         </ScrollView>

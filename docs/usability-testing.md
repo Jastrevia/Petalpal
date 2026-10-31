@@ -47,7 +47,6 @@ These still differ from a real release:
 | Not covered | Why |
 |---|---|
 | Real AI output | The TEST backend's AI limits are 0, so Weekly reports use the code-written version |
-| Weekly 2.0 loop, Monthly 2.0, almanac | Those are on `feat/weekly-insights-m2`, not this build |
 | Install from an invitation | There is no TestFlight, so that first step isn't part of the test |
 | Long-term use | The app expires after 7 days unless reinstalled |
 
@@ -143,5 +142,5 @@ Normal builds keep nothing in SecureStore and have no local database. The Reset 
 3. Sign with the paid team instead of the Personal Team. EAS can manage certificates.
 4. **Capabilities:** nothing was turned off here, so there is nothing to restore. Add a capability in `app.json` only when a feature needs it.
 5. Set the EAS `production` environment values and follow [ios/TESTFLIGHT.md](ios/TESTFLIGHT.md).
-6. Decide which backend the beta uses. Production needs its own approved release and migration steps, and `feat/weekly-insights-m2` needs migration `202611010001` first.
+6. Decide which backend the beta uses. Production needs its own approved release and migration steps, including `202610310001` and `202611010001` before any backend deploy of current `main`.
 7. Test accounts and data on TEST do not carry over to production.

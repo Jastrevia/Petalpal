@@ -10,8 +10,8 @@ const REWARD = require('@/assets/keepsakes/star-candy-jar.webp');
 
 // The daily check-in card at the top of the Garden calendar (design screens 3–5): this
 // round's seven petals, the button, and PPL's keepsakes once it goes through.
-export function CalendarCheckIn({ summary, locale, ink, muted }: {
-  summary: ClosenessSummary; locale: BondLocale; ink: string; muted: string;
+export function CalendarCheckIn({ summary, locale, ink, muted, light = true }: {
+  summary: ClosenessSummary; locale: BondLocale; ink: string; muted: string; light?: boolean;
 }) {
   const copy = BOND_COPY[locale];
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [result, setResult] = useState<CheckInResult | null>(null);
@@ -27,7 +27,7 @@ export function CalendarCheckIn({ summary, locale, ink, muted }: {
     } catch { setError(copy.checkInFailed); }
     finally { setBusy(false); }
   }
-  return <View style={styles.card}>
+  return <View style={[styles.card, !light && styles.cardDark]}>
     <View style={styles.top}>
       <Text style={[styles.title, { color: ink }]}>{copy.checkIn}</Text>
       <Text style={[styles.small, { color: muted }]}>{copy.streak(streak)}</Text>
@@ -56,6 +56,7 @@ export function CalendarCheckIn({ summary, locale, ink, muted }: {
 
 const styles = StyleSheet.create({
   card: { gap: 8, padding: 12, marginBottom: 12, borderRadius: 14, backgroundColor: '#F5ECF8', borderWidth: 1, borderColor: '#D9C2EA' },
+  cardDark: { backgroundColor: '#1B4440', borderColor: '#52716A' },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   title: { fontFamily: 'Georgia', fontSize: 16 },
   small: { fontSize: 12 },

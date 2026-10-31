@@ -1,3 +1,4 @@
+import { usePanelTheme } from '../features/PanelTheme';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { AVATAR_ART, AVATAR_IDS } from './avatarArt';
 
@@ -14,13 +15,14 @@ export function AvatarPicker({ visible, title, selected, busy = false, error = '
     ...AVATAR_IDS.map((id, index) => ({ id, source: AVATAR_ART[id], label: optionLabel(index + 1) })),
   ];
   const current = selected ?? null;
+  const { theme } = usePanelTheme();
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <Pressable accessibilityLabel={closeLabel} onPress={onClose} style={styles.backdrop}>
-      <Pressable accessibilityViewIsModal style={styles.sheet} onPress={() => undefined}>
+      <Pressable accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.surface }]} onPress={() => undefined}>
         <View style={styles.header}>
-          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={styles.close}>
-            <Text style={styles.closeText}>×</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{title}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={[styles.close, { backgroundColor: theme.input }]}>
+            <Text style={[styles.closeText, { color: theme.text }]}>×</Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.grid}>

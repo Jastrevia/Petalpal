@@ -1,3 +1,4 @@
+import { usePanelTheme } from './PanelTheme';
 import { Text, View, type TextStyle } from 'react-native';
 import { GENERAL_SUPPORT, immediateSupportHint } from '../../services/emotionalSafety';
 import { useAppLocale } from '../../services/locale';
@@ -7,5 +8,6 @@ const GENERAL_SUPPORT_ZH='PetalPal 用来记录和回看心情，不提供医疗
 export function EmotionalSafetyNote({text='',style}:{text?:string;style?:TextStyle}) {
  const hint=immediateSupportHint(text);
  const zh=useAppLocale()==='zh-Hans';
- return <View style={{gap:8}}><Text style={style??ui.caption}>{zh?GENERAL_SUPPORT_ZH:GENERAL_SUPPORT}</Text>{hint?<Text accessibilityRole="alert" style={ui.text}>{hint}</Text>:null}</View>;
+ const {theme}=usePanelTheme();
+ return <View style={{gap:8}}><Text style={style??[ui.caption,{color:theme.muted}]}>{zh?GENERAL_SUPPORT_ZH:GENERAL_SUPPORT}</Text>{hint?<Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{hint}</Text>:null}</View>;
 }

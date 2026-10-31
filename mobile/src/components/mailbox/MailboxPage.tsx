@@ -16,6 +16,8 @@ import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 import { MagicLevitationAura } from './MagicLevitationAura';
 import { isLetterRead, MAILBOX_LETTERS as LETTERS, markLetterRead } from './mailboxReadState';
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
+import { localizedLetter } from './mockLetters';
+import { useAppLocale } from '../../services/locale';
 
 const BACKGROUND_IMAGE = require('../../../assets/mailbox/mailbox_bg_clean.jpg');
 
@@ -27,9 +29,10 @@ export const MailboxPage = memo(function MailboxPage() {
   // Stage B ('opening'): 320ms — Flap visibly hinges backward around fold line (-180deg)
   // Stage C ('extracting'): 380ms — Folded paper sheet visibly slides upward out of pocket
   // Stage D ('unfolding'): 460ms — Paper expands along creases into reading letter & settles
+  const locale = useAppLocale();
   const [letters, setLetters] = useState<Letter[]>(() =>
     LETTERS.map((letter) => ({
-      ...letter,
+      ...localizedLetter(letter, locale),
       read: isLetterRead(letter.id),
     }))
   );
@@ -336,7 +339,7 @@ export const MailboxPage = memo(function MailboxPage() {
               ]}
             >
               <Text style={styles.modeToggleText}>
-                {isReading ? 'Stack ✉️' : 'Read 📜'}
+                {locale === 'zh-Hans' ? (isReading ? '收起 ✉️' : '阅读 📜') : (isReading ? 'Stack ✉️' : 'Read 📜')}
               </Text>
             </Pressable>
           </View>

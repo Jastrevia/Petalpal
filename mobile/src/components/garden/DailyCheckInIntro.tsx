@@ -2,14 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { checkInWithFairy, loadClosenessSummary } from '../../services/fairyCloseness';
+import { checkInWithFairy, loadClosenessSummary, type CheckInResult } from '../../services/fairyCloseness';
+import { KeepsakeReveal } from '../bond/KeepsakeReveal';
+import { keepsakeArt } from '../bond/keepsakeArt';
 import { useAppLocale } from '../../services/locale';
 import { calendarDateKey } from './calendarDates';
 import { usePlanting } from './planting/PlantingContext';
 
-// The first time the Garden opens each day: today's check-in with PPL happens, a card shows
-// when it happened, then the card shrinks into the calendar in the top-right corner, so the
-// owner learns that is where check-ins live. Off with the closeness switch (summary null).
+// The first time the Garden opens each day: today's check-in with PPL happens and her keepsake is
+// revealed. Once closed, the keepsake on a small card shrinks into the calendar in the top-right
+// corner, so the owner learns that is where check-ins live. Checked in elsewhere earlier today:
+// just the card. Off with the closeness switch (summary null).
 const SHOWN_KEY = 'petalpal.checkInIntro.shownOn';
 const TIME_KEY = 'petalpal.checkInIntro.checkedInAt';
 const HOLD_MS = 2600, SHRINK_MS = 900;
@@ -17,9 +20,9 @@ const HOLD_MS = 2600, SHRINK_MS = 900;
 const PPL = require('@/assets/moments/TEA_TIME-3.jpg');
 const COPY = {
   en: { title: 'Checked in for today', at: (time: string) => `Today at ${time}`, earlier: 'Earlier today', streak: (n: number) => `${n}-day streak with PPL`,
-    hint: 'Your check-ins live in the calendar, top right.', dismiss: 'Go to the calendar' },
+    hint: 'Your check-ins and keepsakes live in the calendar, top right.', dismiss: 'Go to the calendar' },
   'zh-Hans': { title: '今天已签到', at: (time: string) => `今天 ${time}`, earlier: '今天早些时候', streak: (n: number) => `和小花仙连续签到 ${n} 天`,
-    hint: '签到记录都在右上角的日历里。', dismiss: '去日历看看' },
+    hint: '签到记录和信物都在右上角的日历里，点开就能看。', dismiss: '去日历看看' },
 };
 
 export function DailyCheckInIntro() {
@@ -28,8 +31,14 @@ export function DailyCheckInIntro() {
   const insets = useSafeAreaInsets();
   // Same size rule as the calendar button (GardenCalendar).
   const calendarWidth = Math.min(164, Math.max(125, width * .22));
-  const [card, setCard] = useState<{ time: string | null; streak: number } | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
+  const [card, setCard] = useState<{ time: string | null; streak: number; keepsake?: string } | null>(null);
+  const [reveal, setReveal] = useState<CheckInResult | null>(null);
+  const pendingCard = useRef<{ time: string | null; streak: number; keepsake?: string } | null>(null);
+  const showCard = (next: { time: string | null; streak: number; keepsake?: string }) => {
+    setCard(next);
+    Animated.timing(progress, { toValue: 1, duration: 420, easing: Easing.out(Easing.back(1.4)), useNativeDriver: Platform.OS !== 'web' }).start();
+  };
   const leaving = useRef(false);
   // Waits for the Garden to appear, so the card lands on her Garden, not on an empty screen.
   const { isGardenLoading } = usePlanting();
@@ -44,11 +53,12 @@ export function DailyCheckInIntro() {
       if ((await AsyncStorage.getItem(SHOWN_KEY).catch(() => null)) === today) return;
       const summary = await loadClosenessSummary().catch(() => null);
       if (!summary || !active) return;
-      let streak = summary.checkIn.streak, at: string | null = null;
+      let streak = summary.checkIn.streak, at: string | null = null, earned: CheckInResult | null = null;
       if (!summary.checkIn.checkedInToday) {
         const result = await checkInWithFairy().catch(() => null);
         if (!result || !active) return;
         streak = result.checkIn?.streak ?? streak + 1;
+        if (result.created && result.keepsakes?.length) earned = result;
         at = new Date().toISOString();
         await AsyncStorage.setItem(TIME_KEY, JSON.stringify({ day: today, at })).catch(() => undefined);
       } else {
@@ -58,8 +68,8 @@ export function DailyCheckInIntro() {
       await AsyncStorage.setItem(SHOWN_KEY, today).catch(() => undefined);
       if (!active) return;
       const time = at ? new Date(at).toLocaleTimeString(locale === 'zh-Hans' ? 'zh-CN' : 'en', { hour: 'numeric', minute: '2-digit' }) : null;
-      setCard({ time, streak });
-      Animated.timing(progress, { toValue: 1, duration: 420, easing: Easing.out(Easing.back(1.4)), useNativeDriver: Platform.OS !== 'web' }).start();
+      if (earned) { pendingCard.current = { time, streak, keepsake: earned.keepsakes[0].id }; setReveal(earned); }
+      else showCard({ time, streak });
     })();
     return () => { active = false; };
   }, [locale, progress, isGardenLoading]);
@@ -79,7 +89,14 @@ export function DailyCheckInIntro() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card]);
 
+  const closeReveal = () => {
+    setReveal(null);
+    if (pendingCard.current) showCard(pendingCard.current);
+    pendingCard.current = null;
+  };
+  if (reveal) return <KeepsakeReveal result={reveal} locale={locale} onDone={closeReveal} />;
   if (!card) return null;
+  const art = card.keepsake ? keepsakeArt(card.keepsake) : null;
   // From the middle of the screen into the calendar's centre, shrinking as it goes.
   const cardWidth = Math.min(340, width - 48), cardHeight = 300;
   const toX = width - insets.right - 12 - calendarWidth / 2 - width / 2;
@@ -96,7 +113,7 @@ export function DailyCheckInIntro() {
           { scale },
         ] }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={copy.dismiss} onPress={leave} style={styles.inner}>
-        <View style={styles.portrait}><Image source={PPL} resizeMode="cover" style={styles.pplImage} /></View>
+        {art ? <Image source={art} resizeMode="contain" style={styles.keepsake} /> : <View style={styles.portrait}><Image source={PPL} resizeMode="cover" style={styles.pplImage} /></View>}
         <Text style={styles.check}>✓</Text>
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.time}>{card.time ? copy.at(card.time) : copy.earlier}</Text>
@@ -115,6 +132,7 @@ const styles = StyleSheet.create({
   inner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 18 },
   portrait: { width: 74, height: 74, borderRadius: 37, overflow: 'hidden', borderWidth: 2, borderColor: '#C9A95C', backgroundColor: '#E9DFC4' },
   pplImage: { width: '100%', height: '100%' },
+  keepsake: { width: 96, height: 96 },
   check: { marginTop: 4, fontSize: 22, color: '#3F7A5E' },
   title: { fontFamily: 'Georgia', fontSize: 22, color: '#254E43' },
   time: { fontFamily: 'Georgia', fontSize: 17, color: '#3D5F52' },

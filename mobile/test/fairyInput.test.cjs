@@ -166,10 +166,10 @@ test('actual Fairy hooks complete ten sequential routes, accept mid-walk retarge
   fairy.active(true); fairy.finish();
   assert.ok(distance(fairy.state().position, WALK_NETWORK.nodes[2]) < .001);
 });
-test('actual animation advances at 110 world units per second without teleporting or changing sprite cadence', () => {
+test('actual animation advances at 220 world units per second without teleporting or changing sprite cadence', () => {
   const fairy = fairyHarness(); fairy.move(WALK_NETWORK.nodes[1]);
-  for (let i = 0; i < 20; i++) fairy.step();
-  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 110) < .001);
+  for (let i = 0; i < 10; i++) fairy.step();
+  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 110) < .001, 'half a second');
   assert.ok(fairy.state().remaining.length > 0);
   fairy.finish();
 });
@@ -179,11 +179,11 @@ test('input accounts for elapsed time immediately without counting it again in a
   fairy.move(WALK_NETWORK.nodes[1]);
   fairy.clockAdvance(20); fairy.move(WALK_NETWORK.nodes[1]);
   const immediately = fairy.state().position;
-  assert.ok(Math.abs(distance(WALK_START, immediately) - 2.2) < .001);
+  assert.ok(Math.abs(distance(WALK_START, immediately) - 4.4) < .001);
   fairy.frameAt(60);
   assert.deepEqual(fairy.state().position, immediately, 'An older RAF timestamp cannot rewind movement time');
   fairy.clockAdvance(30); fairy.frameAt(100);
-  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 5.5) < .001, 'Exactly 50ms of movement was accounted for');
+  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 11) < .001, 'Exactly 50ms of movement was accounted for');
 });
 
 test('registered B01 bridge foot chords stay on the actual integrated deck image', async () => {
@@ -247,12 +247,13 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     // …and earns closeness with her (services/fairyCloseness.ts), counted like the hold.
     interactions: 0, noteFairyInteraction: () => { context.interactions++; },
     fairyRef: { current: { isMailboxBusy: () => false, getPosition: () => ({ x: 100, y: 120 }), move: () => { calls.push('move'); return true; } } },
-    // The treehouse decision itself is treehouseTap (fairySchedule.test.mjs); a new tap clears a pending Bookhouse.
-    bookhouseOnEntry: { current: false }, tapTreehouse: { current: () => context.fairyRef.current.visitTreehouse() },
+    // The treehouse and the mailbox open straight away; she is not involved.
+    tapTreehouse: { current: () => calls.push('bookhouse') }, tapMailbox: { current: () => calls.push('mailbox') },
   };
-  for (const [hit, action] of [['hitsMailbox','visitMailbox'],['hitsTreehouse','visitTreehouse'],['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
+  for (const [hit, action] of [['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => false; context.fairyRef.current[action] = () => calls.push(action);
   }
+  context.hitsMailbox = () => false; context.hitsTreehouse = () => false;
   const tap = vm.runInNewContext(compile(`(${source})`), context);
   const expect = (expected, noted = expected.some(call => call === 'move' || call.startsWith('visit'))) => {
     calls.length = 0; context.notes = 0; context.interactions = 0; tap(100, 100); assert.deepEqual(calls, expected);
@@ -266,8 +267,10 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   context.activeModeRef.current = 'normal'; context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail']);
   context.selectedFlower = {}; expect([]); context.selectedFlower = null;
   context.hitCluster = () => null; expect([]);
-  context.fairyRef.current.isMailboxBusy = () => false;
-  for (const [hit, action] of [['hitsMailbox','visitMailbox'],['hitsTreehouse','visitTreehouse'],['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
+  context.fairyRef.current.isMailboxBusy = () => false; context.hitsMailbox = () => false;
+  context.hitsMailbox = () => true; expect(['mailbox'], false); context.hitsMailbox = () => false;
+  context.hitsTreehouse = () => true; expect(['bookhouse'], false); context.hitsTreehouse = () => false;
+  for (const [hit, action] of [['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => true; expect([action]); context[hit] = () => false;
   }
   // A tap never makes her talk (she speaks up on her own): seated, the swing, tea set or moon bed still sends her there.
@@ -280,7 +283,6 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   context.hitsSwing = () => true; expect(['visitSwing']); context.hitsSwing = () => false;
   context.onOpenEventsRef.current = undefined; expect(['move', 'redraw']); context.onOpenEventsRef.current = () => {};
   context.plantedLawnAt = () => null;
-  context.bookhouseOnEntry.current = true; expect(['move', 'redraw']); assert.equal(context.bookhouseOnEntry.current, false);
   context.readOnly = true; expect([]);
   // A friend's Garden still opens its flowers (support and messages), never planting or the Fairy.
   context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail'], false);

@@ -34,7 +34,7 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The puppy and the hedgehog walk in painted frames: one stride of a generated walking clip
   // (scripts/critters/video-frames.py), every pose painted whole. `loop` is the ground their
   // planted paws cover in that stride, so they do not skid.
-  hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 30.2 }, w: 344, h: 280 },
+  hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 19.8 }, w: 344, h: 280 },
   // The puppy also runs (a gallop clip) when it chases the bluebird and sits down where it caught
   // up (a clip from running to sitting); all three share one crop, ground and scale.
   puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), w: 418, h: 300, frames: { columns: 6, count: 17, ground: 275, loop: 41.8,

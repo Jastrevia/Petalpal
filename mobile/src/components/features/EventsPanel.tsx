@@ -1,13 +1,14 @@
 import { EmotionalSafetyNote } from './EmotionalSafetyNote';
 import { AiOutputReport } from './AiPrivacySettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Animated, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
 import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
 import { saveFlowerChoice } from '../../services/flowerChoices';
 import { useAppLocale } from '../../services/locale';
+import { flowerNameText } from '../../services/flowerNames';
 import { clearAnswer, pendingAnswer } from '../../services/questionAnswer';
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { ui } from './FeatureUI';
@@ -141,7 +142,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         <View style={ui.row}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.cardLabel}>{copy.yourFlower}</Text>
-            <Text style={styles.sectionTitle}>{flower.name}</Text>
+            <Text style={styles.sectionTitle}>{flowerNameText(flower.name, locale)}</Text>
             <Text style={styles.caption}>{copy.mood}: {moodLabel(flower.mood as PrimaryMood)}</Text>
           </View>
           <FlowerThumb speciesCode={flower.speciesCode} name={flower.name} image={flower.img} size={84} style={styles.flowerImage} />
@@ -160,10 +161,11 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
       </View> : journal.loading ? <ActivityIndicator color="#477D70" /> : null}
 
       {flower ? <>
-        <View style={styles.shareRow}>
+        <View testID="event-share-row" style={[styles.shareRow, showToFriends && styles.shareRowOn]}>
+          <ShareGlow />
           <Eye open={showToFriends} color={theme.text} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.text}>{copy.show}</Text>
+            <Text style={[styles.text, styles.shareTitle]}>{copy.show}</Text>
             <Text style={styles.caption}>{showToFriends ? copy.showHint : copy.hiddenHint}</Text>
           </View>
           <Switch accessibilityLabel={copy.show} value={showToFriends} onValueChange={setShowToFriends}
@@ -200,6 +202,24 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
 }
 
 // A small drawn eye: open when friends can read the Event, crossed out when they cannot.
+// A soft gold edge that breathes three times when the choice appears, so it is not missed.
+function ShareGlow() {
+  const glow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | undefined;
+    AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then(reduced => {
+      if (reduced) { glow.setValue(.6); return; }
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: .25, duration: 700, useNativeDriver: true }),
+      ]), { iterations: 3 });
+      loop.start();
+    });
+    return () => loop?.stop();
+  }, [glow]);
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, borderWidth: 2, borderColor: '#C9A95C', opacity: glow }]} />;
+}
+
 function Eye({ open, color }: { open: boolean; color: string }) {
   return <View accessible={false} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', opacity: open ? 1 : .7 }}>
     <View style={{ width: 24, height: 14, borderRadius: 12, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
@@ -256,7 +276,9 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   moodCircleSelected: { backgroundColor: '#C9E0D5', borderColor: '#326F69', borderWidth: 2, boxShadow: 'inset 0 0 0 2px #85B4A3' },
   moodText: { fontFamily: 'serif', fontSize: 13, textTransform: 'capitalize', color: theme.text },
   selectedText: { fontWeight: '700' },
-  shareRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  shareRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: theme.input },
+  shareRowOn: { backgroundColor: '#5AA4AB33' },
+  shareTitle: { fontWeight: '700', color: theme.text },
   satisfied: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 14, color: theme.muted },
   plantRow: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
   choice: { flex: 1, minHeight: 72, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 10 },

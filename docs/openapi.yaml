@@ -507,6 +507,51 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /messages/reactions:
+    get:
+      tags: [Social]
+      summary: Like counts and the caller's own reaction for messages in Gardens the caller may visit
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Comma-separated message ids, at most 50
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reactions by message id; messages the caller cannot see are left out
+        '400':
+          description: Invalid ids
+  /messages/{messageId}/reaction:
+    put:
+      tags: [Social]
+      summary: Like or dislike a message once; the first reaction stands
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              additionalProperties: false
+              properties:
+                kind:
+                  type: string
+                  enum: [LIKE, DISLIKE]
+      responses:
+        '200':
+          description: The message's like count and the caller's reaction
+        '400':
+          description: Unsupported request
+        '404':
+          description: The caller's own message, or one they cannot see
   /friends/request:
     post:
       tags: [Social]

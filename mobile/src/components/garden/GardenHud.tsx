@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GARDEN_FEATURES, gardenFeature } from '../../services/featureCatalog';
 import { usePanelTheme } from '../features/PanelTheme';
@@ -15,7 +15,12 @@ import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
 import { momentLocale } from '../moments/momentFormat';
-import { startUserRealtime, stopUserRealtime, subscribeUserRealtime, visitNotice } from '../../services/userRealtime';
+import { friendAcceptedNotice, startUserRealtime, stopUserRealtime, subscribeUserRealtime, visitNotice } from '../../services/userRealtime';
+import { useUnreadMail } from '../mailbox/mailboxReadState';
+import { AiConsentPrompt } from '../features/AiConsentPrompt';
+
+// The mailbox's second door, on the bar: the same letters as tapping the mailbox in the Garden.
+const LETTER_ICON = require('../../../assets/keepsakes/pressed-flower-envelope.webp');
 import { UserAvatar } from '../avatars/UserAvatar';
 import { zhHans } from './fairy/tapLines';
 import { onOpenGardenPanel } from './gardenPanelBus';
@@ -56,17 +61,21 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     if (!ownerId) return;
     startUserRealtime(ownerId);
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const show = (text: string, avatar?: string) => {
+      setNotice(previous => ({ key: (previous?.key ?? 0) + 1, text, avatar }));
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setNotice(null), 5000);
+    };
     const unsubscribe = subscribeUserRealtime({ visit: (record, gardenOwnerId) => {
       if (gardenOwnerId !== ownerId || !record.visitorId || record.visitorId === ownerId) return;
       const text = visitNotice(record, chinese);
-      if (!text) return;
-      setNotice(previous => ({ key: (previous?.key ?? 0) + 1, text, avatar: record.visitorAvatar }));
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setNotice(null), 5000);
-    } });
+      if (text) show(text, record.visitorAvatar);
+    }, friendAccepted: accepter => show(friendAcceptedNotice(accepter.name, chinese), accepter.avatar) });
     return () => { unsubscribe(); if (timer) clearTimeout(timer); };
   }, [ownerId, chinese]);
   useEffect(() => () => stopUserRealtime(), []);
+  const unreadMail = useUnreadMail();
+  const lettersLabel = chinese ? '信箱' : 'Letters';
   const bondWaiting = Boolean(closeness.summary && !closeness.summary.checkIn.checkedInToday);
   const fairyDot = moments.unread || bondWaiting;
   useEffect(() => {
@@ -116,12 +125,21 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       borderRadius: phone ? 24 : 26, backgroundColor: theme.background, borderColor: theme.gold,
     }]}>
       {GARDEN_FEATURES.filter(feature => ['events', 'friends', 'fairy', 'profile'].includes(feature.id)).map(navigationItem)}
+      <Pressable testID="nav-letters" accessibilityRole="button" accessibilityLabel={`${lettersLabel}${unreadMail ? (chinese ? '，有未读' : ', unread') : ''}`}
+        onPress={() => router.push('/mailbox')} style={({ pressed }) => [styles.bottomItem, pressed && styles.pressed]}>
+        <View>
+          <Image accessible={false} source={LETTER_ICON} resizeMode="contain" style={{ width: iconSize, height: iconSize }} />
+          {unreadMail ? <View style={[styles.unread, { borderColor: theme.background }]} /> : null}
+        </View>
+        <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>{lettersLabel}</Text>
+      </Pressable>
     </View>
     <View style={[styles.info, { top: insets.top + 8, left: insets.left + 8, maxWidth: Math.max(100, width - insets.left - insets.right - 100) }]}>
       {isGardenLoading ? <ActivityIndicator accessibilityLabel="Loading Garden" size="small" color="#365b42" /> : null}
       {gardenError ? <><Text accessibilityRole="alert" style={styles.label}>{gardenError}</Text>
         <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
     </View>
+    <AiConsentPrompt />
     {notice ? <Pressable key={notice.key} testID="visit-notice" accessibilityRole="alert" accessibilityLiveRegion="polite"
       onPress={() => setNotice(null)} style={[styles.notice, { top: insets.top + 60, backgroundColor: theme.background, borderColor: theme.gold }]}>
       <UserAvatar avatar={notice.avatar} size={30} />

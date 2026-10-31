@@ -12,19 +12,19 @@ export const COMMUNITY_TEXT_ZH = '请友善待人。不要发布骚扰、仇恨�
 // `embedded`: inside the Me support list, whose row already names it and unfolds it.
 export function CommunityGuidelines({ embedded = false }: { embedded?: boolean } = {}) {
   const [accepted,setAccepted]=useState<boolean|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[open,setOpen]=useState(false);
-  const titleColor=usePanelTheme().theme.text;
+  const {theme}=usePanelTheme(),titleColor=theme.text;
   const chinese=momentLocale(useAuth().experience?.user.preferredLocale)==='zh-Hans';
   async function accept(){setBusy(true);setError('');try{await apiRequest('/users/me/community-acceptance','PUT',{version:COMMUNITY_VERSION,accepted:true});setAccepted(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   useEffect(()=>{let active=true;apiRequest<{accepted:boolean}>('/users/me/community-acceptance').then(v=>{if(active)setAccepted(v.accepted);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[]);
   if (embedded) return <View style={{gap:8}}>
-    <Text style={ui.text}>{chinese ? COMMUNITY_TEXT_ZH : COMMUNITY_TEXT}</Text>
-    <Text style={ui.caption}>{chinese ? '版本' : 'Version'} {COMMUNITY_VERSION}.{accepted ? (chinese ? ' 你已同意。' : ' You accepted these.') : ''}</Text>
+    <Text style={[ui.text,{color:theme.text}]}>{chinese ? COMMUNITY_TEXT_ZH : COMMUNITY_TEXT}</Text>
+    <Text style={[ui.caption,{color:theme.muted}]}>{chinese ? '版本' : 'Version'} {COMMUNITY_VERSION}.{accepted ? (chinese ? ' 你已同意。' : ' You accepted these.') : ''}</Text>
     {accepted === false ? <FeatureActionButton title={chinese ? '我同意社区准则' : 'I accept the Community Guidelines'} disabled={busy} onPress={()=>void accept()}/> : null}
-    {error ? <Text accessibilityRole="alert" style={ui.text}>{error}</Text>:null}</View>;
+    {error ? <Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{error}</Text>:null}</View>;
   return <View style={{gap:8}}>
-    <View style={ui.row}><Text accessibilityRole="header" style={[ui.title,{flex:1,color:titleColor}]}>{chinese ? '社区准则' : 'Community Guidelines'}</Text>{accepted ? <Text style={ui.caption}>{chinese ? '已同意' : 'Accepted'}</Text> : null}</View>
+    <View style={ui.row}><Text accessibilityRole="header" style={[ui.title,{flex:1,color:titleColor}]}>{chinese ? '社区准则' : 'Community Guidelines'}</Text>{accepted ? <Text style={[ui.caption,{color:theme.muted}]}>{chinese ? '已同意' : 'Accepted'}</Text> : null}</View>
     <FeatureActionButton secondary title={open ? (chinese ? '收起准则' : 'Hide the guidelines') : (chinese ? '阅读准则' : 'Read the guidelines')} onPress={()=>setOpen(!open)}/>
-    {open ? <><Text style={ui.text}>{chinese ? COMMUNITY_TEXT_ZH : COMMUNITY_TEXT}</Text>
-      <Text style={ui.caption}>{chinese ? '版本' : 'Version'} {COMMUNITY_VERSION}.</Text></> : null}
-    {accepted === false ? <FeatureActionButton title={chinese ? '我同意社区准则' : 'I accept the Community Guidelines'} disabled={busy} onPress={()=>void accept()}/> : null}{error ? <Text accessibilityRole="alert" style={ui.text}>{error}</Text>:null}</View>;
+    {open ? <><Text style={[ui.text,{color:theme.text}]}>{chinese ? COMMUNITY_TEXT_ZH : COMMUNITY_TEXT}</Text>
+      <Text style={[ui.caption,{color:theme.muted}]}>{chinese ? '版本' : 'Version'} {COMMUNITY_VERSION}.</Text></> : null}
+    {accepted === false ? <FeatureActionButton title={chinese ? '我同意社区准则' : 'I accept the Community Guidelines'} disabled={busy} onPress={()=>void accept()}/> : null}{error ? <Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{error}</Text>:null}</View>;
 }

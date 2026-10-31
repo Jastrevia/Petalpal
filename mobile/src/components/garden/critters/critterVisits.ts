@@ -24,10 +24,10 @@ export type CritterSpec = {
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
-  // The rabbit's pace matches its painted hops: 75.7 units (about a body length) each 0.55 s burst.
-  rabbit: { id: 'rabbit', kind: 'walker', size: 104, speed: 138, altitude: [0, 0] },
-  // The hedgehog's pace matches its painted steps: 30.2 units each 1.08 s.
-  hedgehog: { id: 'hedgehog', kind: 'walker', size: 64, speed: 28, altitude: [0, 0] },
+  // The rabbit's pace matches its painted hops: 45 units (about a body length) each 0.55 s burst.
+  rabbit: { id: 'rabbit', kind: 'walker', size: 62, speed: 82.3, altitude: [0, 0] },
+  // The hedgehog's pace matches its painted steps: 19.8 units each 1.08 s.
+  hedgehog: { id: 'hedgehog', kind: 'walker', size: 42, speed: 18.4, altitude: [0, 0] },
   // The puppy's pace matches its painted stride: 41.8 units each 1.42 s (it runs at RUN_SPEED).
   puppy: { id: 'puppy', kind: 'walker', size: 113, speed: 29.5, altitude: [0, 0] },
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.

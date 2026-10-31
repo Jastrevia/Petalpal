@@ -24,7 +24,7 @@ export function RedeemCodeSettings({redemptions,onRedeemed}:{redemptions:Redempt
  const complete=typed.replace(/-/g,'').length===20;
  if(redemptions?.length) return <View style={{gap:10}}>
   <Text accessibilityRole={justDone?'alert':undefined} style={[ui.text,{color:theme.text,fontWeight:'700'}]}>{justDone?copy.done:copy.already}</Text>
-  <Text style={ui.text}>{copy.pending}</Text></View>;
+  <Text style={[ui.text,{color:theme.text}]}>{copy.pending}</Text></View>;
  const submit=async()=>{
   if(!complete||busy)return;setBusy(true);setError('');
   const result=await redeemCode(typed);setBusy(false);

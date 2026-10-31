@@ -71,6 +71,7 @@ model User {
   yearlyReports           YearlyReport[]
   aiJobs                  AiJob[]
   aiEvidence              AiEvidence[]
+  messageReactions MessageReaction[] @relation("MessageReactionUser")
 }
 
 model Garden {
@@ -142,6 +143,27 @@ model Message {
   flower  Flower   @relation(fields: [flowerId], references: [id])
   user    User?    @relation(fields: [userId], references: [id])
   reports Report[]
+  reactions MessageReaction[]
+}
+
+enum MessageReactionKind {
+  LIKE
+  DISLIKE
+}
+
+// One reaction per person per message, and the first one stands. A dislike comes with a Report.
+model MessageReaction {
+  id        String              @id @default(cuid())
+  messageId String
+  userId    String
+  kind      MessageReactionKind
+  createdAt DateTime            @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("MessageReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model VisitRecord {

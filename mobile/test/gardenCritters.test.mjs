@@ -92,7 +92,7 @@ test('distance along the path grows with travel and stops at the end', () => {
 
 test('every rabbit pause lands on a whole hop, so its painted frames show it sitting', () => {
   const hop = visits.burstLength('rabbit'), rhythm = visits.RHYTHMS.rabbit;
-  assert.ok(Math.abs(hop - 75.7) < 1, 'one hop covers the ground its painted hop does');
+  assert.ok(Math.abs(hop - 45.3) < 1, 'one hop covers the ground its painted hop does');
   const visit = { key: 1, id: 'rabbit', path: [{ x: 0, y: 0 }, { x: 1000, y: 0 }], start: 0, duration: 0, speed: visits.CRITTERS.rabbit.speed, rhythm, lead: visits.FADE_SECONDS, fadeIn: true, walked: 0 };
   visit.duration = visits.FADE_SECONDS + visits.travelSeconds(visits.pathLength(visit.path) / visit.speed, rhythm);
   for (let burst = 1; burst * rhythm.cycle < visit.duration - visits.FADE_SECONDS; burst++) {

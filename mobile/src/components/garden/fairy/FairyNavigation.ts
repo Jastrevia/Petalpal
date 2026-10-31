@@ -8,9 +8,9 @@ import { advance, route as pathRoute, nearest, distance, WALK_START, type Point 
 import { groundRoute } from './groundNavigation';
 import { SWING_EXIT } from './swingDestination';
 import { createAerialFlight, sampleFlight, smooth, SWING_FLIGHT_APPROACH, SWING_FLIGHT_SEAT } from './swingFlight';
-export const WALK_SPEED=.110; // world units per millisecond; shared with renderer
-// Flying is how she crosses the Garden; owner feedback 2026-10-26: was .18 and felt slow.
-export const FLIGHT_SPEED=.30, MIN_FLIGHT_MS=700;
+export const WALK_SPEED=.220; // world units per millisecond; shared with renderer (owner feedback 2026-10-30: twice .110)
+// Flying is how she crosses the Garden, and settling onto a seat is the same flight, at the same speed.
+export const FLIGHT_SPEED=.36, MIN_FLIGHT_MS=500, MIN_ALIGN_MS=300;
 
 export const WALK_HEIGHT_MULTIPLIER=4;
 export type MovementDecision={target:Point;visualHeight:number;distanceToTarget:number;pathDistance:number|null;pathEvaluated:boolean;sameLocalPathSection:boolean;walkReachable:boolean|null;mode:'WALK'|'FLY'|'INVALID';reason:string};
@@ -40,7 +40,7 @@ export class FairyNavigation {
     const approach=createAerialFlight(this.position,this.teaTarget?TEA_APPROACH:this.moonTarget?MOON_APPROACH:SWING_FLIGHT_APPROACH);
     if(!approach){this.state='idle';return;}
     this.alignment=[...approach,this.teaTarget?TEA_SEAT:this.moonTarget?MOON_SLEEP_ANCHOR:SWING_FLIGHT_SEAT];this.flightTime=0;
-    this.duration=Math.max(850,length(this.alignment)/.12);this.state=this.teaTarget?'aligningToTea':this.moonTarget?'aligningToMoonBed':'aligningToSwing';
+    this.duration=Math.max(MIN_ALIGN_MS,length(this.alignment)/FLIGHT_SPEED);this.state=this.teaTarget?'aligningToTea':this.moonTarget?'aligningToMoonBed':'aligningToSwing';
   }
   // Travel can be retargeted normally; the short letter sequence owns the
   // character from alignment until the mail UI handoff has been consumed.

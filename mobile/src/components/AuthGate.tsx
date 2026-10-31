@@ -133,7 +133,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Community Guidelines" accessibilityState={{checked:communityAccepted}} disabled={working} onPress={()=>setCommunityAccepted(!communityAccepted)} style={styles.consent}>
             <Text style={styles.label}>{communityAccepted ? '☑' : '☐'} I accept the Community Guidelines</Text>
           </Pressable>
-          <Text style={styles.hint}>AI is off by default. Read the processor disclosure and choose optional AI features in Settings. You can journal without AI.</Text>
+          <Text style={styles.hint}>AI stays off until you agree: we ask once when your Garden opens, and you can turn it off in Settings. You can journal without AI.</Text>
           {button(working ? 'Saving…' : 'Continue to PetalPal', () => auth.completeProfile({ name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined }), !name.trim() || !communityAccepted)}
           {button('Use another account', auth.logout, false, true)}
         </> : <>

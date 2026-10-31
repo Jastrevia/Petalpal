@@ -103,3 +103,24 @@ export const MOCK_LETTERS: Letter[] = [
 export const RELEASE_LETTERS: Letter[] = MOCK_LETTERS
   .filter((letter) => letter.category !== 'friend')
   .map((letter) => ({ ...letter, date: '' }));
+
+// The letters in Simplified Chinese (same ids), so a zh-Hans owner never opens an English letter.
+const LETTERS_ZH: Record<string, Partial<Letter>> = {
+  'letter-garden-1': { sender: '来自花园的一封信', subject: '你的花园开得真美。', snippet: '谢谢你来到这里，照看这个更温柔、更明亮的小小角落……',
+    headline: '你的花园开得真美。', body: '谢谢你来到这里，照看这个更温柔、更明亮的小小角落。\n\n小小的照料，也能带来了不起的变化。今天早上，中央山坡上的紫色番红花张开花瓣，迎接太阳。\n\n愿你今天无论走到哪里，都带着这一点柔软。',
+    signoff: '满怀感谢，', signature: 'PetalPal 花园', footerQuote: '小小照料，世界更亮。', postmarkText: '今天 • PETALPAL 花园' },
+  'letter-meadow-2': { sender: '草地小仙子', subject: '更明亮的明天', snippet: '溪边的雏菊开了……', headline: '溪边，更明亮的明天。',
+    body: '我在月亮床旁边的木栏杆上放了一块蜂蜜小饼干。等太阳落到西边的山峰后面，我们在睡莲旁见面，一起看傍晚的萤火虫醒来。\n\n带上你最喜欢的陶瓷杯吧，我从溪边摘了新鲜的薄荷叶。',
+    signoff: '轻轻扇着翅膀，', signature: '草地小仙子', footerQuote: '甜甜的拜访，暖暖的心', postmarkText: '仙子草地' },
+  'letter-moonbed-3': { sender: '月亮床的晚安', subject: '好好休息，小家伙', snippet: '提醒你在星光下好好休息……', headline: '在星光下好好休息。',
+    body: '傍晚的露水落在踏脚石旁的洋甘菊花瓣上。黄昏时，花园的呼吸也变得很轻。\n\n愿今晚的你睡得深沉又安稳。你今天种下的一切，都会在你睡着时继续生长。',
+    signoff: '祝你好梦，', signature: '守夜人', footerQuote: '每一次休息，都在为新的花开做准备', postmarkText: '月亮床' },
+  'letter-friend-4': { sender: '朋友的问候', subject: '想起你了', snippet: '微风把你花园的香气带了过来……', headline: '隔着山谷，想起你。',
+    body: '今天，微风把你花园的香气带过了山口。我在这封信里夹了一朵压干的风铃花，让你也看看我露台上的晨光。',
+    signoff: '一直惦记着你，', signature: '远行的朋友', footerQuote: '善良的人之间，距离也很温柔', postmarkText: '山口邮局' },
+  'letter-news-5': { sender: 'PetalPal 花讯', subject: '新的花就要开了', snippet: '山谷里有些令人期待的东西正在生长……', headline: '山谷里，新的花正在生长。',
+    body: '新的季节悄悄来到了山谷。瀑布旁的垂柳开始泛出琥珀般的金色，下面池塘里的锦鲤聚在浮动的睡莲叶下。\n\n新一季的种子包很快会随着秋风飘进信箱。第一个清爽的早晨，记得留意稀有的牵牛花球根。\n\n记得在日落时去水池边看看，秋天的薄雾会慢慢聚在石灯笼周围。',
+    signoff: '与自然为友，', signature: '山谷园丁', footerQuote: '四季更替，自有优雅', postmarkText: '山谷快报' },
+};
+export const localizedLetter = (letter: Letter, locale: string): Letter =>
+  locale === 'zh-Hans' ? { ...letter, ...LETTERS_ZH[letter.id] } : letter;
