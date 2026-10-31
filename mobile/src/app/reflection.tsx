@@ -5,21 +5,26 @@ import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanRespo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWorldTime } from '../components/garden/world-time';
-import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
+import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, monthly2, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
 import { ShortWeeklyReport } from '../components/features/ShortWeeklyReport';
+import { PetalCollection } from '../components/features/PetalCollection';
+import { MonthlyReport2 } from '../components/features/MonthlyReport2';
 import { useAppLocale } from '../services/locale';
 
-// The shelf's books: Weekly, Monthly, and the third one, notes about the reflections (safety note, disclaimers).
-type Book = ReportType | 'notes';
-const BOOKS: Book[] = ['weekly', 'monthly', 'notes'];
+// The shelf's books: Weekly, Monthly, the third one, notes about the reflections (safety note, disclaimers), and the
+// cream fourth one, the 花语集 (petal cards, kept insights, threads, letters, muted words).
+type Book = ReportType | 'notes' | 'collection';
+const BOOKS: Book[] = ['weekly', 'monthly', 'notes', 'collection'];
 // Every label on this screen follows the app language; saved reflections keep their own words.
 const CHROME = {
-  en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'About' }, unit: { weekly: 'week', monthly: 'month' },
+  en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'About', collection: 'Petal collection' }, unit: { weekly: 'week', monthly: 'month' },
     reportOutput: 'Report final output', pick: 'Choose a book from the shelf', notesTitle: 'About these reflections', notes: [
       'Your petal card is only a way to look back at yourself. It is not a prediction, and it cannot replace professional help.',
       'Every number and every quote in a reflection is found by the app in your own entries; AI only words them, and any sentence that does not match what you wrote is left out.',
-      'Don’t want to see an insight? Tap Hide under it. If something in a reflection seems wrong, report it at the end of that reflection.'],
-    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: Book) => type === 'notes' ? 'About these reflections' : `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
+      'Don’t want to see an insight? Tap Hide under it. If something in a reflection seems wrong, report it at the end of that reflection.',
+      'Keep an insight or a card and it waits in the cream Petal collection book. Follow an insight and each Weekly reports on that thread (up to three). Write an entry to answer a question and the next Weekly quotes your answer.',
+      'In the Petal collection you can write one sentence to a later week, withdraw it before its day, and list names or topics that insights must never use.'],
+    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: Book) => type === 'collection' ? 'Petal collection' : type === 'notes' ? 'About these reflections' : `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
     inProgress: ' · In progress', writing: (type: ReportType) => `Writing last ${type === 'weekly' ? 'week' : 'month'}’s reflection…`,
     loading: 'Loading reflection', tryLoad: 'Try loading again', tryRead: 'Try reading again', loadFailed: 'Unable to load saved reflections.',
     readFailed: 'Unable to read this reflection.', emptyTitle: 'A place to look back', empty: (type: ReportType) => `No saved ${type} reflections yet.`,
@@ -33,12 +38,14 @@ const CHROME = {
     previous: (type: ReportType) => `Previous ${type === 'weekly' ? 'week' : 'month'}`, next: (type: ReportType) => `Next ${type === 'weekly' ? 'week' : 'month'}`,
     close: 'Close Reflections', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
     kept: 'Your reflections, kept here.' },
-  'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于' }, unit: { weekly: '周', monthly: '月' },
+  'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于', collection: '花语集' }, unit: { weekly: '周', monthly: '月' },
     reportOutput: '举报最终内容', pick: '从书架上取一本书', notesTitle: '关于这些回看', notes: [
       '花语卡只是陪你回看自己，不是预测，也不能代替专业的帮助。',
       '回看里的每个数字、每句原话，都是程序从你自己的记录里找出来的；AI 只负责把它们说通顺，和你写过的话对不上的句子不会出现。',
-      '不想看到某一条，可以点它下面的「隐藏」。觉得哪份回看有问题，可以在那份回看的最后举报。'],
-    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: Book) => type === 'notes' ? '关于这些回看' : type === 'weekly' ? '周报' : '月报',
+      '不想看到某一条，可以点它下面的「隐藏」。觉得哪份回看有问题，可以在那份回看的最后举报。',
+      '收藏的洞察和花语卡都在书架上奶白色的“花语集”里。跟进一条洞察，之后每份周报都会说说这条线（最多 3 条）。点“写一条来回答”写下的记录，下周的周报会引用它。',
+      '在花语集里可以写一句话给之后的某一周，到那天之前都能撤回；也可以写下不想出现在洞察里的人名或主题。'],
+    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: Book) => type === 'collection' ? '花语集' : type === 'notes' ? '关于这些回看' : type === 'weekly' ? '周报' : '月报',
     inProgress: ' · 还在写', writing: (type: ReportType) => type === 'weekly' ? '正在写上周的周报…' : '正在写上个月的月报…',
     loading: '正在打开', tryLoad: '重新加载', tryRead: '重新打开', loadFailed: '没能打开保存的回看。', readFailed: '没能打开这份回看。',
     emptyTitle: '回看的地方', empty: (type: ReportType) => type === 'weekly' ? '还没有保存的周报。' : '还没有保存的月报。',
@@ -92,13 +99,14 @@ export default function Reflection() {
   // The pavilion opens with every book on the shelf. Tapping one pulls it out, carries it to the desk and opens it
   // (the green book is Weekly, the blue Monthly, the purple one the notes about them).
   const [open, setOpen] = useState<Book | null>(null);
-  const notes = open === 'notes';
+  // `notes`: a book without reports (the notes or the 花语集), shown as one scrolling page.
+  const notes = open === 'notes' || open === 'collection';
   const onBook = (book: Book) => open === book;
   const [flying, setFlying] = useState<Book | null>(null);
   const flight = useRef(new Animated.Value(0)).current, reveal = useRef(new Animated.Value(0)).current;
   function openBook(book: Book) {
     if (flying || book === open) return;
-    if (book !== 'notes') setType(book);
+    if (book === 'weekly' || book === 'monthly') setType(book);
     if (reducedMotion) { reveal.setValue(1); setOpen(book); return; }
     setOpen(null); setFlying(book); flight.setValue(0); reveal.setValue(0);
     Animated.timing(flight, { toValue: 1, duration: 760, easing: Easing.inOut(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(() => {
@@ -256,7 +264,7 @@ export default function Reflection() {
   const cloth = type === 'weekly' ? (night ? '#2F4739' : '#3E5A4C') : (night ? '#233F62' : '#2D5279');
   const accent = type === 'weekly' ? '#55704A' : '#3B5F8C', bookInk = type === 'weekly' ? '#34472F' : '#2A4466';
   // Shelf spines cropped from the same painted art (1000-wide units, rows 138–318): the phone's Weekly/Monthly switch.
-  const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 } };
+  const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 }, collection: { x: 838, w: 74 } };
   // A book's place on the painted shelf, in scene points (the art is 1000 units wide; its shelf row runs 138–318).
   const spineRect = (item: Book) => { const k = sceneWidth / 1000;
     return { left: shelf[item].x * k, top: 138 * k, width: shelf[item].w * k, height: 180 * k }; };
@@ -294,14 +302,20 @@ export default function Reflection() {
           left: -(bookLeft + area.left + (side === 'right' ? pageWidth : 0)), top: -(bookTop + area.top) }} />
     </View>;
 
-  // A Weekly 2.0 report is one spread of the book, without the three tabs (components/features/ShortWeeklyReport.tsx).
+  // A Weekly 2.0 report (components/features/ShortWeeklyReport.tsx) or a Monthly 2.0 one (MonthlyReport2.tsx) is one
+  // spread of the book, without the three tabs.
   const weekly2Of = (report: SavedReport | null) => {
-    const detail = report?.type === 'weekly' ? details[report.id] : null, short = detail ? shortWeekly(detail) : null;
-    return detail && short?.version2 ? { detail, short } : null;
+    const detail = report ? details[report.id] : null;
+    if (detail && report?.type === 'monthly') { const month = monthly2(detail); return month ? { detail, short: null, month } : null; }
+    const short = detail && report?.type === 'weekly' ? shortWeekly(detail) : null;
+    return detail && short?.version2 ? { detail, short, month: null } : null;
   };
   const weekly2Page = (report: SavedReport, part: 'left' | 'right' | 'all', interactive: boolean) => {
     const found = weekly2Of(report)!, label = weekLabel(report.periodKey, lang);
-    return <ShortWeeklyReport short={found.short} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
+    if (found.month) return <MonthlyReport2 month={found.month} part={part} interactive={interactive}
+      date={heading(report, lang) + (report.status === 'PARTIAL' ? t.inProgress : '')}
+      report={interactive ? <View style={{ marginTop: 8 }}><AiOutputReport kind="monthly" outputId={found.detail.id} linkStyle={s.quietLink} title={t.reportOutput} /></View> : null} />;
+    return <ShortWeeklyReport short={found.short!} interactive={interactive} reportId={found.detail.id} reducedMotion={reducedMotion} part={part}
       date={{ eyebrow: lang === 'en' ? label.title.toUpperCase() : label.title, range: label.range + (report.status === 'PARTIAL' ? t.inProgress : '') }}
       report={interactive ? <View style={{ marginTop: 8 }}><AiOutputReport kind="weekly" outputId={found.detail.id} linkStyle={s.quietLink} title={t.reportOutput} /></View> : null}
       onWrite={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })} />;
@@ -312,7 +326,8 @@ export default function Reflection() {
     const shown: Section = interactive ? section : 'Summary';
     const spread = weekly2Of(report);
     // The third book: the safety note and the disclaimers that used to sit inside the reflections.
-    const notesPage = <View style={{ flex: 1, minHeight: 0 }}>
+    const notesPage = open === 'collection' ? <PetalCollection headingSize={compact ? 20 : Math.max(20, Math.min(25, sceneWidth * .024))} />
+      : <View style={{ flex: 1, minHeight: 0 }}>
       <Text accessibilityRole="header" style={[s.heading, { fontSize: compact ? 20 : Math.max(20, Math.min(25, sceneWidth * .024)), marginBottom: 12 }]}>{t.notesTitle}</Text>
       <ScrollView style={{ flex: 1 }}>
         <EmotionalSafetyNote style={s.notesText} />
@@ -320,7 +335,7 @@ export default function Reflection() {
       </ScrollView>
     </View>;
     return <View style={{ flex: 1, minHeight: 0, paddingRight: compact ? 0 : 30, flexDirection: wide ? 'row' : 'column', gap: wide ? 22 : 0 }}>
-      <View style={wide ? { width: '42%', minHeight: 0 } : undefined}>
+      <View style={wide ? { width: '42%', minHeight: 0 } : notes && interactive ? { flex: 1, minHeight: 0 } : undefined}>
       {notes && interactive ? (wide ? null : notesPage) : <>
       {!spread && <>
       <Text accessibilityRole="header" style={[s.heading, compact && { color: bookInk }, { fontSize: compact ? 22 : Math.max(21, Math.min(27, sceneWidth * .026)) }]}>{t.title(type)}</Text>
@@ -387,7 +402,7 @@ export default function Reflection() {
   function rightFace(report: SavedReport | null, interactive = false) {
     const detail = report && !notes ? details[report.id] ?? null : null, spread = notes ? null : weekly2Of(report);
     // Weekly 2.0, right page: the insights, petal card and question (blank paper until the bud is opened).
-    if (spread && report && spread.short.insights) return <View key={report.id} style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
+    if (spread && report && (spread.month || spread.short?.insights)) return <View key={report.id} style={{ flex: 1, minHeight: 0, paddingLeft: 18 }}>
       {weekly2Page(report, 'right', interactive)}
     </View>;
     return <View style={{ flex: compact ? undefined : 1, minHeight: 0, alignItems: 'center', paddingLeft: compact ? 0 : 18, paddingTop: compact ? 15 : 0, paddingBottom: compact ? 0 : artHeight * .045 }}>

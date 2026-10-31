@@ -8,6 +8,7 @@ import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
 import { saveFlowerChoice } from '../../services/flowerChoices';
 import { useAppLocale } from '../../services/locale';
+import { clearAnswer, pendingAnswer } from '../../services/questionAnswer';
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { ui } from './FeatureUI';
 import { EventIllustration } from './EventIllustration';
@@ -33,6 +34,7 @@ const COPY = {
     withoutHelp: 'Plants the same flower but leaves the AI analysis out, if it did not feel right. The flower keeps only the mood you chose.',
     voice: 'Voice input', voiceHint: 'Record up to three minutes, then review the transcript before saving', recording: (t: string) => `Recording ${t} / 3:00`,
     transcribing: 'Transcribing…', preparing: 'Preparing microphone…', done: 'Done', cancel: 'Cancel', help: "What's the difference?",
+    answering: (q: string) => `Answering: ${q}`, notAnswering: 'Not an answer',
   },
   'zh-Hans': {
     intro: '什么是事件？', introText: '写下今天的一件小事，选一个它带给你的心情。PetalPal 会保存它，AI 会读一读里面的情绪，然后为你的花园长出一朵花。',
@@ -50,6 +52,7 @@ const COPY = {
     withoutHelp: '种下同一朵花，但不保留 AI 分析（比如你觉得分析不准）。这朵花只保留你自己选的心情。',
     voice: '语音输入', voiceHint: '最多录三分钟，保存前可以先看一遍转出来的文字', recording: (t: string) => `正在录音 ${t} / 3:00`,
     transcribing: '正在转文字…', preparing: '正在准备麦克风…', done: '完成', cancel: '取消', help: '两种有什么区别？',
+    answering: (q: string) => `回答：${q}`, notAnswering: '不是回答',
   },
 };
 
@@ -62,6 +65,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
   const voice = useEventVoiceInput(journal.content, journal.setContent, journal.busy);
   const [showToFriends, setShowToFriends] = useState(false);
   const [help, setHelp] = useState(false);
+  const [answering, setAnswering] = useState(() => pendingAnswer());
   const saved = journal.result;
   const flower = saved ? journal.flowers[0] : undefined;
   const status = saved?.event.emotionStatus;
@@ -80,6 +84,13 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
     </View> : null}
     <EmotionalSafetyNote text={journal.content} />
 
+    {/* Re-read: saving the answer takes it, so the next Event is not shown as an answer. */}
+    {answering && !saved && pendingAnswer() ? <View style={styles.answering}>
+      <Text style={styles.text}>{copy.answering(answering.question)}</Text>
+      <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { clearAnswer(); setAnswering(null); }}>
+        <Text style={styles.answeringDrop}>{copy.notAnswering}</Text>
+      </Pressable>
+    </View> : null}
     <Text style={styles.sectionTitle}>{copy.what} <Text accessibilityLabel={copy.required} style={styles.required}>*</Text></Text>
     <View style={styles.inputWrap}>
       <TextInput accessibilityLabel={copy.what} placeholder={copy.placeholder} placeholderTextColor="#84998E"
@@ -213,6 +224,8 @@ function EventAction({ title, onPress, disabled = false, secondary = false }: {
 const createStyles = (theme: PanelTheme) => StyleSheet.create({
   body: { gap: 14 },
   text: { fontFamily: 'serif', fontSize: 16, lineHeight: 23, color: theme.text },
+  answering: { gap: 4 },
+  answeringDrop: { fontFamily: 'serif', fontSize: 16, lineHeight: 23, color: theme.text, textDecorationLine: 'underline', opacity: .75 },
   caption: { fontSize: 12, lineHeight: 18, color: theme.muted },
   counter: { fontSize: 11, color: theme.muted, textAlign: 'right', marginTop: -8 },
   sectionTitle: { fontFamily: 'serif', fontWeight: '600', fontSize: 19, color: theme.text },

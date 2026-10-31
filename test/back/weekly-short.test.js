@@ -162,7 +162,7 @@ test("deleting an Event removes a short Weekly report whose mood curve shows it,
         { id: "weekly-other", narrativeSections: [{ kind: "MOOD_CURVE", points: [{ sourceEventId: "event-9" }] }, { kind: "RECENT_MOMENTS" }] }]; },
       deleteMany: async args => { deleted.push(...args.where.id.in); }
     },
-    monthlyReport: { deleteMany: async () => assert.fail("no Monthly report cites the Event") },
+    monthlyReport: { findMany: async () => [], deleteMany: async () => assert.fail("no Monthly report cites the Event") },
     yearlyReport: { deleteMany: async () => assert.fail("no Yearly report cites the Event") }
   };
   const result = await new PrivateEventRepository({ $transaction: fn => fn(tx) })
@@ -210,6 +210,7 @@ test("deleting an earlier Event removes a later short report that quotes it in t
     $queryRawUnsafe: async () => [],
     event: { findFirst: async () => ({ id: "event-old", occurredAt: new Date("2026-08-30T12:00:00Z") }), deleteMany: async () => ({ count: 1 }) },
     aiEvidence: { findMany: async () => [] },
+    monthlyReport: { findMany: async () => [] },
     weeklyReport: {
       findMany: async () => [{ id: "weekly-later", narrativeSections: [{ kind: "THEN_AND_NOW",
         then: { sourceEventId: "event-old" }, now: { sourceEventId: "event-0" } }] }],

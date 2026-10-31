@@ -11,6 +11,7 @@ export interface ReportSection {
   type?: string; role?: string; items?: { text: string; sourceEventId: string; date?: string }[];
   quote?: { text: string; sourceEventId: string; date?: string } | null; evidence?: { sourceEventId: string; date: string }[];
   reportVersion?: string; feedback?: string;
+  subject?: string | null; word?: string; question?: string; writtenOn?: string;
 }
 export interface ThenNowSide { sourceEventId: string; date: string; quote: string }
 export interface SavedReport {
@@ -106,14 +107,21 @@ export interface ShortWeekly {
   // Weekly 2.0 (backend lib/insight-write.js, saved under the v1 contract): headline + insight cards.
   // `version2` marks a 2.0 report (its HEADLINE says so): it opens with the bud and shows the bouquet.
   headline: string | null; insights: { main: Insight; secondary: Insight[] } | null; version2: boolean;
+  // Weekly 2.0 闭环 (backend lib/insight-loop.js), all code-written: threads the owner follows, their answer to an
+  // earlier question, letters due this week and, for a short week, the real threshold. `cardIndex` names the card to keep.
+  threads: { word: string; count: number; claim: string; evidence: { eventId: string; date: string }[] }[];
+  answer: { question: string; quote: { text: string; eventId: string; date: string } } | null;
+  letters: { text: string; writtenOn: string | null }[]; unlock: string | null; cardIndex: number | null;
 }
 export interface PetalCard { id: string; name: string; line: string; text: string; fact: string; disclaimer: string; reason: string | null }
 // TREND is Weekly 2.0's code-written fallback (backend lib/insight-compute.js).
-export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND' | 'ECHO';
+export type InsightType = 'HIDDEN_LINK' | 'SAID_BEFORE' | 'SMALL_GOODS' | 'OPEN_QUESTION' | 'TREND' | 'ECHO' | 'FIRST_TIME' | 'BODY_SIGNAL' | 'RHYTHM' | 'SELF_TALK';
 export type InsightFeedback = 'INACCURATE' | 'HIDDEN';
 export interface Insight {
   // `index` is the section's place in the saved report, which the feedback call names.
   index: number; feedback: InsightFeedback | null;
+  // The word a thread follows (跟进); null for types without one (small goods, trend, echo).
+  subject: string | null;
   type: InsightType; text: string; fact: string | null;
   items: { text: string; eventId: string }[]; quote: { text: string; eventId: string } | null;
   evidence: { eventId: string; date: string }[];
@@ -130,9 +138,21 @@ export function shortWeekly(report: Pick<ReflectionReport, 'narrativeSections'>)
     line: line && eventId ? { text: line.claim, eventId } : null,
     curve: curve && days && points.length ? { claim: curve.claim, days, points } : null,
     side: find('SIDE_BY_SIDE')?.claim ?? null, question: find('QUESTION')?.claim ?? null, support: find('SUPPORT_RESOURCES')?.claim ?? null,
-    thenAndNow: thenNow(find('THEN_AND_NOW')), card: petalCard(find('PETAL_CARD')), ...insightsOf(sections) };
+    thenAndNow: thenNow(find('THEN_AND_NOW')), card: petalCard(find('PETAL_CARD')), ...insightsOf(sections), ...loopOf(sections) };
 }
-const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND', 'ECHO'];
+function loopOf(sections: ReportSection[]) {
+  const of = (kind: string) => sections.filter(section => section?.kind === kind && filled(section.claim));
+  const threads = of('THREAD').filter(section => filled(section.word) && Number.isInteger(section.count) && Array.isArray(section.evidence))
+    .map(section => ({ word: section.word!, count: section.count!, claim: section.claim,
+      evidence: section.evidence!.filter(item => filled(item?.sourceEventId) && DATE.test(item?.date ?? '')).map(item => ({ eventId: item.sourceEventId, date: item.date })) }));
+  const answered = of('ANSWER').find(section => filled(section.question) && filled(section.quote?.text) && filled(section.quote?.sourceEventId) && DATE.test(section.quote?.date ?? ''));
+  const card = sections.findIndex(section => section?.kind === 'PETAL_CARD');
+  return { threads,
+    answer: answered ? { question: answered.question!, quote: { text: answered.quote!.text!, eventId: answered.quote!.sourceEventId!, date: answered.quote!.date! } } : null,
+    letters: of('LETTER').filter(section => filled(section.text)).map(section => ({ text: section.text!, writtenOn: DATE.test(section.writtenOn ?? '') ? section.writtenOn! : null })),
+    unlock: of('UNLOCK')[0]?.claim ?? null, cardIndex: card >= 0 ? card : null };
+}
+const INSIGHT_TYPES: InsightType[] = ['HIDDEN_LINK', 'SAID_BEFORE', 'SMALL_GOODS', 'OPEN_QUESTION', 'TREND', 'ECHO', 'FIRST_TIME', 'BODY_SIGNAL', 'RHYTHM', 'SELF_TALK'];
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
 const spanOf = (value?: { text?: unknown; sourceEventId?: unknown } | null) =>
   value && filled(value.text) && filled(value.sourceEventId) ? { text: value.text, eventId: value.sourceEventId } : null;
@@ -145,7 +165,7 @@ function insight(section: ReportSection, index: number): Insight | null {
   const items = (Array.isArray(section.items) ? section.items : []).map(spanOf).filter(item => item !== null);
   if (!evidence.length || (section.type === 'SMALL_GOODS' && items.length < 2)) return null;
   const feedback = section.feedback === 'INACCURATE' || section.feedback === 'HIDDEN' ? section.feedback : null;
-  return { index, feedback, type: section.type as InsightType, text: section.text, fact: filled(section.fact) ? section.fact : null, items,
+  return { index, feedback, subject: filled(section.subject) ? section.subject : null, type: section.type as InsightType, text: section.text, fact: filled(section.fact) ? section.fact : null, items,
     quote: spanOf(section.quote), evidence };
 }
 function insightsOf(sections: ReportSection[]) {
@@ -205,6 +225,93 @@ export const moodIcon = (mood: PrimaryMood) => PRIMARY_MOODS.indexOf(mood) + 1; 
 export const setInsightFeedback = (reportId: string, index: number, verdict: InsightFeedback | null) =>
   apiRequest<{ narrativeSections: ReportSection[] }>(`/ai/reports/weekly/${encodeURIComponent(reportId)}/insights/${index}/feedback`, 'POST', { verdict });
 
+// ---- Monthly 2.0 (backend lib/monthly-insights.js, code-written; MONTH_HEADLINE.reportVersion monthly-2.0) ----
+type Ref = { text: string; date: string; eventId: string };
+export interface Monthly2 {
+  headline: string; question: string | null;
+  garden: { claim: string; days: string[]; dayMoods: { date: string; mood: PrimaryMood | null }[]; points: { date: string; mood: PrimaryMood; eventId: string }[] } | null;
+  spread: { periodKey: string; cardId: string; name: string; line: string | null; headline: string | null; role: 'start' | 'turn' | 'now' }[];
+  changes: { word: string; claim: string; then: Ref; now: Ref }[];
+  threads: { type: string; keyword: string; count: number; line: string; quote: Ref }[];
+  goods: { text: string; count: number; date: string; eventId: string }[];
+  people: { word: string; count: number; mood: string; moodCount: number }[];
+}
+const refOf = (value?: { quote?: unknown; text?: unknown; date?: unknown; sourceEventId?: unknown } | null): Ref | null => {
+  const text = filled(value?.quote) ? value!.quote : filled(value?.text) ? value!.text : null;
+  return text && filled(value?.sourceEventId) && DATE.test(String(value?.date ?? '')) ? { text, date: value!.date as string, eventId: value!.sourceEventId as string } : null;
+};
+export function monthly2(report: Pick<ReflectionReport, 'narrativeSections'>): Monthly2 | null {
+  const sections = (Array.isArray(report.narrativeSections) ? report.narrativeSections : []) as (ReportSection & Record<string, any>)[];
+  const head = sections.find(section => section?.kind === 'MONTH_HEADLINE');
+  if (head?.reportVersion !== 'monthly-2.0' || !filled(head.claim)) return null;
+  const of = (kind: string) => sections.filter(section => section?.kind === kind);
+  const g = of('MONTH_GARDEN')[0];
+  const garden = g && Array.isArray(g.days) && Array.isArray(g.dayMoods) ? { claim: g.claim, days: g.days.filter((day: unknown) => DATE.test(String(day))),
+    dayMoods: g.dayMoods.filter((day: any) => DATE.test(String(day?.date))).map((day: any) => ({ date: day.date as string, mood: PRIMARY_MOODS.includes(day.mood) ? day.mood as PrimaryMood : null })),
+    points: (Array.isArray(g.points) ? g.points : []).filter((point: any) => PRIMARY_MOODS.includes(point?.mood) && filled(point?.sourceEventId))
+      .map((point: any) => ({ date: point.date as string, mood: point.mood as PrimaryMood, eventId: point.sourceEventId as string })) } : null;
+  const spread = (of('MONTH_SPREAD')[0]?.cards ?? []).filter((card: any) => filled(card?.cardId) && filled(card?.name))
+    .map((card: any) => ({ periodKey: card.periodKey, cardId: card.cardId, name: card.name, line: filled(card.line) ? card.line : null,
+      headline: filled(card.headline) ? card.headline : null, role: ['start', 'turn', 'now'].includes(card.role) ? card.role : 'turn' }));
+  const changes = of('MONTH_CHANGE').map(section => ({ word: section.word, claim: section.claim, then: refOf(section.then), now: refOf(section.now) }))
+    .filter((item): item is Monthly2['changes'][number] => filled(item.word) && !!item.then && !!item.now);
+  const threads = (of('MONTH_THREADS')[0]?.items ?? []).map((item: any) => ({ type: item?.type, keyword: item?.keyword, count: item?.count, line: item?.line, quote: refOf(item?.quote) }))
+    .filter((item: any): item is Monthly2['threads'][number] => filled(item.keyword) && filled(item.line) && Number.isInteger(item.count) && !!item.quote);
+  const goods = (of('MONTH_GOODS')[0]?.items ?? []).filter((item: any) => filled(item?.text) && Number.isInteger(item?.count))
+    .map((item: any) => ({ text: item.text, count: item.count, date: item.date, eventId: item.sourceEventId }));
+  const people = (of('MONTH_PEOPLE')[0]?.people ?? []).filter((item: any) => filled(item?.word) && Number.isInteger(item?.count) && filled(item?.mood))
+    .map((item: any) => ({ word: item.word, count: item.count, mood: item.mood, moodCount: item.moodCount }));
+  return { headline: head.claim, question: of('MONTH_QUESTION')[0]?.claim ?? null, garden, spread, changes, threads, goods, people };
+}
+export const MONTHLY_COPY = {
+  en: { garden: 'This month’s garden', spread: 'This month’s spread', roles: { start: 'Start', turn: 'Turn', now: 'Now' }, change: 'What changed',
+    lastMonth: 'Last month', thisMonth: 'This month', threads: 'Threads this month', goods: 'Small good things', times: (n: number) => `×${n}`,
+    people: 'People this month', show: 'Show', hide: 'Hide', peopleLine: (n: number, mood: string, k: number) => `${n} entries · ${mood} ${k}`,
+    question: 'A question for next month', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], empty: 'No entry' },
+  'zh-Hans': { garden: '本月花园', spread: '本月牌阵', roles: { start: '开始', turn: '转折', now: '现在' }, change: '变化对照',
+    lastMonth: '上个月', thisMonth: '这个月', threads: '线索追踪', goods: '本月好事清单', times: (n: number) => `${n} 次`,
+    people: '本月的人', show: '展开', hide: '收起', peopleLine: (n: number, mood: string, k: number) => `${n} 条 · 『${mood}』${k} 条`,
+    question: '给下个月的问题', days: ['一', '二', '三', '四', '五', '六', '日'], empty: '没有记录' },
+} as const;
+
+// ---- 花语年鉴 (backend lib/almanac.js): built by code when opened, never stored ----
+export interface Almanac {
+  year: number; title: string; summary: string; entries: number; daysWritten: number;
+  months: { month: string; entries: number; days: { date: string; mood: PrimaryMood | null; sourceEventId: string | null }[] }[];
+  echo: { word: string; count: number; months: number; line: string; first: { text: string; date: string; sourceEventId: string };
+    last: { text: string; date: string; sourceEventId: string } } | null;
+  firsts: { word: string; date: string; sourceEventId: string }[];
+  goods: { text: string; count: number; date: string; sourceEventId: string }[];
+  card: { cardId: string; name: string; line: string; count: number; reasons: { periodKey: string; reason: string | null }[] } | null;
+}
+export const loadAlmanacYears = (signal?: AbortSignal) => apiRequest<{ years: number[]; opensOn: string }>('/ai/almanac', 'GET', undefined, { signal });
+export const loadAlmanac = (year: number, signal?: AbortSignal) => apiRequest<Almanac>(`/ai/almanac/${year}`, 'GET', undefined, { signal });
+
+// ---- Weekly 2.0 闭环 (backend lib/insight-loop.js). Owner comes from the session; every call needs Memory on. ----
+const weeklyPath = (reportId: string) => `/ai/reports/weekly/${encodeURIComponent(reportId)}`;
+// 花语集: keep (or let go of) one insight or petal card section of the owner's report.
+export const keepSection = (reportId: string, index: number, kept: boolean) =>
+  apiRequest<{ kept: boolean }>(`${weeklyPath(reportId)}/insights/${index}/keep`, 'POST', { kept });
+// 跟进: the insight's subject becomes a thread (at most three; a fourth is a 409 INSIGHT_LOOP_LIMIT).
+export const followInsight = (reportId: string, index: number) =>
+  apiRequest<{ id: string; word: string }>(`${weeklyPath(reportId)}/insights/${index}/follow`, 'POST', {});
+export const unfollowThread = (threadId: string) => apiRequest<boolean>(`/ai/insight-threads/${encodeURIComponent(threadId)}`, 'DELETE');
+export const answerQuestion = (reportId: string, eventId: string) =>
+  apiRequest<{ answered: boolean }>(`${weeklyPath(reportId)}/answer`, 'POST', { eventId });
+export const writeLetter = (text: string, deliverOn: string) =>
+  apiRequest<{ id: string; text: string; deliverOn: string }>('/ai/future-letters', 'POST', { text, deliverOn });
+export const withdrawLetter = (letterId: string) => apiRequest<boolean>(`/ai/future-letters/${encodeURIComponent(letterId)}`, 'DELETE');
+export const setMute = (word: string, muted: boolean) => apiRequest<{ word: string; muted: boolean }>('/ai/insight-mutes', 'PUT', { word, muted });
+export interface PetalCollection {
+  cards: { cardId: string; name: string; line: string; kept: boolean; appearances: { reportId: string; periodKey: string; reason: string | null }[] }[];
+  insights: { reportId: string; periodKey: string; index: number; type: InsightType; text: string;
+    items: { text: string }[]; quote: { text: string } | null }[];
+  threads: { id: string; word: string; insightType: string; createdAt: string }[];
+  letters: { id: string; text: string; deliverOn: string; createdAt: string; delivered: boolean }[];
+  mutes: string[]; today: string;
+}
+export const loadCollection = (signal?: AbortSignal) => apiRequest<PetalCollection>('/ai/insight-collection', 'GET', undefined, { signal });
+
 // The bouquet: every Event of the week is one flower in its day's column, never higher or lower by mood. One or two
 // flowers on a day stand side by side; more stand in rows of up to three, each row behind a little higher and smaller,
 // so every flower shows however many Events the day has. `lift` is how far a back row stands above the ground line.
@@ -234,8 +341,11 @@ export const SHORT_COPY = {
     bouquet: 'This week’s bouquet',
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
     undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
+    keep: 'Keep', kept: 'Kept', follow: 'Follow', following: 'Following', threadLimit: 'You already follow three threads. Let one go in the Petal collection first.',
+    threads: 'Threads you follow', answered: 'Your answer', letter: 'A letter from you', letterFrom: (date: string) => `Written on ${date}`,
     types: { SAID_BEFORE: 'Something you said', HIDDEN_LINK: 'A quiet link', SMALL_GOODS: 'Small good things',
-      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo' },
+      OPEN_QUESTION: 'A question still open', TREND: 'How the week turned', ECHO: 'An echo', FIRST_TIME: 'A first time',
+      BODY_SIGNAL: 'What your body said', RHYTHM: 'A rhythm', SELF_TALK: 'Words that came back' },
     // The names the Events screen shows when a mood is chosen.
     moods: { SUNNY_BLOOM: 'Sunny', GENTLE_BLOOM: 'Gentle', QUIET_BLOOM: 'Quiet', HEALING_BLOOM: 'Healing', FIRE_BLOOM: 'Fire',
       WONDER_BLOOM: 'Wonder', DRIFTING_BLOOM: 'Drifting', PEACEFUL_BLOOM: 'Peaceful' }, moodChart: 'Moods this week', pageOf: 'Page', page: 'Insight', previousCard: 'Previous', nextCard: 'Next',
@@ -246,7 +356,10 @@ export const SHORT_COPY = {
     bouquet: '本周花束',
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
-    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声' },
+    keep: '收藏', kept: '已收藏', follow: '跟进', following: '跟进中', threadLimit: '你已经在跟进 3 条线了，先在花语集里放下一条。',
+    threads: '你在跟进的线', answered: '你的回答', letter: '你写给自己的信', letterFrom: (date: string) => `写于${date}`,
+    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声',
+      FIRST_TIME: '第一次', BODY_SIGNAL: '身体信号', RHYTHM: '节律', SELF_TALK: '反复的句式' },
     moods: { SUNNY_BLOOM: '开心', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '低落', HEALING_BLOOM: '治愈', FIRE_BLOOM: '愤怒',
       WONDER_BLOOM: '好奇', DRIFTING_BLOOM: '迷茫', PEACEFUL_BLOOM: '平静' }, moodChart: '这周的心情', pageOf: '页',
     page: '洞察', previousCard: '上一条', nextCard: '下一条',

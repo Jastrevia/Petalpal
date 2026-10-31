@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { readEvent } from '../../services/events';
-import { moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, thenNowCount, type Insight, type InsightFeedback,
+import { followInsight, keepSection, loadCollection, moodCurveLayout, moodIcon, setInsightFeedback, SHORT_COPY, shortDate, thenNowCount, type Insight, type InsightFeedback,
   type ShortCopy, type ShortWeekly } from '../../services/reflections';
 import { petalCardArt } from '../petalCards/petalCardArt';
 import { EventIllustration } from './EventIllustration';
 import { useAppLocale } from '../../services/locale';
+import { startAnswer } from '../../services/questionAnswer';
 import { MoodPetalChart, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
 import { ShareCardButton } from './ShareCard';
@@ -52,6 +53,39 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
     catch { setMarks(current => ({ ...current, [item.index]: before })); setMarkError(item.index); }
   }
   const canMark = interactive && short.version2 && !!reportId;
+  // ---- 收藏 / 跟进 (闭环): what this report already has kept and which words are followed, read once ----
+  const [kept, setKept] = useState<Set<number>>(new Set());
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
+  const [loopNote, setLoopNote] = useState<{ index: number; text: string } | null>(null);
+  // Keyed by plain values: the parent rebuilds `short` on every render.
+  const cardIndex = short.cardIndex, cardId = short.card?.id ?? null;
+  useEffect(() => {
+    if (!canMark) return;
+    const controller = new AbortController();
+    loadCollection(controller.signal).then(book => {
+      setKept(new Set([...book.insights.filter(item => item.reportId === reportId).map(item => item.index),
+        ...(cardIndex !== null && cardId && book.cards.some(card => card.cardId === cardId && card.kept &&
+          card.appearances.some(item => item.reportId === reportId)) ? [cardIndex] : [])]));
+      setFollowed(new Set(book.threads.map(thread => thread.word)));
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [canMark, reportId, cardIndex, cardId]);
+  async function keep(index: number) {
+    if (!reportId) return;
+    const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); on ? copy.add(index) : copy.delete(index); return copy; });
+    flip(next); setLoopNote(null);
+    try { await keepSection(reportId, index, next); } catch { flip(!next); setLoopNote({ index, text: copy.feedbackFailed }); }
+  }
+  async function follow(item: Insight) {
+    if (!reportId || !item.subject || followed.has(item.subject)) return;
+    setLoopNote(null);
+    try {
+      const thread = await followInsight(reportId, item.index);
+      setFollowed(current => new Set([...current, thread.word]));
+    } catch (error) {
+      setLoopNote({ index: item.index, text: (error as { status?: number })?.status === 409 ? copy.threadLimit : copy.feedbackFailed });
+    }
+  }
   async function toggle(at: string, id: string) {
     const ticket = ++request.current;
     if (opened?.at === at && opened.id === id) { setOpened(null); return; }
@@ -195,6 +229,10 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         </Pressable>;
       })}
     </View>;
+    // The quiet actions under an insight or the card: 收藏, 跟进, 隐藏.
+    const quiet = (label: string, onPress: () => void, on = false) => <Pressable key={label} accessibilityRole="button" hitSlop={12}
+      accessibilityLabel={label} accessibilityState={{ selected: on }} onPress={onPress}
+      style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}><Text style={[v.markText, on && v.markOn]}>{label}</Text></Pressable>;
     const entry = (item: Insight, at: string, main: boolean) => {
       if (markOf(item) === 'HIDDEN') return <View key={at} testID={`insight-${at}`} style={v.marked}>
         <Text style={v.markedText}>{copy.hidden}</Text>
@@ -211,14 +249,16 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         </View>
         {item.quote && !item.text.includes(item.quote.text) && <Text selectable={interactive} style={v.text}>{`“${item.quote.text}”`}</Text>}
         {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={[v.text, v.good]}>{thing.text}</Text>)}
-        {item.fact && <Text selectable={interactive} style={v.text}>{item.fact}</Text>}
+        {/* The code-written fact line is what the sentence above was checked against; shown again it only repeats it. */}
         {dates(item, at)}
         {panel(at)}
         {canMark && <View style={v.marks}>
-          <Pressable accessibilityRole="button" hitSlop={12} accessibilityLabel={copy.hide} onPress={() => void mark(item, 'HIDDEN')}
-            style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}><Text style={v.markText}>{copy.hide}</Text></Pressable>
+          {quiet(kept.has(item.index) ? copy.kept : copy.keep, () => void keep(item.index), kept.has(item.index))}
+          {item.subject && quiet(followed.has(item.subject) ? copy.following : copy.follow, () => void follow(item), followed.has(item.subject))}
+          {quiet(copy.hide, () => void mark(item, 'HIDDEN'))}
         </View>}
         {markError === item.index && <Text accessibilityRole="alert" style={v.text}>{copy.feedbackFailed}</Text>}
+        {loopNote?.index === item.index && <Text accessibilityRole="alert" style={v.text}>{loopNote.text}</Text>}
       </View>;
     };
     // More insights page sideways, one at a time, with a quiet "1 / 3" and arrows.
@@ -249,14 +289,34 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       {date && <><Text style={v.eyebrow}>{date.eyebrow}</Text>{!!date.range && <Text style={v.range}>{date.range}</Text>}</>}
       {short.headline && <Text accessibilityRole="header" style={v.headline}>{short.headline}</Text>}
     </>;
-    // Only the question itself.
-    const question = short.question && <Text selectable={interactive} style={v.text}>{short.question}</Text>;
+    // The question itself and "写一条来回答": the next Event the owner saves answers it (services/questionAnswer.ts).
+    const question = short.question && <>
+      <Text selectable={interactive} style={v.text}>{short.question}</Text>
+      {interactive && reportId && <View style={v.marks}>{quiet(copy.answer, () => { startAnswer(reportId, short.question!); onWrite(); })}</View>}
+    </>;
+    // 闭环 blocks, all code-written: threads, the owner's answer to an earlier question, letters due this week.
+    const loop: { key: string; node: ReactNode }[] = [];
+    if (short.threads.length) loop.push({ key: 'threads', node: <>{rule}{eyebrow(copy.threads)}
+      {short.threads.map((thread, i) => <View key={thread.word}>
+        <Text selectable={interactive} style={v.text}>{thread.claim}</Text>
+        {thread.evidence.length > 0 && dates({ evidence: thread.evidence } as Insight, `thread-${i}`)}
+        {panel(`thread-${i}`)}
+      </View>)}</> });
+    if (short.answer) loop.push({ key: 'answer', node: <>{rule}{eyebrow(copy.answered)}
+      <Text selectable={interactive} style={v.text}>{short.answer.question}</Text>
+      <Text selectable={interactive} style={[v.text, v.good]}>{short.answer.quote.text}</Text>
+      {dates({ evidence: [{ eventId: short.answer.quote.eventId, date: short.answer.quote.date }] } as Insight, 'answer')}
+      {panel('answer')}</> });
+    short.letters.forEach((letter, i) => loop.push({ key: `letter-${i}`, node: <>{rule}{eyebrow(copy.letter)}
+      <Text selectable={interactive} style={v.text}>{letter.text}</Text>
+      {letter.writtenOn && <Text style={v.pairLabel}>{copy.letterFrom(shortDate(letter.writtenOn, lang))}</Text>}</> }));
     type Block = { key: string; node: ReactNode };
     let left: Block[], right: Block[];
     if (!insights) {
       // A week with no insights: its headline ("这周的花还在长") and a gentle question, nothing else.
-      left = [{ key: 'head', node: head }, ...(question ? [{ key: 'question', node: question }] : [])];
-      right = [];
+      left = [{ key: 'head', node: head }, ...(short.unlock ? [{ key: 'unlock', node: <Text style={v.text}>{short.unlock}</Text> }] : []),
+        ...(question ? [{ key: 'question', node: question }] : [])];
+      right = loop;
     } else {
       left = [{ key: 'head', node: head }];
       if (short.curve) {
@@ -286,6 +346,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           <View style={v.art}>{art('oneMore', 50, WEEKLY_ART.oneMore)}</View>
         </View>
       </> });
+      right.push(...loop);
       if (short.card && cardArt) right.push({ key: 'card', node: <>
         {rule}
         {eyebrow(copy.card)}
@@ -297,8 +358,15 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           {short.card.reason && <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>}
           <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>
         </View>
+
         {interactive && <ShareCardButton card={short.card} headline={short.headline} week={date ? `${date.eyebrow} ${date.range}`.trim() : ''}
           locale={lang} linkStyle={v.link} />}
+
+        {canMark && short.cardIndex !== null && <View style={v.marks}>
+          {quiet(kept.has(short.cardIndex) ? copy.kept : copy.keep, () => void keep(short.cardIndex!), kept.has(short.cardIndex))}
+        </View>}
+        {loopNote && loopNote.index === short.cardIndex && <Text accessibilityRole="alert" style={v.text}>{loopNote.text}</Text>}
+ 
       </> });
       if (question) right.push({ key: 'question', node: <>{rule}{question}</> });
       if (report) right.push({ key: 'report', node: report });
@@ -381,7 +449,7 @@ const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
 // One page of the book: blocks laid out once, split into pages that fit the page's height (a block never splits; a
 // block taller than the page scrolls on its own page). Other pages' blocks stay laid out but hidden, so they keep their
 // measured place; "‹ 1 / 2 ›" turns.
-function Paged({ blocks, testID, copy }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy }) {
+export function Paged({ blocks, testID, copy }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy }) {
   const [height, setHeight] = useState(0);
   // Block heights only: positions are their running sum (on the web a block's measured y is not updated when a block
   // above it changes height).
@@ -440,7 +508,8 @@ const v = StyleSheet.create({
   date: { minHeight: 32, justifyContent: 'center' },
   dateText: { fontFamily: 'Georgia', fontSize: 12, color: GOLD, textDecorationLine: 'underline', textDecorationColor: '#A8823F66' },
   dateOn: { color: INK },
-  marks: { flexDirection: 'row', justifyContent: 'flex-end' },
+  marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18 },
+  markOn: { color: GOLD },
   markButton: { minHeight: 32, justifyContent: 'center' },
   markText: { fontFamily: 'Georgia', fontSize: 12, color: '#9A8261' },
   marked: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
