@@ -1,5 +1,5 @@
 import { hitsMailbox } from './fairy/mailboxDestination';
-import { hitsTreehouse, treehouseTap } from './fairy/treehouseDestination';
+import { hitsTreehouse } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
 import { hitsMoonBed } from './fairy/moonDestination';
 import { hitsSwing } from './fairy/swingDestination';
@@ -258,11 +258,6 @@ export type GardenSceneProps = {
   mode?: 'development' | 'player';
 };
 
-const treehouseHint = (locale?: string | null) =>
-  zhHans(locale)
-    ?{ label: '小花仙在树屋里 ✨', hint: '点一下叫她出来' }
-    : { label: 'Your fairy is in the treehouse ✨', hint: 'Tap to call her out' };
-
 // Whether a tap is on (or within a finger's reach of) a month's lawn.
 const NEAR_LAWN = 30;
 function nearLawn(month: number, x: number, y: number) {
@@ -354,20 +349,12 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const fairyStateRef = useRef<FairyState>('idle'); fairyStateRef.current = fairyState;
   // Her own day (server schedule), for owners the server enables; a user's tap holds it off a minute.
   const noteFairyUser = useFairySchedule(fairyRef, enableFairyWalk && !readOnly);
-  // Tapping the treehouse sends her straight in, and the Bookhouse opens once she is inside.
-  const bookhouseOnEntry = useRef(false);
+  // The treehouse and the mailbox are the owner's doors: a tap goes straight inside, and she stays
+  // out of it. (Read through refs by the memoized tap handler.)
   const tapTreehouse = useRef(() => {});
-  tapTreehouse.current = () => {
-    const fairy = fairyRef.current, bookhouse = !readOnly ? onOpenBookhouse : undefined;
-    const action = treehouseTap(fairyStateRef.current, Boolean(bookhouse));
-    if (action === 'callOut') fairy?.returnFromTreehouse();
-    else if (action === 'openBookhouse') bookhouse?.();
-    else if (action === 'openOnEntry') bookhouseOnEntry.current = true;
-    else if (fairy?.visitTreehouse()) bookhouseOnEntry.current = Boolean(bookhouse);
-    // She cannot get there right now (on her way out, or busy at the mailbox): the door still opens.
-    else bookhouse?.();
-  };
-
+  tapTreehouse.current = () => { if (!readOnly) onOpenBookhouse?.(); };
+  const tapMailbox = useRef(() => {});
+  tapMailbox.current = () => { if (!readOnly) onMailboxOpened?.(); };
   const mailboxPhase: MailboxInteractionPhase = useMemo(() => {
     if (fairyState === 'movingToMailbox' || fairyState === 'flyingToMailbox') return 'walking';
     if (
@@ -643,12 +630,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     left: baseX + cameraX.value + (treehousePlacement.x + 870 * treehousePlacement.scale) * fit * cameraZoom.value - 28,
     top: baseY + cameraY.value + (treehousePlacement.y + 690 * treehousePlacement.scale) * fit * cameraZoom.value - 28,
     width: 56, height: 56,
-  }));
-  // Inside, she is hidden behind the door; a bubble above it says she is there.
-  const treehouseHintStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + (treehousePlacement.x + 870 * treehousePlacement.scale) * fit * cameraZoom.value - 100,
-    top: baseY + cameraY.value + (treehousePlacement.y + 690 * treehousePlacement.scale) * fit * cameraZoom.value - 120,
-    width: 200,
   }));
   const fairyBubbleStyle = useAnimatedStyle(() => ({
     left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 110,
@@ -1066,16 +1047,16 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       // A place she goes (landmarks first), else a lawn with flowers (which opens its Events and
       // leaves her be), else a spot on the paths.
       const at = { x: worldX, y: worldY };
+      if (enableFairyWalk && hitsMailbox(at, treehousePlacement)) { tapMailbox.current(); return; }
+      if (enableFairyWalk && hitsTreehouse(at, treehousePlacement)) { tapTreehouse.current(); return; }
       const destination = !enableFairyWalk ? null
-        : hitsMailbox(at, treehousePlacement) ? () => fairyRef.current?.visitMailbox()
-        : hitsTreehouse(at, treehousePlacement) ? () => tapTreehouse.current()
         : hitsSwing(at, swingPlacement) ? () => fairyRef.current?.visitSwing()
         : hitsTeaArea(at, teaSetPlacement) ? () => fairyRef.current?.visitTea()
         : hitsMoonBed(at, moonBedPlacement) ? () => fairyRef.current?.visitMoonBed()
         : null;
       const lawn = !destination && onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
       if (lawn !== null) { openLawnEvents(lawn, worldX, worldY); return; }
-      if (enableFairyWalk) { noteFairyUser(); bookhouseOnEntry.current = false; }
+      if (enableFairyWalk) noteFairyUser();
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
       if (destination) { destination(); return; }
       if (enableFairyWalk) {
@@ -1588,7 +1569,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               onTreehouseExited?.();
             }} onTreehouseEntered={() => {
               onTreehouseEntered?.();
-              if (bookhouseOnEntry.current) { bookhouseOnEntry.current = false; onOpenBookhouse?.(); }
             }} pixelsPerUnit={()=>fit*cameraZoom.value} onStateChange={setFairyState} ref={fairyRef} debug={fairyDebug} onStatus={setFairyStatus}
               active={worldActive && perf.Land && perf.Infrastructure && infrastructureEnabled && activeMode === 'normal' && !selectedFlower && previewMode}
               blocked={isGardenGroundBlocked} />
@@ -1676,20 +1656,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {!readOnly && onOpenBookhouse && activeMode === 'normal' && !selectedFlower && (
         <Animated.View style={[{ position: 'absolute' }, treehouseEntryStyle]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Enter Treehouse Bookhouse"
-            accessibilityHint="Open your private journals and flower history" onPress={() => {
-              if (enableFairyWalk) { noteFairyUser(); tapTreehouse.current(); } else onOpenBookhouse();
-            }}
+            accessibilityHint="Open your private journals and flower history" onPress={onOpenBookhouse}
             style={({ pressed }) => ({ flex: 1, borderRadius: 28, backgroundColor: pressed ? '#FFF4DC22' : 'transparent' })} />
-        </Animated.View>
-      )}
-      {enableFairyWalk && !readOnly && activeMode === 'normal' && !selectedFlower && fairyInTreehouse && (
-        <Animated.View testID="fairy-treehouse-hint" style={[{ position: 'absolute', alignItems: 'center', zIndex: 25 }, treehouseHintStyle]}>
-          <Pressable accessibilityRole="button" accessibilityLabel={treehouseHint(locale).label} accessibilityHint={treehouseHint(locale).hint}
-            onPress={() => fairyRef.current?.returnFromTreehouse()} style={({ pressed }) => [styles.treehouseHint, pressed && { opacity: 0.75 }]}>
-            <Text style={styles.treehouseHintText}>{treehouseHint(locale).label}</Text>
-            <Text style={styles.treehouseHintHint}>{treehouseHint(locale).hint}</Text>
-          </Pressable>
-          <View style={styles.treehouseHintTail} />
         </Animated.View>
       )}
       {enableFairyWalk && !readOnly && activeMode === 'normal' && !selectedFlower && fairyBubble && (
@@ -2260,7 +2228,6 @@ const styles = StyleSheet.create({
   treehouseHint: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, alignItems: 'center',
     backgroundColor: '#FFF6E2F2', borderWidth: 1, borderColor: '#C9A44C' },
   treehouseHintText: { color: '#5A4630', fontSize: 13, fontWeight: '600' },
-  treehouseHintHint: { color: '#8A7354', fontSize: 11, marginTop: 1 },
   treehouseHintTail: { width: 10, height: 10, marginTop: -6, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF6E2F2',
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },

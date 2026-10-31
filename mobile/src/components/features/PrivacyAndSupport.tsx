@@ -56,7 +56,7 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
   {dialog==='delete'?<Dialog title={copy.deleteAccount} closeLabel={copy.close} onClose={()=>setDialog(null)}>
    <DeleteAccountSettings embedded onPolicy={()=>void open(process.env.EXPO_PUBLIC_DELETION_URL)}/>
   </Dialog>:null}
-  <Text style={ui.caption}>{copy.emergency}</Text></View>;
+  <Text style={[ui.caption,{color:titleColor}]}>{copy.emergency}</Text></View>;
  return <View style={{gap:6}}><Text accessibilityRole="header" style={[ui.title,{color:titleColor}]}>{copy.title}</Text>
  <View>
  <FeatureLinkRow first title={copy.help} onPress={feedback}/>
@@ -67,7 +67,7 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
  <FeatureLinkRow title={copy.support} onPress={support}/>
  </View>
  {status?<Text accessibilityRole="alert" style={[ui.text,{color:titleColor}]}>{status}</Text>:null}
- <Text style={ui.caption}>{copy.emergency}</Text></View>;
+ <Text style={[ui.caption,{color:titleColor}]}>{copy.emergency}</Text></View>;
 }
 
 function Group({label,children}:{label:string;children:ReactNode}){

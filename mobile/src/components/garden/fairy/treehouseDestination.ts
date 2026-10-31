@@ -1,7 +1,6 @@
 import { TREEHOUSE_MAP_X, TREEHOUSE_MAP_Y, TREEHOUSE_MAP_SCALE } from '../treehouseMapPlacement';
 import type { Point } from './walkNetwork';
 import { nearMailbox } from './mailboxDestination';
-import type { FairyState } from './FairyNavigation';
 
 // Source pixels share TreehouseEntity's untrimmed 1448 x 1086 registration.
 const world = (x: number, y: number): Point => ({
@@ -25,13 +24,4 @@ export function hitsTreehouse(p: Point, placement = {
   // Follow canopy/trunk silhouette rather than capturing nearby water/path taps.
   return ((x - 710) / 630) ** 2 + ((y - 365) / 325) ** 2 <= 1 ||
     ((x - 860) / 220) ** 2 + ((y - 745) / 285) ** 2 <= 1;
-}
-
-// A tap on the treehouse. With a Bookhouse to open she goes straight in and it opens once she is
-// inside (no extra button); without one (a friend's Garden, previews) the tap sends her in or out.
-export type TreehouseTap = 'enter' | 'openOnEntry' | 'openBookhouse' | 'callOut';
-export function treehouseTap(state: FairyState, bookhouse: boolean): TreehouseTap {
-  const inside = state === 'insideTreehouse', entering = state === 'enteringTreehouse';
-  if (!bookhouse) return inside || entering ? 'callOut' : 'enter';
-  return inside ? 'openBookhouse' : entering ? 'openOnEntry' : 'enter';
 }

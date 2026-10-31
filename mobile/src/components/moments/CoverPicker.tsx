@@ -1,3 +1,4 @@
+import { usePanelTheme } from '../features/PanelTheme';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { MOMENT_COVER_IDS, MOMENT_COVERS } from './momentCovers';
 
@@ -9,13 +10,14 @@ export function CoverPicker({ visible, title, selected, busy = false, error = ''
 }) {
   const tiles = [{ id: null as string | null, source: defaultCover, label: defaultLabel },
     ...MOMENT_COVER_IDS.map((id, i) => ({ id, source: MOMENT_COVERS[id] as ImageSourcePropType, label: optionLabel(i + 1) }))];
+  const { theme } = usePanelTheme();
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <Pressable accessibilityLabel={closeLabel} onPress={onClose} style={styles.backdrop}>
-      <Pressable accessibilityViewIsModal onPress={() => undefined} style={styles.sheet}>
+      <Pressable accessibilityViewIsModal onPress={() => undefined} style={[styles.sheet, { backgroundColor: theme.surface }]}>
         <View style={styles.header}>
-          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={styles.close}>
-            <Text style={styles.closeText}>×</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{title}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={[styles.close, { backgroundColor: theme.input }]}>
+            <Text style={[styles.closeText, { color: theme.text }]}>×</Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.grid}>

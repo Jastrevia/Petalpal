@@ -94,7 +94,6 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
     place:(rest,at)=>{
       if(!nav.current.place(rest,at))return false;
       elapsed.current=0;facing.value=1;lean.value=0;frame.value=WALK_IDLE;flightBlend.value=0;
-      if(rest==='treehouse'){entryCount.current=++nav.current.treehouseEntryCount;config.current.onTreehouseEntered?.();}
       publish();step.current(performance.now());return true;
     },
     move:p=>requestMove(p),
@@ -178,8 +177,9 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
       <FlyingFairy seconds={flightSeconds} blend={flightBlend}/>
     </Group>
     </Group>
-    <MailboxFairy x={x} y={y} phase={mailboxPhase} elapsedMs={mailboxElapsed} opacity={mailboxBlend}/>
-    <TreehouseEntryOcclusion depth={treehouseDepth}/>
+    {/* Only the development Garden still runs these two sequences: no textures otherwise. */}
+    {state.toLowerCase().includes('mail')&&<MailboxFairy x={x} y={y} phase={mailboxPhase} elapsedMs={mailboxElapsed} opacity={mailboxBlend}/>}
+    {state.toLowerCase().includes('treehouse')&&<TreehouseEntryOcclusion depth={treehouseDepth}/>}
     {(state==='flying'||state==='flyingToSwing'||state==='aligningToSwing')&&<SwingFlightOcclusion/>}
     {debug&&<Circle cx={x} cy={y} r={4} color="#ff4285"/>}
   </>;

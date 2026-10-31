@@ -11,6 +11,7 @@ import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { clusterFootprintRadius } from './flowerClusters';
 import { useAppLocale } from '../../../services/locale';
+import { flowerNameText } from '../../../services/flowerNames';
 
 /** The Garden camera, to keep the ✓ under the ghost while the view moves. */
 export interface PlantingCamera {
@@ -110,7 +111,7 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
           </Text>
         </View>
         <Text style={styles.titleText}>
-          {targetFlower.flowerName ? `${targetFlower.flowerName.toUpperCase()} — ` : ''}
+          {targetFlower.flowerName ? `${zh ? flowerNameText(targetFlower.flowerName, 'zh-Hans') : targetFlower.flowerName.toUpperCase()} — ` : ''}
           {zh ? `${monthName}花园` : `${monthName} Garden`}
         </Text>
         <View

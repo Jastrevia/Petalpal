@@ -92,6 +92,7 @@
   }
   // Today's plantings: deleting a flower never gives one back.
   let plantedToday = 0;
+  const reactions = {};
   let consent = { aiProcessing: false, personalization: false, memoryEnabled: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
   const EMOTIONS = { en: ['calm', 'grateful', 'a little tired'], zh: ['平静', '感激', '有点累'] };
   window.fetch = async (input, options = {}) => {
@@ -186,9 +187,16 @@
         return json({ created: true, ...redemptions[0] }, 200, 300);
       }
       if (p === '/api/redeem') return json({ redemptions });
+      if (p === '/messages/reactions') return json({ reactions: Object.fromEntries((url.searchParams.get('ids') || '').split(',').map(id => [id, reactions[id] ?? { likes: 2, mine: null }])) });
+      if (/^\/messages\/[^/]+\/reaction$/.test(p) && method === 'PUT') {
+        const id = p.split('/')[2], before = reactions[id] ?? { likes: 2, mine: null };
+        reactions[id] = before.mine ? before : { likes: before.likes + (request.kind === 'LIKE' ? 1 : 0), mine: request.kind };
+        return json(reactions[id]);
+      }
       if (p === '/api/fairy/check-in' && method === 'POST') {
         const created = !checkedInToday; checkedInToday = true;
-        return json({ created, checkIn: { localDate: day(0), streak: 4, graceUsed: false }, keepsakes: [], points: created ? 2 : 0 });
+        return json({ created, locale: 'en', checkIn: { localDate: day(0), streak: 4, graceUsed: false }, awarded: created ? 2 : 0, levelUp: null,
+          keepsakes: created ? [{ id: 'acorn-teacup', rarity: 'COMMON', name: 'Acorn Teacup', note: 'I saved this one for you.', reason: 'DAILY', firstTime: true }] : [] });
       }
       if (p === '/events' && method === 'POST') {
         const id = 'e' + (events.size + 1), now = new Date().toISOString();
@@ -243,7 +251,7 @@
       }
       if (ownFlower && method === 'GET') {
         const flower = ownFlowers.find(item => item.id === ownFlower[1]);
-        return flower ? json({ ...flower, messages: [], supportState: { isOwner: true, canSupport: false, supportedToday: false } }) : json({ error: 'Flower not found' }, 404);
+        return flower ? json({ ...flower, messages: [{ id: 'msg1', author: 'Mira', authorUserId: 'friend-mira', text: 'This one is lovely.' }, { id: 'msg2', author: 'Jun', authorUserId: 'friend-jun', text: 'Thinking of you.' }], supportState: { isOwner: true, canSupport: false, supportedToday: false } }) : json({ error: 'Flower not found' }, 404);
       }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });

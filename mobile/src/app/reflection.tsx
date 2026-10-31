@@ -36,7 +36,7 @@ const CHROME = {
     notEnough: 'There isn’t enough recorded evidence to compare periods.',
     footer: (n: number) => `${n} recorded ${n === 1 ? 'event' : 'events'} · Saved reflection`, of: (i: number, n: number) => `${i} of ${n}`,
     previous: (type: ReportType) => `Previous ${type === 'weekly' ? 'week' : 'month'}`, next: (type: ReportType) => `Next ${type === 'weekly' ? 'week' : 'month'}`,
-    close: 'Close Reflections', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
+    close: 'Close Reflections', putBack: 'Put the book back on the shelf', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
     kept: 'Your reflections, kept here.' },
   'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于', collection: '花语集' }, unit: { weekly: '周', monthly: '月' },
     reportOutput: '举报最终内容', pick: '从书架上取一本书', notesTitle: '关于这些回看', notes: [
@@ -56,7 +56,7 @@ const CHROME = {
     notEnough: '记录还不多，暂时不比较。',
     footer: (n: number) => `${n} 条记录 · 已保存`, of: (i: number, n: number) => `${i} / ${n}`,
     previous: (type: ReportType) => type === 'weekly' ? '上一周' : '上一个月', next: (type: ReportType) => type === 'weekly' ? '下一周' : '下一个月',
-    close: '关闭回看', lantern: '灯笼 · 夜晚灯光', lanternHint: '点亮灯笼是夜晚，熄灭回到白天', kept: '你的回看都收在这里。' },
+    close: '关闭回看', putBack: '把书放回书架', lantern: '灯笼 · 夜晚灯光', lanternHint: '点亮灯笼是夜晚，熄灭回到白天', kept: '你的回看都收在这里。' },
 } as const;
 function period(report: SavedReport, lang: ShortLocale) {
   if (report.type === 'monthly') {
@@ -113,6 +113,11 @@ export default function Reflection() {
       setOpen(book); setFlying(null);
       Animated.timing(reveal, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start();
     });
+  }
+  // Back to the desk, with every book on the shelf again; the big × leaves the pavilion.
+  function closeBook() {
+    if (reducedMotion) { setOpen(null); return; }
+    Animated.timing(reveal, { toValue: 0, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => { if (finished) setOpen(null); });
   }
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -246,8 +251,12 @@ export default function Reflection() {
   const bookHeight = compact ? Math.max(320, height - bookTop - 12) : artHeight * .48;
   const bookLeft = compact ? 10 : sceneWidth * .17;
   const sceneHeight = compact ? bookTop + bookHeight + 12 : artHeight;
-  const camera = { position: 'absolute' as const, left: 0, top: 0, width: sceneWidth, height: artHeight };
-  const lakeCamera = { ...camera, top: -artHeight * .14 };
+  // An upright phone is taller than the painting: it is scaled up to fill the whole screen, cropped
+  // at the sides so the shelf, the desk and the window's lake all stay in view.
+  const fillHeight = compact && !wide ? Math.max(artHeight, sceneHeight) : artHeight;
+  const fillWidth = fillHeight * 3 / 4, artLeft = fillWidth > sceneWidth ? Math.max(sceneWidth - fillWidth, -fillWidth * .33) : 0;
+  const camera = { position: 'absolute' as const, left: artLeft, top: 0, width: fillWidth, height: fillHeight };
+  const lakeCamera = { ...camera, top: -fillHeight * .14 };
   // The text area inside the book (same fractions as the resting layout below).
   // Phone: the page sits inside the open cloth cover of the shelf book it came from.
   const area = compact
@@ -266,8 +275,8 @@ export default function Reflection() {
   // Shelf spines cropped from the same painted art (1000-wide units, rows 138–318): the phone's Weekly/Monthly switch.
   const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 }, collection: { x: 838, w: 74 } };
   // A book's place on the painted shelf, in scene points (the art is 1000 units wide; its shelf row runs 138–318).
-  const spineRect = (item: Book) => { const k = sceneWidth / 1000;
-    return { left: shelf[item].x * k, top: 138 * k, width: shelf[item].w * k, height: 180 * k }; };
+  const spineRect = (item: Book) => { const k = fillWidth / 1000;
+    return { left: artLeft + shelf[item].x * k, top: 138 * k, width: shelf[item].w * k, height: 180 * k }; };
   const shelfSpine = (item: Book, h: number) => {
     const { x, w } = shelf[item], k = h / 180;
     return <View style={{ width: w * k, height: h, overflow: 'hidden', borderRadius: 2 }}>
@@ -431,8 +440,10 @@ export default function Reflection() {
         <Image source={interiorDay} style={camera} />
         <Animated.Image source={interiorNight} style={[camera, { opacity: lighting }]} />
       </View>
+      {/* Away from the open book is the desk: a tap there puts the book back, and the shelf stays within reach. */}
+      {open && <Pressable testID="reflection-desk" accessibilityRole="button" accessibilityLabel={t.putBack} onPress={closeBook} style={StyleSheet.absoluteFill} />}
       <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)} hitSlop={6}
-        style={{ position: 'absolute', left: sceneWidth * .91, top: artHeight * .10, width: sceneWidth * .085, height: artHeight * .145, zIndex: 3 }} />
+        style={{ position: 'absolute', left: artLeft + fillWidth * .91, top: fillHeight * .10, width: fillWidth * .085, height: fillHeight * .145, zIndex: compact && !wide ? 0 : 3 }} />
       {/* The painted books on the shelf are the controls; the one that is out leaves a gap. Drawn before the open book,
           which covers them where the two overlap. */}
       {BOOKS.map(item => {
@@ -456,12 +467,14 @@ export default function Reflection() {
         </Animated.View>;
       })()}
       {/* Before a book is taken: a quiet line on the painted book's open pages. */}
-      {!open && !flying && <View pointerEvents="none" style={{ position: 'absolute', top: artHeight * .53, left: sceneWidth * .2, width: sceneWidth * .74,
+      {!open && !flying && <View pointerEvents="none" style={{ position: 'absolute', top: fillHeight * .53, left: artLeft ? 0 : sceneWidth * .2, width: artLeft ? sceneWidth : sceneWidth * .74,
         alignItems: 'center' }}>
         <Text style={[s.pick, { fontSize: Math.max(13, Math.min(17, sceneWidth * .02)) }]}>{t.pick}</Text>
       </View>}
       {open && <Animated.View testID="reflection-book" style={{ position: 'absolute', top: bookTop, left: bookLeft, width: bookWidth, height: bookHeight,
         opacity: reveal, transform: [{ scaleX: reveal.interpolate({ inputRange: [0, 1], outputRange: [.55, 1] }) }] }}>
+        {/* The cover around the page belongs to "away from the page" too. */}
+        <Pressable accessible={false} onPress={closeBook} style={StyleSheet.absoluteFill} />
         {!compact && !notes && !weekly2Of(selected) && <View style={{ position: 'absolute', left: '-6%', top: '10%', gap: 6, zIndex: 2 }}>
           {(['Summary', 'Topics', 'Patterns'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: section === item, disabled: !selected || !details[selected.id] || !!turning }} aria-selected={section === item} disabled={!selected || !details[selected.id] || !!turning} onPress={() => setSection(item)} style={[s.edgeTab, { backgroundColor: ['#BBC09A', '#E1C49A', '#DCA9A0'][i], opacity: section === item ? 1 : .88 }]}><Text style={s.small}>{t.tabs[item]}</Text></Pressable>)}
         </View>}
@@ -528,6 +541,8 @@ export default function Reflection() {
           <Pressable testID="reflection-next-page" accessibilityRole="button" accessibilityLabel={t.next(type)}
             disabled={!!turning || atEnd} onPress={() => void turn(1)} style={[s.turn, { opacity: atEnd ? .35 : 1 }]}><Text style={s.arrow}>›</Text></Pressable>
         </View>}
+        <Pressable testID="reflection-put-back" accessibilityRole="button" accessibilityLabel={t.putBack} disabled={!!turning} onPress={closeBook} hitSlop={10}
+          style={[s.putBack, { left: area.left + area.width - (compact ? 56 : 36), top: area.top + 6 }]}><Text style={s.putBackText}>✕</Text></Pressable>
       </Animated.View>}
     </View>
   </ScrollView>
@@ -539,6 +554,9 @@ const s = StyleSheet.create({
   back: { position: 'absolute', zIndex: 20, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#F3E7CCE6', borderWidth: 1, borderColor: '#BFA36D' },
   closeText: { fontSize: 20, color: '#4A3622' },
+  putBack: { position: 'absolute', zIndex: 6, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F3E7CCD9', borderWidth: 1, borderColor: '#BFA36D99' },
+  putBackText: { fontSize: 13, color: '#5E4B33' },
   pages: { position: 'absolute', borderRadius: 12 },
   sectionHeading: { fontFamily: 'Georgia', fontSize: 18, color: '#654D30', marginTop: 8, marginBottom: 12 },
   pattern: { fontFamily: 'Georgia', fontSize: 15, lineHeight: 23, color: '#556040', marginBottom: 8 },

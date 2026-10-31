@@ -23,14 +23,14 @@ export function DeleteAccountSettings({embedded=false,onPolicy}:{embedded?:boole
  const confirmed=typed.trim()===copy.phrase;
  return <View style={{gap:10}}>{embedded?null:<Text accessibilityRole="header" style={[ui.title,{color:theme.text}]}>{copy.title}</Text>}
  <Text accessibilityRole="alert" style={[ui.text,{color:theme.text,fontWeight:'700'}]}>{copy.warning}</Text>
- <Text style={ui.text}>{copy.what}</Text>
+ <Text style={[ui.text,{color:theme.text}]}>{copy.what}</Text>
  {onPolicy?<Text accessibilityRole="link" onPress={onPolicy} style={[ui.caption,{color:theme.text,textDecorationLine:'underline'}]}>{copy.policy}</Text>:null}
  <Text style={[ui.text,{color:theme.text}]}>{copy.typeLabel(copy.phrase)}</Text>
  <TextInput accessibilityLabel={copy.typeLabel(copy.phrase)} value={typed} onChangeText={setTyped} editable={!busy}
   autoCapitalize="characters" autoCorrect={false} placeholder={copy.phrase} placeholderTextColor={theme.muted}
   style={{minHeight:42,borderRadius:10,borderWidth:1,borderColor:confirmed?theme.gold:theme.border,paddingHorizontal:12,color:theme.text,fontSize:15}}/>
- <Text style={ui.caption}>{copy.recent}</Text>
+ <Text style={[ui.caption,{color:theme.muted}]}>{copy.recent}</Text>
  <FeatureActionButton title={busy?copy.deleting:copy.delete} disabled={busy||!confirmed} onPress={async()=>{
   if(!confirmed)return;setBusy(true);setError('');try{await deleteAccount();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}/>
- {error?<Text accessibilityRole="alert" style={ui.text}>{error}</Text>:null}</View>;
+ {error?<Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{error}</Text>:null}</View>;
 }

@@ -1,8 +1,7 @@
 # iPhone 内测（TestFlight）操作步骤
 
-分支：`feat/ios-beta`（基于 `main` dd93ffa5，只改 App，不改后端，所以连现在的生产后端就能用）。
-包含：游客模式（打开直接进花园）、周报花语卡分享、水面少画一层（画面不变）。
-**没有**包含 `feat/weekly-insights-m2`（周报 M2–M5 需要先跑迁移、部署后端，之后再进 App）。
+从 `main` 打包。`main` 已包含游客模式、周报花语卡分享、水面少画一层和周报 M2–M5。
+App 里的周报新功能要用新后端：连生产环境之前，要先跑生产迁移（含 `202610310001`、`202611010001`）并部署后端，这两步都要单独批准。
 
 只有下面几步需要主人本人操作（账号、密码、付费、签名都只能本人做）。
 
@@ -21,7 +20,7 @@
 ## 每次打包上传（在你电脑终端里）
 
 ```bash
-cd ~/dev/Petalpal/.claude/worktrees/ios-beta/mobile
+cd ~/dev/Petalpal/mobile
 ```
 
 ```bash
@@ -44,7 +43,7 @@ npx eas-cli@latest build --platform ios --profile production --auto-submit
 
 ## 内测前请在真机上看一遍
 
-（今晚这台 Mac 没有 Xcode，原生版没在 iPhone 上跑过；网页预览里看过游客模式和水面。）
+（免费签名的 Release 版在 iPhone 15 Pro 上跑过，见 [usability-testing.md](../usability-testing.md)；旧 iPhone 和 TestFlight 版还没试过。）
 - 打开直接是花园；点 Events / Friends / Me、信箱、回看亭都会弹出登录页，左上“回到花园”能回来。
 - 花仙子走路、荡秋千、进树屋能看；树屋里写日记会要求登录。
 - 登录后是自己的花园；退出登录回到游客花园。

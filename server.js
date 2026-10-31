@@ -2964,13 +2964,17 @@ app.get("/users/:userId/subscription", async (req, res) => {
           });
         });
   
+        // The sender hears who said yes (public profile fields only). Never holds up the accept.
+        let accepter = null;
+        try { accepter = await prisma.user.findUnique({ where: { id: receiverId }, select: { name: true, avatar: true } }); } catch { /* the notice just says "a friend" */ }
         realtime
           .to(`user:${senderId}`)
           .to(`user:${receiverId}`)
           .emit("friendRequestUpdated", {
             type: "request-accepted",
             senderId,
-            receiverId
+            receiverId,
+            accepter
           });
           realtime
           .to(`user:${senderId}`)

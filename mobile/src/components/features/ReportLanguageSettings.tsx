@@ -1,3 +1,4 @@
+import { usePanelTheme } from './PanelTheme';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
@@ -11,9 +12,10 @@ const COPY={en:{current:'App and reflection language',failed:'The language was n
 export function ReportLanguageSettings() {
  const {session,updateLocale}=useAuth(); const owner=session?.user.id;
  const locale=useAppLocale(), copy=COPY[locale];
+ const {theme}=usePanelTheme();
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  async function save(next:AppLocale){if(!owner||busy||next===locale)return;setBusy(true);setStatus('');try{await updateLocale(next);}catch{setStatus(copy.failed);}finally{setBusy(false);}}
- return <View style={{gap:8}}><Text style={ui.text}>{copy.current}</Text>
+ return <View style={{gap:8}}><Text style={[ui.text,{color:theme.text}]}>{copy.current}</Text>
   <View style={ui.row}>{(['en','zh-Hans'] as const).map(l=><View key={l}><FeatureActionButton secondary={l!==locale} title={l===locale?`✓ ${LABELS[l]}`:LABELS[l]} disabled={busy||!owner||l===locale} onPress={()=>void save(l)}/></View>)}</View>
-  {status?<Text accessibilityRole="alert" style={ui.caption}>{status}</Text>:null}</View>;
+  {status?<Text accessibilityRole="alert" style={[ui.caption,{color:theme.muted}]}>{status}</Text>:null}</View>;
 }

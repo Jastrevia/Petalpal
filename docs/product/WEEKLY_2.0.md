@@ -202,7 +202,7 @@
 
 ## 闭环（M2，2026-10-29）
 
-代码在 [lib/insight-loop.js](../../lib/insight-loop.js)，迁移 `202611010001_weekly_insight_loop`（五张新表，只新增，**还没在任何数据库上跑**）。
+代码在 [lib/insight-loop.js](../../lib/insight-loop.js)，迁移 `202611010001_weekly_insight_loop`（五张新表，只新增；随 TEST 部署 35fc6d8a 自动跑，生产还没跑）。
 全部接口只认登录的人自己，需要 Memory 授权；周报里这些块都是**代码写的**，不发给模型。
 
 | 功能 | 怎么用 | 周报里 | 护栏 |

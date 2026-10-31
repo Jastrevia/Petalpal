@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useGardenLoadState, type GardenLoadStore } from './gardenReadiness';
 import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
+import { useAppLocale } from '../../../services/locale';
 
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
 // garden. It changes nothing about rendering or quality.
-export function GardenLoadingOverlay({ store, title = 'Growing your garden…' }: { store: GardenLoadStore; title?: string }) {
+export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore; title?: string }) {
+  const zh = useAppLocale() === 'zh-Hans';
   const load = useGardenLoadState(store);
   const ready = load.water === 'ready' && load.landsLoaded >= load.landsTotal;
   const [elapsed, setElapsed] = useState(0);
@@ -27,24 +29,24 @@ export function GardenLoadingOverlay({ store, title = 'Growing your garden…' }
     return () => window.removeEventListener('unhandledrejection', onRejection);
   }, [ready, store]);
   if (ready) return null;
-  const progress = `Water ${load.water === 'ready' ? '✓' : load.water === 'failed' ? '✕' : '…'} · Islands ${load.landsLoaded}/${load.landsTotal}`;
-  const failures = load.failures.length ? `Couldn’t load: ${load.failures.join(', ')}` : null;
+  const progress = `${zh ? '水面' : 'Water'} ${load.water === 'ready' ? '✓' : load.water === 'failed' ? '✕' : '…'} · ${zh ? '小岛' : 'Islands'} ${load.landsLoaded}/${load.landsTotal}`;
+  const failures = load.failures.length ? `${zh ? '加载失败：' : 'Couldn’t load: '}${load.failures.join(', ')}` : null;
   const reload = Platform.OS === 'web' && typeof window !== 'undefined'
     ? <Pressable accessibilityRole="button" onPress={() => window.location.reload()} style={gardenLoadingStyles.reload}>
-        <Text style={gardenLoadingStyles.reloadText}>Reload</Text></Pressable> : null;
+        <Text style={gardenLoadingStyles.reloadText}>{zh ? '重新加载' : 'Reload'}</Text></Pressable> : null;
   if (elapsed >= 30_000) return <View pointerEvents="box-none" style={gardenLoadingStyles.bannerWrap} testID="garden-loading">
     <View style={gardenLoadingStyles.banner}>
-      <Text style={gardenLoadingStyles.bannerText}>Garden still loading · {progress}</Text>
+      <Text style={gardenLoadingStyles.bannerText}>{zh ? '花园还在加载' : 'Garden still loading'} · {progress}</Text>
       {failures ? <Text style={gardenLoadingStyles.bannerText}>{failures}</Text> : null}
       {reload}
     </View>
   </View>;
   return <View pointerEvents="box-none" style={gardenLoadingStyles.root} testID="garden-loading">
-    <ActivityIndicator color="#365b42" accessibilityLabel="Loading your garden" />
-    <Text accessibilityLiveRegion="polite" style={gardenLoadingStyles.title}>{title}</Text>
+    <ActivityIndicator color="#365b42" accessibilityLabel={zh ? '正在加载花园' : 'Loading your garden'} />
+    <Text accessibilityLiveRegion="polite" style={gardenLoadingStyles.title}>{title ?? (zh ? '花园正在生长…' : 'Growing your garden…')}</Text>
     <Text style={gardenLoadingStyles.hint}>{progress}</Text>
     {failures ? <Text style={gardenLoadingStyles.hint}>{failures}</Text> : null}
-    {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>The first visit can take up to a minute on a slow connection.</Text> : null}
+    {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>{zh ? '网络较慢时，第一次打开可能要一分钟。' : 'The first visit can take up to a minute on a slow connection.'}</Text> : null}
     <WakingFlowerFacts delayMs={4000} showNote={false} />
   </View>;
 }

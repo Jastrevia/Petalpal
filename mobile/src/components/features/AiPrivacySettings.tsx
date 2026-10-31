@@ -46,7 +46,7 @@ export function AiPrivacySettings() {
   const fresh=undecided(c);setSuggested(fresh);setValue(fresh?{aiProcessing:true,personalization:true,memoryEnabled:true}:flags(c));setDisclosure(d);}).catch(e=>{if(active)setStatus(e.message);}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[owner]);
  async function save(next:Consent){if(!owner || (!disclosure && (next.aiProcessing||next.personalization||next.memoryEnabled)))return;setBusy(true);setStatus('');try{setValue(flags(await apiRequest<Consent>(`/users/${owner}/ai-consent`,'PUT',{...flags(next),...(disclosure?{disclosureVersion:disclosure.version}:{})})));setSuggested(false);setStatus(copy.saved);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}
  return <View style={{gap:12}}>
- {disclosure ? <><Text style={ui.text}>{copy.explanation(disclosure.explanation)}</Text>{disclosure.features.map(f=><Text key={f.feature} style={ui.caption}>{copy.feature(f.feature)}: {copy.processor(f.processor)} — {f.configured?copy.configured:copy.unavailable}</Text>)}<Text style={ui.text}>{copy.retention(disclosure.retention)}</Text></>:<Text style={ui.text}>{copy.loading}</Text>}
+ {disclosure ? <><Text style={[ui.text,{color:theme.text}]}>{copy.explanation(disclosure.explanation)}</Text>{disclosure.features.map(f=><Text key={f.feature} style={[ui.caption,{color:theme.muted}]}>{copy.feature(f.feature)}: {copy.processor(f.processor)} — {f.configured?copy.configured:copy.unavailable}</Text>)}<Text style={[ui.text,{color:theme.text}]}>{copy.retention(disclosure.retention)}</Text></>:<Text style={[ui.text,{color:theme.text}]}>{copy.loading}</Text>}
  {(['aiProcessing','personalization','memoryEnabled'] as const).map((key,i)=><View key={key} style={ui.row}><Text style={[ui.text,{flex:1,color:theme.text}]}>{copy.switches[i]}</Text><Switch accessibilityLabel={copy.switches[i]} value={value[key]} disabled={busy||!disclosure||(key!=='aiProcessing'&&!value.aiProcessing)||(key==='memoryEnabled'&&!value.personalization)} onValueChange={enabled=>setValue(v=>({...v,[key]:enabled,...(!enabled&&key==='aiProcessing'?{personalization:false,memoryEnabled:false}:{}),...(!enabled&&key==='personalization'?{memoryEnabled:false}:{})}))}/></View>)}
  {/* The switches look on but nothing is granted yet, so say so where the owner will see it. */}
  {suggested?<View testID="ai-consent-unsaved" style={{borderWidth:1,borderColor:theme.gold,borderRadius:12,padding:10}}><Text style={[ui.text,{color:theme.text,fontWeight:'600'}]}>{copy.suggested}</Text></View>:null}
@@ -54,7 +54,7 @@ export function AiPrivacySettings() {
  <FeatureActionButton title={copy.save} disabled={busy||!disclosure} onPress={()=>void save(value)}/>
  <FeatureActionButton secondary title={copy.withdraw} disabled={busy} onPress={()=>void save({aiProcessing:false,personalization:false,memoryEnabled:false})}/>
  </View>
- {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
+ {status?<Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{status}</Text>:null}</View>;
 }
 const REPORT_COPY={
  en:{report:'Report AI output',note:'Only the output reference and reason are sent. Your private text is not attached.',
@@ -68,10 +68,11 @@ const REPORT_COPY={
 // `title` replaces the opener's label (the Reflection pages say what is being reported).
 export function AiOutputReport({kind,outputId,linkStyle,title}:{kind:string;outputId:string;linkStyle?:TextStyle;title?:string}) {
  const copy=REPORT_COPY[useAppLocale()];
+ const {theme}=usePanelTheme();
  const [open,setOpen]=useState(false),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  return <View style={{gap:8}}>{linkStyle
   ?<Pressable accessibilityRole="button" onPress={()=>setOpen(!open)} disabled={busy} hitSlop={10} style={{alignSelf:'flex-start',minHeight:32,justifyContent:'center'}}><Text style={linkStyle}>{title??copy.report}</Text></Pressable>
   :<FeatureActionButton secondary title={title??copy.report} onPress={()=>setOpen(!open)} disabled={busy}/>}
- {open?<><Text style={ui.text}>{copy.note}</Text><View style={[ui.row,{flexWrap:'wrap',gap:8}]}>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</View></>:null}
- {status?<Text accessibilityRole="alert" style={ui.text}>{status}</Text>:null}</View>;
+ {open?<><Text style={[ui.text,{color:theme.text}]}>{copy.note}</Text><View style={[ui.row,{flexWrap:'wrap',gap:8}]}>{['HARASSMENT','HATE_SPEECH','SELF_HARM','PRIVACY','OTHER'].map(category=><FeatureActionButton key={category} secondary title={copy.categories[category]} disabled={busy} onPress={async()=>{setBusy(true);try{await apiRequest('/ai-output-reports','POST',{kind,outputId,category});setStatus(copy.received);setOpen(false);}catch(e){setStatus((e as Error).message);}finally{setBusy(false);}}}/>)}</View></>:null}
+ {status?<Text accessibilityRole="alert" style={[ui.text,{color:theme.text}]}>{status}</Text>:null}</View>;
 }

@@ -20,6 +20,19 @@ import { clusterDrawing } from './flowerClusters';
 import { DeleteFlowerDialog } from './DeleteFlowerDialog';
 import { readEvent } from '../../../services/events';
 import { useAppLocale } from '../../../services/locale';
+import { flowerMeaningText, flowerNameText } from '../../../services/flowerNames';
+import { useMessageReactions } from '../../../services/messageReactions';
+import { PANEL_THEMES, usePanelTheme, type PanelTheme } from '../../features/PanelTheme';
+
+const MOOD_ZH: Record<string, string> = { SUNNY_BLOOM: '开心', PEACEFUL_BLOOM: '平静', GENTLE_BLOOM: '温柔', WONDER_BLOOM: '好奇', HEALING_BLOOM: '治愈', QUIET_BLOOM: '低落', DRIFTING_BLOOM: '迷茫', FIRE_BLOOM: '愤怒', Unknown: '未知' };
+const COPY = {
+  en: { month: (name: string) => `${name} Garden`, garden: 'Garden', mood: 'Mood', planted: 'Planted', memory: 'Memory', meaning: 'Meaning', hideEvent: 'Hide Event ▴', viewEvent: 'View Event ▾', opening: 'Opening…',
+    eventError: 'This Event can’t be opened right now.', support: (n: number) => `♥ Support received: ${n}`, messages: 'Messages', friend: 'Friend', sending: ' (sending...)', loading: 'Loading flower details…',
+    supported: 'Supported today ✓', working: 'Working...', give: 'Give Support 💗', placeholder: 'Leave a kind message...', leave: 'Leave Message', signIn: 'Sign in to interact with this flower.', close: 'Close flower details', like: 'Like this message', dislike: 'Dislike this message' },
+  'zh-Hans': { month: (name: string) => `${name}花园`, garden: '花园', mood: '心情', planted: '种下于', memory: '记忆', meaning: '花语', hideEvent: '收起事件 ▴', viewEvent: '查看事件 ▾', opening: '正在打开…',
+    eventError: '这件事暂时打不开。', support: (n: number) => `♥ 收到的支持：${n}`, messages: '留言', friend: '朋友', sending: '（发送中…）', loading: '正在加载这朵花…',
+    supported: '今天已支持 ✓', working: '处理中…', give: '送上支持 💗', placeholder: '留下一句温柔的话…', leave: '留言', signIn: '登录后才能和这朵花互动。', close: '关闭花朵详情', like: '赞这条留言', dislike: '不喜欢这条留言' },
+};
 
 const FLOWER_ASSETS: Record<string, any> = {
   pink: require('../../../../assets/garden/flowers/pink.png'),
@@ -45,7 +58,13 @@ export default function FlowerDetailModal() {
   } = usePlanting();
   const [messageText, setMessageText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const zh = useAppLocale() === 'zh-Hans';
+  const locale = useAppLocale(), zh = locale === 'zh-Hans', copy = COPY[locale];
+  const theme = usePanelTheme().theme ?? PANEL_THEMES.dark;
+  const styles = stylesFor(theme);
+  // (Its messages come from the detail below; hooks stay above the early return.)
+  const messageIds = (selectedFlower ? resolveFlowerDetail(selectedFlower, flowerDetailSource).messages : [])
+    .filter(message => message.id && !message.pending && (message.authorUserId || message.userId) !== currentUserId).map(message => message.id as string);
+  const { reactions, like, dislike } = useMessageReactions(messageIds);
   // Owner-only, on tap: the Event this flower grew from (GET /events/:id is owner-scoped).
   const [sourceEvent, setSourceEvent] = useState<{ id: string; state: 'loading' | 'ready' | 'error'; text?: string } | null>(null);
   const eventId = selectedFlowerIsOwner ? selectedFlower?.sourceEventId : undefined;
@@ -69,7 +88,7 @@ export default function FlowerDetailModal() {
   if (!selectedFlower) return null;
 
   const meta = MONTH_REGION_METAS[selectedFlower.month];
-  const monthName = meta?.monthName || `Month ${selectedFlower.month}`;
+  const monthName = zh ? `${selectedFlower.month}月` : meta?.monthName || `Month ${selectedFlower.month}`;
   const detail = resolveFlowerDetail(selectedFlower, flowerDetailSource);
 
   const getImage = (name?: string) => {
@@ -92,7 +111,7 @@ export default function FlowerDetailModal() {
 
   const plantedDate = new Date(selectedFlower.plantedDate);
   const formattedDate = Number.isNaN(plantedDate.getTime()) ? '' : plantedDate.toLocaleDateString(
-    undefined,
+    zh ? 'zh-CN' : 'en',
     { month: 'short', day: 'numeric', year: 'numeric' }
   );
   const supportedToday = !!detail.supportState?.supportedToday;
@@ -120,7 +139,7 @@ export default function FlowerDetailModal() {
           {/* Close button */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close flower details"
+            accessibilityLabel={copy.close}
             onPress={closeFlowerDetail}
             style={styles.closeButton}
           >
@@ -140,49 +159,70 @@ export default function FlowerDetailModal() {
 
           {/* Details */}
           <Text style={styles.flowerName}>
-            {detail.name.toUpperCase()}
+            {zh ? flowerNameText(detail.name, locale) : detail.name.toUpperCase()}
           </Text>
           <Text style={styles.locationSubtitle}>
-            {monthName} Garden • {selectedFlower.landId || meta?.landId || 'Garden'}
+            {copy.month(monthName)} • {selectedFlower.landId || meta?.landId || copy.garden}
           </Text>
 
             <View style={styles.tagRow}>
               <View style={styles.moodTag}>
-                <Text style={styles.moodTagText}>Mood: {detail.mood}</Text>
+                <Text style={styles.moodTagText}>{copy.mood}: {zh ? MOOD_ZH[detail.mood] ?? detail.mood : detail.mood}</Text>
               </View>
               {!!formattedDate && <View style={styles.dateTag}>
-                <Text style={styles.dateTagText}>Planted: {formattedDate}</Text>
+                <Text style={styles.dateTagText}>{copy.planted}: {formattedDate}</Text>
               </View>}
             </View>
 
           {detail.memory ? (
             <View style={styles.notesContainer}>
-              <Text style={styles.detailLabel}>Memory</Text>
+              <Text style={styles.detailLabel}>{copy.memory}</Text>
               <Text style={styles.notesText}>{detail.memory}</Text>
             </View>
           ) : null}
           {detail.meaning ? <View style={styles.notesContainer}>
-            <Text style={styles.detailLabel}>Meaning</Text>
-            <Text style={styles.notesText}>{detail.meaning}</Text>
+            <Text style={styles.detailLabel}>{copy.meaning}</Text>
+            <Text style={styles.notesText}>{flowerMeaningText(detail.meaning, locale)}</Text>
           </View> : null}
 
           {eventId && !detail.memory ? <View style={styles.notesContainer}>
             <Pressable accessibilityRole="button" onPress={toggleSourceEvent}>
-              <Text style={styles.detailLabel}>{sourceEvent?.id === eventId ? 'Hide Event ▴' : 'View Event ▾'}</Text>
+              <Text style={styles.detailLabel}>{sourceEvent?.id === eventId ? copy.hideEvent : copy.viewEvent}</Text>
             </Pressable>
-            {sourceEvent?.id === eventId && sourceEvent.state === 'loading' ? <Text style={styles.notesText}>Opening…</Text> : null}
+            {sourceEvent?.id === eventId && sourceEvent.state === 'loading' ? <Text style={styles.notesText}>{copy.opening}</Text> : null}
             {sourceEvent?.id === eventId && sourceEvent.state === 'ready' ? <Text selectable style={styles.notesText}>{sourceEvent.text}</Text> : null}
-            {sourceEvent?.id === eventId && sourceEvent.state === 'error' ? <Text accessibilityRole="alert" style={styles.notesText}>This Event can’t be opened right now.</Text> : null}
+            {sourceEvent?.id === eventId && sourceEvent.state === 'error' ? <Text accessibilityRole="alert" style={styles.notesText}>{copy.eventError}</Text> : null}
           </View> : null}
           {selectedFlowerIsOwner && selectedFlower?.sourceEventId ? <AiOutputReport kind="event" outputId={selectedFlower.sourceEventId} /> : null}
-          <Text style={styles.receivedSupport}>♥ Support received: {detail.supportCount}</Text>
+          <Text style={styles.receivedSupport}>{copy.support(detail.supportCount)}</Text>
           {detail.messages.length > 0 && <View style={styles.notesContainer}>
-            <Text style={styles.detailLabel}>Messages</Text>
-            {detail.messages.map((message, index) => <View key={message.id || index}><Text style={styles.messageText}>
-              {message.author || message.senderName || 'Friend'}: {message.text}{message.pending ? ' (sending...)' : ''}
-            </Text>{message.id && !message.pending && (message.authorUserId || message.userId) !== currentUserId ? <SafetyActions messageId={message.id} userId={message.authorUserId || message.userId} onBlocked={closeFlowerDetail} /> : null}</View>)}
+            <Text style={styles.detailLabel}>{copy.messages}</Text>
+            {detail.messages.map((message, index) => {
+              const authorId = message.authorUserId || message.userId;
+              const votable = message.id && !message.pending && authorId !== currentUserId;
+              const reaction = votable ? reactions[message.id as string] : undefined;
+              return <View key={message.id || index} style={styles.messageRow}>
+                <Text style={[styles.messageText, styles.messageBody]}>
+                  {message.author || message.senderName || copy.friend}: {message.text}{message.pending ? copy.sending : ''}
+                </Text>
+                {votable ? <View style={styles.reactions}>
+                  <Pressable testID="message-like" accessibilityRole="button" accessibilityLabel={copy.like} accessibilityState={{ selected: reaction?.mine === 'LIKE', disabled: Boolean(reaction?.mine) }}
+                    disabled={Boolean(reaction?.mine)} onPress={() => void like(message.id as string, reaction)} hitSlop={6} style={styles.reaction}>
+                    <Text style={[styles.reactionIcon, reaction?.mine === 'LIKE' && styles.reactionChosen]}>👍🏻</Text>
+                    {reaction?.likes ? <Text style={styles.reactionCount}>{reaction.likes}</Text> : null}
+                  </Pressable>
+                  {/* A dislike asks why first (the same reasons as a report), and counts once a reason is sent. */}
+                  <SafetyActions dislike messageId={message.id} userId={authorId} onBlocked={closeFlowerDetail}
+                    onReported={() => void dislike(message.id as string, reaction)}
+                    trigger={open => <Pressable testID="message-dislike" accessibilityRole="button" accessibilityLabel={copy.dislike} accessibilityState={{ selected: reaction?.mine === 'DISLIKE', disabled: Boolean(reaction?.mine) }}
+                      disabled={Boolean(reaction?.mine)} onPress={open} hitSlop={6} style={styles.reaction}>
+                      <Text style={[styles.reactionIcon, reaction?.mine === 'DISLIKE' && styles.reactionChosen]}>👎🏻</Text>
+                    </Pressable>} />
+                </View> : null}
+              </View>;
+            })}
           </View>}
-          {isDetailLoading && <Text style={styles.statusText}>Loading flower details…</Text>}
+          {isDetailLoading && <Text style={styles.statusText}>{copy.loading}</Text>}
 
           <View style={styles.actionRow}>
             {!selectedFlowerIsOwner && <>
@@ -198,7 +238,7 @@ export default function FlowerDetailModal() {
               ]}
             >
               <Text style={styles.supportButtonText}>
-                {supportedToday ? 'Supported today ✓' : isDetailWorking ? 'Working...' : 'Give Support 💗'}
+                {supportedToday ? copy.supported : isDetailWorking ? copy.working : copy.give}
               </Text>
             </Pressable>
             </>}
@@ -210,29 +250,43 @@ export default function FlowerDetailModal() {
             </>}
           </View>
           {!selectedFlowerIsOwner && <View style={styles.messageForm}><CommunityGuidelines />
-            <TextInput accessibilityLabel="Leave a kind message" multiline maxLength={300}
-              placeholder="Leave a kind message..." value={messageText} onChangeText={setMessageText}
+            <TextInput accessibilityLabel={copy.placeholder} multiline maxLength={300}
+              placeholder={copy.placeholder} placeholderTextColor={theme.muted} value={messageText} onChangeText={setMessageText}
               editable={!!currentUserId && !isDetailWorking} style={styles.messageInput} />
             <Pressable accessibilityRole="button" onPress={sendMessage}
               disabled={!currentUserId || !messageText.trim() || isDetailWorking}
               style={[styles.supportButton, styles.messageSubmitButton,
                 (!currentUserId || !messageText.trim() || isDetailWorking) && styles.buttonDisabled]}>
-              <Text style={styles.supportButtonText}>Leave Message</Text>
+              <Text style={styles.supportButtonText}>{copy.leave}</Text>
             </Pressable>
           </View>}
           {detailError ? <Text accessibilityRole="alert" style={styles.actionError}>{detailError}</Text> : null}
-          {!selectedFlowerIsOwner && !currentUserId && <Text style={styles.statusText}>Sign in to interact with this flower.</Text>}
+          {!selectedFlowerIsOwner && !currentUserId && <Text style={styles.statusText}>{copy.signIn}</Text>}
           </ScrollView>
         </View>
       </View>
-      <DeleteFlowerDialog visible={confirmDelete && selectedFlowerIsOwner} flowerName={detail.name} busy={isDetailWorking}
+      <DeleteFlowerDialog visible={confirmDelete && selectedFlowerIsOwner} flowerName={flowerNameText(detail.name, locale)} busy={isDetailWorking}
         error={confirmDelete ? detailError : ''} onCancel={() => setConfirmDelete(false)}
         onDelete={async () => { if (await deleteSelectedFlower()) setConfirmDelete(false); }} />
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+// The sheet follows the panel theme, like every other panel (never a white card in dark mode).
+const themedStyles = new Map<PanelTheme, ReturnType<typeof createStyles>>();
+function stylesFor(theme: PanelTheme) {
+  let styles = themedStyles.get(theme);
+  if (!styles) { styles = createStyles(theme); themedStyles.set(theme, styles); }
+  return styles;
+}
+const createStyles = (theme: PanelTheme) => StyleSheet.create({
+  messageRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
+  messageBody: { flex: 1 },
+  reactions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reaction: { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 28, minHeight: 28, justifyContent: 'center' },
+  reactionIcon: { fontSize: 15, opacity: .55 },
+  reactionChosen: { opacity: 1 },
+  reactionCount: { fontSize: 11, color: theme.muted },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -247,7 +301,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.surface,
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
@@ -267,7 +321,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: theme.input,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -275,18 +329,18 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#64748B',
+    color: theme.muted,
   },
   imageWrapper: {
     width: 120,
     height: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.input,
     borderRadius: 60,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: theme.border,
   },
   flowerImage: {
     width: 90,
@@ -295,13 +349,13 @@ const styles = StyleSheet.create({
   flowerName: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: theme.text,
     marginBottom: 4,
   },
   locationSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
+    color: theme.muted,
     marginBottom: 10,
   },
   tagRow: {
@@ -322,7 +376,7 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   dateTag: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: theme.input,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 8,
@@ -330,10 +384,10 @@ const styles = StyleSheet.create({
   dateTagText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
+    color: theme.muted,
   },
   notesContainer: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.input,
     padding: 10,
     borderRadius: 10,
     width: '100%',
@@ -344,19 +398,19 @@ const styles = StyleSheet.create({
   notesText: {
     fontSize: 12,
     fontStyle: 'italic',
-    color: '#334155',
+    color: theme.text,
     lineHeight: 18,
     textAlign: 'center',
   },
-  detailLabel: { fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 },
-  messageText: { fontSize: 12, color: '#334155', lineHeight: 18, marginBottom: 4 },
-  receivedSupport: { fontSize: 13, fontWeight: '700', color: '#BE185D', marginBottom: 12 },
-  statusText: { fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 8 },
+  detailLabel: { fontSize: 12, fontWeight: '700', color: theme.text, marginBottom: 6 },
+  messageText: { fontSize: 12, color: theme.text, lineHeight: 18, marginBottom: 4 },
+  receivedSupport: { fontSize: 13, fontWeight: '700', color: theme === PANEL_THEMES.dark ? '#F19CBF' : '#BE185D', marginBottom: 12 },
+  statusText: { fontSize: 12, color: theme.muted, textAlign: 'center', marginTop: 8 },
   actionError: { fontSize: 12, color: '#B91C1C', textAlign: 'center', marginTop: 8 },
   messageForm: { width: '100%', gap: 8, marginTop: 12 },
   messageSubmitButton: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
-  messageInput: { minHeight: 76, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
-    padding: 10, fontSize: 13, color: '#334155', textAlignVertical: 'top' },
+  messageInput: { minHeight: 76, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
+    padding: 10, fontSize: 13, color: theme.text, textAlignVertical: 'top' },
   deleteButton: { flex: 1, paddingVertical: 10, backgroundColor: '#FEF2F2', borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FCA5A5' },
   deleteButtonText: { fontSize: 13, fontWeight: '700', color: '#B91C1C' },

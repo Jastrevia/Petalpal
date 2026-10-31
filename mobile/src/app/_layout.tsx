@@ -1,4 +1,4 @@
-import { PanelThemeProvider } from '../components/features/PanelTheme';
+import { PanelThemeProvider, usePanelTheme } from '../components/features/PanelTheme';
 import { AuthProvider, useAuth } from "../services/auth";
 import { ProductionRouteGate } from "../components/ProductionRouteGate";
 import { AuthGate } from "../components/AuthGate";
@@ -6,7 +6,7 @@ import { nativeSecurityEnabled } from '../services/nativeSecurity';
 import { DarkTheme, DefaultTheme, Slot, Stack, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import type React from 'react';
-import { StyleSheet, View, useColorScheme } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
@@ -44,9 +44,16 @@ function RoutedContent() {
   return <ProductionRouteGate pathname={pathname}><TabLayout /></ProductionRouteGate>;
 }
 
+// Screens behind the panels (and between two screens) use the app's own light/dark choice, not the
+// phone's: otherwise a dark app on a phone set to light flashes white.
+function AppNavigationTheme({ children }: { children: React.ReactNode }) {
+  const { light, theme } = usePanelTheme();
+  const base = light ? DefaultTheme : DarkTheme;
+  return <ThemeProvider value={{ ...base, colors: { ...base.colors, background: theme.background, card: theme.surface, text: theme.text, border: theme.border } }}>{children}</ThemeProvider>;
+}
+
 function TabLayout() {
   const { session } = useAuth();
-  const colorScheme = useColorScheme();
   const pathname = usePathname();
 
   // DEV previews need a stable parent navigator outside NativeTabs' route list.
@@ -55,7 +62,7 @@ function TabLayout() {
   let content;
   if (__DEV__ || pathname === '/' || pathname === '/journal' || pathname === '/garden-history' || pathname === '/bookhouse' || pathname === '/mailbox' || pathname === '/reflection' || pathname.startsWith('/feature/') || pathname.startsWith('/visit/')) {
     content = (
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AppNavigationTheme>
         <AnimatedSplashOverlay />
         <DevLoginEntranceHost>
         <Stack>
@@ -79,16 +86,16 @@ function TabLayout() {
           {__DEV__ && <Stack.Screen name="reading-fairy-test" options={{ title: 'Reading companion preview' }} />}
         </Stack>
         </DevLoginEntranceHost>
-      </ThemeProvider>
+      </AppNavigationTheme>
     );
   } else if (pathname === '/treehouse-test') {
     content = <Slot />;
   } else {
     content = (
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AppNavigationTheme>
         <AnimatedSplashOverlay />
         <AppTabs />
-      </ThemeProvider>
+      </AppNavigationTheme>
     );
   }
 

@@ -15,21 +15,17 @@ export default function HomeScreen() {
   const gardenRef = useRef<GardenSceneHandle>(null);
   const focusFairy = useCallback(() => gardenRef.current?.focusFairy(), []);
   const openEvents = useCallback(() => openGardenPanel('events'), []);
-  // PPL fetches the letters, then the mailbox opens; back in the Garden she stands beside it again.
+  // A tap on the mailbox opens it straight away; a second tap while it opens does nothing.
   const atMailbox = useRef(false);
   const openMailbox = useCallback(() => {
     if (atMailbox.current) return;
     atMailbox.current = true;
     router.push('/mailbox');
   }, []);
-  useFocusEffect(useCallback(() => {
-    if (!atMailbox.current) return;
-    atMailbox.current = false;
-    gardenRef.current?.returnFromMailbox();
-  }, []));
+  useFocusEffect(useCallback(() => { atMailbox.current = false; }, []));
   useEffect(() => { void SplashScreen.hideAsync(); }, []);
   // Guest mode: the Garden with no account and no server reads (flowers come from this device only, none at first);
-  // the Fairy can walk, swing and visit the treehouse to look around. The rest asks for an account.
+  // the Fairy can walk and swing, and the treehouse opens to look around. The rest asks for an account.
   if (!session && guest) return <GestureHandlerRootView style={{ flex: 1 }}>
     <GardenScene ref={gardenRef} enableFairyWalk key="guest" initialWaterfallVersion="v2" backendMode={false}
       onOpenBookhouse={() => router.push('/bookhouse')} onOpenEvents={guest.requestAccount} onOpenReflection={guest.requestAccount}

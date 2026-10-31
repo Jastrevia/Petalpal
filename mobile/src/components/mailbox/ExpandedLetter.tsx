@@ -1,3 +1,4 @@
+import { useAppLocale } from '../../services/locale';
 import { memo } from 'react';
 import {
   Image,
@@ -152,6 +153,7 @@ export const ExpandedLetter = memo(function ExpandedLetter({
   isFolded = false,
   hideFoldTab = false,
 }: ExpandedLetterProps) {
+  const zh = useAppLocale() === 'zh-Hans';
   const tone = STATIONERY_TONES[letter.paperTone || 'cream'];
   const iconSource = BOTANICAL_ICONS[letter.botanicalIcon];
 
@@ -322,7 +324,7 @@ export const ExpandedLetter = memo(function ExpandedLetter({
               <Text
                 style={[styles.signoffPhrase, { color: tone.inkSecondary }]}
               >
-                {letter.signoff || 'With warm affection,'}
+                {letter.signoff || (zh ? '满怀温暖，' : 'With warm affection,')}
               </Text>
               <Text
                 style={[styles.cursiveSignature, { color: tone.inkPrimary }]}
@@ -397,7 +399,7 @@ export const ExpandedLetter = memo(function ExpandedLetter({
           ]}
         >
           <Text style={[styles.foldTabText, { color: tone.inkSecondary }]}>
-            Fold Mail ⤹
+            {zh ? '折回信封 ⤹' : 'Fold Mail ⤹'}
           </Text>
         </Pressable>
       )}
