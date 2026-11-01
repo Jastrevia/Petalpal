@@ -72,8 +72,11 @@ test('real Cloudflare runtime serves the actual Expo export, routes, artwork and
   page.on('pageerror', error => failures.push(error.message));
   // Actual application export, fresh synthetic context, no external auth/API traffic.
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
-  await page.goto(`http://${worker.address}:${worker.port}/bookhouse`);
-  // Signed out: the partner invitation card is the sign-in screen, with the policy links kept below it.
+  // Signed out, the Garden opens as a guest and the treehouse can be looked at, with no sign-in.
+  await page.goto(`http://${worker.address}:${worker.port}/`);
+  await page.getByTestId('guest-navigation').waitFor({ timeout: 20000 });
+  // A page that needs an account: the partner invitation card is the sign-in screen, with the policy links kept below it.
+  await page.goto(`http://${worker.address}:${worker.port}/reflection`);
   await page.getByText('Log In', { exact: true }).waitFor({ timeout: 20000 });
   await page.getByText('Terms of Use', { exact: true }).waitFor();
   assert.equal(failures.length, 0, 'Expo runtime has no uncaught browser errors');
