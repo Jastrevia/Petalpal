@@ -26,7 +26,8 @@ test('synthetic preview signs into the unchanged Expo Garden without provider tr
     if (new URL(route.request().url()).hostname === '127.0.0.1') return route.continue();
     escaped++; return route.abort();
   });
-  await page.goto(`http://${worker.address}:${worker.port}/bookhouse`);
+  // A page that needs an account (the Garden and the treehouse open as a guest).
+  await page.goto(`http://${worker.address}:${worker.port}/reflection`);
   // The invitation card signs in through the real (here synthetic) Firebase email/password flow.
   const logIn = page.getByText('Log In', { exact: true });
   await logIn.waitFor();
