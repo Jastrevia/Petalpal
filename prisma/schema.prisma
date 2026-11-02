@@ -54,6 +54,8 @@ model User {
   fairyCheckIns           FairyCheckIn[]
   fairyKeepsakeGrants     FairyKeepsakeGrant[]
   fairyClosenessAwards    FairyClosenessAward[]
+  gardenPetFoods          GardenPetFood[]
+  gardenPetOutfits        GardenPetOutfit[]
   petalCardDraws          PetalCardDraw[]
   petalCardReadings       PetalCardReading[]
   redeemCodeClaims        RedeemCodeClaim[]
@@ -407,6 +409,38 @@ model FairyKeepsakeGrant {
 
   @@unique([userId, localDate, reason])
   @@index([userId, keepsakeId])
+}
+
+/// Garden pet food ledger (lib/garden-pets.js): +1 per food given, -1 per food eaten; the stock
+/// is the sum per food. `awardKey` makes each gift count once.
+model GardenPetFood {
+  id        String   @id @default(cuid())
+  userId    String
+  foodId    String   @db.VarChar(48)
+  delta     Int
+  reason    String   @db.VarChar(16)
+  awardKey  String   @db.VarChar(96)
+  localDate String   @db.VarChar(10)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, awardKey])
+  @@index([userId, reason])
+}
+
+/// What one Garden pet is wearing, one accessory id per row (lib/garden-pets.js).
+model GardenPetOutfit {
+  userId    String
+  petId     String   @db.VarChar(16)
+  hat       String?  @db.VarChar(48)
+  collar    String?  @db.VarChar(48)
+  pendant   String?  @db.VarChar(48)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, petId])
 }
 
 /// Closeness ledger: one row per award, `awardKey` makes each award idempotent and the

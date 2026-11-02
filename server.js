@@ -22,7 +22,7 @@ import YAML from "yaml";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 import prisma from "./lib/prisma.js";
 import { canVisitGarden, SocialAccessError, withSocialLocks, withSocialAuthorization, sendSocialError } from "./lib/garden-access.js";
@@ -60,10 +60,16 @@ import {
   awardFairyTap,
   checkInWithFairy,
   closenessSummary,
+  dressGardenPet,
   fairyClosenessEnabledFor,
+  fairyMomentsLockedByBond,
+  feedGardenPet,
+  gardenPets,
+  rewardFirstWeekPlanting,
   listCheckIns,
   listKeepsakes
 } from "./lib/fairy-closeness.js";
+import { ACCESSORY_ROWS, GARDEN_PETS, isPetFood } from "./lib/garden-pets.js";
 import { petalCardsEnabledFor } from "./lib/petal-cards.js";
 import { drawPetalCard, heavyCardsOn, PETAL_TOPIC_IDS, petalDrawsForMonth, todaysPetalDraw } from "./lib/petal-card-draw.js";
 import { petalReadingFor, requestPetalReading } from "./lib/petal-reading.js";
@@ -1807,7 +1813,8 @@ app.get("/api/fairy/runtime", async (req, res) => {
 
     await ensureStarterFairy(req.auth.userId);
     const now = new Date();
-    const momentsEnabled = fairyMomentsEnabledFor(req.auth.userId);
+    const momentsEnabled = fairyMomentsEnabledFor(req.auth.userId)
+      && !await fairyMomentsLockedByBond(prisma, { userId: req.auth.userId });
     const captionsEnabled = momentsEnabled && fairyMomentCaptionsEnabled();
     const result = await prisma.$transaction(async (tx) => {
       let activeFairy = await tx.userFairy.findFirst({
@@ -1993,6 +2000,43 @@ app.get("/api/fairy/keepsakes", closenessRoute("GET /api/fairy/keepsakes",
 
 app.post("/api/fairy/closeness/tap", allowBodyFields([]), closenessRoute("POST /api/fairy/closeness/tap",
   req => awardFairyTap(prisma, { userId: req.auth.userId, now: new Date() })));
+
+// The Garden pets' wardrobe and food (lib/garden-pets.js), behind the same switch as closeness.
+const validPet = (req, res, next) => (fairyClosenessEnabledFor(req.auth.userId) && GARDEN_PETS.includes(req.params.petId)
+  ? next() : res.status(404).json({ error: "Not found" }));
+const PET_ERRORS = { UNKNOWN_ACCESSORY: 400, ACCESSORY_LOCKED: 409, NO_FOOD: 409 };
+const petRoute = (label, handler) => async (req, res) => {
+  if (!fairyClosenessEnabledFor(req.auth.userId)) return res.status(404).json({ error: "Not found" });
+  try {
+    const result = await handler(req);
+    if (!result) return res.status(404).json({ error: "Not found" });
+    if (result.error) return res.status(PET_ERRORS[result.error]).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    logServerError(`${label} error`, error);
+    res.status(500).json({ error: "Unable to update the Garden pets" });
+  }
+};
+
+app.get("/api/fairy/pets", petRoute("GET /api/fairy/pets",
+  req => gardenPets(prisma, { userId: req.auth.userId, now: new Date() })));
+
+app.put("/api/fairy/pets/:petId/outfit", validPet, allowBodyFields(ACCESSORY_ROWS), (req, res, next) => {
+  const pieces = ACCESSORY_ROWS.map(slot => req.body?.[slot]);
+  if (!pieces.every(piece => piece === undefined || piece === null || (typeof piece === "string" && piece.length <= 48))) {
+    return res.status(400).json({ error: "An outfit piece must be an accessory id or null" });
+  }
+  next();
+}, petRoute("PUT /api/fairy/pets/:petId/outfit", req => dressGardenPet(prisma, {
+  userId: req.auth.userId, petId: req.params.petId, outfit: req.body, now: new Date()
+})));
+
+app.post("/api/fairy/pets/:petId/feed", validPet, allowBodyFields(["foodId"]), (req, res, next) => {
+  if (!isPetFood(req.body?.foodId)) return res.status(400).json({ error: "Unknown food" });
+  next();
+}, petRoute("POST /api/fairy/pets/:petId/feed", req => feedGardenPet(prisma, {
+  userId: req.auth.userId, petId: req.params.petId, foodId: req.body.foodId, key: randomUUID(), now: new Date()
+})));
 
 // The daily petal card draw (lib/petal-card-draw.js), owner-scoped, once per local day.
 const petalDrawRoute = (label, handler) => async (req, res) => {
@@ -3429,6 +3473,10 @@ app.post("/users/:userId/flowers/:flowerId/placement", async (req, res) => {
       userId: req.auth.userId, flowerId: req.params.flowerId, body: req.body
     });
     res.status(result.created ? 201 : 200).json(result.placement);
+    if (result.created && fairyClosenessEnabledFor(req.auth.userId)) {
+      void rewardFirstWeekPlanting(prisma, { userId: req.auth.userId, now: new Date() })
+        .catch((error) => logServerError("First-week pet food error", error));
+    }
   } catch (error) {
     if (error instanceof FlowerPlacementError) {
       return res.status(error.status).json({ error: error.message, code: error.code });

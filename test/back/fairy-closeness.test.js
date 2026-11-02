@@ -11,8 +11,10 @@ import { setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
 import { FAIRY_KEEPSAKES, KEEPSAKES_BY_ID, keepsakesOf } from "../../lib/fairy-keepsakes.js";
 import {
   CLOSENESS_SOURCES, MAX_LEVEL, awardCloseness, awardFairyTap, checkInWithFairy, closenessLevel, closenessSummary,
-  fairyClosenessEnabledFor, listCheckIns, listKeepsakes, nextStreak, planKeepsakes, pointsToNextLevel
+  dressGardenPet, fairyClosenessEnabledFor, fairyMomentsLockedByBond, feedGardenPet, gardenPets, listCheckIns, listKeepsakes, nextStreak, planKeepsakes,
+  pointsToNextLevel, rewardFirstWeekPlanting
 } from "../../lib/fairy-closeness.js";
+import { ACCESSORY_BANDS, PET_ACCESSORIES, PET_FOODS, unlockedAccessories } from "../../lib/garden-pets.js";
 import { app } from "../../server.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -94,7 +96,7 @@ test("owner switch: a listed id or \"*\", spaces ignored, otherwise off", () => 
 
 // In-memory stand-in for the Prisma calls lib/fairy-closeness.js makes.
 function fakeDatabase(users) {
-  const tables = { fairyCheckIn: [], fairyKeepsakeGrant: [], fairyClosenessAward: [] };
+  const tables = { fairyCheckIn: [], fairyKeepsakeGrant: [], fairyClosenessAward: [], gardenPetFood: [], gardenPetOutfit: [], fairyMoment: [] };
   let id = 0;
   const cmp = (value, filter) => {
     if (filter === null || typeof filter !== "object" || filter instanceof Date) return value === filter;
@@ -121,15 +123,21 @@ function fakeDatabase(users) {
     create: async ({ data }) => {
       if (name === "fairyCheckIn" && tables[name].some(r => r.userId === data.userId && r.localDate === data.localDate)) throw new Error("unique");
       if (name === "fairyClosenessAward" && tables[name].some(r => r.userId === data.userId && r.source === data.source && r.awardKey === data.awardKey)) throw new Error("unique");
+      if (name === "gardenPetFood" && tables[name].some(r => r.userId === data.userId && r.awardKey === data.awardKey)) throw new Error("unique");
       if (name === "fairyKeepsakeGrant" && tables[name].some(r => r.userId === data.userId && r.localDate === data.localDate && r.reason === data.reason)) throw new Error("unique");
       const row = { id: `${name}-${++id}`, createdAt: new Date(id), graceUsed: false, ...data };
       tables[name].push(row); return { ...row };
     },
-    createMany: async ({ data }) => { for (const row of data) await model(name).create({ data: row }); return { count: data.length }; }
+    createMany: async ({ data }) => { for (const row of data) await model(name).create({ data: row }); return { count: data.length }; },
+    upsert: async ({ where, create, update }) => {
+      const row = tables[name].find(r => r.userId === where.userId_petId.userId && r.petId === where.userId_petId.petId);
+      if (row) Object.assign(row, update); else tables[name].push({ ...create });
+    }
   });
   const db = {
     tables,
     user: { findUnique: async ({ where }) => users[where.id] || null },
+    gardenPetFood: model("gardenPetFood"), gardenPetOutfit: model("gardenPetOutfit"), fairyMoment: model("fairyMoment"),
     userFairy: { findFirst: async ({ where }) => (users[where.userId]?.unlockedAt ? { unlockedAt: users[where.userId].unlockedAt } : null) },
     fairyCheckIn: model("fairyCheckIn"), fairyKeepsakeGrant: model("fairyKeepsakeGrant"), fairyClosenessAward: model("fairyClosenessAward"),
     $queryRaw: async () => [{ locked: "" }]
@@ -247,6 +255,101 @@ test("summary and keepsake book", async () => {
   assert.ok(book.keepsakes.filter(keepsake => !keepsake.owned).every(keepsake => !("note" in keepsake) && keepsake.count === 0));
 });
 
+test("bond rewards: Lv 4-10 pendants, 11-15 collars, 16-20 hats, in pairs, never repeated, every row emptied", () => {
+  const rows = row => PET_ACCESSORIES.filter(item => item.row === row);
+  assert.deepEqual(["hat", "collar", "pendant"].map(row => rows(row).length), [10, 9, 13]);
+  assert.equal(new Set(PET_ACCESSORIES.map(item => item.id)).size, 32);
+  for (const userId of Array.from({ length: 200 }, (_, i) => `user_${i}`)) {
+    assert.equal(unlockedAccessories(userId, 3).size, 0, "nothing before Lv 4");
+    let previous = new Map();
+    for (let level = 4; level <= 20; level++) {
+      const now = unlockedAccessories(userId, level);
+      for (const [id, at] of previous) assert.equal(now.get(id), at, "a piece stays, from the level that opened it");
+      const fresh = [...now.keys()].filter(id => !previous.has(id)).map(id => PET_ACCESSORIES.find(item => item.id === id));
+      const band = ACCESSORY_BANDS.find(item => level >= item.from && level <= item.to);
+      assert.ok(fresh.every(item => item.row === band.row), `Lv ${level} only opens its own row`);
+      assert.ok(fresh.length <= band.maxPairs * 2);
+      previous = now;
+    }
+    for (const band of ACCESSORY_BANDS) {
+      const open = [...unlockedAccessories(userId, band.to).keys()].filter(id => PET_ACCESSORIES.find(item => item.id === id).row === band.row);
+      assert.equal(open.length, rows(band.row).length, `${band.row} is empty by Lv ${band.to}`);
+    }
+    assert.equal(unlockedAccessories(userId, 20).size, 32);
+  }
+  assert.deepEqual([...unlockedAccessories("user_1", 9)], [...unlockedAccessories("user_1", 9)], "fixed per owner");
+  assert.notDeepEqual([...unlockedAccessories("user_1", 20).keys()], [...unlockedAccessories("user_2", 20).keys()], "different per owner");
+});
+
+const stockOf = pets => Object.fromEntries(pets.foods.map(food => [food.id, food.count]));
+const totalFood = pets => pets.foods.reduce((sum, food) => sum + food.count, 0);
+const seedPoints = (db, points) => db.tables.fairyClosenessAward.push({ id: "seed", userId: "owner-1", source: "EVENT", awardKey: "seed", localDate: "2026-01-01", points });
+
+test("pet food: one per check-in, five per level reached (owed levels once), three on each first-week planting day", async () => {
+  const db = fakeDatabase({ "owner-1": { ...OWNER["owner-1"], createdAt: new Date("2026-10-20T20:00:00Z") } });
+  assert.equal(totalFood(await gardenPets(db, { userId: "owner-1", now: at("2026-10-20") })), 0);
+  await checkInWithFairy(db, { userId: "owner-1", now: at("2026-10-20") });
+  await checkInWithFairy(db, { userId: "owner-1", now: at("2026-10-20", 23) });
+  assert.equal(totalFood(await gardenPets(db, { userId: "owner-1", now: at("2026-10-20") })), 1, "a repeat check-in gives nothing");
+
+  assert.equal((await rewardFirstWeekPlanting(db, { userId: "owner-1", now: at("2026-10-20") })).length, 3);
+  assert.equal((await rewardFirstWeekPlanting(db, { userId: "owner-1", now: at("2026-10-20", 23) })).length, 0, "only the day's first planting");
+  assert.equal((await rewardFirstWeekPlanting(db, { userId: "owner-1", now: at("2026-10-26") })).length, 3, "day 7 still counts");
+  assert.equal((await rewardFirstWeekPlanting(db, { userId: "owner-1", now: at("2026-10-27") })).length, 0, "day 8 does not");
+  assert.equal(totalFood(await gardenPets(db, { userId: "owner-1", now: at("2026-10-27") })), 7);
+
+  seedPoints(db, 85); // Lv 3 with the check-in's 10 points: two levels reached
+  const later = await gardenPets(db, { userId: "owner-1", now: at("2026-10-27") });
+  assert.equal(later.level, 3);
+  assert.equal(totalFood(later), 7 + 10);
+  assert.equal(totalFood(await gardenPets(db, { userId: "owner-1", now: at("2026-10-28") })), 7 + 10, "owed levels are paid once");
+  assert.ok(PET_FOODS.every(food => stockOf(later)[food.id] >= 0));
+});
+
+test("feeding spends one food and stops at none", async () => {
+  const db = fakeDatabase(OWNER);
+  const now = at("2026-10-22");
+  await checkInWithFairy(db, { userId: "owner-1", now });
+  const stock = stockOf(await gardenPets(db, { userId: "owner-1", now }));
+  const foodId = Object.keys(stock).find(id => stock[id] === 1);
+  const none = Object.keys(stock).find(id => stock[id] === 0);
+  assert.deepEqual(plain(await feedGardenPet(db, { userId: "owner-1", petId: "puppy", foodId, key: "a", now })), { foodId, count: 0 });
+  assert.deepEqual(plain(await feedGardenPet(db, { userId: "owner-1", petId: "puppy", foodId, key: "b", now })), { error: "NO_FOOD" });
+  assert.deepEqual(plain(await feedGardenPet(db, { userId: "owner-1", petId: "puppy", foodId: none, key: "c", now })), { error: "NO_FOOD" });
+});
+
+test("outfits: only opened pieces of the right row, and a list that shows the locks", async () => {
+  const db = fakeDatabase(OWNER);
+  const now = at("2026-10-22");
+  const before = await gardenPets(db, { userId: "owner-1", now });
+  assert.equal(before.accessories.length, 32);
+  assert.ok(before.accessories.every(item => !item.unlocked && item.unlockedAtLevel === null && item.name));
+  assert.equal(before.accessories.find(item => item.id === "lilac-beret").name, "紫藤贝雷帽");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { pendant: "hourglass" }, now })), { error: "ACCESSORY_LOCKED" });
+  seedPoints(db, 3230); // Lv 20
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "hourglass" }, now })), { error: "UNKNOWN_ACCESSORY" }, "a pendant is not a hat");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "no-such-hat" }, now })), { error: "UNKNOWN_ACCESSORY" });
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "lilac-beret", pendant: "hourglass" }, now })), { outfit: { hat: "lilac-beret", collar: null, pendant: "hourglass" } });
+  const after = await gardenPets(db, { userId: "owner-1", now });
+  assert.deepEqual(plain(after.outfits.puppy), { hat: "lilac-beret", collar: null, pendant: "hourglass" });
+  assert.deepEqual(plain(after.outfits.rabbit), { hat: null, collar: null, pendant: null }, "each pet has its own outfit");
+  assert.ok(after.accessories.every(item => item.unlocked));
+  await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: null }, now });
+  assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "taking it off");
+});
+
+test("Fairy Moments open at Lv 3; feeds that already have posts stay open; owners outside the switch keep the old rule", async () => {
+  const db = fakeDatabase(OWNER);
+  const on = { FAIRY_CLOSENESS_OWNER_IDS: "*" }, off = {};
+  assert.equal(await fairyMomentsLockedByBond(db, { userId: "owner-1", env: off }), false);
+  assert.equal(await fairyMomentsLockedByBond(db, { userId: "owner-1", env: on }), true, "a new owner waits for Lv 3");
+  db.tables.fairyMoment.push({ id: "m1", userId: "owner-1" });
+  assert.equal(await fairyMomentsLockedByBond(db, { userId: "owner-1", env: on }), false, "an existing feed is kept");
+  db.tables.fairyMoment.length = 0;
+  seedPoints(db, 85);
+  assert.equal(await fairyMomentsLockedByBond(db, { userId: "owner-1", env: on }), false, "Lv 3 opens it");
+});
+
 test("migration: owner-scoped tables, one check-in a day, cascade on account deletion", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
@@ -256,12 +359,15 @@ test("migration: owner-scoped tables, one check-in a day, cascade on account del
     await db.exec(`INSERT INTO "User" (id, name) VALUES ('owner', 'Owner');
       INSERT INTO "FairyCheckIn" (id, "userId", "localDate", timezone, streak) VALUES ('c1', 'owner', '2026-10-22', 'UTC', 1);
       INSERT INTO "FairyKeepsakeGrant" (id, "userId", "checkInId", "keepsakeId", reason, "localDate") VALUES ('g1', 'owner', 'c1', 'dewdrop', 'DAILY', '2026-10-22');
-      INSERT INTO "FairyClosenessAward" (id, "userId", source, "awardKey", "localDate", points) VALUES ('a1', 'owner', 'CHECK_IN', '2026-10-22', '2026-10-22', 10);`);
+      INSERT INTO "FairyClosenessAward" (id, "userId", source, "awardKey", "localDate", points) VALUES ('a1', 'owner', 'CHECK_IN', '2026-10-22', '2026-10-22', 10);
+      INSERT INTO "GardenPetFood" (id, "userId", "foodId", delta, reason, "awardKey", "localDate") VALUES ('f1', 'owner', 'berry-tart', 1, 'CHECK_IN', 'CHECK_IN:2026-10-22:0', '2026-10-22');
+      INSERT INTO "GardenPetOutfit" ("userId", "petId", hat, "updatedAt") VALUES ('owner', 'puppy', 'lilac-beret', now());`);
+    await assert.rejects(db.exec(`INSERT INTO "GardenPetFood" (id, "userId", "foodId", delta, reason, "awardKey", "localDate") VALUES ('f2', 'owner', 'berry-tart', 1, 'CHECK_IN', 'CHECK_IN:2026-10-22:0', '2026-10-22')`), /unique/i);
     await assert.rejects(db.exec(`INSERT INTO "FairyCheckIn" (id, "userId", "localDate", timezone, streak) VALUES ('c2', 'owner', '2026-10-22', 'UTC', 1)`), /unique/i);
     await assert.rejects(db.exec(`INSERT INTO "FairyClosenessAward" (id, "userId", source, "awardKey", "localDate", points) VALUES ('a2', 'owner', 'CHECK_IN', '2026-10-22', '2026-10-22', 10)`), /unique/i);
     await assert.rejects(db.exec(`INSERT INTO "FairyKeepsakeGrant" (id, "userId", "keepsakeId", reason, "localDate") VALUES ('g2', 'owner', 'tea-leaf', 'DAILY', '2026-10-22')`), /unique/i);
     await db.exec(`DELETE FROM "User" WHERE id = 'owner'`);
-    for (const table of ["FairyCheckIn", "FairyKeepsakeGrant", "FairyClosenessAward"]) {
+    for (const table of ["FairyCheckIn", "FairyKeepsakeGrant", "FairyClosenessAward", "GardenPetFood", "GardenPetOutfit"]) {
       assert.equal((await db.query(`SELECT count(*)::int AS n FROM "${table}"`)).rows[0].n, 0, table);
     }
   } finally { await db.close(); }
@@ -296,7 +402,7 @@ test("closeness routes", async (t) => {
   };
 
   await t.test("off unless the owner is listed", async () => {
-    for (const [route, method] of [["/api/fairy/closeness"], ["/api/fairy/check-ins"], ["/api/fairy/keepsakes"], ["/api/fairy/check-in", "POST"], ["/api/fairy/closeness/tap", "POST"]]) {
+    for (const [route, method] of [["/api/fairy/closeness"], ["/api/fairy/check-ins"], ["/api/fairy/keepsakes"], ["/api/fairy/check-in", "POST"], ["/api/fairy/closeness/tap", "POST"], ["/api/fairy/pets"], ["/api/fairy/pets/puppy/feed", "POST"]]) {
       assert.equal((await call(route, method)).status, 404, route);
     }
     assert.equal(db.tables.fairyCheckIn.length, 0);
@@ -321,5 +427,18 @@ test("closeness routes", async (t) => {
     const book = await call("/api/fairy/keepsakes");
     assert.equal(book.body.owned, 1);
     assert.deepEqual(plain((await call("/api/fairy/closeness/tap", "POST")).body), { awarded: 1, levelUp: null });
+    assert.deepEqual(summary.body.bondRewards.accessories.map(band => [band.row, band.from, band.to, band.owned, band.total]),
+      [["pendant", 4, 10, 0, 13], ["collar", 11, 15, 0, 9], ["hat", 16, 20, 0, 10]]);
+    const pets = await call("/api/fairy/pets");
+    assert.equal(pets.status, 200);
+    assert.equal(pets.body.foods.reduce((sum, food) => sum + food.count, 0), 1, "today's check-in brought one food");
+    const food = pets.body.foods.find(item => item.count === 1).id;
+    assert.equal((await call("/api/fairy/pets/dragon/feed", "POST", { foodId: food })).status, 404);
+    assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: "stone" })).status, 400);
+    assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food, extra: 1 })).status, 400);
+    assert.deepEqual((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food })).body, { foodId: food, count: 0 });
+    assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food })).status, 409);
+    assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: "lilac-beret" })).status, 409, "still locked");
+    assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: 7 })).status, 400);
   });
 });

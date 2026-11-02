@@ -35,6 +35,7 @@ Change policy: see [§10](#10-change-policy). Security and privacy rules in
 | Report evaluation time (`asOf`) | The instant compared with `periodEndUtc` | Trigger route: `new Date()`; worker: the job's `lockedAt` ([lib/ai-worker.js](lib/ai-worker.js)) |
 | Report generation time | When the Weekly job runs and persists the report | Real time on the backend |
 | Ops-metrics active window | `activeUsers7d` / `activeUsers30d` in `ops_totals.csv` count owners with `Event.occurredAt` within 7 / 30 × 24 h before the database's `now()` at export time — rolling instants, not account-local calendar days | `totals` in [scripts/export-ops-metrics.mjs](scripts/export-ops-metrics.mjs) (IMPLEMENTED BUT UNTESTED: the test checks the lifetime totals only) |
+| Garden pet first week | The first seven account-timezone local dates counted from `User.createdAt`; the day's first planting in them brings pet food. `daysBetween(localDateForInstant(createdAt), today)` in `rewardFirstWeekPlanting` ([lib/fairy-closeness.js](lib/fairy-closeness.js)) |
 | Ops-metrics day | The **UTC** calendar day of each stored instant (`User.createdAt`, `Event.occurredAt`, `Flower.createdAt`, AI audit/job `createdAt`), not the account `localDate`; an evening Event in Vancouver can land on the next UTC day. Aggregates only, for the internal dashboard | `day()` in [scripts/export-ops-metrics.mjs](scripts/export-ops-metrics.mjs); see [docs/analytics/POWER_BI.md](docs/analytics/POWER_BI.md) |
 
 ## 2. Event → Memory → Report lifecycle
