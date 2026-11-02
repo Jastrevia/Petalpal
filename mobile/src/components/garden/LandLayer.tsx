@@ -9,7 +9,7 @@ import GardenShoreContact, { makeShoreCoverage } from './water/GardenShoreContac
 
 // The shore and opaque passes share the same decoded artwork and GPU texture.
 // Keep loading in this owning scene root, outside cached static recordings.
-const LandImages = createContext<ReadonlyMap<unknown, SkImage | null> | null>(null);
+export const LandImages = createContext<ReadonlyMap<unknown, SkImage | null> | null>(null);
 export function GardenLandResources({ children, loadStore }: { children: ReactNode; loadStore: GardenLoadStore }) {
   const errors = useMemo(() => GARDEN_LANDS.slice(0, 7).map(land => () => loadStore.reportFailure(`island ${land.id}`)), [loadStore]);
   const central = useImage(GARDEN_LANDS[0].source, errors[0]);

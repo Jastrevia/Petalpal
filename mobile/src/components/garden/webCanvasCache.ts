@@ -103,7 +103,7 @@ function gardenRetirementGate(api: WebViewApi) {
 
 // Skia 2.6.2 Web retains registered views and replaces pictures without
 // disposing them. Own only this Garden's view; other canvases stay untouched.
-export function ownGardenWebView(value: unknown, nativeId: number) {
+export function ownGardenWebView(value: unknown, nativeId: number, retire: (picture: WebPicture) => void = picture => picture.dispose()) {
   const api = value as WebViewApi | undefined;
   const id = String(nativeId);
   const view = api?.views?.[id];
@@ -120,7 +120,7 @@ export function ownGardenWebView(value: unknown, nativeId: number) {
     setPicture.call(view, picture);
     const previous = current;
     current = picture;
-    if (previous && previous !== picture) previous.dispose();
+    if (previous && previous !== picture) retire(previous);
   };
   let released = false;
   return () => {
@@ -128,7 +128,7 @@ export function ownGardenWebView(value: unknown, nativeId: number) {
     released = true;
     retired.add(id);
     const last = current;
-    last?.dispose();
+    if (last) retire(last);
     current = undefined;
     view.setPicture = setPicture;
     if (api.views[id] === view) delete api.views[id];

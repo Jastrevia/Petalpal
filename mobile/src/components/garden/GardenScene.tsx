@@ -1,3 +1,12 @@
+import FireflyLayer from './fireflies/FireflyLayer';
+import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
+import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
+import ExistingWindowLights from './lanterns/ExistingWindowLights';
+import { useNightLighting } from './lanterns/nightLighting';
+import { usePathname } from 'expo-router';
+import LanternLayer from './lanterns/LanternLayer';
+import LanternPlacementEditor from './lanterns/LanternPlacementEditor';
+import { useLanternPlacements } from './lanterns/useLanternPlacements';
 import { hitsMailbox } from './fairy/mailboxDestination';
 import { hitsTreehouse } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
@@ -12,7 +21,7 @@ import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
 import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
-import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
+import { Circle, ColorMatrix, Paint, Group, Image, Path, Rect, useCanvasRef, useImage, type Transforms3d } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
@@ -99,6 +108,7 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
+import GardenStaticRun from './GardenStaticRun';
 import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
@@ -396,6 +406,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
   const worldTime = useWorldTime();
+  const nightLighting = useNightLighting(worldTime.isTreehouseLightingTime);
+  const lanternPathname = usePathname();
+  const fireflyPreview = __DEV__ && lanternPathname === '/firefly-preview';
+  const [fireflySettings, setFireflySettings] = useState(DEFAULT_FIREFLIES);
+  const fireflies = fireflyPreview ? fireflySettings : DEFAULT_FIREFLIES;
+  const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
+  const lanterns = useLanternPlacements(lanternEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
@@ -619,11 +636,26 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const startZoom = useSharedValue(1);
   const focalWorldX = useSharedValue(0);
   const focalWorldY = useSharedValue(0);
-  const cameraTransform = useDerivedValue(() => [
+  const cameraTransform = useDerivedValue<Transforms3d>(() => [
     { translateX: baseX + cameraX.value },
     { translateY: baseY + cameraY.value },
     { scale: fit * cameraZoom.value },
   ]);
+  // The layers that never move, each between things that do. See gardenStaticRuns.ts.
+  const staticLayout = __DEV__ ? calibrationLayout : undefined;
+  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout]);
+  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform]);
+  const selectedStaticLand = __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null;
+  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
+    [cameraTransform, perf.Land, staticLayout, selectedStaticLand]);
+  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}>
+    {environmentEnabled && <GardenEnvironmentLayer />}
+    {/* Approved world-aligned artwork is shared by development and production. */}
+    {infrastructureEnabled && <GardenLand09InterfaceLayer />}
+    <GardenConnectionLayer />
+    {infrastructureEnabled && <GardenInfrastructureLayer />}
+    {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
+  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement]);
   // Hit area follows the existing landmark and camera; the painted scene is unchanged.
   const [pavilionSelected, setPavilionSelected] = useState(false);
   const pavilionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1430,6 +1462,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
+          <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
             {/* 1. Solid fallback, only while the water field is not drawn: the field fills this same rectangle opaquely
@@ -1442,11 +1475,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
 
             {/* Approved receiving-water floor/contact, below fish and all terrain. */}
-            {perf.Water && waterBaseVisible && <>
-              <GardenSubmergedRocks flow={surfaceFlow} />
-              {perf.Land && <LandLayer renderPass="shore" layout={__DEV__ ? calibrationLayout : undefined} />}
-            </>}
-
+            {perf.Water && waterBaseVisible && <GardenSubmergedRocks flow={surfaceFlow} />}
+          </Group>
+          {perf.Water && waterBaseVisible && perf.Land && shoreRun}
+          <Group transform={cameraTransform}>
             {/* 3. Fish (below ripples & surface disturbance) */}
             <GardenProfile name="Fish" enabled={perf.Fish}><FishLayer
               active={worldActive && perf.WaterAnimation}
@@ -1481,9 +1513,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
 
-            {/* Continuous outer cliffs; original water and landmarks are retained. */}
-            {perf.Land && <GardenOuterBasin />}
-
+          </Group>
+          {/* Continuous outer cliffs; original water and landmarks are retained. */}
+          {perf.Land && outerBasinRun}
+          <Group transform={cameraTransform}>
             {/* 6. Lotus */}
             <GardenProfile name="Lotus" enabled={perf.Lotus}><LotusLayer
               flow={surfaceFlow}
@@ -1493,18 +1526,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               mode={perf.WaterAnimation?lotusMode:'static'}
             /></GardenProfile>
 
-            {/* Memory Otter: on the water, under the islands and bridges; evening and night only. */}
-            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
 
             {/* V2 is one independent terrain; islands and treehouse occlude it naturally. */}
             {perf.Waterfall && showLandmarks && waterfallVersion === 'v2' && (
               <WaterfallV2Entity active={worldActive && perf.WaterAnimation} animated={topWaterMotionMode === 'animate' && perf.WaterAnimation} />
             )}
           </Group>
+          {/* 7. LandLayer */}
+          {landRun}
           <Group transform={cameraTransform}>
-            {/* 7. LandLayer */}
-            <GardenProfile name="Land" enabled={perf.Land}><LandLayer layout={__DEV__ ? calibrationLayout : undefined}
-              selectedLandId={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null} /></GardenProfile>
             {/* Month Planting Region Overlay */}
             <GardenProfile name="Planting overlays" enabled={perf.DebugUI}><PlantingRegionOverlay
               screenScale={maskScreenScale}
@@ -1528,13 +1558,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               showFinalMask={showFinalMask}
             /></GardenProfile>
 
-            {environmentEnabled && <GardenEnvironmentLayer />}
-            {/* Approved world-aligned artwork is shared by development and production. */}
-            {infrastructureEnabled && <GardenLand09InterfaceLayer />}
-            <GardenConnectionLayer />
-            {infrastructureEnabled && <GardenInfrastructureLayer />}
-            {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
-
+          </Group>
+          {infrastructureRun}
+          <Group transform={cameraTransform}>
             {/* 8. Reference overlay when enabled */}
             {__DEV__ && (waterfallFocus ? waterfallReferenceOpacity : referenceOpacity) > 0 && (
               <GardenReferenceLayer opacity={waterfallFocus ? waterfallReferenceOpacity : referenceOpacity} />
@@ -1643,11 +1669,29 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
           </Group>
+          </Group>
+          <Group transform={cameraTransform}>
+            {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
+            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
+            {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
+            {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
+              <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
+            <LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
+          </Group>
           </PlantingProvider>
           </GardenLandResources>
         </Canvas>
         </GestureDetector>
       )}
+      {lanternEditorEnabled && <LanternPlacementEditor {...lanterns}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
+        focus={(x, y) => {
+          focusCoords(x, y, 2.2);
+          // Leave the focused sprite clear of the editor, including narrow web viewports.
+          cameraX.value -= viewport.width * 0.3;
+          cameraY.value += viewport.height * 0.25;
+        }} />}
+      {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}
@@ -1704,7 +1748,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
           <Text accessibilityRole="alert" style={styles.lawnNoteText}>{zhHans(locale)
             ? `这是 ${lawnNote.month} 月的草地，不能在这里种花哟`
-            : `This is ${new Date(2024, lawnNote.month - 1, 1).toLocaleDateString('en', { month: 'long' })}'s land. You can't plant flowers here right now.`}</Text>
+            : `${new Date(2024, lawnNote.month - 1, 1).toLocaleDateString('en', { month: 'long' })}'s land: no planting here`}</Text>
         </View>
       )}
       {children}
@@ -2263,8 +2307,8 @@ const styles = StyleSheet.create({
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },
   zoomButtonText: { color: '#fff', fontSize: 25, lineHeight: 30 },
-  lawnNote: { position: 'absolute', alignSelf: 'center', top: '42%', maxWidth: 300, zIndex: 35, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#FAF3DFF5', boxShadow: '0 4px 14px #0B1F1A44' },
-  lawnNoteText: { fontFamily: 'serif', fontSize: 15, lineHeight: 21, color: '#254E43', textAlign: 'center' },
+  lawnNote: { position: 'absolute', alignSelf: 'center', top: '42%', maxWidth: 280, zIndex: 35, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 11, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#FAF3DFF5', boxShadow: '0 4px 14px #0B1F1A44' },
+  lawnNoteText: { fontFamily: 'serif', fontSize: 12, lineHeight: 16, color: '#254E43', textAlign: 'center' },
   controls: { position: 'absolute', top: 8, left: 8, right: 8, padding: 8, gap: 6, backgroundColor: '#FFFFFFE8' },
   controlRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   controlButton: { minHeight: 32, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6, backgroundColor: '#D8DDDA' },

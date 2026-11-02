@@ -105,7 +105,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         pressed && styles.pressed]}>
       <View>
         <SidebarIllustration id={feature.id} size={iconSize} active={selected || highlightedFeature === feature.id} />
-        {(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? <View testID={`hud-${feature.id}-dot`} style={[styles.unread, { borderColor: theme.background }]} /> : null}
+        {(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? <View testID={`hud-${feature.id}-dot`} style={[styles.unread, feature.id === 'friends' && styles.unreadBeside, { borderColor: theme.background }]} /> : null}
       </View>
       <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>
         {FEATURE_LABELS[locale][feature.id] ?? feature.label}
@@ -127,7 +127,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     </View>
     <AiConsentPrompt />
     <GardenDock chinese={chinese} />
-    {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left + 10}
+    {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left}
       maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}
       momentsOn={moments.enabled} momentsUnread={moments.unread} onClose={() => setEntryOpen(false)}
@@ -154,6 +154,8 @@ const styles = StyleSheet.create({
   label: { color: FEATURE_COLORS.ink, fontSize: 10, fontWeight: '600', textAlign: 'center' },
   pressed: { opacity: .7, transform: [{ scale: .96 }] },
   unread: { position: 'absolute', top: 0, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, backgroundColor: '#E5735F' },
+  // The Friends painting fills its square, so its dot sits just outside it.
+  unreadBeside: { right: -11 },
   info: { position: 'absolute', alignSelf: 'center', gap: 5, maxWidth: 220,
     borderRadius: 14, padding: 8, backgroundColor: '#fffaf0e8' },
 });

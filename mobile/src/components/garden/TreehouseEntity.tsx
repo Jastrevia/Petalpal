@@ -22,8 +22,8 @@ const FOREGROUND_PIVOT = { x: 820, y: 900 };
 
 // Inset contours traced against tree-base's painted openings, in source pixels.
 // No external halo: the roof, bark, frame, stairs and mailbox remain untouched.
-const WINDOW_INTERIOR = 'M 783 376 C 802 365 813 380 811 404 C 809 426 795 444 777 449 C 759 451 746 439 746 420 C 746 401 762 383 783 376 Z';
-const LIBRARY_INTERIOR = 'M 854 613 C 886 605 916 621 931 653 C 940 682 931 720 912 749 L 863 774 C 836 770 810 750 799 726 C 788 699 797 660 816 637 C 827 625 839 617 854 613 Z';
+export const WINDOW_INTERIOR = 'M 783 376 C 802 365 813 380 811 404 C 809 426 795 444 777 449 C 759 451 746 439 746 420 C 746 401 762 383 783 376 Z';
+export const LIBRARY_INTERIOR = 'M 854 613 C 886 605 916 621 931 653 C 940 682 931 720 912 749 L 863 774 C 836 770 810 750 799 726 C 788 699 797 660 816 637 C 827 625 839 617 854 613 Z';
 // Tint a copy of the actual pixels, with NO constant color/brightness offset.
 // Screen then lifts existing painted highlights while dark detail stays dark.
 const INTERIOR_LIGHT_MATRIX = [
