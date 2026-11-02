@@ -1,10 +1,10 @@
 import { ApiError } from '../api';
 
-export function registrationError(email: string, password: string, confirmation: string): string {
-  if (!email.trim()) return 'Enter your email address.';
-  if (password.length < 6) return 'Use a password with at least 6 characters.';
-  if (password !== confirmation) return 'Your passwords do not match.';
-  return ''; // Firebase remains authoritative for email/password validity.
+export const MIN_PASSWORD_LENGTH = 8; // The server checks this too (lib/accounts.js).
+export function connectEmailError(email: string, password: string): string {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Enter a valid email address.';
+  if (password.length < MIN_PASSWORD_LENGTH) return `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`;
+  return '';
 }
 
 export interface ProfileInput {
@@ -15,7 +15,7 @@ export interface ProfileInput {
   communityTermsVersion?: string;
 }
 export function profileError(profile: ProfileInput): string {
-  if (!profile.name.trim()) return 'Enter a display name.';
+  if (!profile.name.trim()) return 'Enter a name.';
   if (profile.name.trim().length > 80) return 'Use a display name with at most 80 characters.';
   return '';
 }
@@ -27,7 +27,7 @@ export function authErrorMessage(error: unknown): string {
   const code = (error as { code?: string })?.code;
   // Firebase already answers EMAIL_EXISTS to any sign-up call, so saying it here hides nothing
   // and tells someone from an earlier version how to get back in.
-  if (code === 'auth/email-already-in-use') {
+  if (code === 'auth/email-already-in-use' || code === 'auth/credential-already-in-use') {
     return 'This email already has a PetalPal account. Sign in instead, or tap “Forgot password?” to set a new one.';
   }
   if (code === 'auth/missing-email') return 'Enter your email address first.';

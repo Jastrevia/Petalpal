@@ -1,5 +1,18 @@
 # PetalPal Security
 
+## Sign-up without email: name and avatar, 2026-11-02
+
+Local branch `feat/name-only-signup`; not deployed, no provider or database touched.
+
+- **Identity.** An account is its Firebase uid. `POST /auth/register` (public) creates the profile under a server-chosen uid and returns a Firebase custom token; no Firebase provider setting changes. `email_verified` no longer gates HTTP or sockets. An email still counts only once verified: only a verified address is stored on `User`, links an older account, or passes the Emotion Lab test-account check, which now checks verification itself because the global gate no longer does.
+- **Names.** Unique in the database through the expression index `User_name_normalized_key` (NFKC, case, spacing). A name may not contain `@` or be shaped like a PP number, so it cannot pose as another login. `accountId` is now random rather than the last digits of the clock, and a collision draws again.
+- **Passwords.** `PUT /auth/password` keeps a salted scrypt hash in `AccountPassword`, a table of its own so no query loading a `User` can carry it. Replacing one needs the current password or an email sign-in in the last five minutes. `POST /auth/password-login` gives one answer for an unknown name and a wrong password, spends equal hashing time, and is limited per IP and per name. A password that was never paired with an email cannot be reset; the app says so.
+- **PP numbers are not secrets.** Friends search shows them, so a PP number alone never signs anyone in.
+- **Abuse.** New accounts: 10 per IP per day, refused attempts free (in-process, like the other limiters; resets on restart). Each AI action has a lower daily limit (`noEmail` in `lib/ai-cost-gate.js`) until an email is verified; the global call and USD caps are unchanged. Firebase App Check is not added.
+- **Deletion and sign-out.** An account with neither password nor email is not asked for a recent sign-in before deleting, since it could not provide one. Signing out warns that it cannot come back.
+- **AI consent is unchanged:** off by default, asked once when the Garden opens.
+- **Evidence.** `test/back/account-signup.route.test.js` runs the real migration on PGlite. Not verified: real Firebase custom tokens, real email linking, the iPhone build and hosted TEST.
+
 ## Friends online status, visit alerts and block revocation, 2026-10-26
 
 - **Online status (owner decision: no hide toggle).** `lib/presence.js` tracks, in memory, which

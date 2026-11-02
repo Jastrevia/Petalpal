@@ -134,6 +134,8 @@ import http from "http";
 import { Server } from "socket.io";
 import {
   authenticateRequest,
+  issueFirebaseSignInToken,
+  signedInRecently,
   authenticateSocket,
   revalidateSocketIdentity,
   authenticateFirebaseIdentity,
@@ -142,6 +144,10 @@ import {
 } from "./lib/auth.js";
 import { createRealtimeSecurity, SOCKET_MAX_PACKET_BYTES } from "./lib/socket-security.js";
 import { createRateLimiter, rateLimiters } from "./lib/rate-limit.js";
+import {
+  findUserByLogin, findUserByName, hashPassword, MIN_PASSWORD_LENGTH, newAccountNumber,
+  spendPasswordTime, usernameProblem, validNewPassword, verifyPassword
+} from "./lib/accounts.js";
 import { deleteFirebaseUser } from "./lib/firebase-admin.js";
 import { verifyFirebaseIdToken, findFirebaseUserByEmail } from './lib/firebase-admin.js';
 import { createNativeSecurityHarnessBridge, nativeSecurityHarnessRouter, assertNativeTestDeletion } from './lib/native-security-harness.js';
@@ -182,7 +188,7 @@ if (process.env.NATIVE_SECURITY_TEST === '1') {
 }
 const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
-const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit } = rateLimiters();
+const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit } = rateLimiters();
 
 app.use((req, res, next) => {
   req.requestId = requestId();
@@ -416,6 +422,8 @@ app.use((req, res, next) => {
       (Boolean(path.extname(req.path)) && !privateResponse(req)));
   const isFirebaseSession =
     req.method === "POST" && /^\/auth\/session\/?$/i.test(req.path);
+  const isAccountEntry =
+    req.method === "POST" && ["/auth/register", "/auth/password-login"].includes(req.path);
   const isRemovedLegacyAuth =
     req.method === "POST" &&
     [
@@ -430,6 +438,7 @@ app.use((req, res, next) => {
   if (isPublicPage || isFirebaseSession || isRemovedLegacyAuth) {
     return next();
   }
+  if (isAccountEntry) return admissionRateLimit(req, res, next);
 
   // Public/session setup exceptions retain their existing handling above.
   // Service-executor routes terminate earlier and have separate workload policy.
@@ -1041,17 +1050,63 @@ app.get("/users/:userId/garden", async (req, res) => {
     res.status(500).json({ error: "Failed to get garden" });
   }
 });
-app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, async (req, res) => {
+// A new account's profile, whether it came with a Firebase identity (/auth/session) or none yet (/auth/register).
+// Throws { code: "USERNAME_TAKEN" } if the database already holds this name.
+function newProfileProblem(name, body) {
+  if (!name) return { status: 400, error: "Display name is required" };
+  if (name.length > MAX_DISPLAY_NAME_LENGTH) return { status: 413, error: `Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or fewer` };
+  const shape = usernameProblem(name);
+  if (shape) return { status: 422, error: shape, code: "USERNAME_INVALID" };
+  if (!validOptionalString(body?.avatar, MAX_AVATAR_LENGTH)) return { status: 413, error: `Avatar must be ${MAX_AVATAR_LENGTH} characters or fewer` };
+  if (body?.communityTermsVersion !== COMMUNITY_VERSION) return { status: 428, error: "Accept the Community Guidelines before creating a public profile.", code: "COMMUNITY_ACCEPTANCE_REQUIRED" };
+  assertSocialContent(name);
+  assertSocialContent(body?.avatar || "🦋");
+  if (body?.preferredLocale !== undefined && !normalizeLocale(body.preferredLocale)) return { status: 400, error: "Invalid preferred locale" };
+  return null;
+}
+async function createProfile({ firebaseUid, name, body, email = null }) {
+  const fairyEvent = resolveFairyEvent({ onboardingStep: "EMPTY_GARDEN", onboardingCompleted: false, distinctCheckInCount: 0 });
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const user = await prisma.user.create({
+        data: {
+          id: `user_${Date.now()}`,
+          accountId: newAccountNumber(),
+          firebaseUid,
+          name,
+          communityTermsVersion: COMMUNITY_VERSION,
+          communityAcceptedAt: new Date(),
+          email,
+          emailVerifiedAt: email ? new Date() : null,
+          avatar: body?.avatar || "🦋",
+          timezone: normalizeTimezone(body?.timezone) || "UTC",
+          preferredLocale: body?.preferredLocale === undefined ? "en" : normalizeLocale(body.preferredLocale),
+          garden: { create: { year: new Date().getFullYear() } },
+          fairyState: { create: { lastEvent: fairyEvent.code } },
+          aiConsent: { create: { termsVersion: AI_TERMS_VERSION, aiProcessing: false, grantedAt: null } },
+          subscriptionEntitlement: { create: {} }
+        }
+      });
+      return { user, fairyEvent };
+    } catch (error) {
+      if (error?.code !== "P2002") throw error;
+      // The name is the database's call. Anything else was the ids landing on another account's: draw again.
+      if (await findUserByName(prisma, name)) throw Object.assign(new Error("Name taken"), { code: "USERNAME_TAKEN" });
+      if (attempt >= 3) throw error;
+    }
+  }
+}
+const USERNAME_TAKEN = { error: "That name is taken. Try another one.", code: "USERNAME_TAKEN" };
+
+// Limits making an account, not opening one: an existing account only asks for its session.
+const limitNewProfile = (req, res, next) => req.body?.deferProfileCreation === true ? next() : newAccountRateLimit(req, res, next);
+app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, limitNewProfile, async (req, res) => {
   try {
     const identity = req.firebase;
-    if (!identity.email || !identity.emailVerified) {
-      return res.status(403).json({
-        error: "Verify your email before entering PetalPal"
-      });
-    }
+    // An email counts only once verified: an unverified address could be anyone's.
+    const verifiedEmail = identity.email && identity.emailVerified ? identity.email.trim().toLowerCase() : null;
 
     if (await prisma.accountDeletion.findUnique({where:{firebaseUid:identity.uid},select:{userId:true}})) return res.status(403).json({error:"Account deletion is pending or complete",code:"ACCOUNT_DELETED"});
-    const normalizedEmail = identity.email.trim().toLowerCase();
     let user = await prisma.user.findUnique({
       where: { firebaseUid: identity.uid }
     });
@@ -1059,9 +1114,9 @@ app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, as
     let fairyEvent = null;
 
     if (!user) {
-      const legacyUser = await prisma.user.findUnique({
-        where: { email: normalizedEmail }
-      });
+      const legacyUser = verifiedEmail ? await prisma.user.findUnique({
+        where: { email: verifiedEmail }
+      }) : null;
       if (legacyUser) {
         user = await prisma.user.update({
           where: { id: legacyUser.id },
@@ -1077,61 +1132,18 @@ app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, as
             user: null,
             isNewUser: true,
             needsProfile: true,
-            email: normalizedEmail
+            email: verifiedEmail
           });
         }
         const requestedName = String(req.body?.name || identity.name || "").trim();
-        if (!requestedName) {
-          return res.status(400).json({ error: "Display name is required" });
-        }
-        if (requestedName.length > MAX_DISPLAY_NAME_LENGTH) {
-          return res.status(413).json({ error: `Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or fewer` });
-        }
-        if (!validOptionalString(req.body?.avatar, MAX_AVATAR_LENGTH)) {
-          return res.status(413).json({ error: `Avatar must be ${MAX_AVATAR_LENGTH} characters or fewer` });
-        }
-        if (req.body.communityTermsVersion !== COMMUNITY_VERSION) return res.status(428).json({error:'Accept the Community Guidelines before creating a public profile.',code:'COMMUNITY_ACCEPTANCE_REQUIRED'});
-        assertSocialContent(requestedName);
-        assertSocialContent(req.body.avatar || '🦋');
-        const now = Date.now();
-        const timezone = normalizeTimezone(req.body?.timezone) || "UTC";
-        const preferredLocale = req.body?.preferredLocale === undefined
-          ? "en"
-          : normalizeLocale(req.body.preferredLocale);
-        if (!preferredLocale) {
-          return res.status(400).json({ error: "Invalid preferred locale" });
-        }
-        fairyEvent = resolveFairyEvent({
-          onboardingStep: "EMPTY_GARDEN",
-          onboardingCompleted: false,
-          distinctCheckInCount: 0
-        });
-        user = await prisma.user.create({
-          data: {
-            id: `user_${now}`,
-            accountId: `PP${String(now).slice(-8)}`,
-            firebaseUid: identity.uid,
-            name: requestedName,
-            communityTermsVersion: COMMUNITY_VERSION,
-            communityAcceptedAt: new Date(),
-            email: normalizedEmail,
-            emailVerifiedAt: new Date(),
-            avatar: req.body?.avatar || "🦋",
-            timezone,
-            preferredLocale,
-            garden: { create: { year: new Date().getFullYear() } },
-            fairyState: { create: { lastEvent: fairyEvent.code } },
-            aiConsent: {
-              create: {
-                termsVersion: AI_TERMS_VERSION,
-                aiProcessing: false,
-                grantedAt: null
-              }
-            },
-            subscriptionEntitlement: { create: {} }
-          }
-        });
+        const problem = newProfileProblem(requestedName, req.body);
+        if (problem) return res.status(problem.status).json({ error: problem.error, ...(problem.code ? { code: problem.code } : {}) });
+        ({ user, fairyEvent } = await createProfile({ firebaseUid: identity.uid, name: requestedName, body: req.body, email: verifiedEmail }));
       }
+    } else if (verifiedEmail && user.email === null) {
+      // The email the owner connected and verified. If an older account holds that address, this one simply stays without it.
+      user = await prisma.user.update({ where: { id: user.id }, data: { email: verifiedEmail, emailVerifiedAt: new Date() } })
+        .catch(error => { if (error?.code === "P2002") return user; throw error; });
     }
 
     return res.json({
@@ -1143,15 +1155,89 @@ app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, as
         avatar: user.avatar,
         timezone: user.timezone,
         preferredLocale: user.preferredLocale,
-        emailVerified: true
+        emailVerified: Boolean(user.emailVerifiedAt)
       },
       isNewUser,
       fairyEvent
     });
   } catch (error) {
+    if (error?.code === "USERNAME_TAKEN") return res.status(409).json(USERNAME_TAKEN);
     if (error?.code === "CONTENT_REJECTED") return res.status(422).json({error:"Please choose a profile that follows the Community Guidelines.",code:error.code});
     logServerError("POST /auth/session error", error);
     return res.status(500).json({ error: "Unable to create PetalPal session" });
+  }
+});
+
+// Name and avatar make the account. The uid is ours to choose: Firebase creates that user when the pass is first used.
+app.post("/auth/register", newAccountRateLimit,
+  allowBodyFields(["name", "avatar", "timezone", "preferredLocale", "communityTermsVersion"]), async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const name = String(req.body?.name || "").trim();
+    const problem = newProfileProblem(name, req.body);
+    if (problem) return res.status(problem.status).json({ error: problem.error, ...(problem.code ? { code: problem.code } : {}) });
+    const firebaseUid = `pp_${randomUUID().replaceAll("-", "")}`;
+    const signInToken = await issueFirebaseSignInToken(firebaseUid);
+    await createProfile({ firebaseUid, name, body: req.body });
+    return res.status(201).json({ signInToken });
+  } catch (error) {
+    if (error?.code === "USERNAME_TAKEN") return res.status(409).json(USERNAME_TAKEN);
+    if (error?.code === "CONTENT_REJECTED") return res.status(422).json({error:"Please choose a profile that follows the Community Guidelines.",code:error.code});
+    logServerError("POST /auth/register error", error);
+    return res.status(503).json({ error: "Unable to create your account. Please try again." });
+  }
+});
+
+// Name or PP number, with the password the account set. One answer for every failure, so it never shows which names exist.
+app.post("/auth/password-login", authRateLimit, passwordLoginRateLimit, allowBodyFields(["login", "password"]), async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const { login, password } = req.body || {};
+    const user = typeof login === "string" && login.length <= MAX_DISPLAY_NAME_LENGTH ? await findUserByLogin(prisma, login) : null;
+    const stored = user?.firebaseUid ? await prisma.accountPassword.findUnique({ where: { userId: user.id }, select: { hash: true } }) : null;
+    if (!stored) await spendPasswordTime(password);
+    if (!stored || !await verifyPassword(password, stored.hash)) {
+      emitSecurityEvent({ eventType: "authentication_failure", outcome: "denied", correlationId: req.requestId, routeClass: securityRouteClass(req), safeReason: "password_login_failed" });
+      return res.status(400).json({ error: "Check your name or PP number and password, then try again.", code: "LOGIN_FAILED" });
+    }
+    return res.json({ signInToken: await issueFirebaseSignInToken(user.firebaseUid) });
+  } catch (error) {
+    logServerError("POST /auth/password-login error", error);
+    return res.status(503).json({ error: "We couldn’t sign you in. Please try again." });
+  }
+});
+
+// What this account can come back with after losing the phone.
+app.get("/auth/recovery", async (req, res) => {
+  try {
+    const [user, password] = await Promise.all([
+      prisma.user.findUnique({ where: { id: req.auth.userId }, select: { name: true, accountId: true, email: true, emailVerifiedAt: true } }),
+      prisma.accountPassword.findUnique({ where: { userId: req.auth.userId }, select: { userId: true } })
+    ]);
+    if (!user) return res.status(404).json({ error: "Not found" });
+    return res.json({ name: user.name, accountId: user.accountId, email: user.emailVerifiedAt ? user.email : null, hasPassword: Boolean(password) });
+  } catch (error) {
+    logServerError("GET /auth/recovery error", error);
+    return res.status(500).json({ error: "Unable to load your account" });
+  }
+});
+
+// Replacing a password takes the old one, or a sign-in with the connected email just now (how a forgotten one is reset).
+app.put("/auth/password", authRateLimit, allowBodyFields(["password", "currentPassword"]), async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const { password, currentPassword } = req.body || {};
+    if (!validNewPassword(password)) return res.status(400).json({ error: `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`, code: "PASSWORD_INVALID" });
+    const existing = await prisma.accountPassword.findUnique({ where: { userId: req.auth.userId }, select: { hash: true } });
+    if (existing && !(req.firebase.provider === "password" && signedInRecently(req)) && !await verifyPassword(currentPassword, existing.hash)) {
+      return res.status(403).json({ error: "That isn’t your current password.", code: "CURRENT_PASSWORD_REQUIRED" });
+    }
+    const hash = await hashPassword(password);
+    await prisma.accountPassword.upsert({ where: { userId: req.auth.userId }, update: { hash }, create: { userId: req.auth.userId, hash } });
+    return res.json({ hasPassword: true });
+  } catch (error) {
+    logServerError("PUT /auth/password error", error);
+    return res.status(500).json({ error: "Unable to save your password" });
   }
 });
 
@@ -2457,7 +2543,7 @@ app.post("/events", aiRateLimit, async (req, res) => {
         return res.status(503).json({ error: "Emotion Lab development database is not configured safely" });
       }
       const testEmail = process.env.AUTH_E2E_TEST_EMAIL?.trim().toLowerCase();
-      if (!testEmail || req.firebase?.email?.trim().toLowerCase() !== testEmail) {
+      if (!testEmail || !req.firebase?.emailVerified || req.firebase?.email?.trim().toLowerCase() !== testEmail) {
         return res.status(403).json({ error: "Emotion Lab requires the dedicated E2E test account" });
       }
     }
@@ -2528,7 +2614,7 @@ app.post("/events", aiRateLimit, async (req, res) => {
 app.post("/dev/emotion-preview", aiRateLimit, async (req, res) => {
   if (process.env.NODE_ENV === "production") return res.status(404).json({ error: "Not found" });
   const testEmail = process.env.AUTH_E2E_TEST_EMAIL?.trim().toLowerCase();
-  if (!testEmail || req.firebase?.email?.trim().toLowerCase() !== testEmail) {
+  if (!testEmail || !req.firebase?.emailVerified || req.firebase?.email?.trim().toLowerCase() !== testEmail) {
     return res.status(403).json({ error: "Emotion Lab requires the dedicated E2E test account" });
   }
   if (Object.hasOwn(req.body, "ownerId") || Object.hasOwn(req.body, "userId") || req.query.ownerId !== undefined || req.query.userId !== undefined) {
@@ -3975,7 +4061,9 @@ app.delete("/users/:id", async (req, res) => {
       const id = req.params.id;
 
       if (!requireOwnUser(req, res, id)) return;
-      if (!requireRecentAuthentication(req, res)) return;
+      // An account with no password and no email cannot sign in again, so it must not be asked to.
+      const canSignInAgain = req.firebase.email || await prisma.accountPassword.findUnique({ where: { userId: id }, select: { userId: true } }).catch(() => true);
+      if (canSignInAgain && !requireRecentAuthentication(req, res)) return;
 
       if (process.env.NATIVE_SECURITY_TEST === '1') {
         const target = await prisma.user.findUnique({ where: { id }, select: { email: true, firebaseUid: true } });
