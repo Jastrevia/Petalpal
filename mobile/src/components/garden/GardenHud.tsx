@@ -127,7 +127,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     </View>
     <AiConsentPrompt />
     <GardenDock chinese={chinese} />
-    {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left + 10}
+    {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left}
       maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}
       momentsOn={moments.enabled} momentsUnread={moments.unread} onClose={() => setEntryOpen(false)}
