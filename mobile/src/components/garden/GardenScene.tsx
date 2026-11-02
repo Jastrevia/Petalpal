@@ -21,7 +21,7 @@ import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
 import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
-import { Circle, ColorMatrix, Paint, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
+import { Circle, ColorMatrix, Paint, Group, Image, Path, Rect, useCanvasRef, useImage, type Transforms3d } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
@@ -108,6 +108,7 @@ import {
 } from './waterfallImpactPlacement';
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
+import GardenStaticRun from './GardenStaticRun';
 import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
@@ -635,11 +636,26 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const startZoom = useSharedValue(1);
   const focalWorldX = useSharedValue(0);
   const focalWorldY = useSharedValue(0);
-  const cameraTransform = useDerivedValue(() => [
+  const cameraTransform = useDerivedValue<Transforms3d>(() => [
     { translateX: baseX + cameraX.value },
     { translateY: baseY + cameraY.value },
     { scale: fit * cameraZoom.value },
   ]);
+  // The layers that never move, each between things that do. See gardenStaticRuns.ts.
+  const staticLayout = __DEV__ ? calibrationLayout : undefined;
+  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout]);
+  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform]);
+  const selectedStaticLand = __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null;
+  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
+    [cameraTransform, perf.Land, staticLayout, selectedStaticLand]);
+  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}>
+    {environmentEnabled && <GardenEnvironmentLayer />}
+    {/* Approved world-aligned artwork is shared by development and production. */}
+    {infrastructureEnabled && <GardenLand09InterfaceLayer />}
+    <GardenConnectionLayer />
+    {infrastructureEnabled && <GardenInfrastructureLayer />}
+    {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
+  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement]);
   // Hit area follows the existing landmark and camera; the painted scene is unchanged.
   const [pavilionSelected, setPavilionSelected] = useState(false);
   const pavilionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1459,11 +1475,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
 
             {/* Approved receiving-water floor/contact, below fish and all terrain. */}
-            {perf.Water && waterBaseVisible && <>
-              <GardenSubmergedRocks flow={surfaceFlow} />
-              {perf.Land && <LandLayer renderPass="shore" layout={__DEV__ ? calibrationLayout : undefined} />}
-            </>}
-
+            {perf.Water && waterBaseVisible && <GardenSubmergedRocks flow={surfaceFlow} />}
+          </Group>
+          {perf.Water && waterBaseVisible && perf.Land && shoreRun}
+          <Group transform={cameraTransform}>
             {/* 3. Fish (below ripples & surface disturbance) */}
             <GardenProfile name="Fish" enabled={perf.Fish}><FishLayer
               active={worldActive && perf.WaterAnimation}
@@ -1498,9 +1513,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
 
-            {/* Continuous outer cliffs; original water and landmarks are retained. */}
-            {perf.Land && <GardenOuterBasin />}
-
+          </Group>
+          {/* Continuous outer cliffs; original water and landmarks are retained. */}
+          {perf.Land && outerBasinRun}
+          <Group transform={cameraTransform}>
             {/* 6. Lotus */}
             <GardenProfile name="Lotus" enabled={perf.Lotus}><LotusLayer
               flow={surfaceFlow}
@@ -1516,10 +1532,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallV2Entity active={worldActive && perf.WaterAnimation} animated={topWaterMotionMode === 'animate' && perf.WaterAnimation} />
             )}
           </Group>
+          {/* 7. LandLayer */}
+          {landRun}
           <Group transform={cameraTransform}>
-            {/* 7. LandLayer */}
-            <GardenProfile name="Land" enabled={perf.Land}><LandLayer layout={__DEV__ ? calibrationLayout : undefined}
-              selectedLandId={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null} /></GardenProfile>
             {/* Month Planting Region Overlay */}
             <GardenProfile name="Planting overlays" enabled={perf.DebugUI}><PlantingRegionOverlay
               screenScale={maskScreenScale}
@@ -1543,13 +1558,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               showFinalMask={showFinalMask}
             /></GardenProfile>
 
-            {environmentEnabled && <GardenEnvironmentLayer />}
-            {/* Approved world-aligned artwork is shared by development and production. */}
-            {infrastructureEnabled && <GardenLand09InterfaceLayer />}
-            <GardenConnectionLayer />
-            {infrastructureEnabled && <GardenInfrastructureLayer />}
-            {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
-
+          </Group>
+          {infrastructureRun}
+          <Group transform={cameraTransform}>
             {/* 8. Reference overlay when enabled */}
             {__DEV__ && (waterfallFocus ? waterfallReferenceOpacity : referenceOpacity) > 0 && (
               <GardenReferenceLayer opacity={waterfallFocus ? waterfallReferenceOpacity : referenceOpacity} />

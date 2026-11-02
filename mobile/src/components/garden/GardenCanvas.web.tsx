@@ -2,9 +2,10 @@ import { Skia, type CanvasRef, type SkPicture, type SkRect, type SkImage } from 
 import { SkiaSGRoot } from '@shopify/react-native-skia/lib/module/sksg/Reconciler';
 import { SkiaViewNativeId } from '@shopify/react-native-skia/lib/module/views/SkiaViewNativeId';
 import type { CanvasKit } from 'canvaskit-wasm';
-import { useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
+import { useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { GardenCanvasProps } from './GardenCanvas';
+import { afterNextFrames, createStaticRunHost, StaticRunContext } from './gardenStaticRuns';
 import { GardenWebRenderer } from './gardenWebRenderer';
 import { GardenQualitySelector, frameSample, qualityMode, type QualitySignals, restingFrameSkipped } from './gardenRenderQuality';
 import { ownGardenWebView } from './webCanvasCache';
@@ -24,6 +25,18 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
   const activeRef = useRef(active);
   activeRef.current = active;
   const redrawRef = useRef(() => {});
+  const [runs] = useState(() => {
+    const host = createStaticRunHost<SkPicture>();
+    const snapshotter = { current: null as GardenWebRenderer | null };
+    return { host, snapshotter, value: {
+      host,
+      snapshot: (picture: SkPicture, camera: { x: number; y: number; zoom: number }) => snapshotter.current?.snapshot(picture, camera) ?? null,
+      register: (id: number, onPicture: (picture: SkPicture) => void) => {
+        viewApi().registerView(String(id), { setPicture: onPicture, getSize: () => ({ width: 0, height: 0 }), redraw() {}, makeImageSnapshot() { throw new Error('A static run has no canvas'); } });
+        return ownGardenWebView(viewApi(), id, picture => afterNextFrames(() => picture.dispose()));
+      },
+    } };
+  });
   useImperativeHandle(ref, () => ({
     getNativeId: () => nativeId, redraw: () => redrawRef.current(),
     makeImageSnapshot: rect => viewApi().makeImageSnapshot(nativeId, rect),
@@ -44,6 +57,10 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     const canvas = canvasRef.current!;
     const kit = (globalThis as unknown as { CanvasKit: CanvasKit }).CanvasKit;
     const renderer = new GardenWebRenderer(kit, canvas);
+    let awaitingPicture = false;
+    runs.snapshotter.current = renderer;
+    // Snapshots die with their surface. Wait for the frame recorded without them rather than paint a hole.
+    renderer.onSurfaceChanged = () => { if (runs.host.invalidateAll()) awaitingPicture = true; };
     const api = viewApi();
     let picture: SkPicture | null = null, dirty = true, disposed = false, drawQueued = false;
     let request = 0, previous = 0, windowStart = performance.now();
@@ -68,7 +85,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       }
     };
     const drawLatest = () => {
-      if (disposed || !dirty || !picture || !activeRef.current || document.visibilityState !== 'visible') return;
+      if (disposed || !dirty || !picture || awaitingPicture || !activeRef.current || document.visibilityState !== 'visible') return;
       const start = performance.now();
       // The next animation frame picks up what is skipped here.
       if (restingFrameSkipped(start, lastTouch, lastPaint, pointers.size > 0)) return;
@@ -78,7 +95,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       lastPaint = start;
       if (!pointers.size) draws.push(performance.now() - start);
     };
-    api.registerView(String(nativeId), { setPicture(value: SkPicture) { picture = value; redraw();
+    api.registerView(String(nativeId), { setPicture(value: SkPicture) { picture = value; awaitingPicture = false; redraw();
       // Skia's web animation mapper already runs on RAF. Paint its newest
       // recording in this turn instead of displaying it one RAF later. Coalesce
       // synchronous commits without dropping animation frames or changing cadence.
@@ -109,6 +126,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
         if (previous && !pointers.size) frames.push(now - previous);
         previous = now;
         drawLatest();
+        if (!pointers.size) runs.host.step(now);
         if (now - windowStart >= 2500) {
           const sample = frameSample(frames, draws);
           if (mode === 'AUTO' && draws.length >= 10) {
@@ -127,6 +145,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     return () => {
       // Retain the proven root/view ordering: gate late pictures, then root releases images.
       void root.unmount(); releaseView(); disposed = true;
+      runs.snapshotter.current = null; renderer.onSurfaceChanged = undefined;
       picture = null; redrawRef.current = () => {};
       cancelAnimationFrame(request); observer.disconnect(); renderer.dispose();
       window.removeEventListener('pointerdown', pointerDown, true);
@@ -136,6 +155,6 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       document.removeEventListener('visibilitychange', resetTiming);
     };
   }, [nativeId, root]);
-  useLayoutEffect(() => { void root.render(children); }, [root, children]);
+  useLayoutEffect(() => { void root.render(<StaticRunContext.Provider value={runs.value}>{children}</StaticRunContext.Provider>); }, [root, runs, children]);
   return <View style={style}><canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} /></View>;
 }

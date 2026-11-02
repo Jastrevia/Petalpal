@@ -1,6 +1,6 @@
 import type { CanvasKit, Surface } from 'canvaskit-wasm';
 import { JsiSkImage } from '@shopify/react-native-skia/lib/module/skia/web/JsiSkImage';
-import type { SkRect, SkPicture } from '@shopify/react-native-skia';
+import type { SkImage, SkRect, SkPicture } from '@shopify/react-native-skia';
 import { backingSize, type GardenQuality, type QualitySignals } from './gardenRenderQuality';
 
 // Garden-only replacement for Skia 2.6.2's import-time DPR renderer.
@@ -10,6 +10,7 @@ export class GardenWebRenderer {
   private disposed = false;
   private scaleX = 1;
   private scaleY = 1;
+  onSurfaceChanged?: () => void;
   constructor(private kit: CanvasKit, private canvas: HTMLCanvasElement) {}
   resize(tier: GardenQuality, signals: QualitySignals) {
     if (this.disposed || !signals.width || !signals.height) return false;
@@ -22,6 +23,7 @@ export class GardenWebRenderer {
     this.scaleX = size.width / signals.width;
     this.scaleY = size.height / signals.height;
     this.surface = this.kit.MakeWebGLCanvasSurface(this.canvas);
+    this.onSurfaceChanged?.();
     const context = this.canvas.getContext('webgl2');
     if (context) context.drawingBufferColorSpace = 'display-p3';
     if (!this.surface) throw new Error('Could not create Garden surface');
@@ -40,6 +42,23 @@ export class GardenWebRenderer {
     this.surface.flush();
     return true;
   }
+  // These layers alone, at this camera, on a clear surface the size of the canvas. Same GPU context, so it
+  // costs no more than drawing them once; the result is only valid until the surface is next replaced.
+  snapshot(picture: SkPicture, camera: { x: number; y: number; zoom: number }) {
+    if (!this.surface) return null;
+    const offscreen = this.surface.makeSurface(this.surface.imageInfo());
+    if (!offscreen) return null;
+    const canvas = offscreen.getCanvas();
+    canvas.clear(this.kit.TRANSPARENT);
+    canvas.scale(this.scaleX, this.scaleY);
+    canvas.translate(camera.x, camera.y);
+    canvas.scale(camera.zoom, camera.zoom);
+    canvas.drawPicture((picture as SkPicture & { ref: Parameters<typeof canvas.drawPicture>[0] }).ref);
+    offscreen.flush();
+    const image = offscreen.makeImageSnapshot();
+    offscreen.delete();
+    return { image: new JsiSkImage(this.kit, image) as unknown as SkImage, width: this.canvas.clientWidth, height: this.canvas.clientHeight };
+  }
   makeImageSnapshot(rect?: SkRect) {
     if (!this.surface) throw new Error('Garden surface is unavailable');
     const bounds = rect ? [Math.round(rect.x * this.scaleX), Math.round(rect.y * this.scaleY),
@@ -48,6 +67,7 @@ export class GardenWebRenderer {
   }
   suspend() {
     // Route/background pause frees GPU textures, retaining the canonical picture/images.
+    if (this.surface) this.onSurfaceChanged?.();
     this.surface?.delete();
     this.surface = null;
   }
