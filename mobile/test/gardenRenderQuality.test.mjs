@@ -4,7 +4,7 @@ import { loadPlantingModules } from './loadPlantingModules.mjs';
 const load = loadPlantingModules(undefined, undefined, undefined, true, {
   '@shopify/react-native-skia/lib/module/skia/web/JsiSkImage': { JsiSkImage: class { constructor(kit, ref) { this.ref = ref; } } },
 });
-const { backingSize, qualityMode, GardenQualitySelector, frameSample } = load('../gardenRenderQuality');
+const { backingSize, qualityMode, GardenQualitySelector, frameSample, restingFrameSkipped } = load('../gardenRenderQuality');
 const retina = { width: 730, height: 664, dpr: 2, cores: 8, memoryGB: 8 };
 const fast = { count: 140, p90FrameMs: 17, p90DrawMs: 3 };
 const slow = { count: 80, p90FrameMs: 45, p90DrawMs: 22 };
@@ -148,4 +148,13 @@ test('inactive Garden frees GPU surface and resumes with the same recorded pictu
   assert.equal(surfaces.length, 2);
   assert.equal(operations.filter(x => Array.isArray(x) && x[1] === 'retained-picture').length, 2);
   renderer.dispose(); assert.equal(operations.filter(x => x === 'delete').length, 2);
+});
+
+test('a Garden left alone paints at 30 frames a second; a touch brings back every frame', () => {
+  // Long untouched: the 16.7 ms frame is skipped, the next one (33 ms after the last paint) paints.
+  assert.equal(restingFrameSkipped(100_016.7, 0, 100_000, false), true);
+  assert.equal(restingFrameSkipped(100_033.4, 0, 100_000, false), false);
+  // Touching, or within a moment of the last touch: every frame.
+  assert.equal(restingFrameSkipped(100_016.7, 0, 100_000, true), false);
+  assert.equal(restingFrameSkipped(100_016.7, 97_000, 100_000, false), false);
 });

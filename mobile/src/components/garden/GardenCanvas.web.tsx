@@ -6,7 +6,7 @@ import { useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import type { GardenCanvasProps } from './GardenCanvas';
 import { GardenWebRenderer } from './gardenWebRenderer';
-import { GardenQualitySelector, frameSample, qualityMode, type QualitySignals } from './gardenRenderQuality';
+import { GardenQualitySelector, frameSample, qualityMode, type QualitySignals, restingFrameSkipped } from './gardenRenderQuality';
 import { ownGardenWebView } from './webCanvasCache';
 
 type WebApi = {
@@ -49,6 +49,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     let request = 0, previous = 0, windowStart = performance.now();
     let frames: number[] = [], draws: number[] = [];
     const pointers = new Set<number>();
+    let lastPaint = 0, lastTouch = windowStart;
     const selector = new GardenQualitySelector(windowStart);
     // Testing override is dev-only and URL-scoped. No production settings or storage.
     const mode = __DEV__ ? qualityMode(new URLSearchParams(window.location.search).get('gardenQuality')) : 'AUTO';
@@ -69,9 +70,12 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     const drawLatest = () => {
       if (disposed || !dirty || !picture || !activeRef.current || document.visibilityState !== 'visible') return;
       const start = performance.now();
+      // The next animation frame picks up what is skipped here.
+      if (restingFrameSkipped(start, lastTouch, lastPaint, pointers.size > 0)) return;
       const painted = renderer.draw(picture);
       if (!painted) return;
       dirty = false;
+      lastPaint = start;
       if (!pointers.size) draws.push(performance.now() - start);
     };
     api.registerView(String(nativeId), { setPicture(value: SkPicture) { picture = value; redraw();
@@ -87,8 +91,8 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       makeImageSnapshot: (rect?: SkRect) => { if (picture) renderer.draw(picture); return renderer.makeImageSnapshot(rect); } });
     const releaseView = ownGardenWebView(api, nativeId);
     const resize = () => { if (!disposed && !pointers.size && activeRef.current && document.visibilityState === 'visible') { renderer.resize(tier, signals()); redraw(); } };
-    const pointerDown = (event: PointerEvent) => { pointers.add(event.pointerId); selector.resetSamples(); frames = []; draws = []; previous = 0; };
-    const pointerUp = (event: PointerEvent) => { pointers.delete(event.pointerId); if (!pointers.size) resize(); };
+    const pointerDown = (event: PointerEvent) => { lastTouch = performance.now(); pointers.add(event.pointerId); selector.resetSamples(); frames = []; draws = []; previous = 0; };
+    const pointerUp = (event: PointerEvent) => { lastTouch = performance.now(); pointers.delete(event.pointerId); if (!pointers.size) resize(); };
     const resetTiming = () => { frames = []; draws = []; previous = 0; windowStart = performance.now(); selector.resetSamples(); pointers.clear(); };
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);

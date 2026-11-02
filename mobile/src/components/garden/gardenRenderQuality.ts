@@ -19,6 +19,12 @@ export function backingSize(tier: GardenQuality, signals: QualitySignals) {
   const scale = Math.min(Math.max(dpr, budget.minDpr), budget.dpr, Math.sqrt(budget.pixels / (width * height)), 4096 / Math.max(width, height));
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
+// Every frame repaints the whole Garden, which is what heats a phone. Left alone it needs no more than
+// 30 frames a second; while it is touched, and for a moment after, it runs at full speed.
+const AWAKE_MS = 6000, RESTING_FRAME_MS = 30;
+export function restingFrameSkipped(now: number, lastTouch: number, lastPaint: number, touching: boolean) {
+  return !touching && now - lastTouch > AWAKE_MS && now - lastPaint < RESTING_FRAME_MS;
+}
 export type FrameSample = { p90FrameMs: number; p90DrawMs: number; count: number };
 // AUTO opens at the display's native resolution (HIGH, up to 3x) and steps down to BALANCED
 // (2x) only when this device cannot keep up; it never drops below 2x (PERFORMANCE stays a dev
