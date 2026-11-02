@@ -7,6 +7,10 @@ import { LandImages } from './LandLayer';
 import { sameCamera, SETTLE_MS, type GardenCamera } from './gardenStaticRuns';
 
 type Snapshot = { picture: SkPicture; image: SkImage; camera: GardenCamera };
+// A snapshot reaches this far past each edge of the screen (a share of its size), so a drag only slides
+// it along and repaints nothing. Past that, or at a new zoom, the layers are drawn as usual until the
+// camera rests again. Slides land on whole device pixels, so the art stays exactly as sharp.
+const MARGIN = .4;
 type Props = { cameraTransform: DerivedValue<Transforms3d>; width: number; height: number; order: number; children: ReactNode };
 const cameraOf = (transform: Transforms3d): GardenCamera => {
   'worklet';
@@ -28,15 +32,23 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
   const [{ root, empty }] = useState(() => ({ root: new SkiaSGRoot(Skia as unknown as ConstructorParameters<typeof SkiaSGRoot>[0]), empty: makeEmpty() }));
   const world = useSharedValue<SkPicture | null>(null), snapshot = useSharedValue<Snapshot | null>(null);
   const still = useSharedValue<GardenCamera | null>(null), since = useSharedValue(0);
+  const marginX = Math.round(width * MARGIN), marginY = Math.round(height * MARGIN);
   const showing = useDerivedValue(() => {
     const held = snapshot.value;
-    return held && sameCamera(held.camera, cameraOf(cameraTransform.value)) ? held : null;
+    if (!held) return null;
+    const camera = cameraOf(cameraTransform.value);
+    return held.camera.zoom === camera.zoom && Math.abs(camera.x - held.camera.x) <= marginX && Math.abs(camera.y - held.camera.y) <= marginY ? held : null;
   });
-  const transform = useDerivedValue<Transforms3d>(() => showing.value ? [{ translateX: 0 }] : cameraTransform.value);
+  const transform = useDerivedValue<Transforms3d>(() => {
+    const held = showing.value;
+    if (!held) return cameraTransform.value;
+    const camera = cameraOf(cameraTransform.value);
+    return [{ translateX: Math.round((camera.x - held.camera.x) * density) / density }, { translateY: Math.round((camera.y - held.camera.y) * density) / density }];
+  });
   const picture = useDerivedValue<SkPicture>(() => showing.value?.picture ?? world.value ?? empty);
 
   // Only a whole device pixel maps one to one; otherwise these layers simply stay live.
-  const pixelWidth = width * density, pixelHeight = height * density;
+  const pixelWidth = (width + 2 * marginX) * density, pixelHeight = (height + 2 * marginY) * density;
   const exact = pixelWidth > 0 && pixelHeight > 0 && Number.isInteger(pixelWidth) && Number.isInteger(pixelHeight);
   useFrameCallback(frame => {
     if (!exact) return;
@@ -50,14 +62,14 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
     if (!surface) return;
     const canvas = surface.getCanvas();
     canvas.scale(density, density);
-    canvas.translate(camera.x, camera.y);
+    canvas.translate(camera.x + marginX, camera.y + marginY);
     canvas.scale(camera.zoom, camera.zoom);
     canvas.drawPicture(layers);
     surface.flush();
     const image = surface.makeImageSnapshot();
     surface.dispose();
     const recorder = Skia.PictureRecorder();
-    recorder.beginRecording().drawImageRectOptions(image, Skia.XYWHRect(0, 0, pixelWidth, pixelHeight), Skia.XYWHRect(0, 0, width, height), FilterMode.Nearest, MipmapMode.None);
+    recorder.beginRecording().drawImageRectOptions(image, Skia.XYWHRect(0, 0, pixelWidth, pixelHeight), Skia.XYWHRect(-marginX, -marginY, width + 2 * marginX, height + 2 * marginY), FilterMode.Nearest, MipmapMode.None);
     const paste = recorder.finishRecordingAsPicture();
     recorder.dispose();
     const old = snapshot.value;
