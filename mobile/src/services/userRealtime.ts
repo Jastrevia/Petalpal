@@ -10,7 +10,7 @@ type Listener = {
   presence?: (change: PresenceChange) => void;
   visit?: (record: VisitRecord, gardenOwnerId?: string) => void;
   connection?: (connected: boolean) => void;
-  friendAccepted?: (accepter: { name?: string; avatar?: string }) => void;
+  friendChanged?: () => void;
 };
 
 let socket: Socket | null = null, owner: string | null = null, connected = false;
@@ -33,10 +33,10 @@ export function startUserRealtime(ownerId: string) {
   });
   next.on('disconnect', () => { if (socket !== next) return; connected = false; listeners.forEach(l => l.connection?.(false)); });
   next.on('presenceChanged', (change: PresenceChange) => listeners.forEach(l => l.presence?.(change)));
-  // Sent to both people; only the one who asked hears "they said yes".
-  next.on('friendRequestUpdated', (payload: { type?: string; senderId?: string; accepter?: { name?: string; avatar?: string } | null }) => {
-    if (payload?.type === 'request-accepted' && payload.senderId === ownerId) listeners.forEach(l => l.friendAccepted?.(payload.accepter ?? {}));
-  });
+  // A request or friendship changed, for either person: the Friends dot looks again.
+  const friendChanged = () => { if (socket === next) listeners.forEach(l => l.friendChanged?.()); };
+  next.on('friendRequestUpdated', friendChanged);
+  next.on('friendListUpdated', friendChanged);
   next.on('visitRecordAdded', (payload: { gardenOwnerId?: string; record?: VisitRecord }) => {
     if (payload?.record) listeners.forEach(l => l.visit?.(payload.record!, payload.gardenOwnerId));
   });
@@ -54,15 +54,13 @@ export function subscribeUserRealtime(listener: Listener) {
   return () => { listeners.delete(listener); };
 }
 
-export const friendAcceptedNotice = (name: string | undefined, chinese: boolean) => chinese
-  ? `${name || '一位朋友'} 通过了你的好友申请 🌿` : `${name || 'A friend'} accepted your friend request 🌿`;
-
-// What the owner sees when someone does something in their Garden ("left your garden" stays quiet).
+// What the owner sees when someone does something in their Garden.
 export function visitNotice(record: VisitRecord, chinese: boolean): string | null {
   const name = record.visitorName || (chinese ? '一位朋友' : 'A friend');
   switch (record.action) {
     case 'started visiting your garden': return chinese ? `${name} 来逛你的花园了 🌸` : `${name} is visiting your Garden 🌸`;
     case 'support': return chinese ? `${name} 给你的花送来了支持 💗` : `${name} sent your flower some support 💗`;
+    case 'left your garden': return chinese ? `${name} 离开了你的花园 🍃` : `${name} left your Garden 🍃`;
     case 'message': return chinese ? `${name} 在你的花上留了言 💌` : `${name} left a message on your flower 💌`;
     default: return null;
   }

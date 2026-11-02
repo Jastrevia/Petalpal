@@ -18,8 +18,9 @@ const HEART = '#E7A3B8';
 
 // The Fairy's own feed: photos and text-only small discoveries, newest first. Opening it
 // marks her posts as seen on the server. "Find her" hands back to the Garden camera.
-export function FairyMomentsPanel({ visible, onClose, onFindFairy }: {
-  visible: boolean; onClose: () => void; onFindFairy: () => void;
+// `highlightNewest`: the visit that clears her new-post dot marks the newest post, until closed.
+export function FairyMomentsPanel({ visible, onClose, onFindFairy, highlightNewest = false }: {
+  visible: boolean; onClose: () => void; onFindFairy: () => void; highlightNewest?: boolean;
 }) {
   const { theme } = usePanelTheme();
   const styles = createStyles(theme);
@@ -136,7 +137,7 @@ export function FairyMomentsPanel({ visible, onClose, onFindFairy }: {
           </View> : null}
           {page && !page.posts.length ? <Text style={[styles.muted, styles.status]}>
             {copy.empty(name)}</Text> : null}
-          {page?.posts.map(post => <MomentPost key={post.id} post={post} name={name} avatar={avatar} locale={locale} styles={styles} mutedColor={theme.muted} onLike={() => void toggleLike(post)} />)}
+          {page?.posts.map((post, index) => <MomentPost key={post.id} highlighted={highlightNewest && index === 0} post={post} name={name} avatar={avatar} locale={locale} styles={styles} mutedColor={theme.muted} onLike={() => void toggleLike(post)} />)}
           {page?.nextBefore ? <Pressable accessibilityRole="button" onPress={() => void loadMore()} style={styles.more}>
             {loadingMore ? <ActivityIndicator color={theme.gold} /> : <Text style={styles.link}>{copy.more}</Text>}
           </Pressable> : page?.posts.length ? <Text style={[styles.muted, styles.end]}>{copy.end}</Text> : null}
@@ -153,12 +154,12 @@ export function FairyMomentsPanel({ visible, onClose, onFindFairy }: {
   </Modal>;
 }
 
-function MomentPost({ post, name, avatar, locale, styles, mutedColor, onLike }: {
-  post: FairyMomentPost; name: string; avatar: number; locale: MomentLocale; styles: ReturnType<typeof createStyles>; mutedColor: string; onLike: () => void;
+function MomentPost({ post, highlighted, name, avatar, locale, styles, mutedColor, onLike }: {
+  highlighted: boolean; post: FairyMomentPost; name: string; avatar: number; locale: MomentLocale; styles: ReturnType<typeof createStyles>; mutedColor: string; onLike: () => void;
 }) {
   const copy = MOMENTS_COPY[locale], photo = momentPhoto(post.photoKey), place = momentLocationLabel(post.location, locale);
   const meta = `${momentTimeLabel(post.postedAt, new Date(), locale)} · ${place}`;
-  return <View style={styles.post}>
+  return <View testID={highlighted ? 'moment-post-new' : undefined} style={[styles.post, highlighted && styles.postNew]}>
     <Image source={avatar} style={styles.postAvatar} />
     <View style={styles.postBody}>
       <Text style={styles.postName}>{name}</Text>
@@ -201,6 +202,7 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   muted: { fontSize: 13, lineHeight: 19, color: theme.muted, textAlign: 'center' },
   link: { fontSize: 13, fontWeight: '600', color: theme.gold },
   post: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  postNew: { backgroundColor: `${theme.gold}40`, borderLeftWidth: 4, borderLeftColor: theme.gold },
   postAvatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: theme.gold },
   postBody: { flex: 1, minWidth: 0 },
   postName: { fontSize: 13, fontWeight: '600', color: theme.gold },

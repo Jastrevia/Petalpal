@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GARDEN_FEATURES, gardenFeature } from '../../services/featureCatalog';
 import { usePanelTheme } from '../features/PanelTheme';
@@ -15,16 +15,16 @@ import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
 import { momentLocale } from '../moments/momentFormat';
-import { friendAcceptedNotice, startUserRealtime, stopUserRealtime, subscribeUserRealtime, visitNotice } from '../../services/userRealtime';
-import { useUnreadMail } from '../mailbox/mailboxReadState';
+import { startUserRealtime, stopUserRealtime } from '../../services/userRealtime';
+import { startFriendAlerts, stopFriendAlerts, useFriendAlerts } from '../../services/friendAlerts';
+import { GardenDock } from './GardenDock';
+import { GardenNotices } from './GardenNotices';
 import { AiConsentPrompt } from '../features/AiConsentPrompt';
 
-// The mailbox's second door, on the bar: the same letters as tapping the mailbox in the Garden.
-const LETTER_ICON = require('../../../assets/keepsakes/pressed-flower-envelope.webp');
-import { UserAvatar } from '../avatars/UserAvatar';
 import { zhHans } from './fairy/tapLines';
 import { onOpenGardenPanel } from './gardenPanelBus';
 
+const MOMENTS_CHECK_MS = 5 * 60_000;
 // One navigation model; only its sizing changes with the viewport.
 export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) {
   const insets = useSafeAreaInsets();
@@ -45,6 +45,9 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const runtime = useFairyRuntime();
   const moments = { enabled: Boolean(runtime?.moments), unread: Boolean(runtime?.moments?.unread) };
   const [momentsOpen, setMomentsOpen] = useState(false);
+  // The newest post stands out only on the visit that clears the dots: leaving puts all three back.
+  const [momentsHighlight, setMomentsHighlight] = useState(false);
+  const leaveMoments = () => { setMomentsOpen(false); setMomentsHighlight(false); markFairyMomentsRead(); };
   // The Fairy icon opens her entry card (亲密度 · Our Bond / 朋友圈 · Fairy Moments) when
   // either room is on; the closeness summary reloads each time the card opens.
   const [entryOpens, setEntryOpens] = useState(0);
@@ -56,28 +59,19 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   // Being in the app keeps the owner online for friends; visits to their Garden pop up briefly.
   const ownerId = session?.user.id;
   const chinese = zhHans(experience?.user.preferredLocale);
-  const [notice, setNotice] = useState<{ key: number; text: string; avatar?: string } | null>(null);
   useEffect(() => {
     if (!ownerId) return;
     startUserRealtime(ownerId);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const show = (text: string, avatar?: string) => {
-      setNotice(previous => ({ key: (previous?.key ?? 0) + 1, text, avatar }));
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setNotice(null), 5000);
-    };
-    const unsubscribe = subscribeUserRealtime({ visit: (record, gardenOwnerId) => {
-      if (gardenOwnerId !== ownerId || !record.visitorId || record.visitorId === ownerId) return;
-      const text = visitNotice(record, chinese);
-      if (text) show(text, record.visitorAvatar);
-    }, friendAccepted: accepter => show(friendAcceptedNotice(accepter.name, chinese), accepter.avatar) });
-    return () => { unsubscribe(); if (timer) clearTimeout(timer); };
-  }, [ownerId, chinese]);
+    startFriendAlerts(ownerId);
+    // Her new Moments are recorded when her day is asked for: ask now and then, for the dot.
+    const check = setInterval(() => void refreshFairyRuntime(), MOMENTS_CHECK_MS);
+    return () => { clearInterval(check); stopFriendAlerts(); };
+  }, [ownerId]);
   useEffect(() => () => stopUserRealtime(), []);
-  const unreadMail = useUnreadMail();
-  const lettersLabel = chinese ? '信箱' : 'Letters';
-  const bondWaiting = Boolean(closeness.summary && !closeness.summary.checkIn.checkedInToday);
-  const fairyDot = moments.unread || bondWaiting;
+  const friendAlerts = useFriendAlerts();
+  const friendsDot = friendAlerts.incoming > 0 || friendAlerts.newFriends.length > 0;
+  // Only her Moments light this dot, so without them unlocked it never appears.
+  const fairyDot = moments.enabled && moments.unread;
   useEffect(() => {
     if (!entryFeature) return;
     if (entryFeature === 'fairy') {
@@ -93,7 +87,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const navigationItem = (feature: typeof GARDEN_FEATURES[number]) => {
     const selected = openFeature === feature.id || (feature.id === 'profile' && openFeature === 'settings') || (feature.id === 'garden' && !openFeature);
     return <Pressable key={feature.id} accessibilityRole="button"
-      accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${feature.id === 'fairy' && fairyDot ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
+      accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
       onFocus={() => setHighlightedFeature(feature.id)} onBlur={() => setHighlightedFeature(undefined)}
       onPress={() => {
@@ -111,7 +105,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         pressed && styles.pressed]}>
       <View>
         <SidebarIllustration id={feature.id} size={iconSize} active={selected || highlightedFeature === feature.id} />
-        {feature.id === 'fairy' && fairyDot ? <View style={[styles.unread, { borderColor: theme.background }]} /> : null}
+        {(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? <View testID={`hud-${feature.id}-dot`} style={[styles.unread, { borderColor: theme.background }]} /> : null}
       </View>
       <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>
         {FEATURE_LABELS[locale][feature.id] ?? feature.label}
@@ -125,14 +119,6 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       borderRadius: phone ? 24 : 26, backgroundColor: theme.background, borderColor: theme.gold,
     }]}>
       {GARDEN_FEATURES.filter(feature => ['events', 'friends', 'fairy', 'profile'].includes(feature.id)).map(navigationItem)}
-      <Pressable testID="nav-letters" accessibilityRole="button" accessibilityLabel={`${lettersLabel}${unreadMail ? (chinese ? '，有未读' : ', unread') : ''}`}
-        onPress={() => router.push('/mailbox')} style={({ pressed }) => [styles.bottomItem, pressed && styles.pressed]}>
-        <View>
-          <Image accessible={false} source={LETTER_ICON} resizeMode="contain" style={{ width: iconSize, height: iconSize }} />
-          {unreadMail ? <View style={[styles.unread, { borderColor: theme.background }]} /> : null}
-        </View>
-        <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>{lettersLabel}</Text>
-      </Pressable>
     </View>
     <View style={[styles.info, { top: insets.top + 8, left: insets.left + 8, maxWidth: Math.max(100, width - insets.left - insets.right - 100) }]}>
       {isGardenLoading ? <ActivityIndicator accessibilityLabel="Loading Garden" size="small" color="#365b42" /> : null}
@@ -140,19 +126,17 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
     </View>
     <AiConsentPrompt />
-    {notice ? <Pressable key={notice.key} testID="visit-notice" accessibilityRole="alert" accessibilityLiveRegion="polite"
-      onPress={() => setNotice(null)} style={[styles.notice, { top: insets.top + 60, backgroundColor: theme.background, borderColor: theme.gold }]}>
-      <UserAvatar avatar={notice.avatar} size={30} />
-      <Text style={[styles.noticeText, { color: theme.text }]}>{notice.text}</Text>
-    </Pressable> : null}
+    <GardenDock chinese={chinese} />
+    {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left + 10}
+      maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}
       momentsOn={moments.enabled} momentsUnread={moments.unread} onClose={() => setEntryOpen(false)}
-      onOpenMoments={() => { setEntryOpen(false); setMomentsOpen(true); markFairyMomentsRead(); }}
+      onOpenMoments={() => { setEntryOpen(false); setMomentsHighlight(moments.unread); setMomentsOpen(true); }}
       onOpenBond={() => { setEntryOpen(false); setBondOpen(true); setEntryOpens(count => count + 1); }} />
     <OurBondPanel visible={bondOpen} locale={locale} summary={closeness.summary} loading={closeness.on === null}
       onClose={() => setBondOpen(false)} />
-    <FairyMomentsPanel visible={momentsOpen} onClose={() => setMomentsOpen(false)}
-      onFindFairy={() => { setMomentsOpen(false); onFocusFairy?.(); }} />
+    <FairyMomentsPanel visible={momentsOpen} highlightNewest={momentsHighlight} onClose={leaveMoments}
+      onFindFairy={() => { leaveMoments(); onFocusFairy?.(); }} />
     <FeatureOverlay feature={gardenFeature(openFeature)} onClose={() => setOpenFeature(undefined)} onGardenChanged={refreshGarden} onOpenSettings={() => setOpenFeature('settings')} />
   </View>;
 }
@@ -170,9 +154,6 @@ const styles = StyleSheet.create({
   label: { color: FEATURE_COLORS.ink, fontSize: 10, fontWeight: '600', textAlign: 'center' },
   pressed: { opacity: .7, transform: [{ scale: .96 }] },
   unread: { position: 'absolute', top: 0, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, backgroundColor: '#E5735F' },
-  notice: { position: 'absolute', alignSelf: 'center', maxWidth: 340, flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 9, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, boxShadow: '0 3px 12px #163D4030' },
-  noticeText: { fontFamily: 'serif', fontSize: 14, lineHeight: 19, flexShrink: 1 },
   info: { position: 'absolute', alignSelf: 'center', gap: 5, maxWidth: 220,
     borderRadius: 14, padding: 8, backgroundColor: '#fffaf0e8' },
 });

@@ -7,7 +7,8 @@ test('report UI chooses reason, sends reference only and acknowledges; block is 
  const calls=[]; const hooks=hookHarness();
  const load=loadPlantingModules(undefined,hooks.react,{getItem:async()=>null},false,{
   fetch:async(url,options)=>{calls.push({url,body:options.body ? JSON.parse(options.body) : null});return {ok:true,status:202,json:async()=>({accepted:true})};},
-  'react-native':{View:'View',Text:'Text',Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',StyleSheet:{create:x=>x,absoluteFill:{}}},'./FeatureUI':{FeatureActionButton:'Action',ui:{}},
+  'react-native':{View:'View',Text:'Text',Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',ActivityIndicator:'Spinner',StyleSheet:{create:x=>x,absoluteFill:{},hairlineWidth:1}},'./FeatureUI':{FeatureActionButton:'Action',ui:{}},
+  '../avatars/UserAvatar':{UserAvatar:'UserAvatar'},
   './PanelTheme':{usePanelTheme:()=>({theme:{surface:'#fff',gold:'#000',text:'#000'}})},
  });
  load('../../../services/api').configureApi({apiBaseUrl:'',getAccessToken:async()=>'fixture'});
@@ -18,6 +19,6 @@ test('report UI chooses reason, sends reference only and acknowledges; block is 
  assert.equal(calls[0].url,'/reports');assert.deepEqual(calls[0].body,{messageId:'m',category:'HARASSMENT'});
  // The acknowledgement stays in the sheet until Done; the row is refreshed only then.
  assert.ok(nodes(tree).some(n=>n.props?.children==='Report received. Thank you.'));
- await press('Report message');await press('Block user');assert.equal(calls[1].url,'/users/me/blocks/b');
- assert.ok(nodes(tree).some(n=>n.props?.children==='User blocked.'));
+ await press('Report message');await press('Block user');assert.equal(calls.length,1,'blocking asks first');await press('Yes, block');assert.equal(calls[1].url,'/users/me/blocks/b');
+ assert.ok(nodes(tree).some(n=>/^User blocked\./.test(n.props?.children)));
 });

@@ -8,7 +8,7 @@ import { advance, route as pathRoute, nearest, distance, WALK_START, type Point 
 import { groundRoute } from './groundNavigation';
 import { SWING_EXIT } from './swingDestination';
 import { createAerialFlight, sampleFlight, smooth, SWING_FLIGHT_APPROACH, SWING_FLIGHT_SEAT } from './swingFlight';
-export const WALK_SPEED=.220; // world units per millisecond; shared with renderer (owner feedback 2026-10-30: twice .110)
+export const WALK_SPEED=.160; // world units per millisecond; shared with renderer. Paired with WALK_LOOP_MS so her stride is a person's (owner feedback 2026-11-01); brisker than the first .110
 // Flying is how she crosses the Garden, and settling onto a seat is the same flight, at the same speed.
 export const FLIGHT_SPEED=.36, MIN_FLIGHT_MS=500, MIN_ALIGN_MS=300;
 
@@ -140,6 +140,8 @@ export class FairyNavigation {
     else {this.remaining=points!.slice(1);this.lift=0;this.state=this.remaining.length?(mailbox?'movingToMailbox':'walking'):'idle';if(!this.remaining.length&&(swing||moon||tea||treehouse||mailbox))this.align();else if(!this.remaining.length)this.target=null;}
     return true;
   }
+  // Whether a plain tap could be accepted here, without changing anything.
+  canLand(p:Point,blocked:(p:Point)=>boolean){const b=GARDEN_WORLD_BOUNDS;return Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=b.x&&p.x<b.x+b.width&&p.y>=b.y&&p.y<b.y+b.height&&!blocked(p);}
   update(dtMs:number,blocked:(p:Point)=>boolean){return this.tick(dtMs*WALK_SPEED,blocked);}
   tick(amount:number,blocked:(p:Point)=>boolean){
     if(this.mailboxSequenceActive)return this.updateMailbox(amount/WALK_SPEED);

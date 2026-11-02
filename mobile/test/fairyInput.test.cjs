@@ -166,10 +166,10 @@ test('actual Fairy hooks complete ten sequential routes, accept mid-walk retarge
   fairy.active(true); fairy.finish();
   assert.ok(distance(fairy.state().position, WALK_NETWORK.nodes[2]) < .001);
 });
-test('actual animation advances at 220 world units per second without teleporting or changing sprite cadence', () => {
+test('actual animation advances at 160 world units per second without teleporting or changing sprite cadence', () => {
   const fairy = fairyHarness(); fairy.move(WALK_NETWORK.nodes[1]);
   for (let i = 0; i < 10; i++) fairy.step();
-  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 110) < .001, 'half a second');
+  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 80) < .001, 'half a second');
   assert.ok(fairy.state().remaining.length > 0);
   fairy.finish();
 });
@@ -179,11 +179,11 @@ test('input accounts for elapsed time immediately without counting it again in a
   fairy.move(WALK_NETWORK.nodes[1]);
   fairy.clockAdvance(20); fairy.move(WALK_NETWORK.nodes[1]);
   const immediately = fairy.state().position;
-  assert.ok(Math.abs(distance(WALK_START, immediately) - 4.4) < .001);
+  assert.ok(Math.abs(distance(WALK_START, immediately) - 3.2) < .001);
   fairy.frameAt(60);
   assert.deepEqual(fairy.state().position, immediately, 'An older RAF timestamp cannot rewind movement time');
   fairy.clockAdvance(30); fairy.frameAt(100);
-  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 11) < .001, 'Exactly 50ms of movement was accounted for');
+  assert.ok(Math.abs(distance(WALK_START, fairy.state().position) - 8) < .001, 'Exactly 50ms of movement was accounted for');
 });
 
 test('registered B01 bridge foot chords stay on the actual integrated deck image', async () => {
@@ -240,6 +240,7 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     plantingMonthRef: { current: null }, nearLawn: () => true, cancelPlacement: () => calls.push('cancel'),
     // A lawn with flowers opens Events (owner's Garden only).
     onOpenEventsRef: { current: () => {} }, plantedLawnAt: () => null, openLawnEvents: () => calls.push('events'),
+    monthLawnOpensEvents: false, monthLawnAt: () => null, showLawnNote: () => calls.push('note'),
     enableFairyWalk: true, treehousePlacement: {}, swingPlacement: {}, teaSetPlacement: {}, moonBedPlacement: {}, Platform: { OS: 'web' },
     canvasRef: { current: { redraw: () => calls.push('redraw') } },
     // A tap that may send her somewhere holds her schedule off (fairySchedule.ts).
@@ -260,6 +261,14 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     assert.equal(context.notes, noted ? 1 : 0, String(expected)); assert.equal(context.interactions, context.notes, String(expected));
   };
   expect(['move', 'redraw']);
+  // The owner's Garden: this month's lawn opens Events with or without flowers, another month's says whose it is.
+  context.monthLawnOpensEvents = true;
+  const thisMonth = new Date().getMonth() + 1;
+  context.monthLawnAt = () => thisMonth;
+  tap(100, 100); assert.equal(calls.at(-1), 'events');
+  context.monthLawnAt = () => thisMonth % 12 + 1;
+  tap(100, 100); assert.equal(calls.at(-1), 'note');
+  context.monthLawnAt = () => null; context.monthLawnOpensEvents = false;
   context.hitsMailbox = () => true; context.fairyRef.current.isMailboxBusy = () => true;
   context.activeModeRef.current = 'plant'; expect(['placement']);
   context.plantingMonthRef.current = 10; expect(['placement']);

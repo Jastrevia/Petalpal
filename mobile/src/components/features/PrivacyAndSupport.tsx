@@ -8,9 +8,14 @@ import { CommunityGuidelines } from './CommunityGuidelines';
 import { DeleteAccountSettings } from './DeleteAccountSettings';
 import { RedeemCodeSettings } from './RedeemCodeSettings';
 import { useRedemptions } from '../../services/redeemCodes';
-const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',redeem:'Redeem a code',redeemed:'Redeemed',groupHelp:'Get help',groupRules:'Rules & policies',groupAccount:'Account',close:'Close',
+import { BlockedUsers } from './SafetyActions';
+const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',redeem:'Redeem a code',redeemed:'Redeemed',groupHelp:'Get help',groupRules:'Rules & policies',groupAccount:'Account',close:'Close',blocked:'Blocked users',groupAbout:'About',thanks:'Acknowledgements',
+  thanksBody:['Thank you to our friend Boge Ling, whose petalpal-moments project shared the ideas and early work that helped Fairy Moments grow into the feed PPL posts to today.','PetalPal is also built on the work of many open-source communities, including Expo, React Native, React Native Skia and Prisma. We are grateful to everyone who keeps them going.','And thank you to our first beta testers, whose honest notes shape every corner of this Garden.'],
+ 
   support:'Contact support',mail:'Opening your email app to write to contact@jastrevia.com…',emergency:"PetalPal isn't an emergency service. If you or someone else is in danger, contact local emergency services."},
- 'zh-Hans':{title:'隐私与帮助',help:'发送反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',redeem:'兑换码',redeemed:'已兑换',groupHelp:'获取帮助',groupRules:'规则与政策',groupAccount:'账号',close:'关闭',
+ 'zh-Hans':{title:'隐私与帮助',help:'发送反馈',privacy:'隐私政策',terms:'使用条款',deletion:'账号与数据删除',problem:'报告问题',guidelines:'社区准则',deleteAccount:'删除账号',redeem:'兑换码',redeemed:'已兑换',groupHelp:'获取帮助',groupRules:'规则与政策',groupAccount:'账号',close:'关闭',blocked:'已屏蔽的人',groupAbout:'关于',thanks:'致谢',
+  thanksBody:['感谢我们的朋友 Boge Ling。petalpal-moments 项目分享的想法和早期作品，帮助小花仙的朋友圈长成了今天的样子。','PetalPal 也建立在许多开源社区的成果之上，包括 Expo、React Native、React Native Skia 和 Prisma。谢谢每一位维护它们的人。','也谢谢最早来花园内测的朋友们，你们真诚的反馈让这里的每个角落都变得更好。'],
+ 
   support:'联系客服',mail:'正在打开邮件应用，写信到 contact@jastrevia.com…',emergency:'PetalPal 不是紧急服务。如果你或他人有危险，请联系当地紧急服务。'}};
 // On the web a page opens in a new tab, so the Garden stays where it was.
 async function openPolicy(url:string|undefined,setStatus:(value:string)=>void){if(!url){setStatus('This policy URL is awaiting publication. Contact contact@jastrevia.com.');return;}
@@ -23,7 +28,7 @@ async function openPolicy(url:string|undefined,setStatus:(value:string)=>void){i
 export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLeave?:()=>void}={}){
  const [status,setStatus]=useState('');
  const [unfolded,setUnfolded]=useState<'guidelines'|null>(null);
- const [dialog,setDialog]=useState<'delete'|'redeem'|null>(null);
+ const [dialog,setDialog]=useState<'delete'|'redeem'|'blocked'|'thanks'|null>(null);
  const [redemptions,setRedemptions]=useRedemptions(account);
  const copy=COPY[useAppLocale()];
  const titleColor=usePanelTheme().theme.text;
@@ -47,9 +52,17 @@ export function PrivacyAndSupport({account=false,onLeave}:{account?:boolean;onLe
    <FeatureLinkRow title={copy.terms} onPress={()=>void open(process.env.EXPO_PUBLIC_TERMS_URL)}/>
   </Group>
   <Group label={copy.groupAccount}>
-   <FeatureLinkRow first title={copy.redeem} note={redemptions?.length?copy.redeemed:undefined} onPress={()=>setDialog('redeem')}/>
+   <FeatureLinkRow first title={copy.blocked} onPress={()=>setDialog('blocked')}/>
+   <FeatureLinkRow title={copy.redeem} note={redemptions?.length?copy.redeemed:undefined} onPress={()=>setDialog('redeem')}/>
    <FeatureLinkRow chevron={false} title={copy.deleteAccount} onPress={()=>setDialog('delete')}/>
   </Group>
+  <Group label={copy.groupAbout}>
+   <FeatureLinkRow first title={copy.thanks} onPress={()=>setDialog('thanks')}/>
+  </Group>
+  {dialog==='blocked'?<Dialog title={copy.blocked} closeLabel={copy.close} onClose={()=>setDialog(null)}><BlockedUsers/></Dialog>:null}
+  {dialog==='thanks'?<Dialog title={copy.thanks} closeLabel={copy.close} onClose={()=>setDialog(null)}>
+   <View testID="acknowledgements" style={{gap:12}}>{copy.thanksBody.map((line,index)=><Text key={index} style={[ui.text,{color:titleColor}]}>{line}</Text>)}</View>
+  </Dialog>:null}
   {dialog==='redeem'?<Dialog title={copy.redeem} closeLabel={copy.close} onClose={()=>setDialog(null)}>
    <RedeemCodeSettings redemptions={redemptions} onRedeemed={item=>setRedemptions([item])}/>
   </Dialog>:null}

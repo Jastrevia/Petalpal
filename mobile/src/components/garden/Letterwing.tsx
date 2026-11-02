@@ -10,7 +10,7 @@ import type { TreehousePlacement } from './TreehouseCalibrationEditor';
 // (several wingbeats, first frame = last), then TURN, the bird turning round in the air from
 // facing right to facing left through a front view, then FOLD, the bird opening out into a sheet
 // of letter paper that folds itself into a sealed envelope. One sheet, so one draw per frame.
-// Most of the time it is a sealed envelope resting beside the mailbox (REST seconds); then it
+// Most of the time it is a sealed envelope resting on top of the mailbox (REST seconds); then it
 // unfolds (FOLD backwards) into the bird, flies LOOPS laps, glides back down while it folds, and
 // rests again. The cycle starts as the envelope, so that is what the Garden opens on. In flight
 // it flies one whole FLY loop along each side of its
@@ -66,9 +66,9 @@ export default function Letterwing({ placement, clock, unread }: {
     const c = circuit(clock.value * rate);
     const rx = (unread ? 230 : 310) * k, ry = (unread ? 70 : 96) * k;
     const centreY = mailboxY - (unread ? 175 : 245) * k;
-    // Resting: the envelope, smaller than in flight, lies on the ground beside the mailbox, just
-    // right of its foot (treehouse 1095, 805, measured on screen in the Garden).
-    const restX = placement.x + 1095 * k, restY = placement.y + 805 * k;
+    // Resting: the envelope, smaller than in flight, sits on the mailbox's roof (its hit area
+    // reaches 802 - 118 = 684 in treehouse units; measured on screen in the Garden).
+    const restX = placement.x + 988 * k, restY = placement.y + 682 * k;
     const x = (mailboxX + rx * Math.cos(c.angle)) * (1 - c.rest) + restX * c.rest;
     const y = (centreY + ry * Math.sin(c.angle)) * (1 - c.rest) + restY * c.rest;
     // The near half of the loop is a little larger; it banks gently on the straights.

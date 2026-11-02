@@ -13,13 +13,17 @@ import SheetFrame from '../SheetFrame';
 import { groundRoute } from './groundNavigation';
 import type { ScheduleRest } from './fairySchedule';
 
-// Standing: her original painting. Walking: one painted stride, 25 frames of 280 × 420 in a
-// 5-wide sheet, on the same canvas (so the same foot pivot) as the painting.
+// Standing: her original painting. Walking: one stride baked from that same painting
+// (scripts/critters/fairy-walk-rig.py), 25 frames of 280 × 420 in a 5-wide sheet, on the same
+// canvas (so the same foot pivot).
 const STANDING=require('@/assets/garden/fairy/walk-v2/walk_04.png');
-const WALKING=require('@/assets/garden/fairy/walk-video-v1/walk.webp');
+const WALKING=require('@/assets/garden/fairy/walk-rig-v1/walk.webp');
 const CELL={w:280,h:420,columns:5};
 export type FairyHandle = { getPosition:()=>Point; getState:()=>FairyState; place:(rest:ScheduleRest,at?:Point)=>boolean; move:(p:Point)=>boolean; visitSwing:()=>boolean; visitMoonBed:()=>boolean; visitTea:()=>boolean; visitTreehouse:()=>boolean; visitMailbox:()=>boolean; isMailboxBusy:()=>boolean; returnFromMailbox:()=>boolean; returnFromTreehouse:()=>boolean; pointer:(p:Point)=>void; stop:()=>void };
 type Props={motionClock?:SharedValue<number>;onMailboxOpened?:()=>void;onTreehouseEntered?:()=>void;onTreehouseExited?:()=>void;pixelsPerUnit?:()=>number;onStateChange?:(state:FairyState)=>void;blocked:(p:Point)=>boolean;active:boolean;debug:boolean;onStatus:(s:string)=>void};
+// A burst of taps must not make her twitch: while she is under way the newest tap waits its turn,
+// and she only turns round once she has really been heading the other way for a moment.
+const RETARGET_MS=450,RETARGET_FLYING_MS=900,TURN_MS=140;
 const polyline=(points:Point[])=>points.map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ');
 const networkPath=WALK_NETWORK.edges.map(e=>polyline([WALK_NETWORK.nodes[e.a],WALK_NETWORK.nodes[e.b]])).join(' ');
 function WalkSprite({frame}:{frame:SharedValue<number>}) {
@@ -50,6 +54,7 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
   const groundOpacity=useDerivedValue(()=>1-flightBlend.value);
   const nav=useRef(new FairyNavigation());
   const elapsed=useRef(0);
+  const pendingMove=useRef<Point|null>(null),lastMove=useRef(-Infinity),turning=useRef(0);
   const [state,setState]=useState<FairyState>('idle');
   const lastState=useRef<FairyState>('idle');
   const config=useRef({blocked,active,debug,onStatus,onStateChange,pixelsPerUnit,onTreehouseEntered,onTreehouseExited,onMailboxOpened});config.current={blocked,active,debug,onStatus,onStateChange,pixelsPerUnit,onTreehouseEntered,onTreehouseExited,onMailboxOpened};
@@ -76,10 +81,13 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
   };
   const requestMove=(p:Point,swing=false,moon=false,tea=false,treehouse=false,mailbox=false)=>{
     if(!config.current.active)return false;
+    pendingMove.current=null;
+    const striding=nav.current.state==='walking'||nav.current.state==='movingToMailbox';
     const accepted=nav.current.move(p,config.current.blocked,swing,nav.current.state==='sittingOnSwing'?SEATED_VISUAL_HEIGHT:nav.current.airborne?FLY_VISUAL_HEIGHT:walkVisualHeight(),moon,tea,treehouse,mailbox);
 
     if(!accepted){if(nav.current.traversingTreehouse||nav.current.state==='insideTreehouse'||nav.current.mailboxSequenceActive)return false;config.current.onStatus(nav.current.decision?.reason==='Water or plantable flower area'?'Water / flower bed · choose dry ground':'Cannot reach this destination');return false;}
-    elapsed.current=0;
+    // Already walking and going elsewhere: the stride carries on, it does not start over.
+    if(!striding||(nav.current.state!=='walking'&&nav.current.state!=='movingToMailbox'))elapsed.current=0;
     if(config.current.debug){setRouteDrawing(polyline([nav.current.position,...nav.current.remaining]));setTargetDrawing(nav.current.target);}
     publish();step.current(performance.now());
     if(__DEV__&&config.current.debug&&nav.current.decision){const d=nav.current.decision;
@@ -96,7 +104,14 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
       elapsed.current=0;facing.value=1;lean.value=0;frame.value=WALK_IDLE;flightBlend.value=0;
       publish();step.current(performance.now());return true;
     },
-    move:p=>requestMove(p),
+    move:p=>{
+      const now=performance.now(),under=nav.current.remaining.length>0||nav.current.airborne;
+      if(under&&now-lastMove.current<(nav.current.airborne?RETARGET_FLYING_MS:RETARGET_MS)){
+        if(!config.current.active||!nav.current.canLand(p,config.current.blocked))return false;
+        pendingMove.current=p;step.current(now);return true;
+      }
+      lastMove.current=now;return requestMove(p);
+    },
     returnFromTreehouse:()=>{
       const accepted=nav.current.returnFromTreehouse();if(!accepted)return false;
       elapsed.current=0;facing.value=1;lean.value=0;frame.value=WALK_IDLE;publish();return true;
@@ -110,7 +125,7 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
     visitMoonBed:()=>requestMove({x:0,y:0},false,true),
     pointer(p){if(!config.current.debug)return;const valid=!config.current.blocked(p);
       setPointerDrawing({p,valid});},
-    stop(){nav.current.stop();frame.value=WALK_IDLE;setRouteDrawing('');setTargetDrawing(null);publish();},
+    stop(){pendingMove.current=null;nav.current.stop();frame.value=WALK_IDLE;setRouteDrawing('');setTargetDrawing(null);publish();},
   };
   useImperativeHandle(ref,()=>controls.current!,[]);
   useEffect(()=>{
@@ -121,12 +136,20 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
       // A covered Garden pauses in place; resuming must not reset an interaction.
       if(!config.current.active)return;
       if(config.current.active)seconds.value+=dt/1000;
+      if(pendingMove.current&&(!(nav.current.remaining.length>0||nav.current.airborne)||now-lastMove.current>=(nav.current.airborne?RETARGET_FLYING_MS:RETARGET_MS))){
+        const next=pendingMove.current;pendingMove.current=null;lastMove.current=now;
+        requestMove(next);
+      }
       if(config.current.active&&(nav.current.remaining.length||nav.current.airborne||nav.current.state==='seatedAtTea'||nav.current.traversingTreehouse||(nav.current.mailboxSequenceActive&&nav.current.state!=='mailboxTransition'))){
         const old=nav.current.position;
         const moved=nav.current.update(dt,config.current.blocked);
         if(nav.current.airborne)flightSeconds.value+=dt/1000;
         const point=nav.current.position;
-        if(Math.abs(point.x-old.x)>.001)facing.value=point.x>old.x?1:-1;
+        if(Math.abs(point.x-old.x)>.001){
+          const heading=point.x>old.x?1:-1;
+          if(heading===facing.value)turning.current=0;
+          else {turning.current+=dt;if(elapsed.current===0||turning.current>=TURN_MS){facing.value=heading;turning.current=0;}}
+        }
         lean.value+=( (nav.current.airborne ? (point.x-old.x)*.012 : 0)-lean.value)*Math.min(1,dt/160);
         if(nav.current.traversingTreehouse){facing.value=nav.current.state==='exitingTreehouse'?1:-1;lean.value=0;}
         if(nav.current.state==='aligningToMailbox'||nav.current.state==='retrievingMail'){facing.value=-1;lean.value=0;}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Easing, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const serif = Platform.select({ ios: 'Georgia', default: 'serif' });
@@ -21,6 +21,8 @@ export function ImmersivePaper({ title, subtitle, onClose, closeLabel = 'Close',
     return () => { active = false; rise.stopAnimation(); };
   }, [rise]);
   return <Modal transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    {/* The keyboard must not cover the footer: its microphone and Save. */}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
     <Animated.View style={[styles.scrim, { opacity: rise.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
       paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
       <Animated.View testID="immersive-journal" style={[styles.paper, night && styles.paperNight, {
@@ -42,6 +44,7 @@ export function ImmersivePaper({ title, subtitle, onClose, closeLabel = 'Close',
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </Animated.View>
     </Animated.View>
+    </KeyboardAvoidingView>
   </Modal>;
 }
 

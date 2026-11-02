@@ -37,13 +37,13 @@ check('Closed segments cannot be crossed, including a large elapsed-time step',(
  const stopped=advance(WALK_START,[net.nodes[1]],1000,blocked);assert.deepEqual(stopped.point,WALK_START);assert.equal(stopped.remaining.length,0);
 });
 check('Painted stride: order, cadence, looping and the standing painting at rest are fixed',()=>{
- assert.equal(WALK_FRAMES,25);assert.equal(WALK_LOOP_MS,500);
+ assert.equal(WALK_FRAMES,25);assert.equal(WALK_LOOP_MS,800);
  for(let i=0;i<WALK_FRAMES;i++)assert.equal(walkFrame(i*WALK_LOOP_MS/WALK_FRAMES+1,true),i);
  assert.equal(walkFrame(WALK_LOOP_MS,true),0);assert.equal(walkFrame(777,false),WALK_IDLE);
  const layer=fs.readFileSync(path.join(path.dirname(source),'GardenFairy.tsx'),'utf8');
  // Standing is her original painting; walking only the painted stride sheet, no other set.
  assert.equal((layer.match(/walk-v2\/walk_0[1-8]\.png/g)||[]).length,1);
- assert.ok(layer.includes('walk-v2/walk_04.png')&&layer.includes('walk-video-v1/walk.webp'));
+ assert.ok(layer.includes('walk-v2/walk_04.png')&&layer.includes('walk-rig-v1/walk.webp'));
  assert.ok(!/walk-v[34]/.test(layer));
 });
 console.log(`${count} fairy movement checks passed`);

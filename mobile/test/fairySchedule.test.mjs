@@ -122,9 +122,9 @@ test('with no day from the server she still strolls, and soon', () => {
   assert.equal(act('path', { idleSince: base.now - FIRST_STROLL_MS, pauseMs: FIRST_STROLL_MS }), 'wander');
 });
 
-test('she walks twice as fast, and settling onto a seat is as fast as her flight', () => {
+test('she walks at a brisk pace, and settling onto a seat is as fast as her flight', () => {
   const { WALK_SPEED, FLIGHT_SPEED } = load('../fairy/FairyNavigation');
-  assert.equal(WALK_SPEED, 0.22);
+  assert.equal(WALK_SPEED, 0.16);
   const nav = new FairyNavigation();
   assert.equal(nav.move({ x: 0, y: 0 }, () => false, true), true);
   for (let i = 0; i < 4000 && nav.state !== 'aligningToSwing'; i++) nav.update(16, () => false);
