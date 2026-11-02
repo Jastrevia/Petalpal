@@ -97,3 +97,19 @@ test('production tabs omit the starter demo while development retains it', () =>
     assert.ok(names.includes('garden-test')); assert.ok(names.includes('index'));
   }
 });
+
+test('window events are only used on the web: on a phone window has no addEventListener', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const offenders = [];
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(entry.name) && !/\.web\.tsx?$/.test(entry.name)
+        && /typeof window !== 'undefined'\)\s*window\.(add|remove)EventListener/.test(readFileSync(path, 'utf8'))) offenders.push(path);
+    }
+  };
+  walk(new URL('../src', import.meta.url).pathname);
+  assert.deepEqual(offenders, []);
+});

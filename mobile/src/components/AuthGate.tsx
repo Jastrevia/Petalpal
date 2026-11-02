@@ -53,10 +53,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // another registration. The provider guards against identity changes.
     const recheck = () => { if (!busy.current) void checkVerification.current(); };
     const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') recheck(); });
-    if (typeof window !== 'undefined') window.addEventListener('focus', recheck);
+    // Only the web has window events: on a phone `window` exists but has no addEventListener.
+    const web = Platform.OS === 'web' && typeof window !== 'undefined';
+    if (web) window.addEventListener('focus', recheck);
     return () => {
       subscription.remove();
-      if (typeof window !== 'undefined') window.removeEventListener('focus', recheck);
+      if (web) window.removeEventListener('focus', recheck);
     };
   }, [auth.phase]);
 
