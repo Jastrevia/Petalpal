@@ -292,15 +292,24 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   still on and every account is one. No local date is involved, so time zones do not move the
   boundary. **VERIFIED:** [test/back/beta-cohort.test.js](test/back/beta-cohort.test.js).
 - **Daily flower limit** ([lib/flower-quota.js](lib/flower-quota.js), on unless
-  `DAILY_GROW_LIMIT_ENABLED=false`): at most 2 new flowers per account-local date, counted in
-  `DailyFlowerQuota(userId, localDate)`. An Event's flower counts against `Event.localDate` (set at
-  save from `User.timezone`); legacy Daily Grow and `GET /api/flowers/today` use the server's
-  current local date for the same zone. Deleting a flower never lowers the count; a third Event that
-  day is still saved, just without a flower. The new day's count starts at local midnight.
+  `DAILY_GROW_LIMIT_ENABLED=false`): at most 2 flowers planted per account-local date, counted in
+  `DailyFlowerQuota(userId, localDate)`. An Event's flower counts when it is planted, against the
+  local date of that moment in `User.timezone` (not `Event.localDate`), so an Event left unplanted
+  costs nothing and its flower can be planted another day. Legacy Daily Grow counts when it grows.
+  `GET /api/flowers/today` uses the server's current local date for the same zone. Deleting a flower
+  never lowers the count. An Event saved once the day's plantings are used is still saved, just
+  without a flower. The new day's count starts at local midnight.
   **VERIFIED:** [test/back/flower-quota.test.js](test/back/flower-quota.test.js) (the migration's
-  conditional upsert on PGlite, 4 concurrent reserves → 2 granted) and the `two Flowers a day` test in
-  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (third Event saved
-  without a Flower; deleting a Flower does not free the day).
+  conditional upsert on PGlite, 4 concurrent reserves → 2 granted),
+  [test/back/flower-placement.test.js](test/back/flower-placement.test.js) (planting takes the count,
+  a third planting is refused) and the `two Flowers a day` test in
+  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (unplanted Events take
+  nothing).
+- **Daily Event limit** (`DAILY_EVENT_LIMIT` in [lib/flower-quota.js](lib/flower-quota.js), same
+  switch): at most 4 Events per `Event.localDate`, because each is read by the AI. The next is refused
+  with 429 `DAILY_EVENT_LIMIT` before anything is written; an idempotent replay is never counted.
+  Journals are not limited. **VERIFIED:** `four Events a day` in
+  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js).
 - **Flower land = month** ([lib/flower-placement.js](lib/flower-placement.js)): Garden lands 1–12
   are the months. `POST /users/:userId/flowers/:flowerId/placement` accepts only the land of the
   flower's month: `Event.localDate`, else `DailyCheckIn.localDate`, else `Flower.createdAt` in

@@ -21,9 +21,11 @@ export interface EventResponse {
   memoryJob: { id: string; status: string } | null;
   dailyFlowers?: { limit: number; planted: number; limitReached: boolean };
 }
-// New flowers today (server limit: 2 per account-local day; deleting one does not give it back).
-// `limit` is null when the server lifts the limit for TEST runs.
-export interface FlowersToday { localDate: string; limit: number | null; planted: number | null; remaining: number | null }
+// Flowers planted today (server limit: 2 per account-local day; deleting one does not give it back)
+// and Events written today (limit: 4, each is read by the AI). `limit` is null, and `events` absent,
+// when the server lifts the limits for TEST runs.
+export interface FlowersToday { localDate: string; limit: number | null; planted: number | null; remaining: number | null;
+  events?: { limit: number; written: number; remaining: number } }
 export const loadFlowersToday = () => apiRequest<FlowersToday>('/api/flowers/today');
 export const createEvent = (content: string, primaryGardenMood: PrimaryMood, idempotencyKey: string) =>
   apiRequest<EventResponse>('/events', 'POST', { content: content.trim(), primaryGardenMood },

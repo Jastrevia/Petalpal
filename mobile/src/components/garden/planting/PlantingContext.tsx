@@ -1,4 +1,6 @@
+import type { ApiError } from '../../../services/api';
 import { readEvent } from '../../../services/events';
+import { useAppLocale } from '../../../services/locale';
 import { loadGarden, plantFlowerSpot } from '../../../services/garden';
 import { gardenPlantingRecord, loadGardenPlacements } from './gardenHydration';
 import { useFocusEffect } from 'expo-router';
@@ -121,6 +123,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [selectedFlower, setSelectedFlower] = useState<FlowerPlacementRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const locale = useAppLocale();
   const [session, setSession] = useState<FlowerSession | null>(suppliedSession || null);
   const [flowerDetailSource, setFlowerDetailSource] = useState<FlowerSourceDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
@@ -352,12 +355,16 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       return true;
     } catch (err) {
       console.error('[PlantingContext] Unable to save placement.');
+      if ((err as ApiError).code === 'DAILY_FLOWER_LIMIT') {
+        setValidationResult({ isValid: false, userFeedback: locale === 'zh-Hans' ? '今天的 2 朵花都种下了。这朵可以留到明天再种。' : "You've planted today's 2 flowers. This one can wait until tomorrow." } as never);
+        return false;
+      }
       setValidationResult({ isValid: false, userFeedback: err instanceof Error && err.message ? err.message : 'Unable to plant here. Try again.' });
       return false;
     } finally {
       setIsSaving(false);
     }
-  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode]);
+  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode, locale]);
 
   const cancelPlacement = useCallback(() => {
     setActiveMode('normal');

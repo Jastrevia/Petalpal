@@ -152,7 +152,7 @@ import { apiDocsEnabled, assertAllowedOrigin, isAllowedOrigin, trustProxySetting
 import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
-import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { DAILY_EVENT_LIMIT, flowerLimitEnabled, flowerPlantingOpen, flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
 
@@ -2013,7 +2013,10 @@ app.get("/api/flowers/today", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, timezone: true } });
     if (!user) return res.status(404).json({ error: "User not found" });
     const localDate = getLocalDate(normalizeTimezone(user.timezone) || "UTC");
-    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate }));
+    const flowers = await flowerQuotaToday(prisma, { userId: user.id, localDate });
+    if (!flowerLimitEnabled()) return res.json(flowers);
+    const written = await prisma.event.count({ where: { ownerId: user.id, localDate } });
+    res.json({ ...flowers, events: { limit: DAILY_EVENT_LIMIT, written, remaining: Math.max(0, DAILY_EVENT_LIMIT - written) } });
   } catch (err) {
     logServerError("GET /api/flowers/today error", err);
     res.status(500).json({ error: "Failed to load today's flowers" });
@@ -2263,9 +2266,10 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
       where: { id: event.id, ownerId: event.ownerId },
       data: { primaryGardenMood, secondaryEmotions: safeEmotion.labels, ...metadata }
     });
-    // A third Event in one day is still saved; it just grows no flower (lib/flower-quota.js).
+    // Once the day's plantings are used, an Event is still saved; it just grows no flower
+    // (lib/flower-quota.js). Otherwise its flower waits to be planted, which is what uses one up.
     if (primaryGardenMood && !await database.flower.findUnique({ where: { sourceEventId: event.id } })) {
-      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate });
+      flowerQuota = await flowerPlantingOpen(database, { userId: event.ownerId, localDate: event.localDate });
     }
     if (primaryGardenMood && flowerQuota?.granted !== false) {
       const garden = await ensureGarden(event.ownerId, database);
@@ -2349,7 +2353,8 @@ app.post("/events", aiRateLimit, async (req, res) => {
       primaryGardenMood,
       enrichmentPending: Boolean(primaryGardenMood),
       occurredAt: new Date(),
-      idempotencyKey: req.get("idempotency-key")
+      idempotencyKey: req.get("idempotency-key"),
+      dailyEventLimit: flowerLimitEnabled() ? DAILY_EVENT_LIMIT : null
     });
     transactionElapsedMs = Date.now() - transactionStartedAt;
     if (result.created) await rewardCloseness(req.auth.userId, "EVENT", result.event.id);
@@ -2383,6 +2388,7 @@ app.post("/events", aiRateLimit, async (req, res) => {
     if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error));
     if (error?.code === "EVENT_TOO_LARGE") return res.status(413).json({ error: error.message });
     if (error?.code === "IDEMPOTENCY_CONFLICT") return res.status(409).json({ error: error.message });
+    if (error?.code === "DAILY_EVENT_LIMIT") return res.status(429).json({ error: error.message, code: error.code });
     if (transactionStartedAt !== null && transactionElapsedMs === null) transactionElapsedMs = Date.now() - transactionStartedAt;
     logServerError("POST /events error", error, transactionElapsedMs === null ? {} : { transactionElapsedMs });
     return res.status(500).json({ error: "Failed to create Event" });

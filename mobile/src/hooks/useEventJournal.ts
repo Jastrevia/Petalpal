@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { apiRequest } from '../services/api';
+import { apiRequest, type ApiError } from '../services/api';
 import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
@@ -21,6 +21,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
   const [error, setError] = useState('');
   const [pollError, setPollError] = useState('');
   const [today, setToday] = useState<FlowersToday | null>(null);
+  const [eventLimitHit, setEventLimitHit] = useState(false);
   const pending = useRef<{ content: string; mood: PrimaryMood; key: string } | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -56,8 +57,12 @@ export function useEventJournal(onGardenChanged?: () => void) {
       await refresh();
       if (!mounted.current) return;
       onGardenChanged?.();
-    } catch (err) { if (mounted.current) setError((err as Error).message); }
-    finally { if (mounted.current) setBusy(false); }
+    } catch (err) {
+      if (!mounted.current) return;
+      // The day's Events are used up. What they wrote stays on the page.
+      if ((err as ApiError).code === 'DAILY_EVENT_LIMIT') { setEventLimitHit(true); void refresh(); }
+      else setError((err as Error).message);
+    } finally { if (mounted.current) setBusy(false); }
   }
   useEffect(() => {
     if (!result || !['PENDING','RUNNING'].includes(result.event.emotionStatus)) return;
@@ -112,6 +117,8 @@ export function useEventJournal(onGardenChanged?: () => void) {
   }
   const currentFlowers = result ? flowers.filter(flower => flower.sourceEventId === result.event.id) : [];
   const flowersLeft = today?.limit == null ? null : today.remaining;
-  return { flowers: currentFlowers, flowersToday: today, flowersLeft, placements, content, setContent, mood, setMood, result, busy, loading,
+  const eventsDone = eventLimitHit || today?.events?.remaining === 0;
+  const eventLimit = today?.events?.limit ?? 4;
+  return { flowers: currentFlowers, flowersToday: today, flowersLeft, eventsDone, eventLimit, placements, content, setContent, mood, setMood, result, busy, loading,
     error, pollError, aiProcessingOn, refresh, saveEvent, refreshEventStatus, placeFlower, reset };
 }
