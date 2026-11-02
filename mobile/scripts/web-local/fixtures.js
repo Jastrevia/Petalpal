@@ -77,7 +77,7 @@
   const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png', worldX: 607, worldY: 1081, regionId: `Land${day(6).slice(5, 7)}`,
     createdAt: day(6) + 'T18:00:00.000Z', supportCount: 1, sourceType: 'EVENT', sourceEventId: 'fe1',
     supportState: { supportedToday: false, canSupport: true }, messages: [] };
-  let signedIn = false, blocked = false, checkedInToday = false;
+  let signedIn = false, blocked = false, checkedInToday = false, momentsUnread = true;
   // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
   const ownFlowers = [], events = new Map();
   for (const [id, item] of Object.entries(SHORT_EVENTS)) events.set(id, { id, content: item.content, occurredAt: item.occurredAt,
@@ -268,9 +268,12 @@
       if (p === `/friends/requests/${uid}`) return json({ incoming: incomingRequests, outgoing: outgoingRequests });
       if (p === '/users/search') { const q = (url.searchParams.get('name') || '').toLowerCase().replace(/^@/, '');
         return json(people.filter(person => `${person.name} ${person.accountId}`.toLowerCase().includes(q)), 200, 400); }
-      if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview' }] : [], nextCursor: null });
+      if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview', avatar: '🌼', accountId: 'PP12345678' }] : [], nextCursor: null });
       if (p === `/users/${uid}/ai-consent`) return json(consent);
-      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true });
+      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true, moments: { unread: momentsUnread } });
+      if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'PPL', name: 'PPL', avatar: null, cover: null }, locale: 'en', nextBefore: null,
+        posts: [{ id: 'mo2', postedAt: ago(0), state: 'TEA_TIME', location: 'TEA_TIME', mood: null, photoKey: 'TEA_TIME/3', caption: 'Tea in the sun this morning.', liked: false },
+          { id: 'mo1', postedAt: ago(2), state: 'IN_TREEHOUSE', location: 'IN_TREEHOUSE', mood: null, photoKey: null, caption: 'I found a tiny blue feather.', liked: false }] }); }
       if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: 2, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,

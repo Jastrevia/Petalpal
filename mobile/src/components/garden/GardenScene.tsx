@@ -248,8 +248,11 @@ export type GardenSceneProps = {
   gardenOwnerUserId?: string;
   readOnly?: boolean;
   onOpenBookhouse?: () => void;
-  // Tapping a lawn that has flowers (owner only): the lawn glows, the camera leans in, then this.
+  // Tapping a lawn that has flowers: the lawn glows, the camera leans in, then this.
   onOpenEvents?: (month: number) => void;
+  // The owner's Garden: any tap on this month's lawn opens Events, flowers or not, and another
+  // month's lawn says whose land it is instead.
+  monthLawnOpensEvents?: boolean;
   onOpenReflection?: () => void;
   showCalendar?: boolean;
   /** The owner's language ('en' | 'zh-Hans' …) for the Fairy's in-Garden hints. */
@@ -274,8 +277,13 @@ function plantedLawnAt(placements: readonly { month: number }[], x: number, y: n
   for (const month of months) if (isOnMonthLawn(month, { x, y })) return month;
   return null;
 }
+function monthLawnAt(x: number, y: number) {
+  for (let month = 1; month <= 12; month++) if (isOnMonthLawn(month, { x, y })) return month;
+  return null;
+}
+const LAWN_NOTE_MS = 2800;
 
-function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenEvents, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
+function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenEvents, monthLawnOpensEvents = false, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
   const isDev = showDevControls && mode === 'development';
   runtimeAudit.render('GardenScene');
   const planting = usePlanting();
@@ -731,6 +739,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     cameraY.value = withTiming(viewport.height / 2 - baseY - worldY * fit * zoom, { duration });
     setTimeout(() => onOpenEventsRef.current?.(month), duration + 40);
   }, [calendarReducedMotion, cameraZoom, cameraX, cameraY, calendarPoint, calendarHighlight, viewport.width, viewport.height, baseX, baseY, fit]);
+  // Another month's lawn: a small note says whose land it is, then goes by itself.
+  const [lawnNote, setLawnNote] = useState<{ key: number; month: number } | null>(null);
+  const lawnNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showLawnNote = useCallback((month: number) => {
+    setLawnNote(previous => ({ key: (previous?.key ?? 0) + 1, month }));
+    if (lawnNoteTimer.current) clearTimeout(lawnNoteTimer.current);
+    lawnNoteTimer.current = setTimeout(() => setLawnNote(null), LAWN_NOTE_MS);
+  }, []);
+  useEffect(() => () => { if (lawnNoteTimer.current) clearTimeout(lawnNoteTimer.current); }, []);
   const focusCalMonth = useCallback((month: number) => {
     if (fit <= 0) return;
     const centroid = getCalibratedCentroid(month, plantingCalibrationMap, calibrationLayout);
@@ -1054,7 +1071,14 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         : hitsTeaArea(at, teaSetPlacement) ? () => fairyRef.current?.visitTea()
         : hitsMoonBed(at, moonBedPlacement) ? () => fairyRef.current?.visitMoonBed()
         : null;
-      const lawn = !destination && onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
+      if (!destination && monthLawnOpensEvents && onOpenEventsRef.current) {
+        const month = monthLawnAt(worldX, worldY);
+        if (month !== null) {
+          if (month === new Date().getMonth() + 1) openLawnEvents(month, worldX, worldY); else showLawnNote(month);
+          return;
+        }
+      }
+      const lawn = !destination && !monthLawnOpensEvents && onOpenEventsRef.current ? plantedLawnAt(placementsRef.current, worldX, worldY) : null;
       if (lawn !== null) { openLawnEvents(lawn, worldX, worldY); return; }
       if (enableFairyWalk) noteFairyUser();
       if (enableFairyWalk && !readOnly) noteFairyInteraction();
@@ -1064,7 +1088,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         if (accepted && Platform.OS === 'web') canvasRef.current?.redraw();
       }
     }
-  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, cancelPlacement, openLawnEvents, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement]);
+  }, [readOnly, selectedFlower, fit, baseX, baseY, cameraZoom, cameraX, cameraY, updatePreview, openFlowerDetail, cancelPlacement, openLawnEvents, showLawnNote, monthLawnOpensEvents, previewMode, calibrationMode, calSubMode, selectedCalMonth, plantingCalibrationMap, calibrationLayout, useMonthlyGrowth, enableFairyWalk, swingPlacement, moonBedPlacement, teaSetPlacement, treehousePlacement]);
 
   const startMaskPos = useRef({ localX: 0, localY: 0 });
 
@@ -1676,6 +1700,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
         </View>
       )}
+      {lawnNote && activeMode === 'normal' && !selectedFlower && (
+        <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
+          <Text accessibilityRole="alert" style={styles.lawnNoteText}>{zhHans(locale)
+            ? `这是 ${lawnNote.month} 月的草地，不能在这里种花哟`
+            : `This is ${new Date(2024, lawnNote.month - 1, 1).toLocaleDateString('en', { month: 'long' })}'s land. You can't plant flowers here right now.`}</Text>
+        </View>
+      )}
       {children}
       {showCalendar && !readOnly && activeMode === 'normal' && !selectedFlower && <GardenCalendar onFocusFlower={focusCalendarFlower} />}
       {showCalendar && !readOnly && <DailyCheckInIntro />}
@@ -2232,6 +2263,8 @@ const styles = StyleSheet.create({
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },
   zoomButtonText: { color: '#fff', fontSize: 25, lineHeight: 30 },
+  lawnNote: { position: 'absolute', alignSelf: 'center', top: '42%', maxWidth: 300, zIndex: 35, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#FAF3DFF5', boxShadow: '0 4px 14px #0B1F1A44' },
+  lawnNoteText: { fontFamily: 'serif', fontSize: 15, lineHeight: 21, color: '#254E43', textAlign: 'center' },
   controls: { position: 'absolute', top: 8, left: 8, right: 8, padding: 8, gap: 6, backgroundColor: '#FFFFFFE8' },
   controlRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   controlButton: { minHeight: 32, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6, backgroundColor: '#D8DDDA' },

@@ -9,9 +9,10 @@ Drag/pinch camera controls remain available. The test scene opts in with
 ## Movement and art
 
 - Standing: the approved painting `assets/garden/fairy/walk-v2/walk_04.png`.
-- Walking: `walk-video-v1/walk.webp`, one painted stride (25 frames over 2.08 s) cut from a
-  generated walking clip back onto walk_04's canvas, so scale and foot pivot are unchanged.
-  Horizontal runtime flip for leftward travel.
+- Walking: `walk-rig-v1/walk.webp`, one stride (25 frames over 0.8 s) baked from walk_04 itself by
+  `scripts/critters/fairy-walk-rig.py`: arms swing against the same-side leg from the shoulder with
+  the forearm trailing, feet plant and roll, the body bobs twice a stride. Same canvas and foot pivot.
+  Horizontal runtime flip for leftward travel. Taps during travel wait their turn, so she never twitches.
 - Flying: `fly-video-v1/fly.webp`, 12 frames at 12 fps from a generated flying clip, cut
   back onto the original glide canvas (`fly-v1/glide.png`, kept as the reference) and
   cross-faded at the loop seam. Both sheets are built with `scripts/critters/video-frames.py`.

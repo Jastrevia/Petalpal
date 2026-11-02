@@ -46,6 +46,6 @@ test('friends coming online and visits reach listeners; visit text is short and 
   assert.deepEqual(visits, [['started visiting your garden', 'owner']]);
   assert.equal(realtime.visitNotice({ visitorName: 'Mia', action: 'started visiting your garden' }, false), 'Mia is visiting your Garden 🌸');
   assert.equal(realtime.visitNotice({ visitorName: 'Mia', action: 'support' }, true), 'Mia 给你的花送来了支持 💗');
-  assert.equal(realtime.visitNotice({ visitorName: 'Mia', action: 'left your garden' }, false), null);
+  assert.equal(realtime.visitNotice({ visitorName: 'Mia', action: 'left your garden' }, false), 'Mia left your Garden 🍃');
   realtime.stopUserRealtime();
 });

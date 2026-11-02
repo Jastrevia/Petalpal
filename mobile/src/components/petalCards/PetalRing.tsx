@@ -19,7 +19,7 @@ const COPY = {
     failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose No. ${n} of today's deck`,
     share: 'Share', preparing: 'Preparing…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
     shareFailed: "Couldn't share this time. Try again.", ask: 'What would you like to ask today?',
-    askSub: 'One question a day, then draw a card for it', upright: 'Upright', reversed: 'Reversed',
+    askSub: 'One question a day, then draw a card for it', later: 'Come back later to draw', uses: (n: number) => `Today's draw: ${n}/1`, usedUp: "Today's draw: 1/1 used. Come back tomorrow.", upright: 'Upright', reversed: 'Reversed',
     reading: 'The fairy’s reading', readingWait: 'The fairy is reading your card…',
     readingConsent: 'Turn on AI processing in Privacy to see the fairy’s reading of your card.',
     freeLeft: (n: number) => n === 0 ? 'That was your last free reading.' : `${n} free ${n === 1 ? 'reading' : 'readings'} left.`,
@@ -28,7 +28,7 @@ const COPY = {
     no: '第', round: '轮次', turnOver: '翻开它', close: '关闭', today: '今日花语卡', drawing: '正在抽牌…',
     failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张`,
     share: '分享', preparing: '正在准备…', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
-    shareFailed: '这次没有分享成功，再试一次。', ask: '今天想问什么？', askSub: '每天问一件事，再为它抽一张牌',
+    shareFailed: '这次没有分享成功，再试一次。', ask: '今天想问什么？', askSub: '每天问一件事，再为它抽一张牌', later: '等会再来抽', uses: (n: number) => `今日次数 ${n}/1`, usedUp: '今日次数 1/1 已用完，明天再来吧',
     upright: '正位', reversed: '逆位', reading: '小花仙的解读', readingWait: '小花仙正在读这张牌…',
     readingConsent: '在隐私设置里打开 AI 处理，就能看到小花仙对这张牌的解读。',
     freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `免费解读还剩 ${n} 次。`,
@@ -189,6 +189,10 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         <Text style={styles.sub}>{copy.askSub}</Text>
         {(today?.topics ?? []).map(item => <Pressable key={item.id} accessibilityRole="button" onPress={() => pickTopic(item.id, item.label)}
           style={({ pressed }) => [styles.topic, pressed && styles.pressed]}><Text style={styles.topicText}>{item.label}</Text></Pressable>)}
+        <Text testID="petal-uses" style={styles.uses}>{copy.uses(0)}</Text>
+        <Pressable testID="petal-later" accessibilityRole="button" onPress={onClose} hitSlop={8} style={({ pressed }) => [styles.later, pressed && styles.pressed]}>
+          <Text style={styles.laterText}>{copy.later}</Text>
+        </Pressable>
       </View> : null}
 
       {showRing ? <View pointerEvents="none" style={styles.header}>
@@ -231,6 +235,7 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
       </View> : null}
 
       {phase === 'revealed' && face ? <ScrollView style={[styles.reveal, { top: vh * 0.1 + bigH + 12 }]} contentContainerStyle={styles.revealContent}>
+        <Text testID="petal-used-up" accessibilityRole="alert" style={styles.usedUp}>{copy.usedUp}</Text>
         <Text style={styles.kicker}>{topic.label ?? copy.today}</Text>
         <Text style={styles.cardName}>{face.name}</Text>
         {face.keywords ? <Text style={styles.orientation}>{`${face.reversed ? copy.reversed : copy.upright} · ${face.keywords.join(locale === 'en' ? ', ' : '、')}`}</Text> : null}
@@ -309,9 +314,13 @@ const styles = StyleSheet.create({
   upsideDown: { transform: [{ rotate: '180deg' }] },
   topics: { position: 'absolute', top: 70, left: 24, right: 24, alignItems: 'center', gap: 12, zIndex: 200 },
   ask: { marginTop: 18, fontFamily: 'serif', fontSize: 22, color: '#F3DFA8', textAlign: 'center' },
-  topic: { alignSelf: 'stretch', maxWidth: 360, width: '100%', minHeight: 48, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
+  topic: { alignSelf: 'center', maxWidth: 360, width: '100%', minHeight: 48, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
     justifyContent: 'center', borderWidth: 1, borderColor: '#E9CF8A88', backgroundColor: '#1B154088' },
   topicText: { fontFamily: 'serif', fontSize: 17, color: '#F6EDDB' },
+  uses: { marginTop: 2, fontFamily: 'serif', fontSize: 12, color: '#C9C0E8' },
+  later: { minHeight: 44, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  laterText: { fontFamily: 'serif', fontSize: 15, color: '#E9CF8A', textDecorationLine: 'underline' },
+  usedUp: { fontFamily: 'serif', fontSize: 13, color: '#F3DFA8', textAlign: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#E9CF8A66', backgroundColor: '#1B154088' },
   topicTag: { marginTop: 8, fontFamily: 'serif', fontSize: 15, color: '#F3DFA8' },
   orientation: { fontFamily: 'serif', fontSize: 13, letterSpacing: 1, color: '#E9CF8A', textAlign: 'center' },
   reading: { alignSelf: 'stretch', marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderColor: '#E9CF8A44', gap: 10 },

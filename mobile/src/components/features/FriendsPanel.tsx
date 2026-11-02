@@ -1,4 +1,4 @@
-import { SafetyActions, BlockedUsers } from './SafetyActions';
+import { SafetyActions } from './SafetyActions';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -12,6 +12,7 @@ import { FEATURE_COLORS as colors, ui } from './FeatureUI';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { GardenVisitLog } from './GardenVisitLog';
 import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
+import { markNewFriendsSeen, noteFriendAcceptedHere, syncFriendAlerts, useFriendAlerts } from '../../services/friendAlerts';
 
 const ART = {
   banner: { dark: require('@/assets/friends/banner-dark.webp'), light: require('@/assets/friends/banner-light.webp') },
@@ -108,6 +109,11 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     presence: ({ userId, online }) => setLive(current => ({ ...current, [userId]: online })),
     connection: setSelfOnline,
   }), []);
+  // A new friend's row glows a little until Friends is left after seeing the list.
+  const { newFriends } = useFriendAlerts();
+  const sawList = useRef(tab === 'friends');
+  useEffect(() => { if (tab === 'friends') sawList.current = true; }, [tab]);
+  useEffect(() => () => { if (sawList.current) markNewFriendsSeen(); }, []);
   const mounted = useRef(false);
   const locked = useRef(false);
   const scope = useRef({ ownerId });
@@ -132,6 +138,10 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     }
   }, [ownerId]);
   const refresh = useCallback(() => run(copy.loading, reload), [run, reload, copy.loading]);
+  // Someone asks or says yes while this is open: the list keeps up, without a loading state.
+  useEffect(() => subscribeUserRealtime({ friendChanged: () => {
+    if (!locked.current) void reload(() => mounted.current && !locked.current).catch(() => undefined);
+  } }), [reload]);
   useEffect(() => {
     mounted.current = true; locked.current = false;
     setFriends([]); setRequests({ incoming: [], outgoing: [] }); setResults([]);
@@ -168,12 +178,14 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   async function respond(request: FriendRequest, action: 'accept' | 'reject') {
     if (request.receiverId !== ownerId) return;
     await run(copy.updating, async active => {
+      if (action === 'accept') noteFriendAcceptedHere(request.senderId);
       await respondToFriendRequest(request.id, action);
       if (!active()) return;
       setRequests(current => ({ ...current, incoming: current.incoming.filter(item => item.id !== request.id) }));
       if (action === 'accept' && request.sender) setFriends(current => [...current, request.sender!]);
       setMessage(action === 'accept' ? copy.accepted : copy.rejected);
       await reload(active);
+      void syncFriendAlerts();
     });
   }
   async function confirmRemove() {
@@ -270,7 +282,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     {shown.map(friend => {
       const allowed = friend.allowGardenVisits === true, name = nameOf(friend);
       return <View key={friend.id}>
-        <View testID={`friend-${friend.id}`} style={styles.listRow}>
+        <View testID={`friend-${friend.id}`} style={[styles.listRow, newFriends.includes(friend.id) && styles.listRowNew]}>
           {identity(friend, undefined, true)}
           {managing ? <>
             <Pressable accessibilityRole="button" accessibilityLabel={copy.remove(friend.name)} disabled={!!busy} onPress={() => setRemoving(friend)}
@@ -306,9 +318,6 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
         disabled: !friends.length && !managing, tone: managing ? 'cream' : undefined,
         icon: managing ? null : <SymbolView name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={16} tintColor={theme.text} /> })}
     </View>
-    {/* Blocked people are managed alongside removing friends. */}
-    {managing ? <BlockedUsers button={(label, load, loading) => pill(label, label, load, { disabled: loading, tone: 'quiet',
-      icon: <SymbolView name={{ ios: 'nosign', android: 'block', web: 'block' }} size={15} tintColor={theme.muted} /> })} /> : null}
   </>;
 
   const requestsTab = <>
@@ -386,6 +395,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
             : id === 'requests' ? { ios: 'person.badge.plus', android: 'person_add', web: 'person_add' } : { ios: 'clock', android: 'schedule', web: 'schedule' }}
             size={16} tintColor={selected ? '#1E4F4C' : theme.muted} />
           <Text numberOfLines={1} style={[styles.tabText, selected && styles.darkText]}>{copy.tabs[id]}</Text>
+          {(id === 'requests' && requests.incoming.length > 0) || (id === 'friends' && newFriends.length > 0 && !selected) ? <View testID={`friends-tab-dot-${id}`} style={styles.tabDot} /> : null}
         </Pressable>;
       })}
     </View>}
@@ -463,6 +473,8 @@ const createStyles = (theme: PanelTheme, light: boolean) => StyleSheet.create({
   presenceDot: { position: 'absolute', right: 0, bottom: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 10,
     borderWidth: 1, borderRadius: 16, borderColor: light ? theme.gold : theme.border, backgroundColor: theme.surface },
+  listRowNew: { borderColor: '#E9C766', borderWidth: 1.5, backgroundColor: light ? '#FFF6D8' : '#25524C', boxShadow: '0 0 10px #E9C76666' },
+  tabDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E5735F' },
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   avatar: { backgroundColor: light ? theme.input : '#315B52', borderColor: theme.gold, borderWidth: 1.5 },
   name: { flex: 1, gap: 2, minWidth: 0 }, displayName: { fontFamily: 'serif', fontSize: 17, color: theme.text },

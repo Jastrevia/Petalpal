@@ -1,6 +1,7 @@
 import { AiOutputReport } from '../../features/AiPrivacySettings';
 import { CommunityGuidelines } from '../../features/CommunityGuidelines';
 import { SafetyActions } from '../../features/SafetyActions';
+import { SafetySupportInline, useSafetyWatch } from '../../features/SafetySupport';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
@@ -57,6 +58,7 @@ export default function FlowerDetailModal() {
     detailError,
   } = usePlanting();
   const [messageText, setMessageText] = useState('');
+  const safety = useSafetyWatch(messageText);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const locale = useAppLocale(), zh = locale === 'zh-Hans', copy = COPY[locale];
   const theme = usePanelTheme().theme ?? PANEL_THEMES.dark;
@@ -250,10 +252,11 @@ export default function FlowerDetailModal() {
             </>}
           </View>
           {!selectedFlowerIsOwner && <View style={styles.messageForm}><CommunityGuidelines />
+            {safety.concern ? <SafetySupportInline concern={safety.concern} /> : null}{safety.sheet}
             <TextInput accessibilityLabel={copy.placeholder} multiline maxLength={300}
               placeholder={copy.placeholder} placeholderTextColor={theme.muted} value={messageText} onChangeText={setMessageText}
               editable={!!currentUserId && !isDetailWorking} style={styles.messageInput} />
-            <Pressable accessibilityRole="button" onPress={sendMessage}
+            <Pressable accessibilityRole="button" onPress={() => safety.guard(() => void sendMessage())}
               disabled={!currentUserId || !messageText.trim() || isDetailWorking}
               style={[styles.supportButton, styles.messageSubmitButton,
                 (!currentUserId || !messageText.trim() || isDetailWorking) && styles.buttonDisabled]}>

@@ -1,8 +1,8 @@
 import { EmotionalSafetyNote } from './EmotionalSafetyNote';
 import { AiOutputReport } from './AiPrivacySettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
 import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
@@ -13,6 +13,8 @@ import { clearAnswer, pendingAnswer } from '../../services/questionAnswer';
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { ui } from './FeatureUI';
 import { EventIllustration } from './EventIllustration';
+import { useSafetyWatch } from './SafetySupport';
+import { AttentionGlow } from './AttentionGlow';
 
 const MOODS_ZH: Record<PrimaryMood, string> = {
   SUNNY_BLOOM: '开心', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '低落', HEALING_BLOOM: '治愈',
@@ -27,7 +29,7 @@ const COPY = {
     limit: (of: number) => `Today's ${of} flowers are already growing, so this Event didn't add one. Come back tomorrow for new flowers.`,
     yourFlower: 'Your flower', mood: 'Mood you chose', analysis: 'AI emotion analysis', notDiagnosis: 'Suggestions, not a diagnosis.',
     pending: 'AI is reading your Event…', failed: 'AI analysis is unavailable right now. Your Event and flower are saved.',
-    skipped: 'AI is not turned on yet, so only your chosen mood is used. To turn it on, open Me and tap "Save my AI choices".', noEmotions: 'No other feelings stood out.',
+    skipped: 'AI is not turned on yet, so only your chosen mood is used. To turn it on, open Me → AI & privacy and tap "Save my AI choices".', noEmotions: 'No other feelings stood out.',
     show: 'Show this Event to friends', showHint: 'Friends who visit your Garden can read what you wrote on this flower.', hiddenHint: 'Only you can read what you wrote. Friends see just the flower.',
     satisfied: 'Happy with it? Plant your flower in the Garden.',
     plant: 'Plant', plantWithout: 'Plant without analysis', plantNote: 'with the AI analysis', withoutNote: 'keeps only your mood',
@@ -45,7 +47,7 @@ const COPY = {
     limit: (of: number) => `今天的 ${of} 朵花已经在长了，这件事没有再长出新花。明天再来吧。`,
     yourFlower: '你的花', mood: '你选的心情', analysis: 'AI 情绪分析', notDiagnosis: '只是建议，不是诊断。',
     pending: 'AI 正在读你的事件…', failed: '暂时无法进行 AI 分析。你的事件和花都已保存。',
-    skipped: 'AI 还没开启，所以只用你选的心情。想开启的话，打开「我」，点「保存我的 AI 选择」。', noEmotions: '没有发现其他明显的情绪。',
+    skipped: 'AI 还没开启，所以只用你选的心情。想开启的话，打开「我 → AI 与隐私」，点「保存我的 AI 选择」。', noEmotions: '没有发现其他明显的情绪。',
     show: '把这件事展示给朋友', showHint: '来逛花园的朋友能在这朵花上读到你写的内容。', hiddenHint: '只有你能读到写的内容，朋友只能看到花。',
     satisfied: '满意的话，就把花种进花园吧。',
     plant: '种下', plantWithout: '不带分析种下', plantNote: '保留 AI 分析', withoutNote: '只保留你选的心情',
@@ -67,6 +69,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
   const [showToFriends, setShowToFriends] = useState(false);
   const [help, setHelp] = useState(false);
   const [answering, setAnswering] = useState(() => pendingAnswer());
+  const safety = useSafetyWatch(journal.result ? '' : journal.content);
   const saved = journal.result;
   const flower = saved ? journal.flowers[0] : undefined;
   const status = saved?.event.emotionStatus;
@@ -101,6 +104,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         accessibilityState={{ disabled: journal.busy || voice.active }} disabled={journal.busy || voice.active}
         onPress={() => void voice.start()}
         style={({ pressed }) => [styles.microphone, pressed && ui.pressed, (journal.busy || voice.active) && ui.disabled]}>
+        <AttentionGlow radius={22} spread={12} />
         <Image accessible={false} source={require('../../../assets/events/microphone.png')} style={styles.microphoneIcon} resizeMode="contain" />
       </Pressable> : null}
     </View>
@@ -128,8 +132,10 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
       })}
     </View>
 
-    {saved ? <EventAction secondary title={copy.saved} onPress={() => {}} disabled />
-      : <EventAction title={journal.busy ? copy.saving : copy.save} onPress={() => void journal.saveEvent()}
+    {/* Write another sits right under Saved, ready for the next one: Plant is what ends the page. */}
+    {saved ? <><EventAction secondary title={copy.saved} onPress={() => {}} disabled />
+      <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} /></>
+      : <EventAction title={journal.busy ? copy.saving : copy.save} onPress={() => safety.guard(() => void journal.saveEvent())}
         disabled={journal.busy || voice.active || !journal.content.trim() || !journal.mood} />}
     {!saved && journal.flowersToday?.limit != null ? <Text style={styles.caption}>{journal.flowersLeft
       ? copy.left(journal.flowersLeft, journal.flowersToday.limit) : copy.none(journal.flowersToday.limit)}</Text> : null}
@@ -162,7 +168,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
 
       {flower ? <>
         <View testID="event-share-row" style={[styles.shareRow, showToFriends && styles.shareRowOn]}>
-          <ShareGlow />
+          <AttentionGlow radius={14} spread={14} />
           <Eye open={showToFriends} color={theme.text} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.text, styles.shareTitle]}>{copy.show}</Text>
@@ -196,30 +202,12 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
           <Text style={styles.helpText}>{copy.withoutHelp}</Text>
         </View> : null}
       </> : null}
-      <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} />
     </> : null}
+    {safety.sheet}
   </View>;
 }
 
 // A small drawn eye: open when friends can read the Event, crossed out when they cannot.
-// A soft gold edge that breathes three times when the choice appears, so it is not missed.
-function ShareGlow() {
-  const glow = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    let loop: Animated.CompositeAnimation | undefined;
-    AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then(reduced => {
-      if (reduced) { glow.setValue(.6); return; }
-      loop = Animated.loop(Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: .25, duration: 700, useNativeDriver: true }),
-      ]), { iterations: 3 });
-      loop.start();
-    });
-    return () => loop?.stop();
-  }, [glow]);
-  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 14, borderWidth: 2, borderColor: '#C9A95C', opacity: glow }]} />;
-}
-
 function Eye({ open, color }: { open: boolean; color: string }) {
   return <View accessible={false} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', opacity: open ? 1 : .7 }}>
     <View style={{ width: 24, height: 14, borderRadius: 12, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
@@ -259,7 +247,7 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   rule: { height: 1, backgroundColor: '#C5B17D66' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', backgroundColor: '#E3EEE6', color: '#2F5D52', fontSize: 14, fontFamily: 'serif' },
-  inputWrap: { position: 'relative', overflow: 'hidden', borderRadius: 14, backgroundColor: theme.input },
+  inputWrap: { position: 'relative', borderRadius: 14, backgroundColor: theme.input },
   microphone: { position: 'absolute', right: 8, bottom: 8, width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.gold,
     backgroundColor: theme.surface, boxShadow: `inset 0 0 0 2px ${theme.inset}, 0 2px 4px #69552328` },

@@ -56,7 +56,7 @@ Account: [DEDICATED REVIEW ACCOUNT — supplied securely in console]. Verificati
 
 Settings contains AI processing & privacy, Community Guidelines, Privacy & support, and Delete Account. Optional AI starts off and requires explicit consent to the disclosed processors. [LIST ACTUALLY ENABLED PROVIDERS/FEATURES]. Typing remains available without microphone permission or voice processing. Private Journal text/photos do not feed Event Memory or reflections; optional voice composition sends audio for transcription as disclosed.
 
-In Friends, open Report / Block user. Flower message details provide Report message and Block user. Choose a reason in the app. Blocked users can be unblocked in Friends; friendship is not restored automatically. Social text is screened, and reports are reviewed by [VERIFIED COVERAGE]. Settings deletion requires a sign-in within five minutes. An identity-provider failure can leave deletion pending with support recovery; active PetalPal data is already erased.
+In Friends, open Report / Block user. Flower message details provide Report message and Block user. Choose a reason in the app. Blocked users can be unblocked in Me → Blocked users, which then offers to send a friend request; friendship is not restored automatically. Social text is screened, and reports are reviewed by [VERIFIED COVERAGE]. Settings deletion requires a sign-in within five minutes. An identity-provider failure can leave deletion pending with support recovery; active PetalPal data is already erased.
 
 Public policies/support: [VERIFIED HTTPS LINKS]. Demonstrate social/AI features with [APPROVED SYNTHETIC CONTENT AND REVIEW STEPS]; do not imply unavailable services are active.
 

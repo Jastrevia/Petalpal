@@ -109,10 +109,10 @@ export function advance(position:Point,remaining:Point[],amount:number,blocked:(
   }
   return {point,remaining:rest,moved};
 }
-// Walking: one painted stride (walk-video-v1/walk.webp: 25 frames cut from a walking clip
-// made from walk_04); standing still: walk_04 itself (WALK_IDLE). The stride plays at a
-// brisk pace, not the clip's: four steps a second, so at WALK_SPEED (220 units/s) each two steps
-// still cover about 0.9 of her height and her feet do not slide.
-export const WALK_LOOP_MS=500, WALK_FRAMES=25, WALK_IDLE=-1;
+// Walking: one stride (walk-rig-v1/walk.webp, 25 frames baked from walk_04 by
+// scripts/critters/fairy-walk-rig.py); standing still: walk_04 itself (WALK_IDLE). A brisk person's
+// cadence, 150 steps a minute: at WALK_SPEED (160 units/s) each two steps cover about one of her
+// heights, so arms and feet keep time with how far she moves.
+export const WALK_LOOP_MS=800, WALK_FRAMES=25, WALK_IDLE=-1;
 export function walkFrame(elapsed:number,moving:boolean){if(!moving)return WALK_IDLE;
   return Math.floor((elapsed%WALK_LOOP_MS)/WALK_LOOP_MS*WALK_FRAMES)%WALK_FRAMES;}

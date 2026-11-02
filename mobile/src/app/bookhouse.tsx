@@ -1,4 +1,6 @@
 import { EmotionalSafetyNote } from '../components/features/EmotionalSafetyNote';
+import { useSafetyWatch } from '../components/features/SafetySupport';
+import { AttentionGlow } from '../components/features/AttentionGlow';
 import { BookhouseEnvironment, SceneLighting, SCENE_ASPECT, DESK_Y } from '../components/bookhouse/BookhouseEnvironment';
 import { useWorldTime } from '../components/garden/world-time';
 import { JournalCover } from '../components/bookhouse/JournalCover';
@@ -409,6 +411,7 @@ function JournalEditor({ userId, existing, onClose, onSaved }: {
   const [text, setText] = useState(existing?.text ?? '');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const saving = useRef(false);
   const voice = useEventVoiceInput(text, setText, busy, 2000, 'journal');
+  const safety = useSafetyWatch(text);
   const paperBody = [s.body, { color: '#4B3A27' }];
   const paperCaption = [s.caption, { color: '#7A6448' }];
   const save = async () => {
@@ -437,13 +440,15 @@ function JournalEditor({ userId, existing, onClose, onSaved }: {
         <Pressable accessibilityRole="button" accessibilityLabel={t('Dictate private journal')} accessibilityHint={t('Record up to three minutes, then review before saving')}
           disabled={busy || voice.active} accessibilityState={{ disabled: busy || voice.active }} onPress={() => void voice.start()}
           style={{ width: 48, height: 48, opacity: busy || voice.active ? .5 : 1 }}>
+          <AttentionGlow radius={24} spread={12} />
           <Image accessible={false} source={require('../../assets/events/microphone.png')} style={{ width: 48, height: 48 }} resizeMode="contain" />
         </Pressable>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={t('Save private journal')} disabled={busy || voice.active || !text.trim()} onPress={save}
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Save private journal')} disabled={busy || voice.active || !text.trim()} onPress={() => safety.guard(() => void save())}
         style={[s.save, { backgroundColor: '#5B7A62', opacity: busy || voice.active || !text.trim() ? .55 : 1 }]}><Text style={[s.cream, { fontSize: 18 }]}>{t(busy ? 'Saving…' : existing ? 'Save changes' : 'Save private journal')}</Text></Pressable>
     </>}>
     <EmotionalSafetyNote text={text} />
+    {safety.sheet}
     <TextInput accessibilityLabel={t('Private journal')} placeholder={t('A moment to keep…')} placeholderTextColor="#A08562" value={text} onChangeText={setText} multiline maxLength={2000} editable={!busy} autoFocus
       style={[immersiveText, { flex: 1, minHeight: 200, textAlignVertical: 'top', padding: 0, backgroundColor: 'transparent', ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : {}) }]} />
   </ImmersivePaper>;

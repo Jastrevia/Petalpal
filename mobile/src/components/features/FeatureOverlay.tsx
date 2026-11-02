@@ -120,6 +120,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
   const { session, logout } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [aiOpen, setAiOpen] = useState(false);
   const locale = useAppLocale();
   const copy = OVERLAY_COPY[locale];
   if (feature.id === 'events') return <EventsPanel onClose={onClose} onGardenChanged={onGardenChanged} introOpen={eventsIntro} />;
@@ -131,8 +132,14 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
     <FeatureSection title={copy.language}>
       <ReportLanguageSettings key={session?.user.id} />
     </FeatureSection>
-    <FeatureSection title={copy.ai}>
-      <AiPrivacySettings key={session?.user.id} />
+    {/* Folded under its arrow, so what comes after it is not a long scroll away. */}
+    <FeatureSection>
+      <Pressable testID="ai-privacy-toggle" accessibilityRole="button" accessibilityLabel={copy.ai} accessibilityState={{ expanded: aiOpen }} onPress={() => setAiOpen(open => !open)}
+        style={({ pressed }) => [ui.row, styles.fold, pressed && { opacity: .6 }]}>
+        <Text style={[ui.sectionTitle, { color: theme.text, flex: 1 }]}>{copy.ai}</Text>
+        <Text style={[ui.linkText, { color: theme.muted }]}>{aiOpen ? '⌄' : '›'}</Text>
+      </Pressable>
+      {aiOpen ? <AiPrivacySettings key={session?.user.id} /> : null}
     </FeatureSection>
     <FeatureSection title={copy.background}>
       <View style={ui.row}>
@@ -243,6 +250,7 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   orbit: { width: 96, height: 96, borderRadius: 36, justifyContent: 'center', alignItems: 'center',
     backgroundColor: colors.tealWash, borderWidth: 1, borderColor: colors.line },
   orbitDot: { position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.secondary },
+  fold: { minHeight: 32 },
   profileHero: { alignItems: 'center', gap: 10 },
   betaBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#F6EBCB' },
   betaText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, color: '#7A5A1E' },

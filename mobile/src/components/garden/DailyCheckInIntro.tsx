@@ -4,13 +4,16 @@ import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkInWithFairy, loadClosenessSummary, type CheckInResult } from '../../services/fairyCloseness';
 import { KeepsakeReveal } from '../bond/KeepsakeReveal';
+import { PetalRing } from '../petalCards/PetalRing';
+import { loadPetalToday, type PetalToday } from '../../services/petalCardDraw';
 import { keepsakeArt } from '../bond/keepsakeArt';
 import { useAppLocale } from '../../services/locale';
 import { calendarDateKey } from './calendarDates';
 import { usePlanting } from './planting/PlantingContext';
 
 // The first time the Garden opens each day: today's check-in with PPL happens and her keepsake is
-// revealed. Once closed, the keepsake on a small card shrinks into the calendar in the top-right
+// revealed. Closing it leads straight to today's petal tarot (when petal cards are on and today's is
+// not drawn), and after that the keepsake on a small card shrinks into the calendar in the top-right
 // corner, so the owner learns that is where check-ins live. Checked in elsewhere earlier today:
 // just the card. Off with the closeness switch (summary null).
 const SHOWN_KEY = 'petalpal.checkInIntro.shownOn';
@@ -34,12 +37,18 @@ export function DailyCheckInIntro() {
   const progress = useRef(new Animated.Value(0)).current;
   const [card, setCard] = useState<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const [reveal, setReveal] = useState<CheckInResult | null>(null);
+  const [petal, setPetal] = useState<PetalToday | null>(null), [ringOpen, setRingOpen] = useState(false);
   const pendingCard = useRef<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const showCard = (next: { time: string | null; streak: number; keepsake?: string }) => {
     setCard(next);
     Animated.timing(progress, { toValue: 1, duration: 420, easing: Easing.out(Easing.back(1.4)), useNativeDriver: Platform.OS !== 'web' }).start();
   };
   const leaving = useRef(false);
+  const afterKeepsake = (today: PetalToday | null) => {
+    if (today && !today.drawn) { setRingOpen(true); return; }
+    if (pendingCard.current) showCard(pendingCard.current);
+    pendingCard.current = null;
+  };
   // Waits for the Garden to appear, so the card lands on her Garden, not on an empty screen.
   const { isGardenLoading } = usePlanting();
 
@@ -49,8 +58,8 @@ export function DailyCheckInIntro() {
     (async () => {
       await new Promise(resolve => setTimeout(resolve, 700));
       if (!active) return;
-      const today = calendarDateKey(new Date());
-      if ((await AsyncStorage.getItem(SHOWN_KEY).catch(() => null)) === today) return;
+      const dayKey = calendarDateKey(new Date());
+      if ((await AsyncStorage.getItem(SHOWN_KEY).catch(() => null)) === dayKey) return;
       const summary = await loadClosenessSummary().catch(() => null);
       if (!summary || !active) return;
       let streak = summary.checkIn.streak, at: string | null = null, earned: CheckInResult | null = null;
@@ -60,16 +69,19 @@ export function DailyCheckInIntro() {
         streak = result.checkIn?.streak ?? streak + 1;
         if (result.created && result.keepsakes?.length) earned = result;
         at = new Date().toISOString();
-        await AsyncStorage.setItem(TIME_KEY, JSON.stringify({ day: today, at })).catch(() => undefined);
+        await AsyncStorage.setItem(TIME_KEY, JSON.stringify({ day: dayKey, at })).catch(() => undefined);
       } else {
         const saved = JSON.parse((await AsyncStorage.getItem(TIME_KEY).catch(() => null)) || 'null');
-        if (saved?.day === today) at = saved.at;
+        if (saved?.day === dayKey) at = saved.at;
       }
-      await AsyncStorage.setItem(SHOWN_KEY, today).catch(() => undefined);
+      await AsyncStorage.setItem(SHOWN_KEY, dayKey).catch(() => undefined);
       if (!active) return;
       const time = at ? new Date(at).toLocaleTimeString(locale === 'zh-Hans' ? 'zh-CN' : 'en', { hour: 'numeric', minute: '2-digit' }) : null;
-      if (earned) { pendingCard.current = { time, streak, keepsake: earned.keepsakes[0].id }; setReveal(earned); }
-      else showCard({ time, streak });
+      const today = await loadPetalToday().catch(() => null);
+      if (!active) return;
+      setPetal(today);
+      pendingCard.current = { time, streak, keepsake: earned?.keepsakes[0].id };
+      if (earned) setReveal(earned); else afterKeepsake(today);
     })();
     return () => { active = false; };
   }, [locale, progress, isGardenLoading]);
@@ -89,12 +101,14 @@ export function DailyCheckInIntro() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card]);
 
-  const closeReveal = () => {
-    setReveal(null);
+  const toCalendar = () => {
+    setRingOpen(false);
     if (pendingCard.current) showCard(pendingCard.current);
     pendingCard.current = null;
   };
+  const closeReveal = () => { setReveal(null); afterKeepsake(petal); };
   if (reveal) return <KeepsakeReveal result={reveal} locale={locale} onDone={closeReveal} />;
+  if (ringOpen) return <PetalRing visible today={petal} onClose={toCalendar} />;
   if (!card) return null;
   const art = card.keepsake ? keepsakeArt(card.keepsake) : null;
   // From the middle of the screen into the calendar's centre, shrinking as it goes.
