@@ -1,7 +1,7 @@
 import { PrivacyLinks } from './features/PrivacyAndSupport';
-import { COMMUNITY_VERSION, COMMUNITY_TEXT } from './features/CommunityGuidelines';
+import { COMMUNITY_VERSION, COMMUNITY_TEXT, COMMUNITY_TEXT_ZH } from './features/CommunityGuidelines';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fonts, Spacing } from '../constants/theme';
@@ -23,6 +23,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [name, setName] = useState('');
   const [connect, setConnect] = useState<EmailToConnect | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
   const [communityAccepted,setCommunityAccepted] = useState(false);
   const [working, setWorking] = useState(false);
@@ -69,7 +71,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const backToGarden = mode === 'signIn' || mode === 'register' ? (auth.phase === 'signedOut' && !working ? <Pressable accessibilityRole="button"
     accessibilityLabel="Back to the Garden" hitSlop={12} onPress={() => { setAccountScreen(false); setMode('register'); if (pathname !== '/') router.replace('/'); }}
     style={[styles.backToGarden, { top: insets.top + 10, left: insets.left + 12 }]}>
-    <Text style={styles.backToGardenText}>‹ {/^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale) ? '回到花园' : 'Back to the Garden'}</Text>
+    <Text numberOfLines={1} style={styles.backToGardenText}>‹ {/^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale) ? '返回' : 'Back'}</Text>
   </Pressable> : null) : null;
   // Signed out, the name and avatar card below comes first; the invitation card is for coming back to an account.
   if (mode === 'signIn' && (auth.phase === 'signedOut' || (invitationSignIn && auth.loading)) && !(auth.identity && auth.error)) {
@@ -97,7 +99,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     onSignIn={auth.phase === 'signedOut' ? () => { setConnecting(false); setMode('signIn'); } : undefined} />);
   return overGarden(<KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     {/* The corner buttons float above: the card starts below them, however tall it is. */}
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.page, { paddingTop: insets.top + 64 }]}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.page, { paddingTop: insets.top + 52 }]}>
       <View style={styles.card} testID="auth-card">
         <Text style={styles.brand}>PetalPal</Text>
         <Text style={styles.title}>{copy.title}</Text>
@@ -114,12 +116,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
             accessibilityRole="radio" accessibilityLabel={`Avatar ${index + 1}`}
             accessibilityState={{ selected: avatar === choice }} disabled={working} onPress={() => setAvatar(choice)}
             style={[styles.avatar, avatar === choice && styles.selected]}><UserAvatar avatar={choice} size={52} /></Pressable>)}</View>
-          <Text style={styles.body}>{COMMUNITY_TEXT}</Text>
-          <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Community Guidelines" accessibilityState={{checked:communityAccepted}} disabled={working} onPress={()=>setCommunityAccepted(!communityAccepted)} style={styles.consent}>
-            <Text style={styles.label}>{communityAccepted ? '☑' : '☐'} {copy.accept}</Text>
+          <View style={styles.consent}>
+            <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Community Guidelines" accessibilityState={{checked:communityAccepted}} disabled={working} onPress={()=>setCommunityAccepted(!communityAccepted)}>
+              <Text style={styles.label}>{communityAccepted ? '☑' : '☐'} {copy.accept}</Text>
+            </Pressable>
+            <Text accessibilityRole="link" onPress={() => setGuidelinesOpen(true)} style={[styles.label, styles.underlined]}>{copy.guidelines}</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: moreOpen }} onPress={() => setMoreOpen(!moreOpen)}>
+            <Text style={[styles.hint, styles.underlined]}>{copy.more} {moreOpen ? '⌃' : '›'}</Text>
           </Pressable>
-          <Text style={styles.hint}>{copy.keepsake}</Text>
-          <Text style={styles.hint}>{copy.ai}</Text>
+          {moreOpen ? <>
+            <Text style={styles.hint}>{copy.keepsake}</Text>
+            <Text style={styles.hint}>{copy.ai}</Text>
+          </> : null}
           {button(working ? copy.saving : copy.go, () => profile ? auth.completeProfile(details, connect) : auth.register(details, connect), !name.trim() || !communityAccepted)}
           {profile ? button(copy.other, auth.logout, false, true) : <Pressable accessibilityRole="button" disabled={working} onPress={() => setMode('signIn')} style={styles.switchMode}>
             <Text style={styles.link}>{copy.signIn}</Text>
@@ -130,8 +139,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <PrivacyLinks />
       </View>
     </ScrollView>
+    {guidelinesOpen ? <Modal transparent visible animationType="fade" onRequestClose={() => setGuidelinesOpen(false)}>
+      <View style={styles.scrim}>
+        <View accessibilityViewIsModal style={styles.card} testID="community-guidelines">
+          <Text accessibilityRole="header" style={styles.guidelinesTitle}>{copy.guidelines}</Text>
+          <ScrollView style={styles.guidelinesBody}><Text style={styles.body}>{zh ? COMMUNITY_TEXT_ZH : COMMUNITY_TEXT}</Text></ScrollView>
+          <Pressable accessibilityRole="button" onPress={() => setGuidelinesOpen(false)} style={[styles.button, styles.secondaryButton]}>
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>{copy.close}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal> : null}
     {backToGarden}
-    {retry || auth.identity?.email ? null : <Pressable accessibilityRole="button" accessibilityLabel={connect ? connect.email : copy.connect} hitSlop={8}
+    {retry || auth.identity?.email ? null : <Pressable accessibilityRole="button" accessibilityLabel={connect ? connect.email : copy.connect} hitSlop={12}
       disabled={working} onPress={() => setConnecting(true)} style={[styles.connect, { top: insets.top + 10, right: insets.right + 12 }]}>
       <Text numberOfLines={1} style={styles.backToGardenText}>{connect ? `✓ ${connect.email}` : copy.connect}</Text>
     </Pressable>}
@@ -140,21 +160,25 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 const COPY = {
   en: { title: 'Welcome to your garden', body: 'Choose a name and an avatar. That’s all it takes.', name: 'Your name',
-    nameHint: 'Nobody else can have this name. You’ll use it to sign in.', avatar: 'Garden avatar', accept: 'I accept the Community Guidelines',
+    nameHint: 'Nobody else can have this name. You’ll use it to sign in.', avatar: 'Garden avatar', accept: 'I accept the', guidelines: 'Community Guidelines', close: 'Close', more: 'Good to know',
     keepsake: 'Your Garden lives on this phone’s sign-in. After you plant your first flower, set a password so you can come back on another phone.',
     ai: 'AI stays off until you agree: we ask once when your Garden opens, and you can turn it off in Settings. You can journal without AI.',
     saving: 'Saving…', go: 'Continue to PetalPal', other: 'Use another account', signIn: 'Already have an account? Sign in', connect: 'Connect to your email?' },
   zh: { title: '欢迎来到你的花园', body: '起个名字，选个头像，就可以开始了。', name: '你的名字',
-    nameHint: '这个名字只属于你，之后也可以用它登录。', avatar: '花园头像', accept: '我接受社区准则',
+    nameHint: '这个名字只属于你，之后也可以用它登录。', avatar: '花园头像', accept: '我接受', guidelines: '社区准则', close: '关闭', more: '了解更多',
     keepsake: '花园现在跟着这台手机的登录走。种下第一朵花后，记得设一个密码，换手机也能回来。',
     ai: '在你同意之前 AI 都是关闭的：花园打开时会问你一次，之后也可以在设置里关闭。不用 AI 也能写日记。',
     saving: '正在保存…', go: '进入 PetalPal', other: '换一个账号', signIn: '已有账号？去登录', connect: '连接你的邮箱？' },
 };
 
 const styles = StyleSheet.create({
-  backToGarden: { position: 'absolute', zIndex: 50, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
-  connect: { position: 'absolute', zIndex: 50, minHeight: 44, maxWidth: '62%', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
-  backToGardenText: { fontFamily: 'serif', fontSize: 15, color: '#254E46' },
+  backToGarden: { position: 'absolute', zIndex: 50, minHeight: 30, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 15, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
+  connect: { position: 'absolute', zIndex: 50, minHeight: 30, maxWidth: '70%', justifyContent: 'center', paddingHorizontal: 10, borderRadius: 15, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
+  backToGardenText: { fontFamily: 'serif', fontSize: 13, color: '#254E46' },
+  underlined: { textDecorationLine: 'underline' },
+  scrim: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(8, 24, 22, 0.55)' },
+  guidelinesTitle: { color: '#294732', fontFamily: Fonts.rounded, fontSize: 22, fontWeight: '700' },
+  guidelinesBody: { maxHeight: 360 },
   root: { flex: 1, backgroundColor: '#eff4e9' },
   loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },
   page: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.four },
@@ -177,7 +201,7 @@ const styles = StyleSheet.create({
   avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   avatar: { padding: 3, borderRadius: 32, borderWidth: 2, borderColor: 'transparent' },
   selected: { backgroundColor: '#e3edda', borderColor: '#365b42' },
-  consent: { paddingVertical: Spacing.two },
+  consent: { paddingVertical: Spacing.two, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4 },
   hint: { color: '#536653', fontSize: 12, lineHeight: 18 },
   error: { color: '#983e3e', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
 });

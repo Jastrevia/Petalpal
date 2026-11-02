@@ -309,7 +309,7 @@ test('Phase 1 auth gate separates loading, signed-out, name and avatar, sign-in 
     '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },
     '../services/deviceReset': { devVariant: false }, './features/DeviceReset': { DeviceResetButton: 'DeviceResetButton' },
     'react-native': { ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView',
-      Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View',
+      Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', Modal: 'Modal',
       Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } },
   });
   const gate = load('../../../components/AuthGate'); let tree = hooks.mount(() => gate.AuthGate({ children: 'real-app' }));
@@ -330,6 +330,16 @@ test('Phase 1 auth gate separates loading, signed-out, name and avatar, sign-in 
   assert.equal(nodes(tree).filter((n) => n.props?.secureTextEntry).length, 0);
   assert.ok(nodes(tree).some((n) => n.props?.accessibilityRole === 'radio'));
   assert.equal(nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.accessibilityState.checked, false);
+  nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.onPress(); tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.accessibilityState.checked, true);
+  // The guidelines and the notes stay folded until asked for.
+  assert.doesNotMatch(text(tree), /Be kind|lives on this phone|AI stays off/);
+  nodes(tree).find((n) => n.props?.accessibilityRole === 'link' && text(n).includes('Community Guidelines')).props.onPress(); tree = hooks.render();
+  assert.match(text(nodes(tree).find((n) => n.props.testID === 'community-guidelines')), /Be kind/);
+  nodes(tree).find((n) => n.type === 'Modal').props.onRequestClose(); tree = hooks.render();
+  assert.equal(nodes(tree).some((n) => n.type === 'Modal'), false);
+  nodes(tree).find((n) => n.props?.accessibilityRole === 'button' && text(n).includes('Good to know')).props.onPress(); tree = hooks.render();
+  assert.match(text(tree), /lives on this phone/); assert.match(text(tree), /AI stays off/);
   nodes(tree).find((n) => n.props?.accessibilityLabel === 'Connect to your email?').props.onPress(); tree = hooks.render();
   const connect = nodes(tree).find((n) => n.type === 'ConnectEmailScreen');
   assert.ok(connect, 'it opens its own screen');
