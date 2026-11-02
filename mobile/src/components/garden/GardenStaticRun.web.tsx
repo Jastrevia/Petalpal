@@ -16,7 +16,7 @@ const cameraOf = (transform: Transforms3d): GardenCamera => {
 
 // Its layers live in their own Skia root, so their recording can be drawn with or without the rest of the Garden.
 // Must sit outside the camera groups: it applies the camera itself, and none at all to a snapshot.
-export default function GardenStaticRun({ cameraTransform, children }: { cameraTransform: DerivedValue<Transforms3d>; children: ReactNode }) {
+export default function GardenStaticRun({ cameraTransform, children }: { cameraTransform: DerivedValue<Transforms3d>; width: number; height: number; order: number; children: ReactNode }) {
   const context = useContext(StaticRunContext), landImages = useContext(LandImages);
   const [{ nativeId, root, empty }] = useState(() => {
     const id = SkiaViewNativeId.current++;

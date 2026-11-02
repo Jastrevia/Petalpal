@@ -109,6 +109,7 @@ import {
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
 import GardenStaticRun from './GardenStaticRun';
+import { noteGardenMotion } from './gardenNativeFrames';
 import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
@@ -641,21 +642,22 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     { translateY: baseY + cameraY.value },
     { scale: fit * cameraZoom.value },
   ]);
+  useAnimatedReaction(() => cameraTransform.value, () => { noteGardenMotion(); });
   // The layers that never move, each between things that do. See gardenStaticRuns.ts.
   const staticLayout = __DEV__ ? calibrationLayout : undefined;
-  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout]);
-  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform]);
+  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={0}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout, viewport.width, viewport.height]);
+  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={1}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform, viewport.width, viewport.height]);
   const selectedStaticLand = __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null;
-  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
-    [cameraTransform, perf.Land, staticLayout, selectedStaticLand]);
-  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}>
+  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={2}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
+    [cameraTransform, perf.Land, staticLayout, selectedStaticLand, viewport.width, viewport.height]);
+  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={3}>
     {environmentEnabled && <GardenEnvironmentLayer />}
     {/* Approved world-aligned artwork is shared by development and production. */}
     {infrastructureEnabled && <GardenLand09InterfaceLayer />}
     <GardenConnectionLayer />
     {infrastructureEnabled && <GardenInfrastructureLayer />}
     {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
-  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement]);
+  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement, viewport.width, viewport.height]);
   // Hit area follows the existing landmark and camera; the painted scene is unchanged.
   const [pavilionSelected, setPavilionSelected] = useState(false);
   const pavilionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
