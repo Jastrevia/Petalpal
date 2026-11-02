@@ -30,7 +30,7 @@ const native = (e = ["gratitude"], changes = {}) => ({ model: HAIKU_EVENT_MODEL_
 async function fixture(t) {
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } });
   t.after(() => pg.close());
-  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text);
+  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text, "emailVerifiedAt" timestamp(3) DEFAULT now());
     INSERT INTO "User" VALUES ('alice','UTC'),('bob','UTC');
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY,"termsVersion" text,"aiProcessing" boolean,
       "personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));

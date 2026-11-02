@@ -1,11 +1,12 @@
 import { PrivacyLinks } from './features/PrivacyAndSupport';
 import { COMMUNITY_VERSION, COMMUNITY_TEXT } from './features/CommunityGuidelines';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView,
-  StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+  StyleSheet, Text, TextInput, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fonts, Spacing } from '../constants/theme';
-import { useAuth } from '../services/auth';
+import { useAuth, type EmailToConnect } from '../services/auth';
+import { ConnectEmailScreen } from './features/AccountRecovery';
 import { LoginPreviewPage } from './auth/LoginPreviewPage';
 import { AVATAR_IDS, DEFAULT_AVATAR } from './avatars/avatarArt';
 import { UserAvatar } from './avatars/UserAvatar';
@@ -18,11 +19,10 @@ import { DeviceResetButton } from './features/DeviceReset';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const [mode, setMode] = useState<'signIn' | 'register'>('signIn');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
+  const [mode, setMode] = useState<'signIn' | 'register'>('register');
   const [name, setName] = useState('');
+  const [connect, setConnect] = useState<EmailToConnect | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
   const [communityAccepted,setCommunityAccepted] = useState(false);
   const [working, setWorking] = useState(false);
@@ -35,38 +35,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const guest = useRef<Guest>({ requestAccount: () => setAccountScreen(true) }).current;
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const checkVerification = useRef(auth.checkVerification);
-  checkVerification.current = auth.checkVerification;
 
   useEffect(() => {
-    setEmail(''); setPassword(''); setConfirmation(''); setName('');
-    setAvatar(DEFAULT_AVATAR); setCommunityAccepted(false); setMode('signIn');
+    setName(''); setConnect(null); setConnecting(false);
+    setAvatar(DEFAULT_AVATAR); setCommunityAccepted(false); setMode('register');
   }, [auth.identity?.uid]);
   useEffect(() => {
     if (!auth.loading) void SplashScreen.hideAsync().catch(() => {});
   }, [auth.loading]);
   const signedInLocale = auth.experience?.user.preferredLocale;
   useEffect(() => { if (signedInLocale) rememberDisplayLocale(signedInLocale); }, [signedInLocale]);
-  useEffect(() => {
-    if (auth.phase !== 'verificationPending') return;
-    // Resume after visiting the verification link, without polling or forcing
-    // another registration. The provider guards against identity changes.
-    const recheck = () => { if (!busy.current) void checkVerification.current(); };
-    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') recheck(); });
-    // Only the web has window events: on a phone `window` exists but has no addEventListener.
-    const web = Platform.OS === 'web' && typeof window !== 'undefined';
-    if (web) window.addEventListener('focus', recheck);
-    return () => {
-      subscription.remove();
-      if (web) window.removeEventListener('focus', recheck);
-    };
-  }, [auth.phase]);
-
   async function run(action: () => Promise<void>) {
     if (busy.current) return;
     busy.current = true; setWorking(true);
     try { await action(); }
-    finally { busy.current = false; setWorking(false); setPassword(''); setConfirmation(''); }
+    finally { busy.current = false; setWorking(false); }
   }
   const button = (label: string, action: () => Promise<void>, disabled = false, secondary = false) =>
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: working || disabled }}
@@ -74,11 +57,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       style={[styles.button, secondary && styles.secondaryButton, (working || disabled) && styles.disabled]}>
       <Text style={[styles.buttonText, secondary && styles.secondaryButtonText]}>{label}</Text>
     </Pressable>;
-  const field = (label: string, props: TextInputProps) => <View style={styles.field}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput accessibilityLabel={label} placeholderTextColor="#7a887b" editable={!working}
-      style={styles.input} {...props} />
-  </View>;
 
   if (auth.phase === 'signedIn' && auth.session) return <>{children}</>;
   const guestMode = auth.phase === 'signedOut' && !auth.loading && !(auth.identity && auth.error);
@@ -87,19 +65,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const overGarden = (page: ReactNode) => guestMode ? <GuestContext.Provider value={guest}><View style={{ flex: 1 }}>
     {children}{page ? <View style={StyleSheet.absoluteFill}>{page}</View> : null}</View></GuestContext.Provider> : page;
   if (guestMode && !accountScreen) return overGarden(null);
-  // Only while signing in or creating an account from guest mode; verification and profile steps keep the card.
+  // Only while signing in or creating an account from guest mode; the profile step of an existing identity keeps the card.
   const backToGarden = mode === 'signIn' || mode === 'register' ? (auth.phase === 'signedOut' && !working ? <Pressable accessibilityRole="button"
-    accessibilityLabel="Back to the Garden" hitSlop={12} onPress={() => { setAccountScreen(false); setMode('signIn'); if (pathname !== '/') router.replace('/'); }}
+    accessibilityLabel="Back to the Garden" hitSlop={12} onPress={() => { setAccountScreen(false); setMode('register'); if (pathname !== '/') router.replace('/'); }}
     style={[styles.backToGarden, { top: insets.top + 10, left: insets.left + 12 }]}>
     <Text style={styles.backToGardenText}>‹ {/^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale) ? '回到花园' : 'Back to the Garden'}</Text>
   </Pressable> : null) : null;
-  // Signed out: the partner's invitation card is the sign-in screen (real Firebase sign-in).
-  // Registration, verification, profile and session-retry keep the card below.
+  // Signed out, the name and avatar card below comes first; the invitation card is for coming back to an account.
   if (mode === 'signIn' && (auth.phase === 'signedOut' || (invitationSignIn && auth.loading)) && !(auth.identity && auth.error)) {
-    return overGarden(<View style={{ flex: 1 }}><LoginPreviewPage onCreateAccount={() => { setMode('register'); setPassword(''); setConfirmation(''); }}
-      onSignIn={async (address, secret) => {
+    return overGarden(<View style={{ flex: 1 }}><LoginPreviewPage onCreateAccount={() => setMode('register')}
+      onSignIn={async (login, secret) => {
         setInvitationSignIn(true);
-        try { await auth.login(address, secret); } finally { setInvitationSignIn(false); }
+        try { await auth.login(login, secret); } finally { setInvitationSignIn(false); }
       }}
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />{backToGarden}</View>);
@@ -109,50 +86,44 @@ export function AuthGate({ children }: { children: ReactNode }) {
     <Text style={styles.body}>{auth.phase === 'registering' ? 'Creating your account…' : 'Opening PetalPal…'}</Text>
     {auth.phase === 'registering' ? null : <WakingFlowerFacts />}
   </View>;
-  const verification = auth.phase === 'verificationPending';
   const profile = auth.phase === 'profileRequired';
-  const registering = mode === 'register';
+  // An identity that never finished signing in still has this page to finish on; only without one can a session be retried.
+  const retry = auth.identity && auth.error && !profile;
+  const zh = /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale);
+  const copy = zh ? COPY.zh : COPY.en;
+  const details = { name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined };
+  if (connecting) return overGarden(<ConnectEmailScreen chinese={zh} initial={connect} onClose={() => setConnecting(false)}
+    onSave={(details) => { setConnect(details); setConnecting(false); }}
+    onSignIn={auth.phase === 'signedOut' ? () => { setConnecting(false); setMode('signIn'); } : undefined} />);
   return overGarden(<KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page}>
+    {/* The corner buttons float above: the card starts below them, however tall it is. */}
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.page, { paddingTop: insets.top + 64 }]}>
       <View style={styles.card} testID="auth-card">
         <Text style={styles.brand}>PetalPal</Text>
-        <Text style={styles.title}>{verification ? 'Verify your email' : profile ? 'Welcome to your garden'
-          : registering ? 'Create your PetalPal account' : 'Sign in to PetalPal'}</Text>
-        <Text style={styles.body}>{verification ? `Check your inbox at ${auth.identity?.email || 'your email address'}.`
-          : profile ? 'Choose how you’ll appear in PetalPal.' : 'Your feelings, your flowers, your little place to grow.'}</Text>
-        {verification ? <>
-          {button(working ? 'Checking…' : 'I’ve verified my email', auth.checkVerification)}
-          {button('Resend verification email', auth.resendVerification, false, true)}
-          {button('Use another account', auth.logout, false, true)}
-        </> : profile ? <>
-          {field('Display name', { value: name, onChangeText: setName, maxLength: 80, autoComplete: 'name' })}
-          <Text style={styles.label}>Garden avatar</Text>
+        <Text style={styles.title}>{copy.title}</Text>
+        <Text style={styles.body}>{copy.body}</Text>
+        {retry ? button(zh ? '重试' : 'Retry session', auth.retry, false, true) : <>
+          <View style={styles.field}>
+            <Text style={styles.label}>{copy.name}</Text>
+            <TextInput accessibilityLabel={copy.name} placeholderTextColor="#7a887b" editable={!working} style={styles.input}
+              value={name} onChangeText={setName} maxLength={80} autoComplete="username-new" autoCapitalize="words" autoCorrect={false} />
+            <Text style={styles.hint}>{copy.nameHint}</Text>
+          </View>
+          <Text style={styles.label}>{copy.avatar}</Text>
           <View style={styles.avatars}>{AVATAR_IDS.map((choice, index) => <Pressable key={choice}
             accessibilityRole="radio" accessibilityLabel={`Avatar ${index + 1}`}
             accessibilityState={{ selected: avatar === choice }} disabled={working} onPress={() => setAvatar(choice)}
             style={[styles.avatar, avatar === choice && styles.selected]}><UserAvatar avatar={choice} size={52} /></Pressable>)}</View>
           <Text style={styles.body}>{COMMUNITY_TEXT}</Text>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Community Guidelines" accessibilityState={{checked:communityAccepted}} disabled={working} onPress={()=>setCommunityAccepted(!communityAccepted)} style={styles.consent}>
-            <Text style={styles.label}>{communityAccepted ? '☑' : '☐'} I accept the Community Guidelines</Text>
+            <Text style={styles.label}>{communityAccepted ? '☑' : '☐'} {copy.accept}</Text>
           </Pressable>
-          <Text style={styles.hint}>AI stays off until you agree: we ask once when your Garden opens, and you can turn it off in Settings. You can journal without AI.</Text>
-          {button(working ? 'Saving…' : 'Continue to PetalPal', () => auth.completeProfile({ name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined }), !name.trim() || !communityAccepted)}
-          {button('Use another account', auth.logout, false, true)}
-        </> : <>
-          {field('Email', { value: email, onChangeText: setEmail, keyboardType: 'email-address', autoCapitalize: 'none',
-            autoCorrect: false, autoComplete: 'email' })}
-          {field('Password', { value: password, onChangeText: setPassword, secureTextEntry: true,
-            autoComplete: registering ? 'new-password' : 'current-password' })}
-          {registering && field('Confirm password', { value: confirmation, onChangeText: setConfirmation,
-            secureTextEntry: true, autoComplete: 'new-password' })}
-          {button(working ? 'Please wait…' : registering ? 'Create account' : 'Sign in',
-            () => registering ? auth.register(email, password, confirmation) : auth.login(email, password), !email.trim() || !password)}
-          <Pressable accessibilityRole="button" disabled={working} onPress={() => {
-            setMode(registering ? 'signIn' : 'register'); setPassword(''); setConfirmation('');
-          }} style={styles.switchMode}>
-            <Text style={styles.link}>{registering ? 'Already have an account? Sign in' : 'New to PetalPal? Create account'}</Text>
-          </Pressable>
-          {auth.identity && auth.error ? button('Retry session', auth.retry, false, true) : null}
+          <Text style={styles.hint}>{copy.keepsake}</Text>
+          <Text style={styles.hint}>{copy.ai}</Text>
+          {button(working ? copy.saving : copy.go, () => profile ? auth.completeProfile(details, connect) : auth.register(details, connect), !name.trim() || !communityAccepted)}
+          {profile ? button(copy.other, auth.logout, false, true) : <Pressable accessibilityRole="button" disabled={working} onPress={() => setMode('signIn')} style={styles.switchMode}>
+            <Text style={styles.link}>{copy.signIn}</Text>
+          </Pressable>}
         </>}
         {auth.message ? <Text accessibilityLiveRegion="polite" style={styles.body}>{auth.message}</Text> : null}
         {auth.error ? <Text accessibilityRole="alert" style={styles.error}>{auth.error}</Text> : null}
@@ -160,11 +131,29 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </View>
     </ScrollView>
     {backToGarden}
+    {retry || auth.identity?.email ? null : <Pressable accessibilityRole="button" accessibilityLabel={connect ? connect.email : copy.connect} hitSlop={8}
+      disabled={working} onPress={() => setConnecting(true)} style={[styles.connect, { top: insets.top + 10, right: insets.right + 12 }]}>
+      <Text numberOfLines={1} style={styles.backToGardenText}>{connect ? `✓ ${connect.email}` : copy.connect}</Text>
+    </Pressable>}
   </KeyboardAvoidingView>);
 }
 
+const COPY = {
+  en: { title: 'Welcome to your garden', body: 'Choose a name and an avatar. That’s all it takes.', name: 'Your name',
+    nameHint: 'Nobody else can have this name. You’ll use it to sign in.', avatar: 'Garden avatar', accept: 'I accept the Community Guidelines',
+    keepsake: 'Your Garden lives on this phone’s sign-in. After you plant your first flower, set a password so you can come back on another phone.',
+    ai: 'AI stays off until you agree: we ask once when your Garden opens, and you can turn it off in Settings. You can journal without AI.',
+    saving: 'Saving…', go: 'Continue to PetalPal', other: 'Use another account', signIn: 'Already have an account? Sign in', connect: 'Connect to your email?' },
+  zh: { title: '欢迎来到你的花园', body: '起个名字，选个头像，就可以开始了。', name: '你的名字',
+    nameHint: '这个名字只属于你，之后也可以用它登录。', avatar: '花园头像', accept: '我接受社区准则',
+    keepsake: '花园现在跟着这台手机的登录走。种下第一朵花后，记得设一个密码，换手机也能回来。',
+    ai: '在你同意之前 AI 都是关闭的：花园打开时会问你一次，之后也可以在设置里关闭。不用 AI 也能写日记。',
+    saving: '正在保存…', go: '进入 PetalPal', other: '换一个账号', signIn: '已有账号？去登录', connect: '连接你的邮箱？' },
+};
+
 const styles = StyleSheet.create({
   backToGarden: { position: 'absolute', zIndex: 50, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
+  connect: { position: 'absolute', zIndex: 50, minHeight: 44, maxWidth: '62%', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
   backToGardenText: { fontFamily: 'serif', fontSize: 15, color: '#254E46' },
   root: { flex: 1, backgroundColor: '#eff4e9' },
   loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },

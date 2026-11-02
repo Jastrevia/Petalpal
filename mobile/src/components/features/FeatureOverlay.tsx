@@ -1,3 +1,4 @@
+import { AccountRecoverySettings, SignOutButton } from './AccountRecovery';
 import { devVariant } from '../../services/deviceReset';
 import { DeviceResetButton } from './DeviceReset';
 import { PrivacyAndSupport } from './PrivacyAndSupport';
@@ -153,7 +154,8 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
     <GardenPrivacySettings key={session?.user.id} />
     <PrivacyAndSupport account onLeave={onClose} key={`support-${session?.user.id}`} />
     {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
-    <FeatureActionButton title={busy ? copy.signingOut : copy.signOut} disabled={busy} onPress={async () => {
+    <AccountRecoverySettings key={`recovery-${session?.user.id}`} />
+    <SignOutButton title={busy ? copy.signingOut : copy.signOut} disabled={busy} onSignOut={async () => {
       setBusy(true); setError('');
       try { await logout(); onClose(); }
       catch { setError(copy.signOutFailed); }

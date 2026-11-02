@@ -16,7 +16,7 @@ async function fixture(t) {
   await db.exec(`
     CREATE TYPE "AIJobType" AS ENUM ('WEEKLY_REPORT', 'MONTHLY_REPORT');
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY, "aiProcessing" boolean, "personalization" boolean, "memoryEnabled" boolean, "updatedAt" timestamp(3));
-    CREATE TABLE "User" ("id" text PRIMARY KEY, "timezone" text, "preferredLocale" text);
+    CREATE TABLE "User" ("id" text PRIMARY KEY, "timezone" text, "preferredLocale" text, "emailVerifiedAt" timestamp(3) DEFAULT now());
     CREATE TABLE "AIJob" ("id" text PRIMARY KEY, "ownerId" text, "jobType" "AIJobType", "resourceId" text, "idempotencyKey" text,
       "status" text, "attemptCount" integer, "lockedAt" timestamp(3), "lockedBy" text, "leaseExpiresAt" timestamp(3),
       "completedAt" timestamp(3), "updatedAt" timestamp(3), "lastError" text);

@@ -53,6 +53,16 @@ function invalidCredential(error: unknown) {
   return ['auth/user-disabled', 'auth/user-not-found', 'auth/user-token-expired',
     'auth/invalid-user-token'].includes(code || '');
 }
+// The two routes that come before an account exists: making one, and signing in with a password.
+export async function publicApiRequest<T>(path: string, body: object): Promise<T> {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError(data?.error || `Request failed (${response.status}).`, response.status, data?.code);
+  if (!data) throw new ApiError('The backend did not return JSON data.', response.status);
+  return data as T;
+}
 export async function apiRequest<T>(path: string, method = 'GET', body?: object,
   options: { headers?: Record<string, string>; signal?: AbortSignal } = {}): Promise<T> {
   const current = connection;

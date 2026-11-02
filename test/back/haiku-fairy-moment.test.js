@@ -19,7 +19,7 @@ const native = (c, changes = {}) => ({ model: HAIKU_FAIRY_MOMENT_MODEL_ID, type:
 async function fixture(t, { locale = "zh-Hans", aiProcessing = true } = {}) {
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } });
   t.after(() => pg.close());
-  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text);
+  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text, "emailVerifiedAt" timestamp(3) DEFAULT now());
     INSERT INTO "User" VALUES ('alice','America/Vancouver','${locale}');
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY,"termsVersion" text,"aiProcessing" boolean,
       "personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));

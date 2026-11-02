@@ -44,7 +44,7 @@ const NOW = new Date("2026-10-30T20:00:00Z"); // 13:00 on the 30th in Vancouver
 async function fixture(t, { personalization = true, aiProcessing = true, locale = "zh-Hans" } = {}) {
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } });
   t.after(() => pg.close());
-  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text);
+  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text, "emailVerifiedAt" timestamp(3) DEFAULT now());
     INSERT INTO "User" VALUES ('alice','America/Vancouver','${locale}'), ('bob','America/Vancouver','en');
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY,"termsVersion" text,"aiProcessing" boolean,
       "personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));

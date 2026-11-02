@@ -11,6 +11,7 @@ import { usePlanting } from './planting/PlantingContext';
 import { FairyMomentsPanel } from '../moments/FairyMomentsPanel';
 import { markFairyMomentsRead, refreshFairyRuntime, useFairyRuntime } from '../../services/fairyRuntime';
 import { useClosenessSummary } from '../../services/fairyCloseness';
+import { RecoveryPrompt } from '../features/AccountRecovery';
 import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
@@ -126,6 +127,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
     </View>
     <AiConsentPrompt />
+    <RecoveryPrompt />
     <GardenDock chinese={chinese} />
     {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left}
       maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}

@@ -1,16 +1,19 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail,
-  signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
-import { apiBaseUrl, apiRequest, configureApi } from './api';
+import { EmailAuthProvider, linkWithCredential, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail,
+  signInWithCustomToken, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { apiBaseUrl, apiRequest, configureApi, publicApiRequest } from './api';
 import { firebaseAuth } from './firebase';
 import { loadSessionExperience, type SessionExperience, type SessionUser } from './sessionExperience';
-import { authErrorMessage, PASSWORD_RESET_SENT, profileError, registrationError, type ProfileInput } from './auth/registrationValidation';
+import { authErrorMessage, connectEmailError, PASSWORD_RESET_SENT, profileError, type ProfileInput } from './auth/registrationValidation';
 import { scopeFlowerPlacements, setNativeSecurityExpectedOwner } from '../components/garden/planting/plantingPersistence';
 import { recordNativeLogoutWitness } from './nativeSecurityLogoutWitness';
 import type { FlowerSession } from '../components/garden/planting/flowerDetailApi';
 import { DEFAULT_AVATAR } from '../components/avatars/avatarArt';
 
-export type AuthPhase = 'initializing' | 'signedOut' | 'registering' | 'verificationPending' | 'profileRequired' | 'signedIn';
+export type AuthPhase = 'initializing' | 'signedOut' | 'registering' | 'profileRequired' | 'signedIn';
+/** What brings this account back on another phone; the email counts once verified. */
+export interface AccountRecovery { name: string; accountId: string; email: string | null; hasPassword: boolean }
+export interface EmailToConnect { email: string; password: string }
 interface AuthSnapshot {
   phase: AuthPhase;
   session: FlowerSession | null;
@@ -22,13 +25,23 @@ interface AuthSnapshot {
 interface AuthState extends AuthSnapshot {
   loading: boolean;
   needsProfile: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, confirmation: string) => Promise<void>;
+  /** The name, PP number or connected email, with the account's password. */
+  login: (login: string, password: string) => Promise<void>;
+  /** Name and avatar make the account; an email filled in beforehand is connected as soon as it exists. */
+  register: (profile: ProfileInput, connect?: EmailToConnect | null) => Promise<void>;
   /** Firebase emails a link to set a new password; the reply never says whether the email has an account. */
   resetPassword: (email: string) => Promise<void>;
-  resendVerification: () => Promise<void>;
-  checkVerification: () => Promise<void>;
-  completeProfile: (profile: ProfileInput | string) => Promise<void>;
+  completeProfile: (profile: ProfileInput | string, connect?: EmailToConnect | null) => Promise<void>;
+  /** Adds the email to this account and sends the verification link. Throws what to show the owner. */
+  connectEmail: (email: string, password: string) => Promise<void>;
+  /** The address waiting on, or holding, verification (the account keeps its uid). */
+  connectedEmail: () => { email: string; verified: boolean } | null;
+  resendEmailVerification: () => Promise<void>;
+  /** True once the link has been opened; the server then records the email. */
+  checkEmailVerified: () => Promise<boolean>;
+  loadRecovery: () => Promise<AccountRecovery>;
+  setPassword: (password: string, currentPassword?: string) => Promise<void>;
+  clearMessage: () => void;
   /** Saves a library avatar (components/avatars) for the signed-in owner. */
   updateAvatar: (avatar: string) => Promise<void>;
   /** Saves the app language (also the Weekly reflection language) and switches the app to it. */
@@ -46,12 +59,33 @@ export function useAuth() {
   if (!value) throw new Error('AuthProvider required');
   return value;
 }
+const profileBody = (profile: ProfileInput) => ({
+  name: profile.name.trim(), avatar: profile.avatar || DEFAULT_AVATAR,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  preferredLocale: profile.preferredLocale || 'en', communityTermsVersion: profile.communityTermsVersion,
+});
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthSnapshot>(() => emptyState());
   useEffect(() => { setNativeSecurityExpectedOwner(state.session?.user.id || null); }, [state.session?.user.id]);
   const version = useRef(0);
   const invalidatedUid = useRef<string | null>(null);
   const signedOutError = useRef('');
+  // Runs once the account is open (it needs the API connection). Holds a password only until then.
+  const afterSignIn = useRef<(() => Promise<void>) | null>(null);
+
+  async function addEmail(user: User, email: string, password: string) {
+    // The one password of the account: refused here if it already has a different one.
+    await apiRequest('/auth/password', 'PUT', { password, currentPassword: password });
+    if (!user.email) await linkWithCredential(user, EmailAuthProvider.credential(email.trim(), password));
+    await sendEmailVerification(user);
+  }
+  const connectAfterSignIn = (connect?: EmailToConnect | null) => {
+    afterSignIn.current = connect ? async () => {
+      const user = firebaseAuth().currentUser;
+      if (user) await addEmail(user, connect.email, connect.password);
+      setState((current) => ({ ...current, message: `Verification email sent to ${connect.email.trim()}. Check your inbox and spam folder.` }));
+    } : null;
+  };
 
   function clearAccount(phase: AuthPhase = 'initializing', error = '') {
     version.current++;
@@ -106,20 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       const identity = { uid: user.uid, email: user.email || '' };
-      if (!user.emailVerified) {
-        try { await user.reload(); }
-        catch (error) {
-          if (isCurrent(user, generation)) setState({ ...emptyState('verificationPending', authErrorMessage(error)), identity });
-          return;
-        }
-        if (!isCurrent(user, generation)) return;
-        if (!user.emailVerified) {
-          setState({ ...emptyState('verificationPending'), identity });
-          return; // Never call the backend with an unverified identity.
-        }
-      }
-      // Reload recovery can discover verification completed in another tab.
-      // Refresh claims before the backend verifies email_verified.
+      // A verification completed in another app reaches the backend through fresh claims.
       await user.getIdToken(true);
       if (!isCurrent(user, generation)) return;
       const capturedUser = user;
@@ -132,9 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onUnauthorized: () => { if (isCurrent(capturedUser, generation)) void logout('Your session expired. Please sign in again.'); },
       });
       const result = await apiRequest<{ user: SessionUser | null; needsProfile?: boolean }>('/auth/session', 'POST', profile
-        ? { name: profile.name.trim(), avatar: profile.avatar || DEFAULT_AVATAR,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          preferredLocale: profile.preferredLocale || 'en', communityTermsVersion: profile.communityTermsVersion, aiConsent: profile.aiConsent === true }
+        ? { ...profileBody(profile), aiConsent: profile.aiConsent === true }
         : { deferProfileCreation: true });
       if (!isCurrent(user, generation)) return;
       if (result.needsProfile) {
@@ -148,8 +167,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!await scopeFlowerPlacements(experience.user.id)) throw new Error('Private device cache cleanup failed. Please retry.');
       if (!isCurrent(user, generation)) return;
       setState({ ...emptyState('signedIn'), identity, experience, session: { user: experience.user } });
+      const then = afterSignIn.current;
+      afterSignIn.current = null;
+      if (then) void then().catch((error) => setState((current) => ({ ...current, message: authErrorMessage(error) })));
     } catch (error) {
       if (generation !== version.current) return;
+      afterSignIn.current = null;
+      if (profile && user && (error as { code?: string }).code === 'USERNAME_TAKEN') {
+        setState({ ...emptyState('profileRequired', authErrorMessage(error)), identity: { uid: user.uid, email: user.email || '' } });
+        return;
+      }
       configureApi(null); scopeFlowerPlacements(null);
       setState({ ...emptyState('signedOut', authErrorMessage(error)),
         identity: user ? { uid: user.uid, email: user.email || '' } : null });
@@ -165,38 +192,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) { setState(emptyState('signedOut', authErrorMessage(error))); }
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(login: string, password: string) {
     invalidatedUid.current = null; signedOutError.current = '';
     clearAccount();
     const generation = version.current;
     try {
-      await signInWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+      if (/^[^\s@]+@[^\s@]+$/.test(login.trim())) {
+        // The email's password is the account's: a name or PP number now works with it too,
+        // including right after a reset link changed it.
+        afterSignIn.current = async () => { await apiRequest('/auth/password', 'PUT', { password }); };
+        await signInWithEmailAndPassword(firebaseAuth(), login.trim(), password);
+      } else {
+        const { signInToken } = await publicApiRequest<{ signInToken: string }>('/auth/password-login', { login: login.trim(), password });
+        await signInWithCustomToken(firebaseAuth(), signInToken);
+      }
       // Firebase need not emit a UID change when retrying the same identity.
       if (generation === version.current) await sync();
     }
-    catch (error) { if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
+    catch (error) { afterSignIn.current = null; if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
     // The Firebase identity observer performs the one session initialization.
   }
-  async function register(email: string, password: string, confirmation: string) {
-    const validation = registrationError(email, password, confirmation);
+  async function register(profile: ProfileInput, connect?: EmailToConnect | null) {
+    const validation = profileError(profile);
     if (validation) { setState((current) => ({ ...current, error: validation, message: '' })); return; }
     invalidatedUid.current = null; signedOutError.current = '';
     clearAccount('registering');
     const generation = version.current;
     try {
-      const { user } = await createUserWithEmailAndPassword(firebaseAuth(), email.trim(), password);
-      // Identity observer owns recovery; only this newly created user receives
-      // the email and feedback. A switch/logout while sending cannot alter it.
-      if (firebaseAuth().currentUser?.uid !== user.uid) return;
-      const sendingGeneration = version.current;
-      try {
-        await sendEmailVerification(user);
-        if (isCurrent(user, sendingGeneration)) setState((current) => ({ ...current,
-          message: 'Verification email sent. Check your inbox and spam folder.' }));
-      } catch (error) {
-        if (isCurrent(user, sendingGeneration)) setState((current) => ({ ...current, error: authErrorMessage(error) }));
-      }
-    } catch (error) { if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
+      const { signInToken } = await publicApiRequest<{ signInToken: string }>('/auth/register', profileBody(profile));
+      connectAfterSignIn(connect);
+      await signInWithCustomToken(firebaseAuth(), signInToken);
+      if (generation === version.current) await sync();
+    } catch (error) { afterSignIn.current = null; if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
   }
   async function resetPassword(email: string) {
     const address = email.trim();
@@ -207,38 +234,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState((current) => ({ ...current, error: '', message: PASSWORD_RESET_SENT(address) }));
     } catch (error) { setState((current) => ({ ...current, error: authErrorMessage(error), message: '' })); }
   }
-  async function verification(resend: boolean) {
-    if (state.phase !== 'verificationPending') return;
+  // Throws when another account has signed in meanwhile: nothing here may act on the wrong one.
+  function ownUser() {
     const user = firebaseAuth().currentUser;
-    if (!user || state.identity?.uid !== user.uid || invalidatedUid.current === user.uid) return;
-    const generation = version.current;
-    setState((current) => ({ ...current, error: '', message: '' }));
-    try {
-      await user.reload();
-      if (!isCurrent(user, generation)) return;
-      if (user.emailVerified) {
-        await user.getIdToken(true); // The backend must see the refreshed email_verified claim.
-        if (isCurrent(user, generation)) await sync();
-      } else if (resend) {
-        await sendEmailVerification(user);
-        if (isCurrent(user, generation)) setState((current) => ({ ...current,
-          message: 'Verification email sent. Check your inbox and spam folder.' }));
-      } else {
-        setState((current) => ({ ...current, message: 'Your email isn’t verified yet. Open the link in your inbox, then check again.' }));
-      }
-    } catch (error) { if (isCurrent(user, generation)) setState((current) => ({ ...current, error: authErrorMessage(error) })); }
+    if (!user || state.phase !== 'signedIn' || state.identity?.uid !== user.uid) throw new Error('Sign in to connect your email.');
+    return user;
   }
   const value: AuthState = { ...state,
     loading: state.phase === 'initializing' || state.phase === 'registering',
     needsProfile: state.phase === 'profileRequired',
-    login, register, resetPassword, resendVerification: () => verification(true), checkVerification: () => verification(false),
-    completeProfile: async (input) => {
+    login, register, resetPassword,
+    completeProfile: async (input, connect) => {
       if (state.phase !== 'profileRequired' || state.identity?.uid !== firebaseAuth().currentUser?.uid) return;
       const profile = typeof input === 'string' ? { name: input } : input;
       const error = profileError(profile);
       if (error) { setState((current) => ({ ...current, error })); return; }
+      connectAfterSignIn(connect);
+      // A taken name is refused here too: back to this same screen with the message, still signed in.
       await sync(profile);
     },
+    connectEmail: async (email, password) => {
+      const problem = connectEmailError(email, password);
+      if (problem) throw new Error(problem);
+      try { await addEmail(ownUser(), email, password); }
+      catch (error) { throw new Error(error instanceof Error && !(error as { code?: string }).code && !(error as { status?: number }).status ? error.message : authErrorMessage(error)); }
+    },
+    connectedEmail: () => {
+      const user = firebaseAuth().currentUser;
+      return user?.email ? { email: user.email, verified: user.emailVerified } : null;
+    },
+    resendEmailVerification: async () => {
+      try { await sendEmailVerification(ownUser()); }
+      catch (error) { throw new Error(authErrorMessage(error)); }
+    },
+    checkEmailVerified: async () => {
+      const user = ownUser();
+      try {
+        await user.reload();
+        if (!user.emailVerified) return false;
+        await user.getIdToken(true); // The backend reads the refreshed email_verified claim.
+        await apiRequest('/auth/session', 'POST', { deferProfileCreation: true });
+        return true;
+      } catch (error) { throw new Error(authErrorMessage(error)); }
+    },
+    loadRecovery: () => apiRequest<AccountRecovery>('/auth/recovery'),
+    setPassword: async (password, currentPassword) => {
+      await apiRequest('/auth/password', 'PUT', { password, ...(currentPassword ? { currentPassword } : {}) });
+    },
+    clearMessage: () => setState((current) => ({ ...current, message: '' })),
     updateAvatar: async (avatar) => {
       const owner = state.session?.user.id;
       if (state.phase !== 'signedIn' || !owner) throw new Error('Sign in to change your avatar.');

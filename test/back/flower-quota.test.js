@@ -61,7 +61,7 @@ test("the reserve SQL runs on Postgres with the real migration and stops at two"
   delete process.env.DAILY_GROW_LIMIT_ENABLED;
   const pg = new PGlite();
   t.after(async () => { await pg.close(); if (previous === undefined) delete process.env.DAILY_GROW_LIMIT_ENABLED; else process.env.DAILY_GROW_LIMIT_ENABLED = previous; });
-  await pg.exec('CREATE TABLE "User" ("id" text PRIMARY KEY); INSERT INTO "User" VALUES (\'alice\');');
+  await pg.exec('CREATE TABLE "User" ("id" text PRIMARY KEY, "emailVerifiedAt" timestamp(3) DEFAULT now()); INSERT INTO "User" VALUES (\'alice\');');
   await pg.exec(await readFile(new URL("../../prisma/migrations/202610240001_daily_flower_quota/migration.sql", import.meta.url), "utf8"));
   const tx = { $queryRawUnsafe: async (sql, ...params) => (await pg.query(sql, params)).rows };
   const day = { userId: "alice", localDate: "2026-10-22" };

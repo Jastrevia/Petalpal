@@ -5,7 +5,7 @@
   const API = 'https://api.synthetic.invalid';
   const nativeFetch = window.fetch.bind(window);
   const uid = 'local-preview-owner', email = 'preview@example.invalid', password = 'preview-only';
-  const user = { id: uid, name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale: 'en', aiConsent: true };
+  const user = { id: uid, accountId: 'PP12345678', name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale: 'en', aiConsent: true };
   // People to find and friend requests, so every state of Friends → Requests can be tried.
   const ago = days => new Date(Date.now() - days * 86400e3).toISOString();
   const people = [
@@ -23,8 +23,8 @@
     const now = Math.floor(Date.now() / 1000);
     const encode = v => btoa(JSON.stringify(v)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: uid, user_id: uid, aud: 'petalpal-synthetic',
-      iss: 'https://securetoken.google.com/petalpal-synthetic', email, email_verified: true, iat: now, auth_time: now,
-      exp: now + 3600, firebase: { sign_in_provider: 'password' } })}.synthetic`;
+      iss: 'https://securetoken.google.com/petalpal-synthetic', email: accountEmail || undefined, email_verified: emailVerified, iat: now, auth_time: now,
+      exp: now + 3600, firebase: { sign_in_provider: accountEmail ? 'password' : 'custom' } })}.synthetic`;
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
@@ -77,6 +77,8 @@
   const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png', worldX: 607, worldY: 1081, regionId: `Land${day(6).slice(5, 7)}`,
     createdAt: day(6) + 'T18:00:00.000Z', supportCount: 1, sourceType: 'EVENT', sourceEventId: 'fe1',
     supportState: { supportedToday: false, canSupport: true }, messages: [] };
+  // A name-and-avatar account has no email until one is connected; the link counts as opened on the second check.
+  let accountEmail = email, emailVerified = true, emailChecks = 0, hasPassword = true, linked = true;
   let signedIn = false, blocked = false, checkedInToday = false, momentsUnread = true;
   // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
   const ownFlowers = [], events = new Map();
@@ -105,10 +107,21 @@
       if (url.pathname === '/v1/accounts:signInWithPassword') {
         // Like Firebase, the email ignores case and stray spaces (phones capitalise the first letter).
         if (String(request.email || '').trim().toLowerCase() !== email || String(request.password || '').trim() !== password) return json({ error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } }, 400);
-        signedIn = true;
+        signedIn = true; accountEmail = email; emailVerified = true;
         return json({ localId: uid, email, displayName: user.name, registered: true, idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600' });
       }
-      if (url.pathname === '/v1/accounts:lookup') { signedIn = true; return json({ users: [{ localId: uid, email, emailVerified: true, displayName: user.name, providerUserInfo: [{ providerId: 'password', rawId: email, email }] }] }); }
+      if (url.pathname === '/v1/accounts:signInWithCustomToken') {
+        signedIn = true;
+        return json({ idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600', isNewUser: false });
+      }
+      if (url.pathname === '/v1/accounts:signUp') {
+        if (/taken/i.test(request.email)) return json({ error: { code: 400, message: 'EMAIL_EXISTS' } }, 400);
+        accountEmail = request.email; emailVerified = false; linked = true;
+        return json({ localId: uid, email: accountEmail, idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600' });
+      }
+      if (url.pathname === '/v1/accounts:lookup') {
+        if (accountEmail && !emailVerified && ++emailChecks >= 3) emailVerified = true;
+        signedIn = true; return json({ users: [{ localId: uid, email: accountEmail || undefined, emailVerified, displayName: user.name, providerUserInfo: linked ? [{ providerId: 'password', rawId: email, email }] : [] }] }); }
       if (url.pathname === '/v1/accounts:sendOobCode') return json({ email: request.email });
       return json({ error: { code: 400, message: 'OPERATION_NOT_ALLOWED' } }, 400);
     }
@@ -118,7 +131,21 @@
     }
     if (url.origin === API) {
       const p = url.pathname;
+      if (p === '/auth/register') {
+        if (/taken/i.test(request.name)) return json({ error: 'That name is taken. Try another one.', code: 'USERNAME_TAKEN' }, 409);
+        user.name = request.name; user.avatar = request.avatar; accountEmail = null; emailVerified = false; hasPassword = false; emailChecks = 0; linked = false;
+        return json({ signInToken: 'local-preview-pass' }, 201);
+      }
+      if (p === '/auth/password-login') {
+        if (![user.name.toLowerCase(), String(user.accountId).toLowerCase()].includes(String(request.login).replace(/^@/, '').toLowerCase()) || request.password !== password) {
+          return json({ error: 'Check your name or PP number and password, then try again.', code: 'LOGIN_FAILED' }, 400);
+        }
+        accountEmail = null; emailVerified = false; emailChecks = 0; linked = false;
+        return json({ signInToken: 'local-preview-pass' });
+      }
       if (!signedIn) return json({ error: 'Sign in to the local preview first' }, 401);
+      if (p === '/auth/recovery') return json({ name: user.name, accountId: user.accountId, email: emailVerified ? accountEmail : null, hasPassword });
+      if (p === '/auth/password') { hasPassword = true; return json({ hasPassword }); }
       if (p === '/auth/session') return json({ user });
       if (p === '/ai/reports/weekly/trigger' || p === '/ai/reports/monthly/trigger') return json({ error: 'Reflections are not written in the local preview' }, 409);
       // Weekly 2.0 "不准确 / 隐藏": the mark stays on that insight of the preview report.

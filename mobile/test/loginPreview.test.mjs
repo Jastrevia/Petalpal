@@ -175,11 +175,11 @@ function harness({ width = 390, phase = 'idle', platform = 'web', props = {} } =
 }
 
 const h = harness();
-assert.equal(h.input('Email address').props.autoComplete, 'username', 'Email supports username autofill');
-assert.equal(h.input('Email address').props.textContentType, 'username', 'iOS login autofill uses the username hint');
+assert.equal(h.input('Username / PP number').props.autoComplete, 'username', 'The login supports username autofill');
+assert.equal(h.input('Username / PP number').props.textContentType, 'username', 'iOS login autofill uses the username hint');
 assert.equal(h.input('Password').props.autoComplete, 'current-password', 'Password supports existing-password autofill');
 assert.equal(h.input('Password').props.secureTextEntry, true, 'Password starts concealed');
-for (const label of ['Email address', 'Password']) {
+for (const label of ['Username / PP number', 'Password']) {
   assert.ok(h.nodes().some(({ node }) => node.type === 'Text' && h.text(node).trim() === label), `${label} has a visible persistent label`);
 }
 
@@ -190,24 +190,24 @@ function submit() {
   action.props.onPress(); h.render(); h.assertIdle();
 }
 submit();
-assert.ok(h.byId('email-error'), 'Empty submit shows an email error');
+assert.ok(h.byId('email-error'), 'Empty submit shows a login error');
 assert.ok(h.byId('password-error'), 'Empty submit shows a password error');
 
-h.type('Email address', 'invalid-address');
-assert.equal(Boolean(h.byId('email-error')), false, 'Editing email clears its previous error');
+h.type('Username / PP number', 'invalid-address');
+assert.equal(Boolean(h.byId('email-error')), false, 'Editing the login clears its previous error');
 h.type('Password', 'x');
 assert.equal(Boolean(h.byId('password-error')), false, 'Editing password clears its previous error');
 submit();
-assert.ok(h.byId('email-error'), 'Malformed email is rejected');
+assert.equal(Boolean(h.byId('email-error')), false, 'A name is not an email, and is not refused for it');
 assert.ok(h.byId('password-error'), 'Too-short password is rejected');
 
-h.type('Email address', '  preview@example.invalid  ');
+h.type('Username / PP number', '  preview@example.invalid  ');
 h.type('Password', 'synthetic-preview-only');
 submit();
-assert.equal(Boolean(h.byId('email-error')), false, 'Whitespace-trimmed email validates');
+assert.equal(Boolean(h.byId('email-error')), false, 'Whitespace-trimmed login validates');
 assert.equal(Boolean(h.byId('password-error')), false, 'Valid synthetic password validates');
 assert.match(h.text(h.byId('login-notice')), /preview|not connected|unavailable/i, 'Valid form clearly identifies unavailable authentication');
-for (const label of ['Email address', 'Password']) {
+for (const label of ['Username / PP number', 'Password']) {
   assert.ok(h.nodes().some(({ node }) => node.type === 'Text' && h.text(node).trim() === label), 'Labels remain visible when fields contain values');
 }
 h.press('Show password');
@@ -231,7 +231,7 @@ const explicitHeight = node => {
 for (const control of [login(), h.button('Continue with Apple'), h.button('Continue with Google'), h.button('Show password')]) {
   assert.ok(explicitHeight(control) >= 44, 'Primary, provider, and visibility controls retain a 44px minimum height');
 }
-for (const label of ['Email address', 'Password']) {
+for (const label of ['Username / PP number', 'Password']) {
   const control = h.input(label);
   const parent = h.nodes().find(({ node }) => node === control)?.parent;
   assert.ok(Math.max(explicitHeight(control), explicitHeight(parent)) >= 44, 'Input surface retains a 44px minimum height');
@@ -241,7 +241,7 @@ for (const label of ['Email address', 'Password']) {
 }
 
 h.setPhase('camera_entering');
-for (const label of ['Email address', 'Password']) {
+for (const label of ['Username / PP number', 'Password']) {
   assert.equal(h.input(label).props.editable, false, 'Transition disables editing');
   assert.equal(h.input(label).props.tabIndex, -1, 'Transition removes fields from tab order');
 }
@@ -271,12 +271,12 @@ for (const label of ['Continue with Apple', 'Continue with Google', 'Forgot pass
 assert.equal(Boolean(live.byId('entrance-dev-controls')), false, 'Real sign-in hides the DEV overlay');
 assert.match(live.text(live.byId('login-footer')), /POLICY_LINKS/, 'Terms and Privacy links stay on the card');
 assert.match(live.text(live.byId('login-notice')), /Synthetic sign-in error/, 'The account error is shown on the card');
-live.type('Email address', ' fixture@example.test ');
+live.type('Username / PP number', ' fixture@example.test ');
 live.type('Password', 'synthetic password');
 live.nodes().find(({ node }) => node.type === 'Pressable' && /\bLog In\b/.test(live.text(node)))?.node.props.onPress();
 await new Promise(resolve => setImmediate(resolve));
 live.render();
-assert.deepEqual(signIns, [['fixture@example.test', 'synthetic password']], 'Log In sends the trimmed email and password to the real sign-in once');
+assert.deepEqual(signIns, [['fixture@example.test', 'synthetic password']], 'Log In sends the trimmed login and password to the real sign-in once');
 assert.equal(live.input('Password').props.value, '', 'The password field is cleared after an attempt');
 live.press('Create account');
 assert.equal(signIns.at(-1), 'create', 'Create account opens real registration');
