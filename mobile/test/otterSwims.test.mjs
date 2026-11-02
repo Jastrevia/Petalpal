@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
@@ -39,4 +40,25 @@ test('it rises, swims and dives smoothly, then stays hidden until the next swim'
     const o = otter.swimPose(swim, t).opacity; assert.ok(o >= previous - 1e-9, 'fades in, never pops'); previous = o;
   }
   assert.equal(otter.swimPose({ ...swim, b: { x: -300, y: 0 } }, 12).facing, -1, 'faces the way it swims');
+});
+
+test('she glows above the night grade, so her swims stay clear of the bridges and the waterfall', () => {
+  const { planSwim, swimmableWater, OVER_WATER } = load('../spirits/otterSwims');
+  const water = point => swimmableWater(point, () => true);
+  const bounds = { minX: 60, minY: 40, maxX: 2340, maxY: 1620 };
+  let planned = 0;
+  for (let i = 0; i < 400; i++) {
+    let seed = i * 7 + 1;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const swim = planSwim({ from: null, now: 0, isWater: water, bounds, random });
+    if (!swim) continue;
+    planned++;
+    for (let t = 0; t <= 1; t += .02) {
+      const point = { x: swim.a.x + (swim.b.x - swim.a.x) * t, y: swim.a.y + (swim.b.y - swim.a.y) * t };
+      for (const o of OVER_WATER) assert.ok(((point.x - o.x) / o.rx) ** 2 + ((point.y - o.y) / o.ry) ** 2 > 1, 'swims never cross what stands over the water');
+    }
+  }
+  assert.ok(planned > 300);
+  const scene = fs.readFileSync(new URL('../src/components/garden/GardenScene.tsx', import.meta.url), 'utf8');
+  assert.ok(scene.indexOf('<MemoryOtter') > scene.indexOf('</Group>\n          </Group>\n          <Group transform={cameraTransform}>'), 'drawn after the night grade');
 });

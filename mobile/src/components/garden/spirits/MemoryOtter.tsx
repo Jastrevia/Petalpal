@@ -3,18 +3,18 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
 import { gardenGroundKind } from '../fairy/gardenGround';
 import SheetFrame from '../SheetFrame';
-import { planSwim, swimEnd, swimPose, type Swim } from './otterSwims';
+import { planSwim, swimEnd, swimmableWater, swimPose, type Swim } from './otterSwims';
 
 // Memory Otter, the lake's night spirit: a water otter with blossoms inside, out only in the
 // evening and at night. It swims a stretch of open water, dives, and surfaces somewhere near
 // (otterSwims.ts). Painted frames of a generated swimming clip on black, drawn in screen blend,
 // so the black falls away and its body glows translucent over the water it swims in, lighting
-// only its own patch of lake. 62 frames at 12 fps, 304 × 180 each, painted facing right.
+// only its own patch of lake. GardenScene draws it after the night grade so that glow stays bright. 62 frames at 12 fps, 304 × 180 each, painted facing right.
 const ART = require('@/assets/garden/spirits/otter-swim.webp');
 const SWIM = { columns: 10, count: 62, fps: 12, w: 304, h: 180 };
 // Body length in world units (PPL's walking frame is about 102 wide).
 const LENGTH = 150;
-const isWater = (p: { x: number; y: number }) => gardenGroundKind(p) === 'water';
+const isWater = (p: { x: number; y: number }) => swimmableWater(p, q => gardenGroundKind(q) === 'water');
 // The lake without its outermost edges, which framings crop (world units).
 const BOUNDS = { minX: 60, minY: 40, maxX: 2340, maxY: 1620 };
 

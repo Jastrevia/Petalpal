@@ -41,7 +41,14 @@ const WorldTimeContext = createContext<WorldTimeState | null>(null);
 export function WorldTimeProvider({ children }: { children: ReactNode }) {
   runtimeAudit.render('WorldTimeProvider');
   const [now, setNow] = useState(() => new Date());
-  const [devOverride, setDevOverride] = useState<WorldTimeOverride>('auto');
+  const [devOverride, setDevOverride] = useState<WorldTimeOverride>(() => {
+    if (__DEV__ && typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const p = params.get('phase') || params.get('time');
+      if (p === 'day' || p === 'evening' || p === 'night') return p;
+    }
+    return 'auto';
+  });
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;

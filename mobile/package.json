@@ -62,7 +62,8 @@
     "postinstall": "patch-package",
     "build:web": "expo export --platform web",
     "ios:device": "node ./scripts/ios-device.mjs --env development --configuration Debug",
-    "ios:device:release": "node ./scripts/ios-device.mjs --env usability-test --configuration Release"
+    "ios:device:release": "node ./scripts/ios-device.mjs --env usability-test --configuration Release",
+    "test:night": "node --test ./test/fireflies.test.mjs && node --test ./test/lanternLighting.test.mjs && node --test ./test/lanternPlacement.test.mjs"
   },
   "private": true
 }

@@ -1,3 +1,12 @@
+import FireflyLayer from './fireflies/FireflyLayer';
+import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
+import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
+import ExistingWindowLights from './lanterns/ExistingWindowLights';
+import { useNightLighting } from './lanterns/nightLighting';
+import { usePathname } from 'expo-router';
+import LanternLayer from './lanterns/LanternLayer';
+import LanternPlacementEditor from './lanterns/LanternPlacementEditor';
+import { useLanternPlacements } from './lanterns/useLanternPlacements';
 import { hitsMailbox } from './fairy/mailboxDestination';
 import { hitsTreehouse } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
@@ -12,7 +21,7 @@ import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
 import { DailyCheckInIntro } from './DailyCheckInIntro';
 import type { FlowerSession } from './planting/flowerDetailApi';
-import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
+import { Circle, ColorMatrix, Paint, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
@@ -396,6 +405,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
   const worldTime = useWorldTime();
+  const nightLighting = useNightLighting(worldTime.isTreehouseLightingTime);
+  const lanternPathname = usePathname();
+  const fireflyPreview = __DEV__ && lanternPathname === '/firefly-preview';
+  const [fireflySettings, setFireflySettings] = useState(DEFAULT_FIREFLIES);
+  const fireflies = fireflyPreview ? fireflySettings : DEFAULT_FIREFLIES;
+  const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
+  const lanterns = useLanternPlacements(lanternEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
@@ -1430,6 +1446,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
+          <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
             {/* 1. Solid fallback, only while the water field is not drawn: the field fills this same rectangle opaquely
@@ -1493,8 +1510,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               mode={perf.WaterAnimation?lotusMode:'static'}
             /></GardenProfile>
 
-            {/* Memory Otter: on the water, under the islands and bridges; evening and night only. */}
-            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
 
             {/* V2 is one independent terrain; islands and treehouse occlude it naturally. */}
             {perf.Waterfall && showLandmarks && waterfallVersion === 'v2' && (
@@ -1643,11 +1658,29 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
           </Group>
+          </Group>
+          <Group transform={cameraTransform}>
+            {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
+            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
+            {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
+            {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
+              <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
+            <LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
+          </Group>
           </PlantingProvider>
           </GardenLandResources>
         </Canvas>
         </GestureDetector>
       )}
+      {lanternEditorEnabled && <LanternPlacementEditor {...lanterns}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
+        focus={(x, y) => {
+          focusCoords(x, y, 2.2);
+          // Leave the focused sprite clear of the editor, including narrow web viewports.
+          cameraX.value -= viewport.width * 0.3;
+          cameraY.value += viewport.height * 0.25;
+        }} />}
+      {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}

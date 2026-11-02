@@ -17,6 +17,15 @@ const MAX_TILT = 0.4; // radians from level
 
 const between = ([low, high]: readonly [number, number], random: () => number) => low + (high - low) * random();
 
+// She glows above the night grade, over everything in the Garden, so her swims keep clear of what
+// stands over the water: the three bridges (same areas as the Fairy's flight obstacles) and the waterfall.
+export const OVER_WATER = [
+  { x: 1575, y: 605, rx: 145, ry: 95 }, { x: 1610, y: 1040, rx: 225, ry: 115 }, { x: 1720, y: 1470, rx: 150, ry: 140 },
+  { x: 1060, y: 80, rx: 190, ry: 170 },
+] as const;
+export const swimmableWater = (point: Point, isWater: (p: Point) => boolean) =>
+  isWater(point) && OVER_WATER.every(o => ((point.x - o.x) / o.rx) ** 2 + ((point.y - o.y) / o.ry) ** 2 > 1);
+
 export function isOpenWater(point: Point, isWater: (p: Point) => boolean) {
   if (!isWater(point)) return false;
   for (let i = 0; i < 8; i++) {
