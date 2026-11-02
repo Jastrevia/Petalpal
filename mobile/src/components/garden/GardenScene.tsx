@@ -1704,7 +1704,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
           <Text accessibilityRole="alert" style={styles.lawnNoteText}>{zhHans(locale)
             ? `这是 ${lawnNote.month} 月的草地，不能在这里种花哟`
-            : `This is ${new Date(2024, lawnNote.month - 1, 1).toLocaleDateString('en', { month: 'long' })}'s land. You can't plant flowers here right now.`}</Text>
+            : `${new Date(2024, lawnNote.month - 1, 1).toLocaleDateString('en', { month: 'long' })}'s land: no planting here`}</Text>
         </View>
       )}
       {children}
@@ -2263,8 +2263,8 @@ const styles = StyleSheet.create({
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },
   zoomButtonText: { color: '#fff', fontSize: 25, lineHeight: 30 },
-  lawnNote: { position: 'absolute', alignSelf: 'center', top: '42%', maxWidth: 300, zIndex: 35, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#FAF3DFF5', boxShadow: '0 4px 14px #0B1F1A44' },
-  lawnNoteText: { fontFamily: 'serif', fontSize: 15, lineHeight: 21, color: '#254E43', textAlign: 'center' },
+  lawnNote: { position: 'absolute', alignSelf: 'center', top: '42%', maxWidth: 280, zIndex: 35, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 11, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#FAF3DFF5', boxShadow: '0 4px 14px #0B1F1A44' },
+  lawnNoteText: { fontFamily: 'serif', fontSize: 12, lineHeight: 16, color: '#254E43', textAlign: 'center' },
   controls: { position: 'absolute', top: 8, left: 8, right: 8, padding: 8, gap: 6, backgroundColor: '#FFFFFFE8' },
   controlRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   controlButton: { minHeight: 32, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 6, backgroundColor: '#D8DDDA' },

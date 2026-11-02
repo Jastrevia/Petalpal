@@ -40,19 +40,21 @@ export function GardenDock({ chinese }: { chinese: boolean }) {
     setRing(fresh ?? petal);
   }
   const short = height < 500;
-  const size = short ? 40 : Math.min(58, Math.max(46, width * .135));
+  // The same size as the bottom bar's icons, so the Garden stays in view.
+  const phone = width < 600 || (width < 900 && short);
+  const size = phone ? Math.max(28, Math.min(short ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;
   const drawn = Boolean(petal?.drawn);
   const item = (id: string, image: ImageSourcePropType, label: string, a11y: string, onPress: () => void, dot = false, note?: string) =>
     <Pressable key={id} testID={`dock-${id}`} accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress}
-      style={({ pressed }) => [styles.item, { width: Math.max(62, size + 10) }, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
       <View>
         <Image accessible={false} source={image} resizeMode="contain" style={{ width: size, height: size }} />
         {dot ? <View testID={`dock-${id}-dot`} style={[styles.dot, { borderColor: theme.background }]} /> : null}
       </View>
-      <Text numberOfLines={1} style={[styles.label, { fontSize: short ? 10 : 11 }]}>{label}{note ? ` ${note}` : ''}</Text>
+      <Text numberOfLines={1} style={styles.label}>{label}{note ? ` ${note}` : ''}</Text>
     </Pressable>;
   return <>
-    <View testID="garden-dock" pointerEvents="box-none" style={[styles.dock, { top: insets.top + 78, right: insets.right + 8, gap: short ? 0 : 4 }]}>
+    <View testID="garden-dock" pointerEvents="box-none" style={[styles.dock, { top: insets.top + 78, right: insets.right + 4 }]}>
       {/* Hidden while the server's petal card switch leaves this owner out. */}
       {petal ? item('tarot', TAROT, copy.tarot, drawn ? copy.tarotUsed : copy.tarot, () => void openRing(), false, drawn ? '1/1' : undefined) : null}
       {item('pet', PET, copy.pet, copy.pet, () => setPetOpen(true))}
@@ -77,9 +79,9 @@ export function GardenDock({ chinese }: { chinese: boolean }) {
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', alignItems: 'center' },
-  item: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  item: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: .7, transform: [{ scale: .94 }] },
-  label: { fontFamily: 'serif', lineHeight: 14, color: '#FFF8E4', textShadowColor: '#0B241FE6', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  label: { fontFamily: 'serif', fontSize: 10, lineHeight: 13, color: '#FFF8E4', textShadowColor: '#0B241FE6', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   dot: { position: 'absolute', top: 0, right: -1, width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, backgroundColor: '#E5735F' },
   scrim: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#0A1A1799' },
   card: { width: '100%', maxWidth: 320, alignItems: 'center', gap: 8, padding: 22, borderRadius: 22, borderWidth: 1.5 },

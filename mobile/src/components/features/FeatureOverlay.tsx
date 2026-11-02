@@ -1,6 +1,7 @@
 import { devVariant } from '../../services/deviceReset';
 import { DeviceResetButton } from './DeviceReset';
 import { PrivacyAndSupport } from './PrivacyAndSupport';
+import { RedeemCodeChip } from './RedeemCodeSettings';
 import { AiPrivacySettings } from './AiPrivacySettings';
 import { ReportLanguageSettings } from './ReportLanguageSettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
@@ -210,8 +211,11 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
     </Pressable>
     <Text style={[ui.title, { color: theme.text }]}>{profile?.name || OVERLAY_COPY[locale].account404}</Text>
     <Text testID="profile-presence" style={[ui.caption, { color: online ? '#4F8A4E' : theme.muted }]}>{online ? '● ' : '○ '}{online ? copy.online : copy.offline}</Text>
-    {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
-      <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
+    <View style={styles.badges}>
+      {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
+        <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
+      <RedeemCodeChip />
+    </View>
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
     <AvatarPicker visible={choosing} title={copy.title} selected={profile?.avatar} busy={saving} error={error}
       closeLabel={copy.close} optionLabel={copy.option} onSelect={avatar => void choose(avatar)} onClose={() => setChoosing(false)} />
@@ -252,6 +256,7 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   orbitDot: { position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.secondary },
   fold: { minHeight: 32 },
   profileHero: { alignItems: 'center', gap: 10 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8 },
   betaBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#F6EBCB' },
   betaText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, color: '#7A5A1E' },
   avatar: { backgroundColor: colors.purpleWash, borderWidth: 2, borderColor: colors.secondary },
