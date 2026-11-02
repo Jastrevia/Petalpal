@@ -4,6 +4,7 @@ import { usePanelTheme, type PanelTheme } from './PanelTheme';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
+import { voiceMessage } from '../../services/voiceErrors';
 import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
 import { saveFlowerChoice } from '../../services/flowerChoices';
@@ -116,7 +117,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         <Text style={styles.text}>{copy.done}</Text></Pressable> : null}
       <Pressable accessibilityRole="button" onPress={() => void voice.cancel()} style={styles.voiceControl}><Text style={styles.text}>{copy.cancel}</Text></Pressable>
     </View> : null}
-    {voice.error ? <Text accessibilityRole="alert" style={styles.caption}>{voice.error}</Text> : null}
+    {voice.error ? <Text accessibilityRole="alert" style={styles.caption}>{voiceMessage(voice.error, locale)}</Text> : null}
     {voice.overflow ? <Text selectable style={styles.text}>{voice.overflow}</Text> : null}
 
     <Text style={styles.sectionTitle}>{copy.choose} <Text accessibilityLabel={copy.required} style={styles.required}>*</Text></Text>

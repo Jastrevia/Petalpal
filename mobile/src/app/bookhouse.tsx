@@ -17,6 +17,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { boundCamera, focusCamera, zoomCamera, type ShelfCamera } from '../components/bookhouse/shelfCamera';
 import { EngravedYear, ShelfMotif } from '../components/bookhouse/EngravedYear';
 import { useAuth } from '../services/auth';
+import { voiceMessage } from '../services/voiceErrors';
 import { useAppLocale } from '../services/locale';
 import { flowerNameText } from '../services/flowerNames';
 import { useGuest } from '../services/guest';
@@ -432,7 +433,7 @@ function JournalEditor({ userId, existing, onClose, onSaved }: {
         {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel={t('Done recording')} onPress={() => void voice.done()} style={s.smallButton}><Text style={paperBody}>{t('Done')}</Text></Pressable>}
         <Pressable accessibilityRole="button" accessibilityLabel={t('Cancel voice input')} onPress={() => void voice.cancel()} style={s.smallButton}><Text style={paperBody}>{t('Cancel')}</Text></Pressable>
       </View>}
-      {!!voice.error && <Text accessibilityRole="alert" style={paperBody}>{voice.error}</Text>}
+      {!!voice.error && <Text accessibilityRole="alert" style={paperBody}>{voiceMessage(voice.error, zh ? 'zh-Hans' : 'en')}</Text>}
       {!!voice.overflow && <Text selectable style={paperBody}>{voice.overflow}</Text>}
       {!!error && <Text accessibilityRole="alert" style={paperBody}>{error}</Text>}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

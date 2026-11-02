@@ -10,7 +10,7 @@ import { useAuth } from '../../services/auth';
 import { useCheckInMonth, useClosenessSummary } from '../../services/fairyCloseness';
 import { momentLocale } from '../moments/momentFormat';
 import { BOND_COPY } from '../bond/bondCopy';
-import { CalendarCheckIn } from '../bond/CalendarCheckIn';
+import { CalendarCheckIn, CalendarPetalEntry } from '../bond/CalendarCheckIn';
 import { flowerNameText } from '../../services/flowerNames';
 
 const COPY = {
@@ -88,7 +88,7 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
             <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => setOpen(false)} style={{ padding: 8, ...focus }}><Text style={popupLabel}>×</Text></Pressable>
           </View>
           <ScrollView>
-            {closeness.summary ? <CalendarCheckIn summary={closeness.summary} locale={locale} ink={popup.ink} muted={popup.muted} light={light} /> : null}
+            {closeness.summary ? <CalendarCheckIn summary={closeness.summary} locale={locale} ink={popup.ink} muted={popup.muted} light={light} /> : open && closeness.on === false ? <CalendarPetalEntry locale={locale} /> : null}
             <View style={{ flexDirection: 'row' }}>{copy.weekdays.map((day, i) => <Text key={i} style={[popupLabel, { width: '14.285%', textAlign: 'center', fontSize: 12 }]}>{day}</Text>)}</View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginVertical: 8 }}>{cells.map((day, i) => {
               const key = dateKey(new Date(month.getFullYear(), month.getMonth(), day));

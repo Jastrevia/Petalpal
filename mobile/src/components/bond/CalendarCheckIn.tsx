@@ -54,6 +54,19 @@ export function CalendarCheckIn({ summary, locale, ink, muted, light = true }: {
   </View>;
 }
 
+// Petal cards on with closeness off: the calendar still opens today's card.
+export function CalendarPetalEntry({ locale }: { locale: BondLocale }) {
+  const copy = BOND_COPY[locale];
+  const petal = usePetalToday(null), [ringOpen, setRingOpen] = useState(false);
+  if (!petal) return null;
+  return <View style={{ marginBottom: 12 }}>
+    <Pressable accessibilityRole="button" onPress={() => setRingOpen(true)} style={({ pressed }) => [styles.petalButton, pressed && styles.pressed]}>
+      <Text style={styles.petalText}>{petal.drawn?.card ? copy.petalSee(petal.drawn.card.name) : `✦ ${copy.petalDraw}`}</Text>
+    </Pressable>
+    <PetalRing visible={ringOpen} today={petal} onClose={() => setRingOpen(false)} />
+  </View>;
+}
+
 const styles = StyleSheet.create({
   card: { gap: 8, padding: 12, marginBottom: 12, borderRadius: 14, backgroundColor: '#F5ECF8', borderWidth: 1, borderColor: '#D9C2EA' },
   cardDark: { backgroundColor: '#1B4440', borderColor: '#52716A' },

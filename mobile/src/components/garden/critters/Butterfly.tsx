@@ -9,7 +9,7 @@ import { residents, skyTaken } from './gardenResidents';
 // it flutters to another stone (butterflyStones.ts). Seen from above, painted body pointing up
 // (448 × 367); it turns to its heading and its wings beat fast in the air.
 const ART = require('@/assets/garden/critters/butterfly.webp');
-const W = 448, H = 367, SIZE = 54;
+const W = 448, H = 367, SIZE = 30;
 const LAWNS = STONES.map((_, i) => stoneLawn(i, isOnMonthLawn));
 const lawnOf = (stone: number) => LAWNS[stone];
 

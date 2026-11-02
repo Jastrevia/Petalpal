@@ -672,9 +672,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     width: 56, height: 56,
   }));
   const fairyBubbleStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 110,
-    top: baseY + cameraY.value + (fairyBubblePoint.value.y - 150) * fit * cameraZoom.value - 64,
-    width: 220,
+    left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 75,
+    top: baseY + cameraY.value + (fairyBubblePoint.value.y - 150) * fit * cameraZoom.value - 50,
+    width: 150,
   }));
   const sayFairyLine = useCallback((state: FairyState, at: { x: number; y: number }) => {
     const line = pickTapLine(state, locale, recentFairyLines.current, Math.random, AMBIENT_LINES);
@@ -2300,10 +2300,10 @@ const styles = StyleSheet.create({
   scene: { flex: 1, backgroundColor: GARDEN_WATER_COLOR },
   fairyAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#365b42', alignItems: 'center' },
   fairyActionText: { color: '#fff', fontSize: 14 },
-  treehouseHint: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, alignItems: 'center',
+  treehouseHint: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 11, alignItems: 'center',
     backgroundColor: '#FFF6E2F2', borderWidth: 1, borderColor: '#C9A44C' },
-  treehouseHintText: { color: '#5A4630', fontSize: 13, fontWeight: '600' },
-  treehouseHintTail: { width: 10, height: 10, marginTop: -6, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF6E2F2',
+  treehouseHintText: { color: '#5A4630', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
+  treehouseHintTail: { width: 7, height: 7, marginTop: -4, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF6E2F2',
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },
   zoomButtonText: { color: '#fff', fontSize: 25, lineHeight: 30 },
