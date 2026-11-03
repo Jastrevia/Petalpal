@@ -1,5 +1,5 @@
 import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
 import { usePetOutfit } from '@/services/gardenPets';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
@@ -180,45 +180,55 @@ export function Critter({ visit, clock, zoom = 1, look = 'bare' }: { visit: Visi
 // moment. Looks on the same walking clip are in step already; a change to the other clip
 // (cape on or off) starts it at the frame whose legs match the ones showing (`phase`, a fraction
 // of its stride added to the ground covered), so the step carries on instead of jumping.
+// Each look is drawn by its own walker (keyed by the look), so a look's grid is never laid over
+// another look's sheet; the old look stays whole until the new one's sheets are in, then fades.
 const SWITCH_SECONDS = 0.25;
 const frac = (x: number) => x - Math.floor(x);
-type Shown = { look: PuppyLook; phase: number; from?: PuppyLook; fromPhase: number; at: number };
+type Shown = { look: PuppyLook; phase: number; from?: PuppyLook; fromPhase: number; ready: boolean; at: number };
 function Puppy({ visit, clock, look }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook }) {
   const reduced = useReducedMotion();
-  const [shown, setShown] = useState<Shown>({ look, phase: 0, fromPhase: 0, at: 0 });
+  const [shown, setShown] = useState<Shown>({ look, phase: 0, fromPhase: 0, ready: false, at: 0 });
   useEffect(() => {
     if (look === shown.look) return;
+    // Back to the look still showing before the new one was in: it simply stays.
+    if (look === shown.from && !shown.ready) { setShown({ look, phase: shown.fromPhase, fromPhase: 0, ready: true, at: 0 }); return; }
     const now = clock.value, along = visit.walked + visitDistance(visit, now);
     const was = PUPPY_LOOKS[shown.look], next = PUPPY_LOOKS[look];
     const frame = Math.floor(frac(along / was.loop + shown.phase) * was.count) % was.count;
     const phase = was.clip === next.clip ? shown.phase : frac((MATCHING_FRAME[was.clip][next.clip]![frame] + 0.5) / next.count - along / next.loop);
-    setShown({ look, phase, from: reduced ? undefined : shown.look, fromPhase: shown.phase, at: now });
-  }, [look, shown, reduced, clock, visit]);
+    // What shows now goes on showing: the current look once its sheets are in, else the one it
+    // was replacing.
+    const from = shown.ready ? shown.look : shown.from, fromPhase = shown.ready ? shown.phase : shown.fromPhase;
+    setShown({ look, phase, from, fromPhase, ready: false, at: Infinity });
+  }, [look, shown, clock, visit]);
+  const ready = useCallback(() => setShown(current => (current.ready ? current : { ...current, ready: true, at: clock.value })), [clock]);
   useEffect(() => {
-    if (shown.from === undefined) return;
-    const timer = setTimeout(() => setShown(current => ({ ...current, from: undefined })), SWITCH_SECONDS * 1000 + 100);
+    if (shown.from === undefined || !shown.ready) return;
+    const timer = setTimeout(() => setShown(current => ({ ...current, from: undefined })), (reduced ? 0 : SWITCH_SECONDS * 1000) + 100);
     return () => clearTimeout(timer);
-  }, [shown]);
+  }, [shown, reduced]);
   const fading = shown.from !== undefined;
-  const fadeOut = useDerivedValue(() => (fading ? Math.max(0, 1 - (clock.value - shown.at) / SWITCH_SECONDS) : 0), [fading, shown.at]);
+  const span = reduced ? 1e-3 : SWITCH_SECONDS;
+  const fadeOut = useDerivedValue(() => (fading ? Math.min(1, Math.max(0, 1 - (clock.value - shown.at) / span)) : 0), [fading, shown.at, span]);
   return <>
-    <PuppyLookWalker visit={visit} clock={clock} look={shown.look} phase={shown.phase} />
-    {fading ? <PuppyLookWalker visit={visit} clock={clock} look={shown.from!} phase={shown.fromPhase} fade={fadeOut} /> : null}
+    {/* Keyed by look alone: a look going from shown to fading keeps its walker and its loaded sheets. */}
+    <PuppyLookWalker key={shown.look} visit={visit} clock={clock} look={shown.look} phase={shown.phase} onReady={ready} />
+    {fading ? <PuppyLookWalker key={shown.from} visit={visit} clock={clock} look={shown.from!} phase={shown.fromPhase} fade={fadeOut} /> : null}
   </>;
 }
 
-function PuppyLookWalker({ visit, clock, look, phase, fade }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook; phase: number; fade?: DerivedValue<number> }) {
+function PuppyLookWalker({ visit, clock, look, phase, fade, onReady }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook; phase: number; fade?: DerivedValue<number>; onReady?: () => void }) {
   const sheet = useImage(PUPPY_LOOKS[look].source);
   if (!sheet) return null;
-  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={PUPPY_LOOKS[look]} w={ART.puppy.w} h={ART.puppy.h} phase={phase} fade={fade} />;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={PUPPY_LOOKS[look]} w={ART.puppy.w} h={ART.puppy.h} phase={phase} fade={fade} onReady={onReady} />;
 }
 
 // A walker in painted frames: which frame shows is set by how far it has come (over all its legs),
 // so each stride covers the same ground however the pace changes; standing still, it holds its
 // frame and carries on from it.
 // `phase`: a fraction of the stride to start the walk from; `fade`: drawn fading out over another
-// look (no shadow of its own then).
-function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number; phase?: number; fade?: DerivedValue<number> }) {
+// look (no shadow of its own then); `onReady`: told once all its sheets are in.
+function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onReady }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number; phase?: number; fade?: DerivedValue<number>; onReady?: () => void }) {
   const spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
   const scale = spec.size / Math.max(w, h);
@@ -238,6 +248,8 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade }: { v
   // Resting between legs (with a rest sheet): settling down, sitting, then getting up again; or,
   // getting up only (`rising`, before a chase).
   const restSheet = useImage(frames.rest?.source ?? null);
+  const loaded = (!frames.run || !!runSheet) && (!frames.rest || !!restSheet);
+  useEffect(() => { if (loaded) onReady?.(); }, [loaded, onReady]);
   const restFrame = useDerivedValue(() => {
     const rest = frames.rest, e = clock.value - visit.start;
     if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
