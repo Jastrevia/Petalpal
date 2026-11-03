@@ -31,6 +31,9 @@ jobs:
           persist-credentials: false
           # Pinned-reference parity tests read historical commits with git show.
           fetch-depth: 0
+          # Every commit and every code file, but not the history of large paintings: those made
+          # the full fetch take most of the 15 minutes. Today's files are still checked out whole.
+          filter: blob:limit=1m
       - name: Node 24 (matches pinned backend Docker image; tzdata 2026c)
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
