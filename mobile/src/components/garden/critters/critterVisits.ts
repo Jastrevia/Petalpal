@@ -28,8 +28,9 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   rabbit: { id: 'rabbit', kind: 'walker', size: 62, speed: 82.3, altitude: [0, 0] },
   // The hedgehog's pace matches its painted steps: 19.8 units each 1.08 s.
   hedgehog: { id: 'hedgehog', kind: 'walker', size: 42, speed: 18.4, altitude: [0, 0] },
-  // The puppy's pace matches its painted stride: 41.8 units each 1.42 s (it runs at RUN_SPEED).
-  puppy: { id: 'puppy', kind: 'walker', size: 113, speed: 29.5, altitude: [0, 0] },
+  // The puppy's pace sits between its two painted walks (puppyLooks.ts): bare 123.7 units each
+  // 2.75 s, caped 43.3 units each 1.25 s (it runs at RUN_SPEED).
+  puppy: { id: 'puppy', kind: 'walker', size: 113, speed: 38, altitude: [0, 0] },
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
   silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
 };
@@ -85,6 +86,13 @@ export function planChase({ visit, now, path }: { visit: Visit; now: number; pat
   const lead = rising ? RISE_SECONDS : 0.15;
   return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + visitDistance(visit, now),
     chase: true, sits: false, rising, speed: RUN_SPEED, rhythm: RUNNING, duration: lead + pathLength(path) / RUN_SPEED };
+}
+
+// Stops a chase where the puppy is now (when its outfit changes mid-run, it sits down first and
+// changes sitting): the leg simply ends here, so the next leg is the usual sit after a chase.
+export function stopChase(visit: Visit, now: number): Visit {
+  if (!visit.chase || now >= visit.start + visit.duration) return visit;
+  return { ...visit, duration: Math.max(visit.lead, now - visit.start) };
 }
 
 // The rabbit and the hedgehog play only on lawns with no flowers yet, one animal to a lawn (and

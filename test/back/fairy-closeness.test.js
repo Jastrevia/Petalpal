@@ -255,7 +255,7 @@ test("summary and keepsake book", async () => {
   assert.ok(book.keepsakes.filter(keepsake => !keepsake.owned).every(keepsake => !("note" in keepsake) && keepsake.count === 0));
 });
 
-test("bond rewards: Lv 4-10 pendants, 11-15 collars, 16-20 hats, in pairs, never repeated, every row emptied", () => {
+test("bond rewards: Lv 4-8 hats, 9-15 pendants, 16-20 collars, in pairs, never repeated, every row emptied", () => {
   const rows = row => PET_ACCESSORIES.filter(item => item.row === row);
   assert.deepEqual(["hat", "collar", "pendant"].map(row => rows(row).length), [10, 9, 13]);
   assert.equal(new Set(PET_ACCESSORIES.map(item => item.id)).size, 32);
@@ -428,7 +428,7 @@ test("closeness routes", async (t) => {
     assert.equal(book.body.owned, 1);
     assert.deepEqual(plain((await call("/api/fairy/closeness/tap", "POST")).body), { awarded: 1, levelUp: null });
     assert.deepEqual(summary.body.bondRewards.accessories.map(band => [band.row, band.from, band.to, band.owned, band.total]),
-      [["pendant", 4, 10, 0, 13], ["collar", 11, 15, 0, 9], ["hat", 16, 20, 0, 10]]);
+      [["hat", 4, 8, 0, 10], ["pendant", 9, 15, 0, 13], ["collar", 16, 20, 0, 9]]);
     const pets = await call("/api/fairy/pets");
     assert.equal(pets.status, 200);
     assert.equal(pets.body.foods.reduce((sum, food) => sum + food.count, 0), 1, "today's check-in brought one food");

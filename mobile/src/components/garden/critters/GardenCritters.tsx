@@ -1,14 +1,16 @@
 import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { useDerivedValue, useReducedMotion, type SharedValue } from 'react-native-reanimated';
+import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
+import { usePetOutfit } from '@/services/gardenPets';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
+import { MATCHING_FRAME, PUPPY_LOOKS, puppyLookOf, type PuppyLook } from './puppyLooks';
 import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, leaveVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, leaveVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -35,11 +37,9 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // (scripts/critters/video-frames.py), every pose painted whole. `loop` is the ground their
   // planted paws cover in that stride, so they do not skid.
   hedgehog: { source: require('@/assets/garden/critters/hedgehog-walk.webp'), frames: { columns: 5, count: 13, ground: 277, loop: 19.8 }, w: 344, h: 280 },
-  // The puppy also runs (a gallop clip) when it chases the bluebird and sits down where it caught
-  // up (a clip from running to sitting); all three share one crop, ground and scale.
-  puppy: { source: require('@/assets/garden/critters/puppy-walk.webp'), w: 418, h: 300, frames: { columns: 6, count: 17, ground: 275, loop: 41.8,
-    run: { source: require('@/assets/garden/critters/puppy-run.webp'), columns: 5, count: 15, loop: 181.5 },
-    rest: { source: require('@/assets/garden/critters/puppy-sit.webp'), count: 16, rise: 2 } } },
+  // The puppy walks, gallops after the bluebird and sits down where it caught up in its outfit's
+  // paintings (puppyLooks.ts; bare when it has nothing on), all sharing one crop, ground and scale.
+  puppy: { source: PUPPY_LOOKS.bare.source, w: 418, h: 300, frames: PUPPY_LOOKS.bare },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -48,6 +48,9 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
       rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24, always: true } } },
 };
 const REST_FPS = 12;
+// From the end of a run to sitting still: the longest settling-down sheet (16 frames at REST_FPS)
+// plus the check that starts the next leg.
+const SIT_DOWN_MS = 1600;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 // Where the puppy waits for a bird landing on `perch`: the path point nearest below it.
@@ -67,6 +70,20 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
   const awaySince = useRef<number | null>(null);
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
+  // What the puppy has on (its wardrobe, lib/garden-pets.js); `dressed` overrides it in development.
+  const outfit = usePetOutfit('puppy', active);
+  const [dressed, setDressed] = useState<PuppyLook | undefined>(undefined);
+  const look = dressed !== undefined ? dressed : puppyLookOf(outfit);
+  // The look it shows. Walking or sitting, a new outfit goes on at once; running after the
+  // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
+  const [shownLook, setShownLook] = useState(look);
+  useEffect(() => {
+    const now = clock.value;
+    if (!visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && now < v.start + v.duration)) { setShownLook(look); return; }
+    setVisits(current => current.map(v => (v.id === 'puppy' ? stopChase(v, now) : v)));
+    const timer = setTimeout(() => setShownLook(look), SIT_DOWN_MS);
+    return () => clearTimeout(timer);
+  }, [look, clock]);
   const unplanted = useMemo(() => {
     const planted = new Set(placements.filter(p => !awaitsPlanting(p)).map(p => p.month));
     return Array.from({ length: 12 }, (_, i) => i + 1).filter(month => !planted.has(month));
@@ -125,10 +142,13 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
   useEffect(() => {
     if (!__DEV__ || typeof window === 'undefined') return;
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
-      visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1) })),
+      visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1), chase: Boolean(visit.chase), sits: Boolean(visit.sits) })),
       clear: () => setVisits([]),
       // Send the puppy after the bluebird as if it had just taken off for `to`.
       chase: (to: Point) => chase.current(to),
+      // Dress the puppy as if its outfit were `to` ('bare', 'hat', 'cape-hat' …; undefined: back
+      // to what the server says).
+      dress: (to?: PuppyLook) => setDressed(to),
       unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
       spawn: (id: CritterId) => {
         for (let attempt = 0; attempt < 40; attempt++) {
@@ -142,12 +162,13 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
       },
     };
   }, [clock]);
-  return <>{visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} />)}</>;
+  return <>{visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} />)}</>;
 });
 
-export function Critter({ visit, clock, zoom = 1 }: { visit: Visit; clock: SharedValue<number>; zoom?: number }) {
+export function Critter({ visit, clock, zoom = 1, look = 'bare' }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook }) {
   const art = ART[visit.id];
-  const image = useImage(art.source);
+  const image = useImage(visit.id === 'puppy' ? null : art.source);
+  if (visit.id === 'puppy') return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}><Puppy visit={visit} clock={clock} look={look} /></Group>;
   if (!image) return null;
   return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
     {art.frames && CRITTERS[visit.id].kind === 'walker' ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
@@ -155,14 +176,53 @@ export function Critter({ visit, clock, zoom = 1 }: { visit: Visit; clock: Share
   </Group>;
 }
 
+// The puppy in its outfit. A new outfit simply goes on: the old look fades off the new one in a
+// moment. Looks on the same walking clip are in step already; a change to the other clip
+// (cape on or off) starts it at the frame whose legs match the ones showing (`phase`, a fraction
+// of its stride added to the ground covered), so the step carries on instead of jumping.
+const SWITCH_SECONDS = 0.25;
+const frac = (x: number) => x - Math.floor(x);
+type Shown = { look: PuppyLook; phase: number; from?: PuppyLook; fromPhase: number; at: number };
+function Puppy({ visit, clock, look }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook }) {
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState<Shown>({ look, phase: 0, fromPhase: 0, at: 0 });
+  useEffect(() => {
+    if (look === shown.look) return;
+    const now = clock.value, along = visit.walked + visitDistance(visit, now);
+    const was = PUPPY_LOOKS[shown.look], next = PUPPY_LOOKS[look];
+    const frame = Math.floor(frac(along / was.loop + shown.phase) * was.count) % was.count;
+    const phase = was.clip === next.clip ? shown.phase : frac((MATCHING_FRAME[was.clip][next.clip]![frame] + 0.5) / next.count - along / next.loop);
+    setShown({ look, phase, from: reduced ? undefined : shown.look, fromPhase: shown.phase, at: now });
+  }, [look, shown, reduced, clock, visit]);
+  useEffect(() => {
+    if (shown.from === undefined) return;
+    const timer = setTimeout(() => setShown(current => ({ ...current, from: undefined })), SWITCH_SECONDS * 1000 + 100);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  const fading = shown.from !== undefined;
+  const fadeOut = useDerivedValue(() => (fading ? Math.max(0, 1 - (clock.value - shown.at) / SWITCH_SECONDS) : 0), [fading, shown.at]);
+  return <>
+    <PuppyLookWalker visit={visit} clock={clock} look={shown.look} phase={shown.phase} />
+    {fading ? <PuppyLookWalker visit={visit} clock={clock} look={shown.from!} phase={shown.fromPhase} fade={fadeOut} /> : null}
+  </>;
+}
+
+function PuppyLookWalker({ visit, clock, look, phase, fade }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook; phase: number; fade?: DerivedValue<number> }) {
+  const sheet = useImage(PUPPY_LOOKS[look].source);
+  if (!sheet) return null;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={PUPPY_LOOKS[look]} w={ART.puppy.w} h={ART.puppy.h} phase={phase} fade={fade} />;
+}
+
 // A walker in painted frames: which frame shows is set by how far it has come (over all its legs),
 // so each stride covers the same ground however the pace changes; standing still, it holds its
 // frame and carries on from it.
-function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number }) {
+// `phase`: a fraction of the stride to start the walk from; `fade`: drawn fading out over another
+// look (no shadow of its own then).
+function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number; phase?: number; fade?: DerivedValue<number> }) {
   const spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
   const scale = spec.size / Math.max(w, h);
-  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity, [visit]);
+  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity * (fade ? fade.value : 1), [visit, fade]);
   const transform = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
     return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: (pose.dx < 0 ? -1 : 1) * scale }, { scaleY: scale },
@@ -171,9 +231,9 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
   const running = Boolean(visit.chase && frames.run);
   const stride = running ? frames.run! : frames;
   const frame = useDerivedValue(() => {
-    const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / stride.loop;
+    const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / stride.loop + (running ? 0 : phase);
     return Math.floor((along - Math.floor(along)) * stride.count) % stride.count;
-  }, [visit, stride, reduced]);
+  }, [visit, stride, reduced, running, phase]);
   const runSheet = useImage(frames.run?.source ?? null);
   // Resting between legs (with a rest sheet): settling down, sitting, then getting up again; or,
   // getting up only (`rising`, before a chase).
@@ -197,11 +257,11 @@ function FrameWalker({ visit, clock, sheet, frames, w, h }: { visit: Visit; cloc
     return [{ translateX: pose.x }, { translateY: pose.y }];
   }, [visit]);
   return <Group opacity={opacity}>
-    <Group transform={shadow}>
+    {fade ? null : <Group transform={shadow}>
       <Oval x={-spec.size * 0.4} y={-spec.size * 0.06} width={spec.size * 0.8} height={spec.size * 0.12} color="rgba(30, 44, 26, 0.22)">
         <BlurMask blur={3} style="normal" />
       </Oval>
-    </Group>
+    </Group>}
     {frames.trail ? <PetalTrail visit={visit} clock={clock} source={frames.trail} reduced={!!reduced} /> : null}
     <Group transform={transform}>
       <Group opacity={walkOpacity}>{running && runSheet
