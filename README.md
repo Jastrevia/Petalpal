@@ -9,74 +9,12 @@
 ![React Native](https://img.shields.io/badge/React%20Native-Expo-000000?logo=expo&logoColor=white)
 ![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-2F6B3B)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20Prisma-315D8A)
-![AI](https://img.shields.io/badge/AI-Cloudflare%20Workers%20AI-F38020)
+![AI](https://img.shields.io/badge/AI-Cloudflare%20Workers%20AI%20%2B%20Claude-F38020)
+![Art](https://img.shields.io/badge/Art-Painted%20%2B%20AI%20Motion-B07CC6)
 
-[Product](#-product) · [Technology](#-technology-stack) · [Architecture](#-system-architecture) · [Status](#-project-status) · [Getting Started](#getting-started) · [Team](#-team)
+[Product](#-product) · [Technology](#-technology-stack) · [Architecture](#-system-architecture) · [Status](#-project-status) · [Getting Started](#-getting-started) · [Team](#-team)
 
 </div>
-
----
-
-## 🚀 Getting Started
-
-Clone the repository:
-
-```bash
-git clone https://github.com/starstarrr/PetalPal_v2.git
-cd PetalPal_v2
-```
-
-Install backend dependencies:
-
-```bash
-npm install
-```
-
-Install frontend dependencies:
-
-```bash
-cd client
-npm install
-cd ..
-```
-
-Generate Prisma Client and apply migrations:
-
-```bash
-npx prisma generate
-npx prisma migrate deploy
-```
-
-Start the backend:
-
-```bash
-npm start
-```
-
-Start the frontend:
-
-```bash
-cd client
-npm run dev
-```
-
-Start the AI worker:
-
-```bash
-npm run start:ai-worker
-```
-
----
-
-## 📚 Technical Documentation
-
-Detailed engineering documentation is maintained separately:
-
-- [`INTEGRATION_DEPLOYMENT.md`](./INTEGRATION_DEPLOYMENT.md) — Canonical SOP to read before branch integration, isolated testing or controlled deployment; [`WARNING.md`](./WARNING.md) takes precedence for privacy and credential safety
-- [`MOBILE.md`](./MOBILE.md) — Physical-iPhone setup, mobile authentication, and isolated native testing runbook
-- [`LONG_TERM_AI.md`](./LONG_TERM_AI.md) — Long-term AI, memory, reports, and retrieval architecture
-- [`SECURITY.md`](./SECURITY.md) — Security architecture and backend hardening
-- [`experiments/emotion-classifier-v2/ML_PROGRESS.md`](./experiments/emotion-classifier-v2/ML_PROGRESS.md) — Machine learning experiments and evaluation
 
 ---
 
@@ -95,6 +33,10 @@ Instead of treating journaling as a static text workflow, PetalPal turns emotion
 | 👥 **Social Garden** | Supports friend search, requests, Garden visits, support, and messages |
 | 🧚 **Interactive Fairy** | Uses Spine animation for state-driven Fairy experiences |
 | 🧠 **Long-Term Reflection** | Builds EventMemory, retrieval foundations, and grounded reflection workflows |
+| 🏛️ **Reflection Pavilion** | Keeps Weekly and Monthly reflections as painted books on a shelf, with a book of kept cards and insights |
+| 🔮 **Petal Tarot** | A daily petal card drawn like tarot, with a short AI reading for the chosen topic |
+| 🤝 **Fairy Bond** | Daily calendar check-in, keepsakes, closeness levels, and rewards |
+| 🐾 **Garden Residents** | Painted animals that live in the Garden, each with its own habits |
 
 ### 🌸 Mood-to-Garden
 
@@ -143,6 +85,31 @@ This boundary allows PetalPal to build personalized long-term experiences withou
 
 Spine-powered skeletal animation brings the Fairy to life through character states and state-driven interactions. Daily activity and meaningful Events can influence Fairy interactions.
 
+### 🏛️ Reflection Pavilion
+
+The Weekly and Monthly reflections live in a pavilion in the Garden. Each reflection is a painted book on a shelf: tapping one pulls it out, carries it to the desk and opens it.
+
+- **Weekly 2.0:** code finds facts in the owner's own words, and the model only picks and phrases them. Every sentence is checked, with template fallbacks.
+- **Monthly 2.0:** written by code with no model call. It shows a month garden calendar, the spread of the month's Weekly cards, and the threads that came back.
+- **The petal book:** kept petal cards, insights, threads, and letters to a later week, plus a year book computed from the twelve month gardens.
+
+### 🔮 Petal Tarot & Fairy Bond
+
+- **Petal Tarot:** a daily petal card drawn like tarot. The owner picks one of five topics, draws from 78 cards (some reversed), and can get a short AI reading for that topic.
+- **Fairy Bond:** a daily calendar check-in that reveals a keepsake from the Fairy, with streaks and closeness levels. Levels open rewards, including Fairy Moments and outfits for the Garden pets.
+- **Fairy Moments:** the Fairy keeps her own small feed of painted moments and captions.
+
+### 🐾 Garden Residents
+
+The Garden has painted animals that live in it, each moving in hand-painted frames and following its own rules:
+
+- **Rabbit and hedgehog:** play only on lawns that have no flowers yet, one animal to a lawn.
+- **Butterfly:** rests on lawn stones and flutters from stone to stone.
+- **Bluebird:** flies between perches. About half the time, the puppy gallops after it and sits down where the bird lands.
+- **Memory Otter:** swims the lake at night, alongside lanterns and fireflies.
+
+Painted frames are played by the distance walked, not by time, so paws never skid. The puppy is also getting outfits from the Fairy Bond rewards: each look walks, runs, and sits as the same dog at the same size.
+
 ---
 
 ## ⚡ Technology Stack
@@ -151,13 +118,14 @@ Spine-powered skeletal animation brings the Fairy to life through character stat
 | --- | --- |
 | Mobile Frontend | React Native, Expo, React Native Skia |
 | Web Frontend | React, Vite, JavaScript |
-| Character Animation | Spine |
+| Character Animation | Spine (Fairy), painted frame sheets (Garden residents) |
 | Visual Design | Adobe Photoshop, Custom Visual Assets |
+| Generative Art Pipeline | AI image generation and editing, AI video generation for motion, Python + OpenCV (optical flow, tracking), rembg cut-outs |
 | Backend | Node.js, Express, REST APIs |
 | Database | PostgreSQL, Prisma ORM |
 | Authentication | Firebase Authentication, Firebase Admin |
 | Real-Time | Socket.IO |
-| AI Integration | Cloudflare Workers AI |
+| AI Integration | Cloudflare Workers AI, Anthropic Claude (Haiku, Sonnet, Opus) through Cloudflare AI Gateway |
 | Long-Term AI | EventMemory, Evidence Provenance, Background AI Jobs |
 | Machine Learning | Python, PyTorch, ONNX |
 | Retrieval | PostgreSQL, pgvector |
@@ -210,7 +178,9 @@ The mobile experience combines:
 | React Native + Expo | Application structure and core mobile flows |
 | React Native Skia | Garden rendering, camera transforms, zoom/pan, and state-driven visuals |
 | Spine | Fairy skeletal animation and character states |
+| Reanimated | UI-thread motion for the Fairy, Garden residents, and transitions |
 | Adobe Photoshop | Custom Garden, Flower, Treehouse, icon, and interface assets |
+| AI-assisted art pipeline | Painted icons, card faces, and illustrations; Garden residents' motion made from generated clips and packed into frame sheets |
 
 The web frontend uses React, Vite, and JavaScript. Firebase Authentication, REST APIs, and Socket.IO connect the interfaces to account and real-time social workflows.
 
@@ -231,19 +201,6 @@ PetalPal's backend is built with **Node.js, Express, PostgreSQL, and Prisma**.
 - Real-time social interactions
 - AI processing
 - Long-term memory infrastructure
-
-### Reliability
-
-- Transactional database operations
-- Idempotent workflows
-- Input validation
-- API rate limiting
-- Database migrations
-- Background processing
-- Failure recovery
-- Owner-scoped private resources
-
-These controls keep core product flows reliable even when external AI services or background processing fail.
 
 ---
 
@@ -330,7 +287,7 @@ Security and reliability are treated as core product infrastructure.
 - Owner-scoped private resources
 - Input validation
 - Rate limiting
-- Transactions
+- Transactions and database migrations
 - Idempotency
 - Background-job recovery
 - Retry and fallback controls
@@ -339,6 +296,8 @@ Security and reliability are treated as core product infrastructure.
 - Render deployment
 - Automated backend testing
 
+These controls keep core product flows reliable even when external AI services or background processing fail.
+
 ---
 
 ## ⭐ Engineering Highlights
@@ -346,11 +305,14 @@ Security and reliability are treated as core product infrastructure.
 - Built a cross-platform product with **React, React Native, and Expo**
 - Built interactive Garden and Treehouse experiences with **React Native Skia**
 - Integrated **Spine** for animated Fairy character experiences
+- Built a **generative art pipeline**: AI-generated motion clips are cut out, tracked, and packed into frame sheets that Skia plays by distance walked
+- Brought **Garden residents** to life with rule-driven behaviour: lawn rules, a bluebird chase, and sitting and rising
 - Built real-time social interactions using **Socket.IO**
 - Designed a **Node.js + Express + PostgreSQL + Prisma** backend
 - Implemented **Firebase-authenticated private-resource ownership**
 - Added transaction-safe, idempotent, and failure-aware workflows
 - Built durable PostgreSQL-backed AI processing
+- Integrated **Anthropic Claude** through Cloudflare AI Gateway, with code-checked outputs and fallbacks
 - Designed a privacy-separated **Journal / Event** architecture
 - Built **EventMemory**, evidence provenance, and owner-scoped retrieval foundations
 - Developed **PostgreSQL + pgvector** semantic-retrieval foundations for RAG
@@ -376,10 +338,14 @@ Security and reliability are treated as core product infrastructure.
 | ✅ Implemented | Durable background AI processing |
 | ✅ Implemented | Private EventMemory foundation |
 | ✅ Implemented | Multi-label emotion classification pipeline |
+| ✅ Implemented | Reflection pavilion with Weekly 2.0 and Monthly 2.0 (switched on per owner during beta) |
+| ✅ Implemented | Petal Tarot daily draw and AI readings |
+| ✅ Implemented | Fairy Bond: calendar check-in, keepsakes, and closeness levels |
+| ✅ Implemented | Garden residents and night view |
 | 🔨 In Progress | Expanded Garden and Treehouse interactions |
 | 🔨 In Progress | Embedding model evaluation |
 | 🔨 In Progress | PostgreSQL + pgvector semantic retrieval and full RAG generation |
-| 🔨 In Progress | Grounded Weekly / Monthly reflections |
+| 🔨 In Progress | Garden pet wardrobe: outfits, feeding, and petting |
 | 🔨 In Progress | Interactive Yearly Journey |
 | 🔨 In Progress | Continued ML evaluation and data-quality improvement |
 | 🔨 In Progress | Beta testing and product iteration |
@@ -404,21 +370,13 @@ Interactive Yearly Journey
 
 ---
 
-## 📚 Technical Documentation
-
-- [`LONG_TERM_AI.md`](./LONG_TERM_AI.md) — long-term AI, memory, reports, and retrieval architecture
-- [`SECURITY.md`](./SECURITY.md) — security architecture and backend hardening
-- [`experiments/emotion-classifier-v2/ML_PROGRESS.md`](./experiments/emotion-classifier-v2/ML_PROGRESS.md) — machine-learning experiments and evaluation
-
----
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Clone
 
 ```bash
-git clone https://github.com/starstarrr/PetalPal_v2.git
-cd PetalPal_v2
+git clone https://github.com/Jastrevia/Petalpal.git
+cd Petalpal
 ```
 
 ### Install
@@ -467,9 +425,21 @@ npm run start:ai-worker
 
 ---
 
+## 📚 Technical Documentation
+
+Detailed engineering documentation is maintained separately:
+
+- [`INTEGRATION_DEPLOYMENT.md`](./INTEGRATION_DEPLOYMENT.md) — Canonical SOP to read before branch integration, isolated testing or controlled deployment; [`WARNING.md`](./WARNING.md) takes precedence for privacy and credential safety
+- [`MOBILE.md`](./MOBILE.md) — Physical-iPhone setup, mobile authentication, and isolated native testing runbook
+- [`LONG_TERM_AI.md`](./LONG_TERM_AI.md) — Long-term AI, memory, reports, and retrieval architecture
+- [`SECURITY.md`](./SECURITY.md) — Security architecture and backend hardening
+- [`experiments/emotion-classifier-v2/ML_PROGRESS.md`](./experiments/emotion-classifier-v2/ML_PROGRESS.md) — Machine learning experiments and evaluation
+
+---
+
 ## 👥 Team
 
-PetalPal is developed by **JX Technologies Inc.**
+PetalPal is developed by **Jastrevia**.
 
 ### 👩🏻‍💻 Jinyin Cao
 *Co-Founder · Product / Frontend Lead*
@@ -516,7 +486,7 @@ Jinyin leads PetalPal's product and frontend direction, with a focus on user exp
 ### 👩🏻‍💻 Xingran Ma
 *Co-Founder · Technical / AI Lead*
 
-Xingran leads PetalPal's backend architecture, AI and retrieval systems, machine learning, security, reliability, and production infrastructure, while also contributing to product and frontend integration.
+Xingran leads PetalPal's backend architecture, AI and retrieval systems, machine learning, security, reliability, and production infrastructure.
 
 #### ⚙️ Backend Engineering
 
@@ -546,6 +516,13 @@ Xingran leads PetalPal's backend architecture, AI and retrieval systems, machine
 - Harden AI jobs against duplicate execution, partial failures, retries, and invalid outputs
 - Maintain automated testing, Docker development environments, Render deployment, and reliability controls
 
+#### 🎨 Visual Design & Interactive Frontend
+
+- Design and paint every icon in the app and what it shows, including the Petal Tarot card faces and the calendar
+- Build the first version of the Treehouse
+- Create every animated Garden animal end to end, from art and motion clips to frame sheets and in-Garden behaviour, including the puppy's outfits
+- Design and build the reflection pavilion's contents: the shelf, the books, and what each one opens
+
 #### 🔗 Product & Frontend Integration
 
 - Contribute to product strategy, UX, and interaction design across core experiences
@@ -555,9 +532,9 @@ Xingran leads PetalPal's backend architecture, AI and retrieval systems, machine
 
 ---
 
-## 🌸 JX Technologies Inc.
+## 🌸 Jastrevia
 
-**JX Technologies Inc.** builds AI-native consumer products that combine interactive design, software engineering, and personalized intelligent experiences.
+**Jastrevia** builds AI-native consumer products that combine interactive design, software engineering, and personalized intelligent experiences.
 
 PetalPal is designed to help people preserve meaningful moments, understand patterns over time, and watch their experiences grow into a living digital world.
 
