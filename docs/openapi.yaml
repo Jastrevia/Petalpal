@@ -281,6 +281,66 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /users/{userId}/events:
+    get:
+      tags: [Garden]
+      summary: Get the authenticated user's Events for one calendar month (Treehouse journal, read-only)
+      description: >-
+        Selects Events by their stored localDate (the account-timezone date set when the Event was saved), never by
+        converting occurredAt, and includes Events that grew no flower. Owner only; no query parameter other than
+        month is accepted. Returns no fields beyond those GET /events/{eventId} already returns to the owner.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2026-10'
+      responses:
+        '200':
+          description: Up to 500 Events, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        content: { type: string }
+                        localDate: { type: string, format: date }
+                        occurredAt: { type: string, format: date-time }
+                        primaryGardenMood: { type: string, nullable: true }
+                        secondaryEmotions: { type: array, items: { type: string }, nullable: true }
+                        emotionStatus: { type: string }
+                        emotionOutcome: { type: string, nullable: true }
+                        flower:
+                          type: object
+                          nullable: true
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            img: { type: string }
+                            mood: { type: string }
+                            meaning: { type: string, nullable: true }
+                            speciesCode: { type: string, nullable: true }
+                            colorAccent: { type: string, nullable: true }
+                            createdAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /users/{userId}/fairy-state:
     get:
       tags: [Fairy]

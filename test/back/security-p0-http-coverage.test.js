@@ -22,6 +22,8 @@ const routes = [
   ["POST /friends/requests/:requestId/accept", "receiver is checked against req.auth.userId"],
   ["POST /friends/requests/:requestId/reject", "receiver is checked against req.auth.userId"],
   ["POST /friends/remove", "userId is req.auth.userId"],
+  ["PATCH /users/:userId/journals/:journalId", "requireOwnUser; content allowlist; updateMany scopes the Journal to req.auth.userId and standalone (dailyCheckInId null)"],
+  ["DELETE /users/:userId/journals/:journalId", "requireOwnUser; deleteMany scopes the Journal to req.auth.userId and standalone (dailyCheckInId null)"],
   ["POST /users/:userId/flowers", "requireOwnUser; all created ownership fields use user.id"],
   ["POST /users/:userId/flowers/:flowerId/support", "visitorUserId is req.auth.userId; target owner is resource path"],
   ["POST /users/:userId/flowers/:flowerId/message", "visitorUserId is req.auth.userId; target owner is resource path"],
@@ -41,7 +43,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 27);
+  assert.equal(routes.length, 29);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

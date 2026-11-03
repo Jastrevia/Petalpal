@@ -84,6 +84,7 @@ test('private Journal routes isolate persistence and preserve historical shelf e
   assert.equal(entries.length, 4); assert.equal(entries[0].localDate, '2026-10-02');
   assert.equal(entries[0].flower, null); assert.equal(entries[0].emotionResult, null);
   assert.equal(entries[3].localDate, '2024-01-02'); assert.equal(entries[3].flower.id, 'old-flower');
+  assert.equal(entries[0].journal.locked, false); assert.equal(entries[3].journal.locked, true);
   const difficult = '爸爸对我说：“你是废物”。我很难过，想寻求帮助。';
   const allowed = await request('POST', { content: difficult });
   assert.equal(allowed.status, 201);
@@ -112,6 +113,94 @@ test('private Journal routes isolate persistence and preserve historical shelf e
   }
   assert.equal((await photoRequest('PUT', null)).status, 200);
   assert.equal((await (await photoRequest('GET')).json()).coverImage, null);
+  assert.deepEqual(forbidden, []);
+});
+
+test('private Journal edit and delete are owner-only and never touch Daily Grow history', async t => {
+  const originals = [];
+  const stub = (object, key, fn) => { const original = object[key]; originals.push(() => { object[key] = original; }); object[key] = fn; };
+  const forbidden = [];
+  for (const model of ['dailyCheckIn', 'flower', 'event', 'eventMemory', 'emotionResult', 'aiJob', 'aiInteractionMetadata', 'garden', 'fairyState', 'message']) {
+    if (!prisma[model]) continue;
+    for (const method of ['create', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']) {
+      stub(prisma[model], method, async () => { forbidden.push(`${model}.${method}`); throw Error('Forbidden side effect'); });
+    }
+  }
+  setFirebaseTokenVerifierForTests(async () => ({ uid: 'owner-firebase', email_verified: true }));
+  stub(prisma.user, 'findUnique', async ({ where }) => where.firebaseUid ? { id: 'owner' } : { timezone: 'America/Vancouver' });
+  const rows = () => [
+    { id: 'mine', userId: 'owner', dailyCheckInId: null, content: 'Original private words' },
+    { id: 'grown', userId: 'owner', dailyCheckInId: 'checkin-1', content: 'Daily Grow words' },
+    { id: 'theirs', userId: 'someone-else', dailyCheckInId: null, content: 'Not yours' },
+  ];
+  let table = rows();
+  const matches = (row, where) => Object.entries(where).every(([key, value]) => row[key] === value);
+  stub(prisma.journal, 'findFirst', async ({ where, select }) => {
+    assert.equal(where.userId, 'owner');
+    assert.deepEqual(select, { id: true, dailyCheckInId: true });
+    const row = table.find(row => matches(row, where));
+    return row ? { id: row.id, dailyCheckInId: row.dailyCheckInId } : null;
+  });
+  stub(prisma.journal, 'updateMany', async ({ where, data }) => {
+    assert.deepEqual(Object.keys(data), ['content']);
+    assert.equal(where.userId, 'owner'); assert.equal(where.dailyCheckInId, null);
+    const hit = table.filter(row => matches(row, where)); hit.forEach(row => Object.assign(row, data));
+    return { count: hit.length };
+  });
+  stub(prisma.journal, 'deleteMany', async ({ where }) => {
+    assert.equal(where.userId, 'owner'); assert.equal(where.dailyCheckInId, null);
+    const before = table.length; table = table.filter(row => !matches(row, where));
+    return { count: before - table.length };
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(async () => {
+    originals.reverse().forEach(restore => restore());
+    setFirebaseTokenVerifierForTests();
+    await new Promise(resolve => server.close(resolve));
+  });
+  const call = (method, path, body, token = true) => fetch(`http://127.0.0.1:${server.address().port}/users/${path}`, {
+    method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: 'Bearer test-token' } : {}) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+  });
+  // Authentication and ownership come first: another user's path is refused before any lookup.
+  assert.equal((await call('PATCH', 'owner/journals/mine', { content: 'x' }, false)).status, 401);
+  assert.equal((await call('DELETE', 'owner/journals/mine', undefined, false)).status, 401);
+  assert.equal((await call('PATCH', 'someone-else/journals/theirs', { content: 'x' })).status, 403);
+  assert.equal((await call('DELETE', 'someone-else/journals/theirs')).status, 403);
+  // A journal id owned by someone else is invisible under the caller's own path.
+  assert.equal((await call('PATCH', 'owner/journals/theirs', { content: 'Taken over' })).status, 404);
+  assert.equal((await call('DELETE', 'owner/journals/theirs')).status, 404);
+  assert.equal((await call('PATCH', 'owner/journals/missing', { content: 'x' })).status, 404);
+  assert.equal(table.find(row => row.id === 'theirs').content, 'Not yours');
+  // Edits follow the same content rules as new journals and only accept content.
+  for (const content of ['', '   ', 12, null]) assert.equal((await call('PATCH', 'owner/journals/mine', { content })).status, 400);
+  assert.equal((await call('PATCH', 'owner/journals/mine', { content: 'x'.repeat(2001) })).status, 413);
+  assert.equal((await call('PATCH', 'owner/journals/mine', { content: 'Fine', dailyCheckInId: 'link-me' })).status, 400);
+  assert.equal((await call('PATCH', 'owner/journals/mine', { content: 'Fine', userId: 'someone-else' })).status, 400);
+  const rejected = await call('PATCH', 'owner/journals/mine', { content: 'fuck you' });
+  assert.equal(rejected.status, 422);
+  const rejectedBody = await rejected.json();
+  assert.equal(rejectedBody.code, 'CONTENT_REJECTED'); assert.ok(!JSON.stringify(rejectedBody).includes('fuck'));
+  assert.equal(table.find(row => row.id === 'mine').content, 'Original private words');
+  // Daily Grow journals are protected from both edit and delete.
+  for (const [method, body] of [['PATCH', { content: 'Rewritten' }], ['DELETE', undefined]]) {
+    const response = await call(method, 'owner/journals/grown', body);
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'JOURNAL_LOCKED');
+  }
+  assert.deepEqual(table.find(row => row.id === 'grown'), rows()[1]);
+  // A successful edit trims like create and keeps the journal's identity.
+  const edited = await call('PATCH', 'owner/journals/mine', { content: '  Kinder words  ' });
+  assert.equal(edited.status, 200);
+  assert.deepEqual(await edited.json(), { id: 'mine', content: 'Kinder words' });
+  assert.equal(table.find(row => row.id === 'mine').content, 'Kinder words');
+  const removed = await call('DELETE', 'owner/journals/mine');
+  assert.equal(removed.status, 200);
+  assert.deepEqual(await removed.json(), { success: true, id: 'mine' });
+  assert.equal(table.some(row => row.id === 'mine'), false);
+  assert.equal((await call('DELETE', 'owner/journals/mine')).status, 404);
+  assert.deepEqual(table.map(row => row.id), ['grown', 'theirs']);
   assert.deepEqual(forbidden, []);
 });
 
