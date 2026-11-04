@@ -1605,37 +1605,60 @@ app.get("/session", async (req, res) => {
 });
 
 // Private journals never enter Daily Grow, Events, or AI processing.
+// Create and edit share one content rule; on rejection the response is already sent.
+function privateJournalContent(req, res) {
+  const content = req.body?.content;
+  if (typeof content !== "string" || !content.trim()) {
+    res.status(400).json({ error: "Write something before saving your journal" }); return null;
+  }
+  if (content.length > 2000) { res.status(413).json({ error: "Journal must be 2000 characters or fewer" }); return null; }
+  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) { res.status(422).json(contentSafetyResponse(req,error)); return null; } throw error; }
+  return content.trim();
+}
 app.post("/users/:userId/journals",
   (req, res, next) => { if (requireOwnUser(req, res, req.params.userId)) next(); },
   allowBodyFields(["content"]), async (req, res) => {
-  const content = req.body?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    return res.status(400).json({ error: "Write something before saving your journal" });
-  }
-  if (content.length > 2000) return res.status(413).json({ error: "Journal must be 2000 characters or fewer" });
-  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error)); throw error; }
+  const content = privateJournalContent(req, res);
+  if (content === null) return;
   const journal = await prisma.journal.create({
-    data: { userId: req.auth.userId, content: content.trim() }
+    data: { userId: req.auth.userId, content }
   });
   res.status(201).json(journal);
 });
 
-// Fix a saved journal: same rules as writing one. Only the owner's own journal changes.
-app.put("/users/:userId/journals/:journalId",
+// Only standalone Treehouse journals can change. A journal written through a Daily Grow
+// check-in is the source of that Flower's history, so it stays read-only (409).
+const LOCKED_JOURNAL = { error: "This journal belongs to a flower in your Flower History, so it can't be changed here.", code: "JOURNAL_LOCKED" };
+async function ownedPrivateJournal(req, res) {
+  const journal = await prisma.journal.findFirst({
+    where: { id: req.params.journalId, userId: req.auth.userId }, select: { id: true, dailyCheckInId: true }
+  });
+  if (!journal) { res.status(404).json({ error: "Journal not found" }); return null; }
+  if (journal.dailyCheckInId) { res.status(409).json(LOCKED_JOURNAL); return null; }
+  return journal;
+}
+const updatePrivateJournal = [
   (req, res, next) => { if (requireOwnUser(req, res, req.params.userId)) next(); },
   allowBodyFields(["content"]), async (req, res) => {
-  const content = req.body?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    return res.status(400).json({ error: "Write something before saving your journal" });
-  }
-  if (content.length > 2000) return res.status(413).json({ error: "Journal must be 2000 characters or fewer" });
-  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error)); throw error; }
-  const updated = await prisma.journal.updateMany({
-    where: { id: req.params.journalId, userId: req.auth.userId },
-    data: { content: content.trim() }
+  const content = privateJournalContent(req, res);
+  if (content === null || !await ownedPrivateJournal(req, res)) return;
+  // The owner and standalone checks repeat in the write so a concurrent change cannot slip past them.
+  const result = await prisma.journal.updateMany({
+    where: { id: req.params.journalId, userId: req.auth.userId, dailyCheckInId: null }, data: { content }
   });
-  if (!updated.count) return res.status(404).json({ error: "Journal not found" });
-  res.json({ id: req.params.journalId, content: content.trim() });
+  if (!result.count) return res.status(404).json({ error: "Journal not found" });
+  res.json({ id: req.params.journalId, content });
+}];
+app.patch("/users/:userId/journals/:journalId", ...updatePrivateJournal);
+// Installed apps from before the Treehouse redesign still send PUT; same rules as PATCH.
+app.put("/users/:userId/journals/:journalId", ...updatePrivateJournal);
+app.delete("/users/:userId/journals/:journalId", async (req, res) => {
+  if (!requireOwnUser(req, res, req.params.userId) || !await ownedPrivateJournal(req, res)) return;
+  const result = await prisma.journal.deleteMany({
+    where: { id: req.params.journalId, userId: req.auth.userId, dailyCheckInId: null }
+  });
+  if (!result.count) return res.status(404).json({ error: "Journal not found" });
+  res.json({ success: true, id: req.params.journalId });
 });
 
 app.get("/users/:userId/journals/:journalId/cover", async (req, res) => {
@@ -1678,7 +1701,8 @@ app.get("/users/:userId/journals", async (req, res) => {
     localDate: journal.dailyCheckIn?.localDate || new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit"
     }).format(journal.createdAt),
-    journal: { id: journal.id, content: journal.content },
+    // locked: written through a Daily Grow check-in, so the Treehouse cannot edit or delete it.
+    journal: { id: journal.id, content: journal.content, locked: Boolean(journal.dailyCheckIn) },
     emotionResult: journal.dailyCheckIn?.emotionResult || null,
     flower: journal.dailyCheckIn?.flower || null
   }));
@@ -1702,6 +1726,34 @@ app.get("/users/:userId/check-ins", async (req, res) => {
   });
 
   res.json(checkIns);
+});
+
+// The Treehouse journal's left pages: the owner's Events for one calendar month, read-only, by their stored local
+// date (no timezone conversion). Includes Events that grew no flower (the daily flower quota), which the garden
+// route cannot reach. No content beyond what GET /events/:eventId already returns to the owner.
+const EVENT_MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
+app.get("/users/:userId/events", async (req, res) => {
+  if (!requireOwnUser(req, res, req.params.userId)) return;
+  const month = typeof req.query.month === "string" ? req.query.month : "";
+  if (!EVENT_MONTH.test(month) || Object.keys(req.query).some(key => key !== "month")) {
+    return res.status(400).json({ error: "Invalid month" });
+  }
+  try {
+    const events = await prisma.event.findMany({
+      where: { ownerId: req.auth.userId, localDate: { gte: `${month}-01`, lte: `${month}-31` } },
+      select: {
+        id: true, content: true, localDate: true, occurredAt: true, primaryGardenMood: true, secondaryEmotions: true,
+        emotionStatus: true, emotionOutcome: true,
+        flower: { select: { id: true, name: true, img: true, mood: true, meaning: true, speciesCode: true, colorAccent: true, createdAt: true } }
+      },
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      take: 500
+    });
+    return res.json({ events });
+  } catch (error) {
+    logServerError("GET /users/:userId/events error", error);
+    return res.status(500).json({ error: "Failed to load Events" });
+  }
 });
 
 app.get("/users/:userId/fairy-state", async (req, res) => {

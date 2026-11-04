@@ -5,7 +5,8 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { readJournalCover, saveJournalCover } from '../../services/bookhouse';
 import { BookhouseArt } from './BookhouseArt';
 
-export function JournalCover({ userId, journalId, size }: { userId: string; journalId: string; size: number }) {
+/** `readOnly` (a journal being read): the photo, if there is one, with no Add, Change or Remove controls. */
+export function JournalCover({ userId, journalId, size, readOnly = false }: { userId: string; journalId: string; size: number; readOnly?: boolean }) {
   const [cover, setCover] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
@@ -41,6 +42,11 @@ export function JournalCover({ userId, journalId, size }: { userId: string; jour
     catch { if (alive.current) setError('Unable to remove photo. Please try again.'); }
     finally { if (alive.current) setBusy(false); }
   };
+  if (readOnly) return cover ? <View style={{ alignItems: 'center', width: '100%' }}>
+    <View style={{ padding: 5, backgroundColor: '#F8E9CE', borderWidth: 1, borderColor: '#C1A47A', transform: [{ rotate: '-2deg' }] }}>
+      <Image accessibilityLabel="Private journal photo" source={{ uri: cover }} style={{ width: size, height: size * .8 }} resizeMode="cover" />
+    </View>
+  </View> : null;
   return <View style={{ alignItems: 'center', width: '100%' }}>
     <Pressable accessibilityRole="button" accessibilityLabel={cover ? 'Change journal photo' : 'Add journal photo'} disabled={busy} onPress={() => void choose()}
       style={{ alignItems: 'center', minWidth: 44, minHeight: 44, padding: 5, backgroundColor: cover ? '#F8E9CE' : 'transparent', borderWidth: cover ? 1 : 0, borderColor: '#C1A47A', transform: [{ rotate: '-2deg' }] }}>

@@ -236,6 +236,25 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
 - **Daily Grow** computes its local date with a separate helper
   (`getLocalDate`/`normalizeTimezone` in [server.js](server.js)), also from
   `User.timezone`.
+- **Treehouse future-month lock** (client display only): the Treehouse bookshelf locks months after the
+  owner's current month and years after the current year, comparing `year * 12 + month` with today's date in
+  `User.timezone` (`todayLocalDate`, `monthLocked`, `yearLocked` in
+  [mobile/src/services/bookhouse.ts](mobile/src/services/bookhouse.ts)), evaluated at runtime. A month or year
+  that already holds a saved journal is never locked. No server route, stored date or period changes.
+  **TESTED BEHAVIOR:** [mobile/test/bookhouse.test.mjs](mobile/test/bookhouse.test.mjs) (boundaries and the
+  Vancouver-vs-UTC month edge).
+- **Treehouse journal days** (client display; one read-only route): each open monthly book shows one spread per
+  calendar day, matching three stores only by their stored local date (`YYYY-MM-DD`, never converted): private
+  journals and Daily Grow check-ins (`DailyCheckIn.localDate`, set by `getLocalDate`) and Events (`Event.localDate`,
+  set by `localDateForInstant`). Events come from `GET /users/:userId/events?month=YYYY-MM`, which filters
+  `Event.localDate` between `YYYY-MM-01` and `YYYY-MM-31` as strings (owner only, read-only), so an evening Event in
+  Vancouver stays on its local day even when `occurredAt` is already the next UTC day. Today's page (the only page
+  that creates a journal) is `todayLocalDate(User.timezone)` at runtime; the server still dates the new journal
+  itself. No page exists after today unless it already holds a journal. No stored date or period changes.
+  **TESTED BEHAVIOR:** [mobile/test/bookhouse.test.mjs](mobile/test/bookhouse.test.mjs) (`monthDays`: stored date
+  wins over a next-UTC-day timestamp, no future days, today always present) and
+  [test/back/journal-month-events.test.js](test/back/journal-month-events.test.js) (owner scope, month validation,
+  string date range, no writes).
 - **Fairy day and night** ([lib/fairy-runtime.js](lib/fairy-runtime.js) `fairyDayPhase`,
   `FAIRY_RUNTIME_CONFIG.night`; owner decision 2026-10-21): the seeded runtime states follow
   `User.timezone` (invalid or missing: UTC). Every local evening at 22:00 her night starts and
