@@ -253,3 +253,184 @@ test('the puppy wears one painted look per outfit, one set at a time, and every 
   for (const [from, to] of Object.entries(looks.MATCHING_FRAME))
     for (const [clip, frames] of Object.entries(to)) assert.equal(frames.length, Object.values(looks.PUPPY_LOOKS).find(l => l.clip === from).count, `${from} -> ${clip}`);
 });
+
+test('a tapped puppy sits where it is until let go, then gets up and walks on along its path', () => {
+  const nodes = WALK_NETWORK.nodes, edge = edges[0];
+  const a = nodes[edge.a], b = nodes[edge.b];
+  const walking = { key: 1, id: 'puppy', path: [a, b], start: 0, lead: 0, fadeIn: false, walked: 5,
+    speed: visits.CRITTERS.puppy.speed, rhythm: visits.RHYTHMS.puppy, duration: visits.travelSeconds(visits.pathLength([a, b]) / visits.CRITTERS.puppy.speed, visits.RHYTHMS.puppy) };
+  const now = 1.5, there = visits.visitPose(walking, now);
+  const held = visits.holdVisit(walking, now);
+  assert.ok(held.held && held.sits && !held.chase && held.lead === visits.HOLD_SECONDS);
+  assert.equal(visits.holdVisit(held, now + 1), held, 'holding twice changes nothing');
+  for (const t of [now, now + 30, now + 600]) {
+    const pose = visits.visitPose(held, t);
+    assert.ok(Math.hypot(pose.x - there.x, pose.y - there.y) < 1e-6, 'stays where it was tapped');
+  }
+  assert.equal(Math.sign(visits.visitPose(held, now + 5).dx), Math.sign(there.dx), 'still faces the way it went');
+  assert.ok(Math.abs(held.walked - (walking.walked + visits.visitDistance(walking, now))) < 1e-9, 'its stride carries on');
+  assert.deepEqual(plain(held.path.at(-1)), plain(b), 'the rest of its path is kept');
+  // Let go a while later: it gets up (rise seconds) and walks the rest of the way.
+  const released = visits.releaseVisit(held, now + 20, 1.3, 1.25);
+  assert.ok(!released.held && Math.abs(released.lead - (20 + 1.25)) < 1e-9);
+  assert.ok(Math.abs(released.start + released.duration - (now + 21.25 + (held.duration - held.lead))) < 1e-9);
+  const end = visits.visitPose(released, released.start + released.duration + 1);
+  assert.ok(Math.hypot(end.x - b.x, end.y - b.y) < 1e-6);
+  // Let go at once: it still finishes sitting down before it gets up.
+  assert.ok(Math.abs(visits.releaseVisit(held, now + 0.2, 1.3, 1.25).lead - 2.55) < 1e-9);
+  assert.equal(visits.releaseVisit(walking, now, 1, 1), walking, 'only a held pet is let go');
+  // Tapped at the end of a leg, it sits on the path point it reached, and the next leg starts there.
+  const done = visits.holdVisit(walking, walking.duration + 2);
+  const next = visits.planNextLeg({ visit: visits.releaseVisit(done, walking.duration + 4, 1.3, 1.25), now: walking.duration + 9, network: WALK_NETWORK, edges, points, random: seeded(7) });
+  assert.ok(next && Math.hypot(next.path[0].x - b.x, next.path[0].y - b.y) < 1e-6);
+  // Sitting already (after a chase): it simply sits on.
+  const sitting = { ...walking, sits: true, lead: 10, duration: 10 + walking.duration };
+  const still = visits.holdVisit(sitting, 4);
+  assert.ok(still.held && still.start === sitting.start && still.lead === 4 + visits.HOLD_SECONDS);
+});
+
+test('the pet ring is a 120° third of a ring beside the pet, whole on a phone screen', () => {
+  const ring = load('../critters/petRing');
+  const phone = { width: 375, height: 740 };
+  for (const panel of [false, true]) {
+    for (const pet of [{ x: 60, y: 400, body: 40 }, { x: 340, y: 300, body: 40 }, { x: 190, y: 90, body: 60 }, { x: 200, y: 720, body: 30 }]) {
+      const layout = ring.ringLayout(pet, phone, panel);
+      assert.equal(ring.RING_DEGREES, 120);
+      assert.equal(ring.ringArc(layout).sweep, 120);
+      // Its corners and its outer edge stay on screen, clear of the Garden's top buttons and tab bar.
+      for (let t = -1; t <= 1; t += 0.25) for (const r of [layout.inner, layout.outer]) {
+        const p = ring.ringPoint(layout, r, t);
+        assert.ok(p.x >= 0 && p.x <= phone.width, `x ${p.x}`);
+        assert.ok(p.y >= ring.TOP_CLEAR && p.y <= phone.height - ring.BOTTOM_CLEAR + 1e-9, `y ${p.y}`);
+      }
+      // Top to bottom: feed, pat, dress up.
+      const spot = t => { const p = ring.ringPoint(layout, (layout.inner + layout.outer) / 2, t); return ring.ringSpot(layout, p.x, p.y); };
+      assert.deepEqual([spot(-0.7).segment, spot(0).segment, spot(0.7).segment], [0, 1, 2]);
+      assert.equal(ring.RING_ACTIONS.join(), 'feed,pat,dress');
+      assert.equal(ring.ringSpot(layout, layout.cx, layout.cy), null, 'the pet itself is not part of the ring');
+      assert.equal(ring.ringSpot(layout, layout.cx - layout.side * layout.outer * 0.8, layout.cy), null, 'nor the other side');
+    }
+  }
+  // Room to its right: it opens to the right; at the right edge, to the left.
+  // A press without a position (keyboard) is outside the ring, never an unknown segment.
+  assert.equal(ring.ringSpot(ring.ringLayout({ x: 200, y: 400, body: 40 }, phone), undefined, undefined), null);
+  assert.equal(ring.ringSpot(ring.ringLayout({ x: 200, y: 400, body: 40 }, phone), NaN, 400), null);
+  assert.equal(ring.ringLayout({ x: 60, y: 400, body: 40 }, phone).side, 1);
+  assert.equal(ring.ringLayout({ x: 340, y: 400, body: 40 }, phone).side, -1);
+  const left = ring.ringLayout({ x: 340, y: 400, body: 40 }, phone), up = ring.ringPoint(left, left.outer, -1);
+  assert.ok(up.y < left.cy && up.x < left.cx, 'on the left it still runs from top to bottom');
+});
+
+test('the wardrobe shows every piece, sends the whole outfit, and only opened pieces can be chosen', () => {
+  const ring = load('../critters/petRing');
+  const piece = (id, row, unlocked = true) => ({ id, row, collection: 'c', name: id, unlocked, unlockedAtLevel: unlocked ? 4 : null });
+  const pieces = [piece('lilac-beret', 'hat'), piece('flower-sprig', 'hat'), piece('lilac-cape', 'collar', false), piece('compass-star', 'pendant')];
+  assert.deepEqual(ring.shelfOf(pieces, 'hat').map(p => p.id), ['lilac-beret', 'flower-sprig']);
+  assert.equal(ring.shelfOf(pieces, 'collar').length, 1, 'a piece not opened yet still shows');
+  const worn = { hat: null, collar: null, pendant: 'compass-star' };
+  assert.deepEqual(plain(ring.outfitWith(worn, pieces[0])), { hat: 'lilac-beret', collar: null, pendant: 'compass-star' }, 'all three slots');
+  assert.deepEqual(plain(ring.outfitWith(null, pieces[1])), { hat: 'flower-sprig', collar: null, pendant: null });
+  assert.deepEqual(plain(ring.outfitWith(worn, pieces[3])), { hat: null, collar: null, pendant: null }, 'a worn piece comes off');
+  assert.equal(ring.outfitWith(worn, pieces[2]), null, 'locked');
+  assert.ok(ring.isWorn(worn, pieces[3]) && !ring.isWorn(worn, pieces[0]));
+  // Worn but not shown: the other set's hat under a cape, and a pendant under any cape.
+  assert.deepEqual([...ring.puppyHiddenPieces({ hat: 'flower-sprig', collar: 'lilac-cape', pendant: 'compass-star' })].sort(), ['compass-star', 'flower-sprig']);
+  assert.deepEqual([...ring.puppyHiddenPieces({ hat: 'flower-sprig', collar: null, pendant: 'compass-star' })], ['compass-star']);
+  assert.equal(ring.puppyHiddenPieces({ hat: 'lilac-beret', collar: null, pendant: 'compass-star' }).size, 0);
+});
+
+test('every catalog piece has its wardrobe icon', async () => {
+  const fs = await import('node:fs');
+  const { PET_ACCESSORIES } = await import('../../lib/garden-pets.js');
+  const icons = load('../critters/accessoryIcons').ACCESSORY_ICONS;
+  assert.equal(Object.keys(icons).length, PET_ACCESSORIES.length);
+  for (const { id } of PET_ACCESSORIES) {
+    assert.ok(icons[id], id);
+    assert.ok(fs.existsSync(new URL(`../${icons[id].replace('@/', '')}`, import.meta.url)), id);
+  }
+});
+
+test('the Maltese comes only with the puppy and follows it, sitting beside it once close', () => {
+  const random = seeded(3);
+  assert.equal(visits.planFriendVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, random }), null);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  assert.equal(puppy.id, 'puppy');
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  assert.equal(friend.id, 'maltese');
+  assert.equal(visits.planFriendVisit({ key: 4, now: 0, active: [puppy, friend], network: WALK_NETWORK, edges, random }), null);
+  // Close by: it sits down facing the puppy.
+  const here = { x: 100, y: 100 };
+  const sit = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 190, y: 100 }, path: null, random });
+  assert.equal(sit.sits, true);
+  assert.ok(sit.path[1].x > sit.path[0].x, 'faces the puppy');
+  // Far: it goes a stretch of the way, stopping short of the puppy, faster when far behind.
+  const far = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 700, y: 100 }, path: [here, { x: 400, y: 100 }, { x: 700, y: 100 }], random });
+  assert.equal(far.sits, false);
+  assert.ok(visits.pathLength(far.path) <= 160 + 1e-6);
+  assert.ok(far.speed > visits.CRITTERS.maltese.speed);
+  // It stops short, never on top of the puppy.
+  const end = far.path.at(-1);
+  assert.ok(700 - end.x >= visits.APART, `stops ${700 - end.x} short`);
+  // Too close: it steps aside first, then sits.
+  const aside = visits.asideFrom(here, { x: 120, y: 100 }, () => false);
+  assert.ok(Math.abs(aside.x - 120) >= visits.APART - 1e-6);
+  const step = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 120, y: 100 }, path: null, random, aside });
+  assert.equal(step.sits, false);
+  assert.deepEqual(step.path.at(-1), aside);
+});
+
+test('the Maltese leads about seven walks in ten; a game of chase ends with the puppy catching up', () => {
+  const random = seeded(11);
+  let maltese = 0;
+  for (let i = 0; i < 2000; i++) if (visits.pickLeader(random) === 'maltese') maltese++;
+  assert.ok(Math.abs(maltese / 2000 - visits.MALTESE_LEADS) < 0.04, `${maltese / 2000}`);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  const dash = [{ x: 100, y: 100 }, { x: 300, y: 100 }], chase = [{ x: 60, y: 100 }, { x: 100, y: 100 }];
+  const game = visits.planPlay({ maltese: friend, puppy, now: 50, dash, chase });
+  assert.ok(game);
+  assert.equal(game.maltese.play, true);
+  assert.equal(game.puppy.chase, true);
+  assert.ok(game.puppy.speed <= visits.RUN_SPEED + 1e-6);
+  const stops = game.maltese.start + game.maltese.duration, caught = game.puppy.start + game.puppy.duration;
+  assert.ok(Math.abs(caught - stops) < 0.6, `caught ${caught.toFixed(2)} vs stops ${stops.toFixed(2)}`);
+  // Never through the Maltese: at every moment of the run it keeps at least a body length behind.
+  // (They start close: it only waits until the Maltese is a body length ahead, and never closes in again.)
+  let apart = false;
+  for (let t = 50; t <= stops; t += 0.05) {
+    const m = visits.visitPose(game.maltese, t), p = visits.visitPose(game.puppy, t), gap = Math.hypot(m.x - p.x, m.y - p.y);
+    if (gap >= visits.APART) apart = true;
+    if (apart) assert.ok(gap >= visits.APART - 1, `at ${t.toFixed(2)}: ${gap.toFixed(1)}`);
+    else assert.equal(visits.visitDistance(game.puppy, t), 0, 'it waits while the Maltese is close');
+  }
+  assert.ok(apart);
+  assert.ok(game.ends >= caught);
+  // It pulls up beside the Maltese, not on top of it.
+  const sat = game.puppy.path.at(-1), stopped = game.maltese.path.at(-1);
+  assert.ok(Math.hypot(sat.x - stopped.x, sat.y - stopped.y) > 40);
+  // A puppy on its ring menu (held) does not play.
+  assert.equal(visits.planPlay({ maltese: friend, puppy: { ...puppy, held: true }, now: 50, dash, chase }), null);
+});
+
+test('pair scenes: the Maltese walks up beside the puppy, both stay for the clip, then it is over', () => {
+  const random = seeded(4);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  for (const kind of ['tug', 'hug']) {
+    const pAt = { x: 500, y: 400 }, mAt = { x: 620, y: 400 }, spot = { x: 500 + visits.SCENE_SPECS[kind].apart, y: 400 };
+    const s = visits.planScene({ key: 9, kind, maltese: friend, puppy, now: 10, mAt, pAt, approach: [mAt, spot] });
+    assert.ok(s);
+    assert.equal(s.scene.dir, 1);
+    const end = s.maltese.path.at(-1);
+    assert.ok(Math.abs(end.x - spot.x) < 1, `${kind}: walks to its place`);
+    assert.ok(s.maltese.start + s.maltese.duration <= s.scene.start, `${kind}: there before the clip`);
+    assert.ok(s.puppy.start + s.puppy.duration >= s.scene.end, `${kind}: the puppy stays for it`);
+    assert.equal(visits.sceneShown(s.scene, s.scene.start + 1), 1);
+    assert.equal(visits.sceneShown(s.scene, s.scene.end + 0.1), 0);
+  }
+  // The puppy can run and the Maltese chase it.
+  const g = visits.planPlay({ maltese: friend, puppy, now: 50, dash: [{ x: 100, y: 100 }, { x: 320, y: 100 }], chase: [{ x: 60, y: 100 }, { x: 100, y: 100 }], runner: 'puppy' });
+  assert.ok(g);
+  assert.equal(g.puppy.chase, true);
+  assert.equal(g.maltese.running, true);
+});

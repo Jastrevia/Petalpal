@@ -28,6 +28,21 @@
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
+  const petPieces = [['lilac-beret', 'hat', 'Lilac Beret', '紫藤贝雷帽'], ['straw-sun-hat', 'hat', 'Straw Sun Hat', '草编遮阳帽'], ['sage-bonnet', 'hat', 'Sage Bonnet', '鼠尾草小帽'],
+    ['blossom-wreath', 'hat', 'Blossom Wreath', '花环'], ['flower-sprig', 'hat', 'Flower Sprig', '鬓边花枝'], ['starlit-plume-cap', 'hat', 'Starlit Plume Cap', '星羽军帽'],
+    ['midnight-hood', 'hat', 'Midnight Hood', '午夜兜帽'], ['golden-circlet', 'hat', 'Golden Circlet', '金叶头环'], ['voyager-goggles', 'hat', 'Voyager Goggles', '旅人风镜帽'],
+    ['laurel-crown', 'hat', 'Laurel Crown', '月桂冠'], ['petal-capelet', 'collar', 'Petal Capelet', '花瓣小披肩'], ['lilac-cape', 'collar', 'Lilac Cape', '紫藤披风'],
+    ['bell-bow', 'collar', 'Bell Bow', '铃铛蝴蝶结'], ['cream-ruffle', 'collar', 'Cream Ruffle', '奶油荷叶领'], ['sage-capelet', 'collar', 'Sage Capelet', '鼠尾草披肩'],
+    ['star-capelet', 'collar', 'Star Capelet', '星辰小披肩'], ['midnight-cape', 'collar', 'Midnight Cape', '午夜披风'], ['gilded-wing-collar', 'collar', 'Gilded Wing Collar', '金翼领'],
+    ['star-mantle', 'collar', 'Star Mantle', '星夜斗篷'], ['crystal-drop', 'pendant', 'Crystal Drop', '水晶坠'], ['glow-lantern', 'pendant', 'Glow Lantern', '暖光小灯笼'],
+    ['lilac-clover', 'pendant', 'Lilac Clover', '紫色四叶坠'], ['crescent-bloom', 'pendant', 'Crescent Bloom', '花月弯钩'], ['little-spellbook', 'pendant', 'Little Spellbook', '小魔法书'],
+    ['sealed-letter', 'pendant', 'Sealed Letter', '花封信笺'], ['compass-star', 'pendant', 'Compass Star', '罗盘星'], ['crescent-crystal', 'pendant', 'Crescent Crystal', '新月水晶'],
+    ['gilded-tome', 'pendant', 'Gilded Tome', '鎏金书册'], ['noble-lantern', 'pendant', 'Noble Lantern', '贵族提灯'], ['hourglass', 'pendant', 'Hourglass', '沙漏'],
+    ['crystal-spire', 'pendant', 'Crystal Spire', '水晶尖坠'], ['gilded-feather', 'pendant', 'Gilded Feather', '金羽坠']];
+  const petOpened = new Set([...petPieces.filter(([, row]) => row === 'hat').map(([id]) => id), 'petal-capelet', 'lilac-cape', 'crystal-drop', 'glow-lantern', 'compass-star', 'crescent-crystal']);
+  const petFoods = [['berry-tart', 'Berry Tart', '莓果挞', 3], ['flower-cookies', 'Flower Cookies', '小花饼干', 2], ['fish-biscuit', 'Fish Biscuit', '小鱼饼', 1], ['honey-seeds', 'Honey Seeds', '蜂蜜谷粒', 0]];
+  const petOutfits = { puppy: { hat: 'lilac-beret', collar: null, pendant: null } };
+
   const petalTopics = [['FORTUNE', 'Today’s fortune'], ['DIRECTION', 'The way ahead'], ['LOVE', 'Love'], ['WORK', 'Work & study'],
     ['PEOPLE', 'People around you']].map(([id, label]) => ({ id, label }));
   let redemptions = [];
@@ -253,6 +268,25 @@
         const flower = ownFlowers.find(item => item.id === ownFlower[1]);
         return flower ? json({ ...flower, messages: [{ id: 'msg1', author: 'Mira', authorUserId: 'friend-mira', text: 'This one is lovely.' }, { id: 'msg2', author: 'Jun', authorUserId: 'friend-jun', text: 'Thinking of you.' }], supportState: { isOwner: true, canSupport: false, supportedToday: false } }) : json({ error: 'Flower not found' }, 404);
       }
+      // The pets' outfit and feeding (before the catch-all below answers every other write).
+      const dressing = p.match(/^\/api\/fairy\/pets\/([a-z]+)\/(outfit|feed)$/);
+      if (dressing && dressing[2] === 'outfit' && method === 'PUT') {
+        const outfit = { hat: request.hat ?? null, collar: request.collar ?? null, pendant: request.pendant ?? null };
+        for (const slot of ['hat', 'collar', 'pendant']) {
+          const piece = petPieces.find(([id]) => id === outfit[slot]);
+          if (outfit[slot] && (!piece || piece[1] !== slot)) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
+          if (outfit[slot] && !petOpened.has(outfit[slot])) return json({ error: 'ACCESSORY_LOCKED' }, 409);
+        }
+        petOutfits[dressing[1]] = outfit;
+        return json({ outfit }, 200, 250);
+      }
+      if (dressing && dressing[2] === 'feed' && method === 'POST') {
+        const food = petFoods.find(([id]) => id === request.foodId);
+        if (!food) return json({ error: 'Unknown food' }, 400);
+        if (!food[3]) return json({ error: 'NO_FOOD' }, 409);
+        food[3] -= 1;
+        return json({ foodId: food[0], count: food[3] }, 200, 250);
+      }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
       if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: plantedToday, remaining: Math.max(0, 2 - plantedToday) });
@@ -278,6 +312,11 @@
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
         collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
+      // The Garden pets (lib/garden-pets.js): a Bond level that has opened every hat, two capes
+      // and four pendants, so locks, both puppy sets and the cape-hides-the-pendant rule can be tried.
+      if (p === '/api/fairy/pets') return json({ locale: user.preferredLocale, level: 17, foods: petFoods.map(([id, en, zh, count]) => ({ id, name: user.preferredLocale === 'zh-Hans' ? zh : en, count })),
+        outfits: Object.fromEntries(['puppy', 'hedgehog', 'butterfly', 'rabbit', 'bluebird'].map(id => [id, petOutfits[id] || { hat: null, collar: null, pendant: null }])),
+        accessories: petPieces.map(([id, row, en, zh]) => ({ id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: petOpened.has(id), unlockedAtLevel: petOpened.has(id) ? 4 : null })) });
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });

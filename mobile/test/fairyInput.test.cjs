@@ -250,6 +250,8 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     fairyRef: { current: { isMailboxBusy: () => false, getPosition: () => ({ x: 100, y: 120 }), move: () => { calls.push('move'); return true; } } },
     // The treehouse and the mailbox open straight away; she is not involved.
     tapTreehouse: { current: () => calls.push('bookhouse') }, tapMailbox: { current: () => calls.push('mailbox') },
+    // A pet under the tap (the puppy) opens its ring menu before anything else (critters/PetRingMenu.tsx).
+    gardenPets: { current: null }, setPetRing: () => calls.push('ring'),
   };
   for (const [hit, action] of [['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => false; context.fairyRef.current[action] = () => calls.push(action);
@@ -261,6 +263,10 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     assert.equal(context.notes, noted ? 1 : 0, String(expected)); assert.equal(context.interactions, context.notes, String(expected));
   };
   expect(['move', 'redraw']);
+  // The puppy under the tap: it sits and its ring menu opens; nothing else happens.
+  context.gardenPets.current = { petAt: () => ({ id: 'puppy', x: 100, y: 100, size: 113 }), hold: () => calls.push('hold') };
+  expect(['hold', 'ring']);
+  context.gardenPets.current = null;
   // The owner's Garden: this month's lawn opens Events with or without flowers, another month's says whose it is.
   context.monthLawnOpensEvents = true;
   const thisMonth = new Date().getMonth() + 1;

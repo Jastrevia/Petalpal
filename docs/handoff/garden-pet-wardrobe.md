@@ -28,8 +28,31 @@ Not done yet (next work, in the owner's order):
 2. **Wardrobe screen** that feels like a closet: every piece shows; pieces not yet opened show a
    small lock. Choosing a piece calls `PUT /api/fairy/pets/:petId/outfit`.
 3. **Eating and being-patted animations** for the puppy, as natural as its walk. These need new
-   painted motion clips (see "Art" below).
+   painted motion clips (see "Art" below). *Started 2026-11-05:* set 2's petal cape (look `cape2`)
+   has both (`PUPPY_ACTIONS` in `puppyLooks.ts`, `eat-cape2.webp` / `pat-cape2.webp`): oil-motion
+   clips (minimax h3 highspeed, 6 s, 24 fps kept at 12) that start and end on that look's sitting
+   frame, the eating clip from a key frame with a painted bowl added (gpt-image edit). Owner
+   approved them as made. Prompts, key frames and the packer (`action_sheet.py`) are in
+   `~/dev/petalpal-motion/dressed/actions/`. The ring menu plays them (Feed after a food is eaten,
+   Pat) and steps aside meanwhile; every other look still shows only rising hearts. Still to make:
+   the bare puppy and set 1's cape (4 clips, 2 bowl key frames), then hats and necklaces tracked
+   onto them like the walks.
 4. **The other four pets** (hedgehog, butterfly, rabbit, bluebird) have no outfit art yet.
+   *New pet, 2026-11-05:* a Maltese, the puppy's tiny best friend (`maltese` in `critterVisits.ts`,
+   `maltese-walk.webp` / `maltese-sit.webp`). The owner chose its look (a realistic fluffy white
+   puppy, gpt-image key frame `~/dev/petalpal-motion/maltese/M0-chosen.png`; it need not match the
+   puppy's painted style) and asked that it be small. Walk loop and walk-to-sit are oil-motion clips
+   (minimax h3 highspeed) cut with crop 190,30,920,690 into 293 × 220 cells. It comes only with the
+   puppy (`planFriendVisit`, a little way from it), then follows it along the paths and sits beside
+   it facing it (`planFollow`). No ring menu or wardrobe for it yet.
+   *Playing together (2026-11-05):* the Maltese leads about 7 walks in 10 (the puppy is clingy),
+   the puppy the rest (`pickLeader`); they never stand inside each other (`APART`). Now and then,
+   when close: a chase (either one runs, on its painted run; `planPlay`), a tug-of-war with a rope
+   toy, or a hug (`planScene`: one oil-motion clip of both, `pair-tug.webp` / `pair-hug.webp`,
+   anchored on the puppy's paws). Clips, prompts and the packer (`pair/pair_sheet.py`) are in
+   `~/dev/petalpal-motion/maltese/`. The golden's sitting frames had a dark patch under the belly:
+   Kiro repainted it (one oil-motion edit, `~/dev/petalpal-motion/dressed/belly/NOTES.md`) in all
+   seven bare-body sit sheets; the hug clip was regenerated with a clean belly.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

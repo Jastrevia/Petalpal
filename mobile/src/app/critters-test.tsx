@@ -1,23 +1,23 @@
-import { Canvas, Rect } from '@shopify/react-native-skia';
+import { Canvas, Group, Rect } from '@shopify/react-native-skia';
 import { Redirect } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
-import { Critter } from '@/components/garden/critters/GardenCritters';
-import { PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
+import { Critter, PairSceneClip } from '@/components/garden/critters/GardenCritters';
+import { PUPPY_ACTIONS, PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
 import { Otter } from '@/components/garden/spirits/MemoryOtter';
 import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
-import { CRITTER_IDS, CRITTERS, RHYTHMS, RUN_SPEED, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Visit } from '@/components/garden/critters/critterVisits';
+import { CRITTER_IDS, CRITTERS, MALTESE_RUN_SPEED, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
 // painting and motion can be judged up close. Not part of production navigation.
 const WIDTH = 360, HEIGHT = 260;
 // The puppy is the biggest visitor: a little less zoom keeps all of it on the lawn; the rabbit's
 // hops are a body length each, so it needs room for a few.
-const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2 : id === 'silktail' ? 1.3 : 2.4);
+const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2 : id === 'silktail' ? 1.3 : id === 'maltese' ? 2.2 : 2.4);
 // The visitors plus the Silktail Fox spirit (not a random visitor; shown resting first, then walking).
-const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'silktail'];
+const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
@@ -25,7 +25,10 @@ export default function CrittersTestScreen() {
   // The puppy's outfit: switching it mid-walk shows how one look turns into another.
   const [look, setLook] = useState<PuppyLook>('bare');
   // The puppy's moves: its walk, its gallop (a chase), or sitting a while first, then getting up.
-  const [move, setMove] = useState<'walk' | 'run' | 'sit'>('walk');
+  // (eat / pat: the puppy's painted actions, petal cape only.)
+  const [move, setMove] = useState<'walk' | 'run' | 'sit' | 'eat' | 'pat'>('walk');
+  // The pair's painted scenes (puppy and Maltese together), shown on their own.
+  const [pair, setPair] = useState<SceneKind | null>(null);
   const seconds = useSharedValue(0);
   const rate = useSharedValue(1);
   useEffect(() => { rate.value = slow ? 0.25 : 1; }, [slow, rate]);
@@ -40,14 +43,22 @@ export default function CrittersTestScreen() {
     const ZOOM = zoomFor(id), margin = CRITTERS[id].size * 0.45;
     const y = CRITTERS[id].kind === 'walker' ? HEIGHT / ZOOM * 0.78 : HEIGHT / ZOOM * 0.5;
     const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
-    const spec = CRITTERS[id], puppyMove = id === 'puppy' ? move : 'walk';
-    const running = puppyMove === 'run', sitting = puppyMove === 'sit';
-    const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? RUN_SPEED : spec.speed;
+    const spec = CRITTERS[id], puppyMove = id === 'puppy' || id === 'maltese' ? move : 'walk';
+    const acting = id === 'puppy' && (puppyMove === 'eat' || puppyMove === 'pat');
+    const running = puppyMove === 'run', sitting = puppyMove === 'sit' || acting;
+    const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? (id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED) : spec.speed;
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
-    const lead = id === 'silktail' ? 10 : sitting ? 7 : FADE_SECONDS;
+    const lead = id === 'silktail' ? 10 : acting ? 10 : sitting ? 7 : FADE_SECONDS;
     return { key: round, id, path, start, duration: lead + travelSeconds(length / speed, rhythm), speed, rhythm,
-      lead, fadeIn: id !== 'silktail' && !sitting, walked: 0, chase: running, sits: sitting };
+      lead, fadeIn: id !== 'silktail' && !sitting, walked: 0, chase: running && id === 'puppy', running: running && id === 'maltese', sits: sitting,
+      ...(acting ? { held: true, action: { kind: puppyMove as 'eat' | 'pat', start: start + 2 } } : {}) };
   }, [id, round, start, move]);
+  const scene = useMemo<Scene | null>(() => (pair ? { key: round, kind: pair, start: start + 0.4, end: start + 0.4 + SCENE_SPECS[pair].seconds, x: 70, y: HEIGHT / 1.5 * 0.78, dir: 1 } : null), [pair, round, start]);
+  useEffect(() => {
+    if (!scene) return;
+    const timer = setInterval(() => { if (seconds.value > scene.end + 0.6) { setRound(value => value + 1); setStart(seconds.value); } }, 200);
+    return () => clearInterval(timer);
+  }, [scene, seconds]);
   // Rounds run on the preview clock, so slow motion stretches them too.
   useEffect(() => {
     const timer = setInterval(() => { if (seconds.value > visit.start + visit.duration) setRound(value => value + 1); }, 200);
@@ -79,15 +90,19 @@ export default function CrittersTestScreen() {
     </Canvas> : <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
       <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#5C7F45" />
       <Rect x={0} y={HEIGHT * 0.62} width={WIDTH} height={HEIGHT * 0.3} color="#B9AA8C" />
-      <Critter key={id} visit={visit} clock={seconds} zoom={zoomFor(id)} look={look} />
+      {scene ? <Group transform={[{ scale: 1.5 }]}><PairSceneClip key={scene.key} scene={scene} clock={seconds} /></Group>
+        : <Critter key={`${id}-${move}`} visit={visit} clock={seconds} zoom={zoomFor(id)} look={look} />}
     </Canvas>}
     <Text testID="critter-debug" style={styles.label}>{debug}</Text>
-    <View style={styles.row}>{PREVIEW_IDS.map(item => <Pressable key={item} onPress={() => { setOtter(false); setId(item); }}
-      style={[styles.button, !otter && id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}
+    <View style={styles.row}>{PREVIEW_IDS.map(item => <Pressable key={item} onPress={() => { setOtter(false); setPair(null); setId(item); }}
+      style={[styles.button, !otter && !pair && id === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}
       <Pressable onPress={() => { setOtter(true); setStart(seconds.value); }} style={[styles.button, otter && styles.selected]}><Text style={styles.label}>otter (night)</Text></Pressable></View>
-    {!otter && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
+    <View style={styles.row}>{(['hug', 'tug'] as const).map(item => <Pressable key={item} onPress={() => { setOtter(false); setPair(item); setStart(seconds.value); }}
+      style={[styles.button, pair === item && styles.selected]}><Text style={styles.label}>{item === 'hug' ? 'pair: hug 抱抱' : 'pair: tug 抢玩具'}</Text></Pressable>)}</View>
+    {!otter && !pair && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
       style={[styles.button, look === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
-    {!otter && id === 'puppy' ? <View style={styles.row}>{(['walk', 'run', 'sit'] as const).map(item => <Pressable key={item} onPress={() => { setMove(item); setRound(value => value + 1); }}
+    {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
+      onPress={() => { setMove(item); if ((item === 'eat' || item === 'pat') && !PUPPY_ACTIONS[look]) setLook('cape2'); setRound(value => value + 1); }}
       style={[styles.button, move === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     <View style={styles.row}>
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>

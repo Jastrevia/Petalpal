@@ -17,6 +17,13 @@ export async function loadPets() {
   catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
 }
 
+// Feeds `petId` one of `foodId` (409 NO_FOOD when none are left): the count left comes back.
+export const feedPet = (petId: PetId, foodId: string) =>
+  apiRequest<{ foodId: string; count: number }>(`/api/fairy/pets/${petId}/feed`, 'POST', { foodId });
+// Puts on a whole outfit, all three slots (null takes one off); the outfit saved comes back.
+export const dressPet = (petId: PetId, outfit: PetOutfit) =>
+  apiRequest<{ outfit: PetOutfit }>(`/api/fairy/pets/${petId}/outfit`, 'PUT', outfit);
+
 // Whoever changes an outfit (the wardrobe) calls petsChanged(), so the Garden redresses its pets.
 const changeListeners = new Set<() => void>();
 export function onPetsChanged(listener: () => void) { changeListeners.add(listener); return () => { changeListeners.delete(listener); }; }
