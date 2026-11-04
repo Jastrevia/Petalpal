@@ -1,4 +1,4 @@
-import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
+import { BlurMask, Group, Image, Oval, Path, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
 import { usePetOutfit } from '@/services/gardenPets';
@@ -10,7 +10,7 @@ import { ACTION_FPS, actionSeconds, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, 
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, FOLLOW_NEAR, holdVisit, planFollow, planFriendVisit, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -43,7 +43,9 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The Maltese, the puppy's tiny friend: an oil-motion walk (one 5 s loop, 40 frames kept) and a
   // walk-to-sit (20 frames), cut with one crop (190,30,920,690) so they lie on the same cells.
   maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
-    frames: { columns: 8, count: 40, ground: 216, loop: 78.8, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 } } },
+    frames: { columns: 8, count: 40, ground: 216, loop: 78.8, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
+      // Its run (one 5 s loop, 32 frames kept), same cells: chasing the puppy or dashing off in a game.
+      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 32, loop: 178.4 } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -95,6 +97,14 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
   const [shownLook, setShownLook] = useState(look);
   const shownLookRef = useRef(shownLook); shownLookRef.current = shownLook;
+  // Who leads the pair's walks (critterVisits.ts pickLeader), and hearts rising after a game.
+  const pair = useRef<{ leader: PairLeader; until: number }>({ leader: 'maltese', until: 0 });
+  const [hearts, setHearts] = useState<{ key: number; x: number; y: number; start: number }[]>([]);
+  const forcePlay = useRef(false);
+  const forceKind = useRef<'chase' | 'tug' | 'hug' | null>(null);
+  const lastTry = useRef<unknown>(null);
+  const [sceneList, setScenes] = useState<Scene[]>([]);
+  const scenes = useRef(sceneList); scenes.current = sceneList;
   const reducedRef = useRef(false); reducedRef.current = !!useReducedMotion();
   useEffect(() => {
     const now = clock.value;
@@ -139,22 +149,106 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
     const legs = setInterval(() => {
       const now = clock.value;
+      if (now >= pair.current.until) pair.current = { leader: pickLeader(Math.random), until: now + leadSpell(Math.random) };
+      // Whoever follows breaks off a walk of its own to go after the other.
+      const follower = pair.current.leader === 'maltese' ? 'puppy' : 'maltese';
+      if (visitsRef.current.some(v => v.id === 'maltese' && !v.leaving) && visitsRef.current.some(v => v.id === 'puppy' && !v.leaving)) {
+        const lagging = visitsRef.current.find(v => v.id === follower), other = visitsRef.current.find(v => v.id !== follower && (v.id === 'puppy' || v.id === 'maltese'));
+        // Never inside each other: one walking into the other makes the follower step aside.
+        const a = lagging && visitPose(lagging, now), b = other && visitPose(other, now);
+        const crowded = !!(a && b && Math.hypot(a.x - b.x, a.y - b.y) < APART * 0.7);
+        if (lagging && breakOff(lagging, now, crowded) !== lagging) { visitsRef.current = visitsRef.current.map(v => (v === lagging ? breakOff(v, now, crowded) : v)); setVisits(visitsRef.current); }
+      }
       if (!visitsRef.current.some(visit => now >= visit.start + visit.duration)) return;
-      setVisits(current => current.flatMap(visit => {
+      setVisits(current => {
+        // The Maltese and the puppy together: a game of chase now and then, when the Maltese is
+        // leading and its walk ends close to the puppy.
+        const maltese = current.find(v => v.id === 'maltese' && !v.leaving), puppy = current.find(v => v.id === 'puppy' && !v.leaving);
+        let game: ReturnType<typeof planPlay> = null, staged: ReturnType<typeof planScene> = null;
+        const busy = (v: Visit) => v.held || v.chase || v.play || (v.inScene && now < v.inScene.end);
+        if (__DEV__ && maltese && puppy && now >= maltese.start + maltese.duration && forcePlay.current) {
+          const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
+          lastTry.current = { check: true, busyM: !!busy(maltese), busyP: !!busy(puppy), gap: Math.round(Math.hypot(m.x - p.x, m.y - p.y)) };
+        }
+        if (maltese && puppy && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
+          const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
+          const here = { x: m.x, y: m.y }, mate = { x: p.x, y: p.y };
+          if (distance(here, mate) <= PLAY_NEAR * 1.6) {
+            // Which game: chasing each other (either one runs), tug-of-war, or a hug.
+            const kind = forceKind.current ?? (['chase', 'chase', 'tug', 'hug'] as const)[Math.floor(Math.random() * 4)];
+            if (kind === 'chase') {
+              const runner: PairLeader = Math.random() < 0.5 ? 'maltese' : 'puppy';
+              const from = runner === 'maltese' ? here : mate, other = runner === 'maltese' ? mate : here;
+              const goal = dashGoal(from, other, Math.random);
+              const dash = goal ? pathTo(from, goal) : null;
+              const toStart = pathTo(other, from);
+              game = dash ? planPlay({ maltese, puppy, now, dash, chase: toStart, runner }) : null;
+            } else {
+              // Its place beside the puppy, on the side it is on (else the other side), with a way there.
+              const near = here.x >= mate.x ? 1 : -1;
+              for (const dir of [near, -near]) {
+                const spot = { x: mate.x + dir * SCENE_SPECS[kind].apart, y: mate.y };
+                if (isGardenGroundBlocked(spot)) continue;
+                const approach = pathTo(here, spot);
+                staged = planScene({ key: ++keyRef.current, kind, maltese, puppy, now, mAt: { x: mate.x + dir * (SCENE_SPECS[kind].apart + 1), y: mate.y }, pAt: mate, approach });
+                if (staged) break;
+              }
+              if (__DEV__) lastTry.current = { kind, at: now, staged: !!staged };
+            }
+          }
+        }
+        if (game || staged) { forcePlay.current = false; forceKind.current = null; }
+        if (game) {
+          const played = game;
+          setHearts(all => [...all.filter(h => h.start + 3 > now), { key: ++keyRef.current, x: played.at.x, y: played.at.y, start: played.ends + 0.6 }]);
+          return current.map(v => (v.key === played.maltese.key ? played.maltese : v.key === played.puppy.key ? played.puppy : v));
+        }
+        if (staged) {
+          const s = staged;
+          setScenes(all => [...all.filter(x => x.end > now), s.scene]);
+          if (s.scene.kind === 'hug') setHearts(all => [...all.filter(h => h.start + 3 > now), { key: ++keyRef.current, x: s.scene.x + s.scene.dir * 32, y: s.scene.y, start: s.scene.start + 2.2 }]);
+          return current.map(v => (v.key === s.maltese.key ? s.maltese : v.key === s.puppy.key ? s.puppy : v));
+        }
+        return current.flatMap(original => {
+        let visit = original;
         if (now < visit.start + visit.duration) return [visit];
         if (visit.leaving) return [];
         const lawn = visit.lawn;
         if (lawn !== undefined && (!lawns.current.unplanted.includes(lawn) || lawns.current.taken(visit.id).includes(lawn))) return [leaveVisit(visit, now)];
-        // The Maltese goes after its friend the puppy (and sits beside it) while it is here.
-        const friend = visit.id === 'maltese' ? current.find(v => v.id === 'puppy' && !v.leaving) : undefined;
-        if (friend) {
+        // In a pair scene: stay put until it is over (the clip shows them both meanwhile).
+        if (visit.inScene && now < visit.inScene.end) {
+          const at = visitPose(visit, visit.start + visit.duration);
+          return [sceneHold(visit, now, { x: at.x, y: at.y }, at.dx < 0 ? -1 : 1, SCENE_SPECS[scenes.current.find(x => x.end === visit.inScene!.end)?.kind ?? 'tug'].sits)];
+        }
+        if (visit.inScene) visit = { ...visit, inScene: undefined };
+        // The pair: whoever is not leading goes after the other and sits down beside it. After a
+        // game the Maltese sits facing the puppy; after a chase the puppy sits where it caught up.
+        const mateId = visit.id === 'maltese' ? 'puppy' : visit.id === 'puppy' ? 'maltese' : null;
+        const friend = mateId ? current.find(v => v.id === mateId && !v.leaving) : undefined;
+        const follows = friend && (visit.id === 'maltese' ? visit.play || pair.current.leader === 'puppy' : !visit.chase && pair.current.leader === 'maltese');
+        if (friend && follows) {
           const end = visitPose(visit, visit.start + visit.duration), mate = visitPose(friend, now);
           const here = { x: end.x, y: end.y }, leader = { x: mate.x, y: mate.y };
-          const path = distance(here, leader) > FOLLOW_NEAR ? route(here, leader, isGardenGroundBlocked) : null;
-          return [planFollow({ visit, now, here, leader, path, random: Math.random })];
+          const path = !visit.play && distance(here, leader) > FOLLOW_NEAR ? pathTo(here, leader) : null;
+          const aside = distance(here, leader) < APART ? asideFrom(here, leader, isGardenGroundBlocked) : null;
+          return [{ ...planFollow({ visit, now, here, leader, path, random: Math.random, aside }), play: false }];
         }
-        return [planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current }) ?? visit];
-      }));
+        const plan = () => planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current });
+        // Leading the pair: a walk that does not go through the other one.
+        const mate = friend ? visitPose(friend, now) : null;
+        const next = mate ? clearOf([plan(), plan(), plan(), plan(), plan(), plan()], { x: mate.x, y: mate.y }) : plan();
+        if (next) return [{ ...next, following: false, play: false, running: false }];
+        // Off the paths (a game or a chase ended between path points): walk back onto the nearest one.
+        const end = visitPose(visit, visit.start + visit.duration), here = { x: end.x, y: end.y };
+        const node = WALK_NETWORK.nodes.filter(n => Math.hypot(n.x - here.x, n.y - here.y) > 4 && safeSegment(here, n, isGardenGroundBlocked))
+          .sort((a, b) => Math.hypot(a.x - here.x, a.y - here.y) - Math.hypot(b.x - here.x, b.y - here.y))[0];
+        if (!node) return [visit];
+        const spec = CRITTERS[visit.id], lead = visit.chase ? between2(3, 6) : 0.6;
+        return [{ ...visit, path: [here, node], start: now, lead, duration: lead + Math.hypot(node.x - here.x, node.y - here.y) / spec.speed,
+          speed: spec.speed, rhythm: RHYTHMS_OF(visit.id), fadeIn: false, walked: visit.walked + visitDistance(visit, visit.start + visit.duration),
+          sits: Boolean(visit.chase), rising: false, chase: false, play: false, running: false, following: false }];
+        });
+      });
     }, 150);
     // The bluebird takes off: about half the time the puppy runs after it.
     chase.current = (to: Point) => {
@@ -181,7 +275,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       petAt: (point, slop) => {
         const now = clock.value;
         for (const visit of visitsRef.current) {
-          if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead) continue;
+          if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead || visit.inScene && now < visit.inScene.end) continue;
           const pose = visitPose(visit, now), size = CRITTERS[visit.id].size;
           if (Math.abs(point.x - pose.x) <= size * 0.45 + slop && point.y >= pose.y - size * 0.7 - slop && point.y <= pose.y + size * 0.08 + slop)
             return { id: visit.id, x: pose.x, y: pose.y, size };
@@ -209,6 +303,11 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
       visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1), chase: Boolean(visit.chase), sits: Boolean(visit.sits) })),
       clear: () => setVisits([]),
+      // The pair: who leads for the next while ('maltese' or 'puppy'); start a game of chase as soon as they can.
+      lastTry: () => lastTry.current,
+      scenes: () => scenes.current,
+      lead: (who: PairLeader) => { pair.current = { leader: who, until: clock.value + 120 }; },
+      play: (kind?: 'chase' | 'tug' | 'hug') => { pair.current = { leader: 'maltese', until: clock.value + 120 }; forcePlay.current = true; forceKind.current = kind ?? null; },
       // Where each visitor is now (world units).
       poses: () => visitsRef.current.map(visit => { const pose = visitPose(visit, clock.value); return { id: visit.id, x: Math.round(pose.x), y: Math.round(pose.y), sits: Boolean(visit.sits), opacity: Math.round(pose.opacity * 100) / 100, leaving: Boolean(visit.leaving), held: Boolean(visit.held), left: Math.round(visit.start + visit.duration - clock.value) }; }),
       // Send the puppy after the bluebird as if it had just taken off for `to`.
@@ -234,7 +333,11 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       },
     };
   }, [clock]);
-  return <>{visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} />)}</>;
+  return <>
+    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} />)}
+    {sceneList.map(scene => <PairSceneClip key={scene.key} scene={scene} clock={clock} />)}
+    {hearts.map(heart => <PlayHearts key={heart.key} x={heart.x} y={heart.y} start={heart.start} clock={clock} />)}
+  </>;
 });
 
 export function Critter({ visit, clock, zoom = 1, look = 'bare' }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook }) {
@@ -305,13 +408,14 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
   const spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
   const scale = spec.size / Math.max(w, h);
-  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity * (fade ? fade.value : 1), [visit, fade]);
+  // (Hidden while the pair's scene clip shows them both.)
+  const opacity = useDerivedValue(() => visitPose(visit, clock.value).opacity * (fade ? fade.value : 1) * (1 - sceneShown(visit.inScene, clock.value)), [visit, fade]);
   const transform = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
     return [{ translateX: pose.x }, { translateY: pose.y }, { scaleX: (pose.dx < 0 ? -1 : 1) * scale }, { scaleY: scale },
       { translateX: -w / 2 }, { translateY: -frames.ground }];
   }, [visit, scale, w, frames]);
-  const running = Boolean(visit.chase && frames.run);
+  const running = Boolean((visit.chase || visit.running) && frames.run);
   const stride = running ? frames.run! : frames;
   const frame = useDerivedValue(() => {
     const along = reduced ? 0 : (visit.walked + visitDistance(visit, clock.value)) / stride.loop + (running ? 0 : phase);
@@ -365,6 +469,63 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
       {actions ? (['eat', 'pat'] as const).map(kind => <ActionClip key={kind} kind={kind} spec={actions[kind]} visit={visit} clock={clock} shown={actionShown} w={w} ground={frames.ground} />) : null}
     </Group>
   </Group>;
+}
+
+// A way on foot from `from` (anywhere, maybe between path points) to `to`: straight when nothing
+// is in the way, else along the paths from the nearest path point it can step to.
+const between2 = (a: number, b: number) => a + (b - a) * Math.random();
+const RHYTHMS_OF = (id: CritterId) => RHYTHMS[id];
+function pathTo(from: Point, to: Point): Point[] | null {
+  if (safeSegment(from, to, isGardenGroundBlocked)) return [from, to];
+  const direct = route(from, to, isGardenGroundBlocked);
+  if (direct) return direct;
+  const steps = WALK_NETWORK.nodes.filter(n => safeSegment(from, n, isGardenGroundBlocked))
+    .sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y)).slice(0, 3);
+  for (const n of steps) {
+    const rest = route(n, to, isGardenGroundBlocked);
+    if (rest) return [from, ...rest];
+  }
+  return null;
+}
+
+// Where the Maltese dashes off to in a game: a path point some way off (but not too far), so the
+// puppy has a short run after it.
+function dashGoal(from: Point, away: Point, random: () => number) {
+  // Away from the puppy (on the far side of the Maltese), so the run never goes through it.
+  const side = Math.sign(from.x - away.x) || 1;
+  const spots = POINTS.filter(p => { const d = Math.hypot(p.x - from.x, p.y - from.y); return d >= 140 && d <= 320 && (p.x - from.x) * side > 40; });
+  return spots.length ? spots[Math.floor(random() * spots.length)] : null;
+}
+
+// Three small hearts rising over the pair after a game (world units, above where they sat down).
+const HEART = Skia.Path.MakeFromSVGString('M0 3 C0 -1 -6 -1 -6 3 C-6 6 -2 8 0 10 C2 8 6 6 6 3 C6 -1 0 -1 0 3 Z')!;
+function PlayHearts({ x, y, start, clock }: { x: number; y: number; start: number; clock: SharedValue<number> }) {
+  return <>{[[-14, 0, 1.1], [4, -10, 1.4], [18, -2, 0.9]].map(([dx, dy, k], i) => <Heart key={i} x={x + dx} y={y - 70 + dy} k={k} start={start + i * 0.25} clock={clock} color={i === 1 ? '#F38FB3' : '#F7A8C4'} />)}</>;
+}
+function Heart({ x, y, k, start, clock, color }: { x: number; y: number; k: number; start: number; clock: SharedValue<number>; color: string }) {
+  const opacity = useDerivedValue(() => { const t = (clock.value - start) / 1.6; return t < 0 || t > 1 ? 0 : Math.min(1, t * 5, (1 - t) * 2.5); }, [start]);
+  const transform = useDerivedValue(() => { const t = Math.max(0, Math.min(1, (clock.value - start) / 1.6)); return [{ translateX: x }, { translateY: y - t * 30 }, { scale: k }]; }, [x, y, k, start]);
+  return <Group opacity={opacity} transform={transform}><Path path={HEART} color={color} /></Group>;
+}
+
+// The pair scenes: one painted clip of both (oil-motion, ~/dev/petalpal-motion/maltese/pair), drawn
+// so the golden puppy's paws land where the puppy stands (`anchor`, its centre and ground row in a
+// cell) and scaled to the Garden (`k`, world units per cell pixel); the Maltese is then `apart`
+// beside it (SCENE_SPECS), where it walked up to. Mirrored when the Maltese is on its left.
+const PAIR_SCENES: Record<SceneKind, { source: number; columns: number; count: number; w: number; h: number; anchor: [number, number]; k: number }> = {
+  tug: { source: require('@/assets/garden/critters/pair-tug.webp'), columns: 6, count: 71, w: 564, h: 200, anchor: [153.1, 193.8], k: 0.342 },
+  hug: { source: require('@/assets/garden/critters/pair-hug.webp'), columns: 8, count: 71, w: 428, h: 220, anchor: [124, 211.8], k: 0.3072 },
+};
+const SCENE_FPS = 12;
+function PairSceneClip({ scene, clock }: { scene: Scene; clock: SharedValue<number> }) {
+  const spec = PAIR_SCENES[scene.kind];
+  const sheet = useImage(spec.source);
+  const frame = useDerivedValue(() => Math.max(0, Math.min(spec.count - 1, Math.floor((clock.value - scene.start) * SCENE_FPS))), [scene, spec]);
+  const opacity = useDerivedValue(() => sceneShown(scene, clock.value), [scene]);
+  const transform = useMemo(() => [{ translateX: scene.x }, { translateY: scene.y }, { scaleX: scene.dir * spec.k }, { scaleY: spec.k },
+    { translateX: -spec.anchor[0] }, { translateY: -spec.anchor[1] }], [scene, spec]);
+  if (!sheet) return null;
+  return <Group opacity={opacity} transform={transform}><SheetFrame sheet={sheet} frame={frame} columns={spec.columns} count={spec.count} w={spec.w} h={spec.h} /></Group>;
 }
 
 const ACTION_FADE = 0.2;

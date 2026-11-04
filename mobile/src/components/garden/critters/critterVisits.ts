@@ -81,6 +81,12 @@ export type Visit = {
   held?: boolean;
   // While held: eating or being patted (puppyLooks.ts PUPPY_ACTIONS), from `start` (clock seconds).
   action?: { kind: 'eat' | 'pat'; start: number };
+  // The Maltese dashing off in a game of chase with the puppy (planPlay); `following`: a leg going
+  // after (or sitting by) the other of the pair (planFollow).
+  play?: boolean; following?: boolean;
+  // Drawn with its run (the Maltese running in a game or catching up); `inScene`: part of a pair
+  // scene (tug-of-war, a hug) shown as one clip from `start` to `end` (planScene).
+  running?: boolean; inScene?: { start: number; end: number };
 };
 
 // The puppy chases the bluebird about half the times it takes off: it runs (its painted gallop,
@@ -421,30 +427,200 @@ export function planFriendVisit({ key, now, active, network, edges, random }: {
 // (a short stretch at a time, so it keeps up as the puppy moves on), trotting a little faster when
 // it has fallen far behind; once beside it, it sits down facing it for a while, then checks again.
 // `path`: the route to the puppy (walkNetwork route), null when none; `leader`: the puppy's pose now.
-export const FOLLOW_NEAR = 60;
+// They never stand or sit inside each other: at least APART units between them (the puppy's body
+// is about 50 either side of its paws, the Maltese's about 28), so a follower stops that far short
+// and, finding itself closer, first steps aside to `aside` (a free spot that far from the other).
+export const APART = 82;
+export const FOLLOW_NEAR = 110;
 const FOLLOW_STRETCH = 160;
-export function planFollow({ visit, now, here, leader, path, random }: {
-  visit: Visit; now: number; here: Point; leader: Point; path: Point[] | null; random: () => number;
+export function planFollow({ visit, now, here, leader, path, random, aside = null }: {
+  visit: Visit; now: number; here: Point; leader: Point; path: Point[] | null; random: () => number; aside?: Point | null;
 }): Visit {
   const spec = CRITTERS[visit.id], walked = visit.walked + visitDistance(visit, visit.start + visit.duration);
   const gap = distance(here, leader);
+  if (gap < APART && aside && distance(aside, here) > 4) {
+    // Too close: step aside first (then sit, on the next leg).
+    return { ...visit, path: [here, aside], start: now, lead: 0.1, duration: 0.1 + distance(here, aside) / spec.speed, speed: spec.speed,
+      rhythm: RHYTHMS[visit.id], fadeIn: false, walked, sits: false, rising: false, chase: false, following: true, running: false };
+  }
   if (gap <= FOLLOW_NEAR || !path || path.length < 2) {
-    // Beside it (or no way there): sit down facing the puppy.
+    // Beside it (or no way there): sit down facing it.
     const facing = leader.x >= here.x ? 1 : -1;
     const lead = between(REST[visit.id], random) + 1.5;
     return { ...visit, path: [here, { x: here.x + facing * 0.5, y: here.y }], start: now, lead, duration: lead + 0.05,
-      speed: spec.speed, rhythm: RHYTHMS[visit.id], fadeIn: false, walked, sits: true, rising: false, chase: false };
+      speed: spec.speed, rhythm: RHYTHMS[visit.id], fadeIn: false, walked, sits: true, rising: false, chase: false, following: true, running: false };
   }
-  // Stop a little short of the puppy, and go only a stretch of the way before looking again.
+  // Stop well short of it, and go only a stretch of the way before looking again.
   const route: Point[] = [path[0]];
-  let left = Math.min(FOLLOW_STRETCH, Math.max(0, pathLength(path) - FOLLOW_NEAR * 0.6));
+  let left = Math.min(FOLLOW_STRETCH, Math.max(0, pathLength(path) - APART - 10));
   for (let i = 1; i < path.length && left > 1e-6; i++) {
     const a = path[i - 1], b = path[i], length = distance(a, b);
     if (length <= left) { route.push(b); left -= length; continue; }
     route.push({ x: a.x + (b.x - a.x) * left / length, y: a.y + (b.y - a.y) * left / length }); left = 0;
   }
-  if (route.length < 2 || pathLength(route) < 4) return { ...visit, start: now, lead: 1, duration: 1.05, path: [here, { x: here.x + 0.5, y: here.y }], fadeIn: false, walked, sits: false };
-  const speed = spec.speed * (gap > FOLLOW_STRETCH * 2 ? 1.6 : 1);
-  return { ...visit, path: route, start: now, lead: 0.15, duration: 0.15 + pathLength(route) / speed, speed, rhythm: RHYTHMS[visit.id],
-    fadeIn: false, walked, sits: false, rising: false, chase: false };
+  if (route.length < 2 || pathLength(route) < 4) return { ...visit, start: now, lead: 1, duration: 1.05, path: [here, { x: here.x + 0.5, y: here.y }], fadeIn: false, walked, sits: false, following: true };
+  const far = gap > FOLLOW_STRETCH * 2, speed = spec.speed * (far ? 1.6 : 1);
+  // Sitting: it gets up first (its sit played back), then sets off.
+  const rising = Boolean(visit.sits), lead = rising ? RISE_SECONDS * 0.7 : 0.15;
+  return { ...visit, path: route, start: now, lead, duration: lead + pathLength(route) / speed, speed, rhythm: RHYTHMS[visit.id],
+    fadeIn: false, walked, sits: false, rising, chase: false, following: true, running: far && visit.id === 'maltese' };
+}
+
+// Who leads their walks: the Maltese most of the time (the puppy is clingy and trails after it),
+// the puppy the rest; chosen afresh every LEAD_SPELL seconds.
+export type PairLeader = 'maltese' | 'puppy';
+export const MALTESE_LEADS = 0.7;
+export const LEAD_SPELL: [number, number] = [40, 70];
+export const pickLeader = (random: () => number): PairLeader => (random() < MALTESE_LEADS ? 'maltese' : 'puppy');
+export const leadSpell = (random: () => number) => between(LEAD_SPELL, random);
+
+// A game of chase, now and then when the two are close: the Maltese dashes off along `dash`, the
+// puppy gallops after it along `chase` (its painted run) and catches up just as the Maltese stops;
+// then both sit down together (the Maltese facing it) and `ends` is when hearts may rise.
+export const PLAY_NEAR = 110;
+export const PLAY_CHANCE = 0.35;
+const DASH = 1.9, PULL_UP = APART + 8;
+// The puppy's dash when the Maltese chases it: a playful lope, slow enough for its little friend.
+const PUPPY_DASH = 70;
+// `path` without its last `by` units.
+export function trimEnd(path: Point[], by: number): Point[] {
+  let keep = pathLength(path) - by;
+  if (keep <= 0) return path.slice(0, 1);
+  const out: Point[] = [path[0]];
+  for (let i = 1; i < path.length && keep > 1e-6; i++) {
+    const a = path[i - 1], b = path[i], length = distance(a, b);
+    if (length <= keep) { out.push(b); keep -= length; continue; }
+    out.push({ x: a.x + (b.x - a.x) * keep / length, y: a.y + (b.y - a.y) * keep / length }); keep = 0;
+  }
+  return out;
+}
+export function planPlay({ maltese, puppy, now, dash, chase, runner = 'maltese' }: {
+  maltese: Visit; puppy: Visit; now: number; dash: Point[] | null; chase: Point[] | null; runner?: PairLeader;
+}): { maltese: Visit; puppy: Visit; ends: number; at: Point } | null {
+  // `dash`: the runner's way off; `chase`: the chaser's way to where the runner starts from. The
+  // chaser then runs the runner's own trail behind it, never closer than APART, and pulls up that
+  // far behind it as it stops. Either may run: the Maltese dashes off, or the puppy does and the
+  // Maltese scampers after it (both on their painted runs).
+  if (!dash || dash.length < 2 || pathLength(dash) < 60 || !chase || chase.length < 1 || puppy.held || puppy.chase || maltese.held) return null;
+  const run = runner === 'maltese' ? maltese : puppy, after = runner === 'maltese' ? puppy : maltese;
+  const speed = runner === 'maltese' ? CRITTERS.maltese.speed * DASH : PUPPY_DASH;
+  const walked = run.walked + visitDistance(run, Math.min(now, run.start + run.duration));
+  const dashing: Visit = { ...run, path: dash, start: now, lead: 0.2, duration: 0.2 + pathLength(dash) / speed, speed,
+    rhythm: runner === 'maltese' ? RHYTHMS.maltese : RUNNING, fadeIn: false, walked, sits: false, rising: false,
+    chase: runner === 'puppy', play: runner === 'maltese', running: runner === 'maltese', following: false };
+  const arrives = now + dashing.duration;
+  const trail = trimEnd([...chase, ...dash.slice(distance(chase[chase.length - 1], dash[0]) < 1e-6 ? 1 : 0)], PULL_UP);
+  // It sets off once the runner is a body length ahead along the trail.
+  const delay = Math.max(0.6, (APART - pathLength(chase)) / speed + 0.2);
+  if (trail.length < 2 || pathLength(trail) < 40) return null;
+  const rising = Boolean(after.sits) && now + delay < after.start + after.lead;
+  const lead = rising ? RISE_SECONDS : 0.15, start = now + delay;
+  const travel = Math.max(0.5, arrives - start - lead);
+  const pace = Math.min(runner === 'maltese' ? RUN_SPEED : PUPPY_DASH * 1.4, pathLength(trail) / travel);
+  const chasing: Visit = { ...after, path: trail, start, lead, duration: lead + pathLength(trail) / pace, speed: pace,
+    rhythm: runner === 'maltese' ? RUNNING : RHYTHMS.maltese, fadeIn: false, walked: after.walked + visitDistance(after, Math.min(now, after.start + after.duration)),
+    sits: false, rising, chase: runner === 'maltese', play: runner === 'puppy', running: runner === 'puppy', following: false };
+  const out = runner === 'maltese' ? { maltese: dashing, puppy: chasing } : { maltese: chasing, puppy: dashing };
+  return { ...out, ends: Math.max(arrives, chasing.start + chasing.duration), at: dash[dash.length - 1] };
+}
+
+// The one who should follow is off on a walk of its own (just arrived, or the lead just changed):
+// it breaks off where it is now, so its next leg goes after the other. Not while resting where a
+// leg ended (it gets up and goes when the rest is over), held, chasing or in a game.
+export function breakOff(visit: Visit, now: number, crowded = false): Visit {
+  const elapsed = now - visit.start;
+  if (visit.chase || visit.held || visit.play || visit.leaving || visit.inScene || now >= visit.start + visit.duration) return visit;
+  // Crowded (the other walking into it): it makes room at once, even from a rest or a follow.
+  // (Not one already walking a follow leg, e.g. stepping aside: that one is moving off.)
+  if (crowded && (visit.sits || !visit.following)) return { ...visit, lead: Math.min(visit.lead, elapsed), duration: elapsed };
+  if (visit.following || elapsed < visit.lead) return visit;
+  return { ...visit, duration: elapsed };
+}
+
+// A free spot `APART` from `other`, on the side `from` is on (else the other side), for a pair
+// member that ended up too close; null when neither side is free.
+export function asideFrom(from: Point, other: Point, blocked: (p: Point) => boolean): Point | null {
+  const side = from.x >= other.x ? 1 : -1;
+  for (const s of [side, -side]) {
+    const spot = { x: other.x + s * APART, y: from.y };
+    if (!blocked(spot)) return spot;
+  }
+  return null;
+}
+
+// How close `path` comes to `point`, past its first `skip` units (its start may be close already).
+export function closestApproach(path: readonly Point[], point: Point, skip = 0) {
+  let best = Infinity, along = 0;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i], length = distance(a, b);
+    for (let k = 0; k <= 8; k++) {
+      const u = k / 8, d = along + u * length;
+      if (d < skip) continue;
+      const x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u;
+      best = Math.min(best, Math.hypot(x - point.x, y - point.y));
+    }
+    along += length;
+  }
+  return best;
+}
+// The leader's next walk keeps clear of the other one: of a few candidate walks the first that
+// never comes within APART of it, else the one that keeps farthest, cut off before it gets close.
+export function clearOf(candidates: readonly (Visit | null)[], other: Point): Visit | null {
+  let best: Visit | null = null, bestGap = -1;
+  for (const leg of candidates) {
+    if (!leg) continue;
+    const gap = closestApproach(leg.path, other, 20);
+    if (gap >= APART) return leg;
+    if (gap > bestGap) { best = leg; bestGap = gap; }
+  }
+  if (!best) return null;
+  // Walk only up to where it would come close, then rest there.
+  let cut = best.path.length;
+  for (let i = 1; i < best.path.length; i++) if (Math.hypot(best.path[i].x - other.x, best.path[i].y - other.y) < APART) { cut = i; break; }
+  const path = best.path.slice(0, Math.max(2, cut));
+  if (path.length < 2 || pathLength(path) < 2) return best;
+  return { ...best, path, duration: best.lead + travelSeconds(pathLength(path) / best.speed, best.rhythm) };
+}
+
+// Pair scenes, drawn as one painted clip of both (GardenCritters PAIR_SCENES): a tug-of-war with a
+// rope toy (both standing) and a hug (both sitting). The Maltese walks up to its place facing the
+// puppy (`apart` units from it, on its side) and the scene plays there, both held for it.
+export type SceneKind = 'tug' | 'hug';
+export const SCENE_SPECS: Readonly<Record<SceneKind, { seconds: number; apart: number; sits: boolean }>> = {
+  tug: { seconds: 71 / 12, apart: 106.6, sits: false },
+  hug: { seconds: 71 / 12, apart: 65.3, sits: true },
+};
+export type Scene = { key: number; kind: SceneKind; start: number; end: number; x: number; y: number; dir: 1 | -1 };
+export function planScene({ key, kind, maltese, puppy, now, mAt, pAt, approach }: {
+  key: number; kind: SceneKind; maltese: Visit; puppy: Visit; now: number; mAt: Point; pAt: Point; approach: Point[] | null;
+}): { maltese: Visit; puppy: Visit; scene: Scene } | null {
+  if (puppy.held || maltese.held || puppy.chase || !approach || approach.length < 1) return null;
+  const spec = SCENE_SPECS[kind], dir: 1 | -1 = mAt.x >= pAt.x ? 1 : -1;
+  const spot = { x: pAt.x + dir * spec.apart, y: pAt.y };
+  const to = [...approach.slice(0, -1), spot];
+  const path = to.length >= 2 ? [...to, { x: spot.x - dir * 0.5, y: spot.y }] : [mAt, { x: mAt.x - dir * 0.5, y: mAt.y }];
+  const speed = CRITTERS.maltese.speed, walking = pathLength(path) / speed;
+  const start = now + Math.max(walking + 0.3, spec.sits ? 1.6 : 0.4), end = start + spec.seconds;
+  const scene: Scene = { key, kind, start, end, x: pAt.x, y: pAt.y, dir };
+  const m: Visit = { ...maltese, path, start: now, lead: 0.1, duration: 0.1 + walking, speed, rhythm: RHYTHMS.maltese, fadeIn: false,
+    walked: maltese.walked + visitDistance(maltese, Math.min(now, maltese.start + maltese.duration)), sits: false, rising: false, chase: false,
+    play: false, running: false, following: true, inScene: { start, end } };
+  const lead = end - now;
+  const p: Visit = { ...puppy, path: [pAt, { x: pAt.x + dir * 0.5, y: pAt.y }], start: now, lead, duration: lead + 0.05, speed: CRITTERS.puppy.speed,
+    rhythm: RHYTHMS.puppy, fadeIn: false, walked: puppy.walked + visitDistance(puppy, Math.min(now, puppy.start + puppy.duration)),
+    sits: spec.sits, rising: false, chase: false, following: true, inScene: { start, end } };
+  return { maltese: m, puppy: p, scene };
+}
+// Holding still in place until a scene is over (a pair member whose own leg ended first).
+export function sceneHold(visit: Visit, now: number, here: Point, facing: 1 | -1, sits: boolean): Visit {
+  const end = visit.inScene!.end, lead = Math.max(0.05, end - now);
+  return { ...visit, path: [here, { x: here.x + facing * 0.5, y: here.y }], start: now, lead, duration: lead + 0.05, fadeIn: false, sits, rising: false,
+    walked: visit.walked + visitDistance(visit, visit.start + visit.duration) };
+}
+// How much of a scene shows at `t` (0..1), fading in and out over SCENE_FADE.
+export const SCENE_FADE = 0.35;
+export function sceneShown(scene: { start: number; end: number } | undefined, t: number) {
+  'worklet';
+  if (!scene || t <= scene.start || t >= scene.end) return 0;
+  return Math.min(1, (t - scene.start) / SCENE_FADE, (scene.end - t) / SCENE_FADE);
 }

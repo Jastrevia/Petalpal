@@ -360,7 +360,7 @@ test('the Maltese comes only with the puppy and follows it, sitting beside it on
   assert.equal(visits.planFriendVisit({ key: 4, now: 0, active: [puppy, friend], network: WALK_NETWORK, edges, random }), null);
   // Close by: it sits down facing the puppy.
   const here = { x: 100, y: 100 };
-  const sit = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 140, y: 100 }, path: null, random });
+  const sit = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 190, y: 100 }, path: null, random });
   assert.equal(sit.sits, true);
   assert.ok(sit.path[1].x > sit.path[0].x, 'faces the puppy');
   // Far: it goes a stretch of the way, stopping short of the puppy, faster when far behind.
@@ -368,4 +368,69 @@ test('the Maltese comes only with the puppy and follows it, sitting beside it on
   assert.equal(far.sits, false);
   assert.ok(visits.pathLength(far.path) <= 160 + 1e-6);
   assert.ok(far.speed > visits.CRITTERS.maltese.speed);
+  // It stops short, never on top of the puppy.
+  const end = far.path.at(-1);
+  assert.ok(700 - end.x >= visits.APART, `stops ${700 - end.x} short`);
+  // Too close: it steps aside first, then sits.
+  const aside = visits.asideFrom(here, { x: 120, y: 100 }, () => false);
+  assert.ok(Math.abs(aside.x - 120) >= visits.APART - 1e-6);
+  const step = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 120, y: 100 }, path: null, random, aside });
+  assert.equal(step.sits, false);
+  assert.deepEqual(step.path.at(-1), aside);
+});
+
+test('the Maltese leads about seven walks in ten; a game of chase ends with the puppy catching up', () => {
+  const random = seeded(11);
+  let maltese = 0;
+  for (let i = 0; i < 2000; i++) if (visits.pickLeader(random) === 'maltese') maltese++;
+  assert.ok(Math.abs(maltese / 2000 - visits.MALTESE_LEADS) < 0.04, `${maltese / 2000}`);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  const dash = [{ x: 100, y: 100 }, { x: 300, y: 100 }], chase = [{ x: 60, y: 100 }, { x: 100, y: 100 }];
+  const game = visits.planPlay({ maltese: friend, puppy, now: 50, dash, chase });
+  assert.ok(game);
+  assert.equal(game.maltese.play, true);
+  assert.equal(game.puppy.chase, true);
+  assert.ok(game.puppy.speed <= visits.RUN_SPEED + 1e-6);
+  const stops = game.maltese.start + game.maltese.duration, caught = game.puppy.start + game.puppy.duration;
+  assert.ok(Math.abs(caught - stops) < 0.6, `caught ${caught.toFixed(2)} vs stops ${stops.toFixed(2)}`);
+  // Never through the Maltese: at every moment of the run it keeps at least a body length behind.
+  // (They start close: it only waits until the Maltese is a body length ahead, and never closes in again.)
+  let apart = false;
+  for (let t = 50; t <= stops; t += 0.05) {
+    const m = visits.visitPose(game.maltese, t), p = visits.visitPose(game.puppy, t), gap = Math.hypot(m.x - p.x, m.y - p.y);
+    if (gap >= visits.APART) apart = true;
+    if (apart) assert.ok(gap >= visits.APART - 1, `at ${t.toFixed(2)}: ${gap.toFixed(1)}`);
+    else assert.equal(visits.visitDistance(game.puppy, t), 0, 'it waits while the Maltese is close');
+  }
+  assert.ok(apart);
+  assert.ok(game.ends >= caught);
+  // It pulls up beside the Maltese, not on top of it.
+  const sat = game.puppy.path.at(-1), stopped = game.maltese.path.at(-1);
+  assert.ok(Math.hypot(sat.x - stopped.x, sat.y - stopped.y) > 40);
+  // A puppy on its ring menu (held) does not play.
+  assert.equal(visits.planPlay({ maltese: friend, puppy: { ...puppy, held: true }, now: 50, dash, chase }), null);
+});
+
+test('pair scenes: the Maltese walks up beside the puppy, both stay for the clip, then it is over', () => {
+  const random = seeded(4);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  for (const kind of ['tug', 'hug']) {
+    const pAt = { x: 500, y: 400 }, mAt = { x: 620, y: 400 }, spot = { x: 500 + visits.SCENE_SPECS[kind].apart, y: 400 };
+    const s = visits.planScene({ key: 9, kind, maltese: friend, puppy, now: 10, mAt, pAt, approach: [mAt, spot] });
+    assert.ok(s);
+    assert.equal(s.scene.dir, 1);
+    const end = s.maltese.path.at(-1);
+    assert.ok(Math.abs(end.x - spot.x) < 1, `${kind}: walks to its place`);
+    assert.ok(s.maltese.start + s.maltese.duration <= s.scene.start, `${kind}: there before the clip`);
+    assert.ok(s.puppy.start + s.puppy.duration >= s.scene.end, `${kind}: the puppy stays for it`);
+    assert.equal(visits.sceneShown(s.scene, s.scene.start + 1), 1);
+    assert.equal(visits.sceneShown(s.scene, s.scene.end + 0.1), 0);
+  }
+  // The puppy can run and the Maltese chase it.
+  const g = visits.planPlay({ maltese: friend, puppy, now: 50, dash: [{ x: 100, y: 100 }, { x: 320, y: 100 }], chase: [{ x: 60, y: 100 }, { x: 100, y: 100 }], runner: 'puppy' });
+  assert.ok(g);
+  assert.equal(g.puppy.chase, true);
+  assert.equal(g.maltese.running, true);
 });
