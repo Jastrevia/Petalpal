@@ -4,6 +4,18 @@ import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from '../components/garden/planting/plantingPersistence';
+import { dispatchOnboarding } from '../components/onboarding/onboardingSignals';
+
+// A Save Event response is stored only when it carries its Event (and the Event's id); anything
+// else is reported instead of being rendered. The pending idempotency key is kept, so saving
+// again returns the same Event rather than creating a second one.
+const UNCONFIRMED_SAVE = 'PetalPal could not confirm this Event. Tap Save Event again: it will not be saved twice.';
+function confirmedEvent(created: EventResponse | null | undefined): EventResponse {
+  if (!created || typeof created !== 'object' || !created.event || typeof created.event.id !== 'string') {
+    throw new Error(UNCONFIRMED_SAVE);
+  }
+  return created;
+}
 
 // Existing Event orchestration, kept independent of the replaceable panel.
 export function useEventJournal(onGardenChanged?: () => void) {
@@ -42,24 +54,27 @@ export function useEventJournal(onGardenChanged?: () => void) {
       content: content.trim(), mood, key: `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     };
     try {
-      const created = await createEvent(pending.current!.content, mood, pending.current!.key);
+      const created = confirmedEvent(await createEvent(pending.current!.content, mood, pending.current!.key));
       if (!mounted.current) return;
       pending.current = null; setResult(created); setContent('');
       // POST can omit sourceEvent. Read the owner Garden projection before showing
       // the new Flower, including already-completed emotion enrichment.
       await refresh();
+      // The first-time tour links its first Event (and the Flower it grew) to the real records.
+      dispatchOnboarding({ type: 'eventSaved', eventId: created.event.id, flowerId: created.flower?.id ?? null });
       if (!mounted.current) return;
       onGardenChanged?.();
     } catch (err) { if (mounted.current) setError((err as Error).message); }
     finally { if (mounted.current) setBusy(false); }
   }
   useEffect(() => {
-    if (!result || !['PENDING','RUNNING'].includes(result.event.emotionStatus)) return;
+    if (!result?.event || !['PENDING','RUNNING'].includes(result.event.emotionStatus)) return;
     let cancelled = false; let timer: ReturnType<typeof setTimeout>; let attempts = 0;
     async function poll() {
       try {
         const event = await readEvent(result!.event.id);
         if (cancelled) return;
+        if (!event?.id) throw new Error('Event status is unavailable right now.');
         setPollError('');
         if (!['PENDING','RUNNING'].includes(event.emotionStatus)) {
           setResult((current) => current ? { ...current, event } : null); void refresh(); onGardenChanged?.(); return;
@@ -69,7 +84,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
     }
     timer = setTimeout(poll, 10000);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [result?.event.id, result?.event.emotionStatus, refresh, onGardenChanged]);
+  }, [result?.event?.id, result?.event?.emotionStatus, refresh, onGardenChanged]);
   function plant(flower: BackendFlower) {
     const record = plantingRecord(flower, session?.user.timezone, result?.flower?.id === flower.id ? result.event.localDate : undefined);
     router.navigate({ pathname: '/', params: { mode: 'plant', flowerId: record.flowerId,
@@ -80,6 +95,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
     if (!result) return;
     try {
       const event = await readEvent(result.event.id);
+      if (!event?.id) throw new Error('Event status is unavailable right now.');
       if (mounted.current) { setResult({ ...result, event }); setPollError(''); await refresh(); onGardenChanged?.(); }
     } catch (err) { if (mounted.current) setPollError((err as Error).message); }
   }

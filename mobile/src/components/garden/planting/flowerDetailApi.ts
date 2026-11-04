@@ -45,6 +45,17 @@ export function leaveFlowerMessage(ownerId: string, flowerId: string, text: stri
   return request(`${flowerPath(ownerId, flowerId)}/message`, 'POST', { text: trimmed });
 }
 
+/** Owner-only: store a planted cluster's Garden position (world coordinates + logical Land). */
+export function saveFlowerPosition(ownerId: string, placement: {
+  flowerId: string; worldX: number; worldY: number; landId?: string; scale?: number; rotation?: number;
+}): Promise<{ id: string; worldX: number; worldY: number; landId: string; scale: number; rotation: number }> {
+  if (!placement.landId) throw new Error('Choose a Garden Land for this flower.');
+  return request(`${flowerPath(ownerId, placement.flowerId)}/placement`, 'PATCH', {
+    worldX: placement.worldX, worldY: placement.worldY, landId: placement.landId,
+    scale: placement.scale ?? 1, rotation: placement.rotation ?? 0,
+  });
+}
+
 export async function deleteSourceFlower(ownerId: string, flowerId: string): Promise<void> {
   await request(flowerPath(ownerId, flowerId), 'DELETE');
 }

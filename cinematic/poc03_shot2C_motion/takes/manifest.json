@@ -1,0 +1,46 @@
+[
+ {
+  "name": "2C_veo_01",
+  "model": "veo",
+  "endpoint": "fal-ai/veo3.1/first-last-frame-to-video",
+  "seed": 1000,
+  "file": "2C_veo_01.mp4",
+  "prompt_sha1": "21858f76d0",
+  "usd_est": 1.2000000000000002,
+  "seconds": 141
+ },
+ {
+  "name": "2C_kling_01",
+  "model": "kling",
+  "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+  "seed": 1000,
+  "file": "2C_kling_01.mp4",
+  "prompt_sha1": "21858f76d0",
+  "usd_est": 0.672,
+  "seconds": 174
+ },
+ {
+  "name": "2C_kling_02",
+  "model": "kling",
+  "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+  "seed": 1001,
+  "file": "2C_kling_02.mp4",
+  "prompt_sha1": "2d299ec795",
+  "prompt_file": "motion_prompt_r2_A_pacing.txt",
+  "negative_file": "negative_prompt_r2.txt",
+  "usd_est": 0.672,
+  "seconds": 172
+ },
+ {
+  "name": "2C_kling_03",
+  "model": "kling",
+  "endpoint": "fal-ai/kling-video/v3/pro/image-to-video",
+  "seed": 1002,
+  "file": "2C_kling_03.mp4",
+  "prompt_sha1": "3e47b29557",
+  "prompt_file": "motion_prompt_r2_B_light.txt",
+  "negative_file": "negative_prompt_r2.txt",
+  "usd_est": 0.672,
+  "seconds": 186
+ }
+]

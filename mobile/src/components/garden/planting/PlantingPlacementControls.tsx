@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
+import { onboardingTarget } from '../../onboarding/onboardingTargets';
+import { useOnboardingSnapshot } from '../../onboarding/onboardingSignals';
 
 export default function PlantingPlacementControls() {
   const {
@@ -20,6 +22,9 @@ export default function PlantingPlacementControls() {
     cancelPlacement,
     showPlacementDebug,
   } = usePlanting();
+  // During the first-time tour the first flower must be planted, so Cancel is not offered.
+  const tour = useOnboardingSnapshot();
+  const tourPlanting = tour.running && tour.step === 'plant.place';
 
   if (activeMode === 'normal' || !targetFlower) {
     return null;
@@ -37,7 +42,7 @@ export default function PlantingPlacementControls() {
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
       {/* Top Guidance Banner */}
-      <View style={styles.topBanner}>
+      <View {...onboardingTarget('planting.banner')} style={styles.topBanner}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {isAdjusting ? '🔄 ADJUST POSITION' : '🌱 PLANTING FLOWER'}
@@ -73,7 +78,7 @@ export default function PlantingPlacementControls() {
 
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
-        <Pressable
+        {!tourPlanting && <Pressable
           accessibilityRole="button"
           onPress={cancelPlacement}
           disabled={isSaving}
@@ -83,7 +88,7 @@ export default function PlantingPlacementControls() {
           ]}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
-        </Pressable>
+        </Pressable>}
 
         <Pressable
           accessibilityRole="button"

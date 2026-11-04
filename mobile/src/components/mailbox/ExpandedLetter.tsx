@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import type { BotanicalIconType, Letter, PaperTone } from './types';
+import { UserAvatar } from '../avatars/UserAvatar';
 import {
   LETTER_DECKLE_CLIP,
   LETTER_PAPER_BACKGROUND,
@@ -246,7 +247,10 @@ export const ExpandedLetter = memo(function ExpandedLetter({
                   { borderColor: tone.deckleInner },
                 ]}
               >
-                {iconSource && (
+                {letter.senderAvatar !== undefined ? (
+                  // A friend's note carries their own portrait in place of the botanical study.
+                  <UserAvatar avatar={letter.senderAvatar} size={36} radius={3} style={styles.senderAvatar} />
+                ) : iconSource && (
                   <Image
                     source={iconSource}
                     style={styles.studyBadgeImage}
@@ -563,6 +567,10 @@ const styles = StyleSheet.create({
   studyBadgeImage: {
     width: 36,
     height: 44,
+  },
+  senderAvatar: {
+    marginTop: 4,
+    backgroundColor: 'transparent',
   },
   senderScriptGroup: {
     gap: 2,

@@ -1,8 +1,9 @@
 import { plantingRecord } from '../../../services/events';
 import { loadGarden, type GardenFlower } from '../../../services/garden';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from './plantingPersistence';
-import { getApprovedMonthCentroid, isFootprintInApprovedMonthMaskWorld } from './approvedPlantingMasks';
+import { getApprovedMonthCentroid, isFootprintInApprovedMonthMaskWorld, isPointInApprovedMonthMaskWorld } from './approvedPlantingMasks';
 import { MONTH_REGION_METAS } from './plantingRegionData';
+import { clusterGeometry, footprintPoints, footprintsOverlap, placementFootprint, type Footprint } from './approvedFlowerClusters';
 
 export function gardenPlantingRecord(flower: GardenFlower, timezone = 'UTC'): FlowerPlacementRecord {
   return { ...plantingRecord(flower, timezone), sourceType: flower.sourceType,
@@ -36,19 +37,37 @@ export function hydrateGardenPlacements(flowers: readonly GardenFlower[], local:
     .map(p => [p.flowerId, p]));
   const slots = new Map<number, number>();
   // Sorting makes fallback placement independent of backend response order.
-  return [...flowers].sort((a, b) => a.id.localeCompare(b.id)).map(flower => {
+  const records: FlowerPlacementRecord[] = [...flowers].sort((a, b) => a.id.localeCompare(b.id)).map(flower => {
     if (flower.userId !== ownerId) throw new Error('This flower belongs to another Garden.');
     const canonical = gardenPlantingRecord(flower, timezone);
+    // A position saved on the Flower is authoritative and survives refresh and sign-in.
+    const saved = flower.placement;
+    if (saved) return { ...canonical, worldX: saved.worldX, worldY: saved.worldY, landId: saved.landId,
+      scale: saved.scale, rotation: saved.rotation, placementOrigin: 'SERVER' };
     const localPlacement = localById.get(flower.id);
     if (localPlacement) return { ...canonical, worldX: localPlacement.worldX, worldY: localPlacement.worldY,
       landId: localPlacement.landId, scale: localPlacement.scale ?? canonical.scale, rotation: localPlacement.rotation ?? canonical.rotation,
       placementOrigin: 'LOCAL' };
-    const points = monthFallbackPoints(canonical.month);
-    const index = slots.get(canonical.month) || 0;
-    slots.set(canonical.month, index + 1);
-    const point = points[index % points.length];
-    return { ...canonical, worldX: point.x, worldY: point.y,
-      landId: MONTH_REGION_METAS[canonical.month].landId, placementOrigin: 'FALLBACK' };
+    return { ...canonical, landId: MONTH_REGION_METAS[canonical.month].landId, placementOrigin: 'FALLBACK' };
+  });
+  // Unplaced (historical) flowers get a preview spot where the whole cluster fits its Land
+  // without overlapping another; only a full Land reuses the earlier ring order.
+  const occupied: Footprint[] = records.filter(p => p.placementOrigin !== 'FALLBACK').map(placementFootprint);
+  return records.map(record => {
+    if (record.placementOrigin !== 'FALLBACK') return record;
+    const points = monthFallbackPoints(record.month);
+    const free = points.find(point => {
+      const g = clusterGeometry({ ...record, worldX: point.x, worldY: point.y });
+      const footprint = g ? g.footprint : placementFootprint({ ...record, worldX: point.x, worldY: point.y });
+      return (!g || footprintPoints(footprint, 12).every(p => isPointInApprovedMonthMaskWorld(record.month, p.x, p.y)))
+        && !occupied.some(other => footprintsOverlap(footprint, other));
+    });
+    const index = slots.get(record.month) || 0;
+    slots.set(record.month, index + 1);
+    const point = free ?? points[index % points.length];
+    const placed = { ...record, worldX: point.x, worldY: point.y };
+    occupied.push(placementFootprint(placed));
+    return placed;
   });
 }
 export async function loadGardenPlacements(ownerId: string, viewerId: string, timezone = 'UTC') {

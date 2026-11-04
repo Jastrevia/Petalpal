@@ -171,6 +171,39 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
 - **Daily Grow** computes its local date with a separate helper
   (`getLocalDate`/`normalizeTimezone` in [server.js](server.js)), also from
   `User.timezone`.
+- **Treehouse future-month lock** (client display only): the Treehouse bookshelf locks months after the
+  owner's current month and years after the current year, comparing `year * 12 + month` with today's date in
+  `User.timezone` (`todayLocalDate`, `monthLocked`, `yearLocked` in
+  [mobile/src/services/bookhouse.ts](mobile/src/services/bookhouse.ts)), evaluated at runtime. A month or year
+  that already holds a saved journal is never locked. No server route, stored date or period changes.
+  **TESTED BEHAVIOR:** [mobile/test/bookhouse.test.mjs](mobile/test/bookhouse.test.mjs) (boundaries and the
+  Vancouver-vs-UTC month edge).
+- **Treehouse journal days** (client display; one read-only route): each open monthly book shows one spread per
+  calendar day, matching three stores only by their stored local date (`YYYY-MM-DD`, never converted): private
+  journals and Daily Grow check-ins (`DailyCheckIn.localDate`, set by `getLocalDate`) and Events (`Event.localDate`,
+  set by `localDateForInstant`). Events come from `GET /users/:userId/events?month=YYYY-MM`, which filters
+  `Event.localDate` between `YYYY-MM-01` and `YYYY-MM-31` as strings (owner only, read-only), so an evening Event in
+  Vancouver stays on its local day even when `occurredAt` is already the next UTC day. Today's page (the only page
+  that creates a journal) is `todayLocalDate(User.timezone)` at runtime; the server still dates the new journal
+  itself. No page exists after today unless it already holds a journal. No stored date or period changes.
+  **TESTED BEHAVIOR:** [mobile/test/bookhouse.test.mjs](mobile/test/bookhouse.test.mjs) (`monthDays`: stored date
+  wins over a next-UTC-day timestamp, no future days, today always present) and
+  [test/back/journal-month-events.test.js](test/back/journal-month-events.test.js) (owner scope, month validation,
+  string date range, no writes).
+- **Daily Garden encouragement** ([lib/garden-encouragement.js](lib/garden-encouragement.js)):
+  a visitor may give one Support and leave one note per friend's Garden per day. The day
+  is the **visitor's** `User.timezone` date (`getSupportCalendarDay`, the Flower Support rule;
+  invalid or missing: UTC), stored as `GardenEncouragement.localDate` with its `timezone`;
+  the unique index `(senderId, ownerId, kind, localDate)` enforces the limit. The client
+  never sends a date. The state response carries `resetsAt` (the visitor's next local
+  midnight, `localTimeToUtc`); the app re-reads 1.5 s after it and on returning to the
+  foreground. The owner's "supported your garden today" count uses the **owner's** zone:
+  `createdAt` in `[local 00:00, next local 00:00)` of `User.timezone`, so the two sides of
+  one Support can fall on different local dates. Note times show in the phone's zone.
+  **VERIFIED:** [test/back/garden-encouragement.test.js](test/back/garden-encouragement.test.js)
+  (Vancouver 2026-10-25 day bounds, the 2026-11-01 change keeping a 24-hour day, next-day
+  reset at 2026-10-27T07:00Z, a Shanghai owner's today window) and
+  [mobile/test/gardenEncouragement.test.mjs](mobile/test/gardenEncouragement.test.mjs).
 - **Fairy day and night** ([lib/fairy-runtime.js](lib/fairy-runtime.js) `fairyDayPhase`,
   `FAIRY_RUNTIME_CONFIG.night`; owner decision 2026-10-21): the seeded runtime states follow
   `User.timezone` (invalid or missing: UTC). Every local evening at 22:00 her night starts and

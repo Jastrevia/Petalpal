@@ -281,6 +281,66 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /users/{userId}/events:
+    get:
+      tags: [Garden]
+      summary: Get the authenticated user's Events for one calendar month (Treehouse journal, read-only)
+      description: >-
+        Selects Events by their stored localDate (the account-timezone date set when the Event was saved), never by
+        converting occurredAt, and includes Events that grew no flower. Owner only; no query parameter other than
+        month is accepted. Returns no fields beyond those GET /events/{eventId} already returns to the owner.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          example: '2026-10'
+      responses:
+        '200':
+          description: Up to 500 Events, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        content: { type: string }
+                        localDate: { type: string, format: date }
+                        occurredAt: { type: string, format: date-time }
+                        primaryGardenMood: { type: string, nullable: true }
+                        secondaryEmotions: { type: array, items: { type: string }, nullable: true }
+                        emotionStatus: { type: string }
+                        emotionOutcome: { type: string, nullable: true }
+                        flower:
+                          type: object
+                          nullable: true
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            img: { type: string }
+                            mood: { type: string }
+                            meaning: { type: string, nullable: true }
+                            speciesCode: { type: string, nullable: true }
+                            colorAccent: { type: string, nullable: true }
+                            createdAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /users/{userId}/fairy-state:
     get:
       tags: [Fairy]
@@ -410,6 +470,66 @@ paths:
                 $ref: '#/components/schemas/FairyRuntime'
         '409':
           description: Fairy onboarding is not complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/onboarding:
+    get:
+      tags: [Fairy]
+      summary: First-time tour progress for the authenticated owner
+      description: >-
+        Owners who already have an Event, a Flower, a Fairy or a finished first-flower onboarding
+        are reported (and stored) as completed and never see the tour.
+      responses:
+        '200':
+          description: Tour progress (no-store)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingTutorial'
+    patch:
+      tags: [Fairy]
+      summary: Name the Fairy, link the first Event and Flower, advance or complete the tour
+      description: >-
+        Identity comes from the token only. The step only moves forward (earlier steps are
+        ignored). Steps after naming need her name; steps after the Event need the owner's own
+        Event; steps after planting need the planted Flower (or an Event that grew none).
+        `complete` also unlocks the Garden like the first-flower onboarding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                step: { type: string, example: garden.zoom }
+                fairyName: { type: string, maxLength: 16 }
+                firstEventId: { type: string, maxLength: 128 }
+                firstFlowerId: { type: string, maxLength: 128 }
+                flowerPlanted: { type: boolean, enum: [true] }
+                complete: { type: boolean, enum: [true] }
+      responses:
+        '200':
+          description: Updated progress (no-store)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingTutorial'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A required earlier step is missing, or the value was already recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: The Fairy name did not pass content safety
           content:
             application/json:
               schema:
@@ -686,6 +806,50 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /users/{userId}/flowers/{flowerId}/placement:
+    patch:
+      tags: [Garden]
+      summary: Save a planted flower cluster's Garden position (owner only)
+      description: >
+        Stores world coordinates and the logical Land on the existing Flower position fields
+        (left, top, regionId, scale, rotation) and marks them with layoutVersion 2. Legacy
+        layoutVersion 1 coordinates are never read as Garden positions. Only the owner may write.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/FlowerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [worldX, worldY, landId]
+              properties:
+                worldX: { type: number, minimum: 0, exclusiveMaximum: 2400 }
+                worldY: { type: number, minimum: 0, exclusiveMaximum: 1800 }
+                landId: { type: string, pattern: '^Land(0[1-9]|1[0-2])$' }
+                scale: { type: number, minimum: 0.25, maximum: 4, default: 1 }
+                rotation: { type: number, minimum: -180, maximum: 180, default: 0 }
+      responses:
+        '200':
+          description: Position saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  worldX: { type: number }
+                  worldY: { type: number }
+                  landId: { type: string }
+                  scale: { type: number }
+                  rotation: { type: number }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /users/{userId}/flowers/{flowerId}/support:
     post:
       tags: [Social]
@@ -738,6 +902,112 @@ paths:
                 $ref: '#/components/schemas/SocialFlower'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /users/{userId}/garden-encouragement:
+    get:
+      tags: [Social]
+      summary: Today's Support and note state between the visitor and a friend's Garden
+      description: Requires a confirmed friendship and the owner's Garden visit permission. The day is the visitor's account-timezone date.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Daily state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GardenEncouragementState'
+        '403':
+          description: Not a confirmed friend, Garden private, or the visitor's own Garden (code OWN_GARDEN)
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/garden-encouragement/support:
+    post:
+      tags: [Social]
+      summary: Give today's Support to a friend's Garden (once per friend per day)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '201':
+          description: Support recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GardenEncouragementState'
+        '409':
+          description: Already supported this Garden today (code ALREADY_SUPPORTED_TODAY, with state)
+        '428':
+          description: Community Guidelines not yet accepted (code COMMUNITY_ACCEPTANCE_REQUIRED)
+
+  /users/{userId}/garden-encouragement/message:
+    post:
+      tags: [Social]
+      summary: Leave today's note in a friend's Garden (once per friend per day)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 200, description: Trimmed; 1–200 characters }
+      responses:
+        '201':
+          description: Note left
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GardenEncouragementState'
+        '400':
+          description: Empty or malformed note (NOTE_EMPTY, NOTE_INVALID)
+        '409':
+          description: Already left a note today (code ALREADY_MESSAGED_TODAY, with state)
+        '413':
+          description: Note longer than 200 characters (NOTE_TOO_LONG)
+        '422':
+          description: Note rejected by content safety
+
+  /users/me/garden-encouragements:
+    get:
+      tags: [Social]
+      summary: Support and notes the signed-in owner received
+      parameters:
+        - in: query
+          name: cursor
+          required: false
+          schema: { type: string }
+          description: The previous page's nextCursor (50 notes per page, newest first)
+      responses:
+        '200':
+          description: Support counts (today in the owner's timezone, total, unread) and notes with sender profiles
+
+  /users/me/garden-encouragements/read:
+    post:
+      tags: [Social]
+      summary: Mark received notes as read and/or Support as seen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                messageIds: { type: array, maxItems: 50, items: { type: string } }
+                supports: { type: boolean }
+      responses:
+        '200':
+          description: Number of rows updated
 
   /visit:
     post:
@@ -891,6 +1161,17 @@ components:
         type: string
 
   schemas:
+    OnboardingTutorial:
+      type: object
+      required: [status, step, fairyName, fairyNamed, firstEventId, firstFlowerId, flowerPlanted]
+      properties:
+        status: { type: string, enum: [active, completed] }
+        step: { type: string, example: intro.name }
+        fairyName: { type: string, nullable: true }
+        fairyNamed: { type: boolean }
+        firstEventId: { type: string, nullable: true }
+        firstFlowerId: { type: string, nullable: true }
+        flowerPlanted: { type: boolean }
     Error:
       type: object
       required: [error]
@@ -1145,6 +1426,21 @@ components:
           items:
             $ref: '#/components/schemas/SocialMessage'
 
+    GardenEncouragementState:
+      type: object
+      properties:
+        owner:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            avatar: { type: string }
+        localDate: { type: string, example: '2026-10-25' }
+        timezone: { type: string, example: America/Vancouver }
+        resetsAt: { type: string, format: date-time }
+        hasSupportedToday: { type: boolean }
+        hasMessagedToday: { type: boolean }
+        messageMaxLength: { type: integer, example: 200 }
     SocialFlower:
       type: object
       required: [id, mood, name, meaning, img, left, top, scale, rotation, layer, layoutVersion, supportCount, variant, rarity, growthState, createdAt, messages]

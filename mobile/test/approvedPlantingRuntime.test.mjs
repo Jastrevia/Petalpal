@@ -47,8 +47,9 @@ export async function runApprovedRuntimeTests(assert) {
     assert(Boolean(point), `Month ${m}: approved Final Mask contains a complete standard planting footprint`);
     if (point) {
       validPoints[m] = point;
-      assert(validator.validateFlowerPlacement({ flowerId: `month-${m}`, month: m,
-        worldX: point.x, worldY: point.y, speciesCode: 'CHAMOMILE', existingPlacements: [] }).isValid,
+      // A whole approved cluster (larger than the 22-unit standard circle) fits close to that point.
+      assert(Boolean(validator.findNearestValidPlacement({ flowerId: `month-${m}`, month: m,
+        speciesCode: 'CHAMOMILE', existingPlacements: [] }, point, 80)),
         `Month ${m}: production validator accepts the approved footprint`);
     }
   }

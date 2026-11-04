@@ -8,7 +8,8 @@ export interface FlowerPlacementRecord extends FlowerPlacement {
   supportCount: number;
   sourceType?: import('../../../services/garden').FlowerSource;
   dailyCheckInId?: string;
-  placementOrigin?: 'LOCAL' | 'FALLBACK';
+  /** SERVER: saved on the Flower; LOCAL: confirmed this session; FALLBACK: unplaced preview spot. */
+  placementOrigin?: 'LOCAL' | 'SERVER' | 'FALLBACK';
   variant?: string;
   rarity?: string;
   growthState?: string;
@@ -250,12 +251,23 @@ export const DEFAULT_SEED_PLACEMENTS: FlowerPlacementRecord[] = [
 // Cache only; browser and native storage remain the durable source of truth.
 let memoryPlacementsStore: FlowerPlacementRecord[] | null = null;
 
+// DEV-only /onboarding-preview: placements for the synthetic preview owner live in memory
+// only. Browser and device storage (and every real account's cache) are never read or written.
+let previewPlacements: FlowerPlacementRecord[] | null = null;
+export function setPreviewPlacementMemory(owner: string | null) {
+  if (!__DEV__) return;
+  activeOwner = owner; generation++; memoryPlacementsStore = null;
+  previewPlacements = owner ? [] : null;
+  storageReady = Boolean(owner);
+}
+
 export async function loadFlowerPlacements(
   session = capturePlacementSession()
 ): Promise<FlowerPlacementRecord[]> {
   return enqueue(async () => {
     if (!current(session)) return [];
     if (!storageReady) throw cacheError();
+    if (__DEV__ && previewPlacements) return (memoryPlacementsStore = [...previewPlacements]);
     try {
       const key = ownerKey(session.owner!);
       const stored = typeof window !== 'undefined' && window.localStorage
@@ -274,6 +286,7 @@ export async function saveFlowerPlacements(
   return enqueue(async () => {
     if (!current(session)) return;
     if (!storageReady) throw cacheError();
+    if (__DEV__ && previewPlacements) { previewPlacements = [...placements]; memoryPlacementsStore = placements; return; }
     try {
       const key = ownerKey(session.owner!);
       if (typeof window !== 'undefined' && window.localStorage) {

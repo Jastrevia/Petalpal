@@ -1,3 +1,12 @@
+import FireflyLayer from './fireflies/FireflyLayer';
+import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
+import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
+import ExistingWindowLights from './lanterns/ExistingWindowLights';
+import { useNightLighting } from './lanterns/nightLighting';
+import { usePathname } from 'expo-router';
+import LanternLayer from './lanterns/LanternLayer';
+import LanternPlacementEditor from './lanterns/LanternPlacementEditor';
+import { useLanternPlacements } from './lanterns/useLanternPlacements';
 import { hitsMailbox } from './fairy/mailboxDestination';
 import { hitsTreehouse } from './fairy/treehouseDestination';
 import {hitsTeaArea} from './fairy/teaDestination';
@@ -11,7 +20,7 @@ import { useFairySchedule } from './fairy/useFairySchedule';
 import { noteFairyInteraction } from '../../services/fairyCloseness';
 import { GardenCalendar } from './GardenCalendar';
 import type { FlowerSession } from './planting/flowerDetailApi';
-import { Circle, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
+import { Circle, ColorMatrix, Paint, Group, Image, Path, Rect, useCanvasRef, useImage } from '@shopify/react-native-skia';
 import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { isGardenGroundBlocked } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
@@ -29,9 +38,13 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GardenLoadingOverlay } from './loading/GardenLoadingOverlay';
+import type { GardenCameraApi } from '../onboarding/gardenCamera';
+import { dispatchOnboarding } from '../onboarding/onboardingSignals';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { publishWater, reportGardenLoadFailure } from './loading/gardenReadiness';
 import Canvas from './GardenCanvas';
 import PlantingRegionOverlay from './planting/PlantingRegionOverlay';
@@ -69,7 +82,8 @@ import {
   undoMaskEdit,
 } from './planting/plantingMaskRefinement';
 import PlantedFlowerLayer from './planting/PlantedFlowerLayer';
-import { USE_MONTHLY_GARDEN_GROWTH_V1_1, gardenSpecies, hitProductionFlower } from './planting/productionGrowth';
+import { USE_MONTHLY_GARDEN_GROWTH_V1_1 } from './planting/productionGrowth';
+import { clusterSpeciesCode, hitClusterFlower } from './planting/approvedFlowerClusters';
 import PlantingPlacementControls from './planting/PlantingPlacementControls';
 import FlowerDetailModal from './planting/FlowerDetailModal';
 import {
@@ -247,6 +261,8 @@ export type GardenSceneProps = {
   locale?: string | null;
   /** Partner preview alias: 'player' hides the same DEV controls as showDevControls={false}. */
   mode?: 'development' | 'player';
+  /** First-time tour layer, drawn above the Garden with eased access to the existing camera. */
+  renderOverlay?: (camera: GardenCameraApi) => import('react').ReactNode;
 };
 
 const treehouseHint = (locale?: string | null) =>
@@ -254,7 +270,7 @@ const treehouseHint = (locale?: string | null) =>
     ?{ label: '小花仙在树屋里 ✨', hint: '点一下叫她出来' }
     : { label: 'Your fairy is in the treehouse ✨', hint: 'Tap to call her out' };
 
-function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
+function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development', renderOverlay }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
   const isDev = showDevControls && mode === 'development';
   runtimeAudit.render('GardenScene');
   const planting = usePlanting();
@@ -292,7 +308,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     setShowPlacementDebug,
   } = planting;
 
-  const unresolvedGardenArt = useMemo(() => [...new Set(placements.filter(p => !gardenSpecies(p))
+  const unresolvedGardenArt = useMemo(() => [...new Set(placements.filter(p => !clusterSpeciesCode(p.speciesCode, p.flowerName))
     .map(p => p.speciesCode || p.flowerName || 'UNKNOWN'))], [placements]);
 
   const activeModeRef = useRef(activeMode);
@@ -356,6 +372,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
   const worldTime = useWorldTime();
+  const nightLighting = useNightLighting(worldTime.isTreehouseLightingTime);
+  const lanternPathname = usePathname();
+  const fireflyPreview = __DEV__ && lanternPathname === '/firefly-preview';
+  const [fireflySettings, setFireflySettings] = useState(DEFAULT_FIREFLIES);
+  const fireflies = fireflyPreview ? fireflySettings : DEFAULT_FIREFLIES;
+  const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
+  const lanterns = useLanternPlacements(lanternEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
@@ -551,6 +574,39 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     cameraY.value = withTiming(next.y, timing);
     cameraZoom.value = withTiming(next.zoom, timing);
   }, [viewport.width, viewport.height, fit, baseX, baseY, cameraX, cameraY, cameraZoom, reducedCameraMotion]);
+  // Eased camera moves for the first-time tour. One progress value drives zoom (geometric) and
+  // the world point at the screen centre (linear), and every frame is clamped by the same
+  // camera contract as gestures, so a move never fights the clamp or leaves the Garden.
+  const cameraTween = useSharedValue({ active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 });
+  const cameraProgress = useSharedValue(0);
+  useAnimatedReaction(() => cameraProgress.value, t => {
+    const a = cameraTween.value;
+    if (!a.active || fit <= 0) return;
+    const z = a.fromZ * Math.pow(a.toZ / a.fromZ, t);
+    const cx = a.fromX + (a.toX - a.fromX) * t, cy = a.fromY + (a.toY - a.fromY) * t;
+    const next = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY,
+      viewport.width / 2 - baseX - cx * fit * z, viewport.height / 2 - baseY - cy * fit * z, z);
+    cameraX.value = next.x; cameraY.value = next.y; cameraZoom.value = next.zoom;
+  }, [viewport.width, viewport.height, fit, baseX, baseY]);
+  const cameraApi = useMemo<GardenCameraApi>(() => {
+    const minimum = fit > 0 ? constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom : 1;
+    const centre = (x: number, y: number, zoom: number) => ({
+      x: (viewport.width / 2 - baseX - x) / (fit * zoom), y: (viewport.height / 2 - baseY - y) / (fit * zoom) });
+    return {
+      x: cameraX, y: cameraY, zoom: cameraZoom, fit, baseX, baseY, viewport,
+      limits: { min: minimum, max: Math.max(3, minimum * 3) },
+      animateTo: (frame, durationMs) => new Promise<boolean>(resolve => {
+        if (fit <= 0) { resolve(false); return; }
+        const target = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, frame.x, frame.y, frame.zoom);
+        const from = centre(cameraX.value, cameraY.value, cameraZoom.value), to = centre(target.x, target.y, target.zoom);
+        cancelAnimation(cameraX); cancelAnimation(cameraY); cancelAnimation(cameraZoom);
+        cameraTween.value = { active: 1, fromX: from.x, fromY: from.y, fromZ: cameraZoom.value, toX: to.x, toY: to.y, toZ: target.zoom };
+        cameraProgress.value = 0;
+        cameraProgress.value = withTiming(1, { duration: reducedCameraMotion ? 0 : durationMs, easing: Easing.inOut(Easing.cubic) },
+          finished => { runOnJS(resolve)(Boolean(finished)); });
+      }),
+    };
+  }, [fit, baseX, baseY, viewport, cameraX, cameraY, cameraZoom, cameraTween, cameraProgress, reducedCameraMotion]);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const element = sceneElement.current as unknown as HTMLElement | null;
@@ -950,7 +1006,13 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;
-      let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitProductionFlower(currentPlacements,worldX,worldY):null;
+      // Whole-cluster silhouettes, front-most first; touch tolerance is in screen pixels.
+      const legacyHit = (p: FlowerPlacementRecord) => {
+        const def = getFlowerPlacementDefinition(p.flowerName);
+        return Math.hypot(worldX - p.worldX, worldY - (p.worldY - def.visualHeight * 0.35)) <= def.hitboxRadius;
+      };
+      let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth ? hitClusterFlower(currentPlacements, worldX, worldY,
+        (Platform.OS === 'web' ? 4 : 10) / (fit * currentZoom), legacyHit) : null;
       for (let i = currentPlacements.length - 1; !useMonthlyGrowth && i >= 0; i--) {
         const p = currentPlacements[i];
         const def = getFlowerPlacementDefinition(p.flowerName);
@@ -1340,6 +1402,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
           <GardenLandResources>
           <PlantingProvider value={drawnPlanting}>
+          <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
             {/* 1. Solid fallback */}
@@ -1543,16 +1606,32 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
           </Group>
+          </Group>
+          <Group transform={cameraTransform}>
+            {showLandmarks && perf.Landmarks && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
+            {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
+              <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
+            <LanternLayer placements={lanterns.placements} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
+          </Group>
           </PlantingProvider>
           </GardenLandResources>
         </Canvas>
         </GestureDetector>
       )}
+      {lanternEditorEnabled && <LanternPlacementEditor {...lanterns}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
+        focus={(x, y) => {
+          focusCoords(x, y, 2.2);
+          // Leave the focused sprite clear of the editor, including narrow web viewports.
+          cameraX.value -= viewport.width * 0.3;
+          cameraY.value += viewport.height * 0.25;
+        }} />}
+      {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay />
-      <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => zoomAt(1.25)}
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>+</Text></Pressable>
       </View>
       {isDev && __DEV__ && <GardenRuntimePanel flags={perfFlags} onFlags={setPerfFlags} count={perfCount} onCount={setPerfCount}
@@ -2161,6 +2240,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           />
         )
       )}
+      {renderOverlay && !readOnly ? renderOverlay(cameraApi) : null}
     </View>
   );
 }

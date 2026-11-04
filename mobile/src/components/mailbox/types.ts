@@ -34,6 +34,8 @@ export type MailboxPhase =
 export interface Letter {
   id: string;
   sender: string;
+  /** A friend's profile avatar, for notes left in the Garden; absent on PetalPal letters. */
+  senderAvatar?: string | null;
   subject: string;
   snippet: string;
   date: string;

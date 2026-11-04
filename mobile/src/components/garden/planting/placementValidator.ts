@@ -6,14 +6,14 @@ import {
   GARDEN_WORLD_WIDTH,
   MONTH_REGION_METAS,
 } from './plantingRegionData';
-import {
-  FlowerPlacementDefinition,
-  getFlowerPlacementDefinition,
-} from './flowerFootprintConfig';
+import { FlowerPlacementDefinition } from './flowerFootprintConfig';
 import { type MonthRegionCalibration } from './plantingRegionGeometry';
-import { getApprovedRegionAtWorld, isFootprintInApprovedMonthMaskWorld } from './approvedPlantingMasks';
+import { getApprovedRegionAtWorld, isFootprintInApprovedMonthMaskWorld, isPointInApprovedMonthMaskWorld } from './approvedPlantingMasks';
+import { clusterGeometry, footprintPoints, footprintsOverlap, nearestAcceptedPoint, placementFootprint, type Footprint } from './approvedFlowerClusters';
 import type { GardenLandLayout } from '../gardenMapLayout';
 import { resolveParentCollision } from './parentCollision';
+
+export { placementFootprint };
 
 export interface FlowerPlacement {
   id: string;
@@ -65,6 +65,13 @@ export interface ValidatePlacementParams {
   landLayout?: GardenLandLayout;
 }
 
+/** Nearest valid position to a starting point (rings of `step` world units), so a new preview
+ * starts somewhere the whole cluster fits. Returns null when the Land has no room. */
+export function findNearestValidPlacement(params: Omit<ValidatePlacementParams, 'worldX' | 'worldY'>,
+  start: { x: number; y: number }, maxRadius = 260, step = 8): { worldX: number; worldY: number } | null {
+  return nearestAcceptedPoint(start, (worldX, worldY) => validateFlowerPlacement({ ...params, worldX, worldY }).isValid, maxRadius, step);
+}
+
 export function validateFlowerPlacement({
   flowerId,
   month,
@@ -76,8 +83,10 @@ export function validateFlowerPlacement({
   speciesCode,
   landLayout,
 }: ValidatePlacementParams): ValidationResult {
+  // Approved cluster art is planted at the size of the flower's own Land (the only valid destination).
+  const cluster = clusterGeometry({ worldX, worldY, month, speciesCode, flowerName }, MONTH_REGION_METAS[month]?.landId);
   const collision = resolveParentCollision(speciesCode, flowerName);
-  if (collision.status === 'UNRESOLVED') {
+  if (!cluster && collision.status === 'UNRESOLVED') {
     return { isValid:false, reason:'COLLISION_CLASS_UNRESOLVED',
       userFeedback:'This flower is not ready for planting yet.' };
   }
@@ -125,14 +134,17 @@ export function validateFlowerPlacement({
   }
 
   // 3. Entire Footprint Containment Check
-  // The entire logical footprint (circle of radius footprintRadius) must fit inside the target month region.
+  // The entire footprint (the whole cluster's ground ellipse, or the legacy parent circle)
+  // must fit inside the target month region.
   const r = collision.radius;
+  const own: Footprint = cluster ? cluster.footprint : { cx: worldX, cy: worldY, rx: r, ry: r };
 
-  if (!isFootprintInApprovedMonthMaskWorld(month, worldX, worldY, r, landLayout)) {
+  if (cluster ? !footprintPoints(own).every(point => isPointInApprovedMonthMaskWorld(month, point.x, point.y, landLayout))
+    : !isFootprintInApprovedMonthMaskWorld(month, worldX, worldY, r, landLayout)) {
     return {
       isValid: false,
       reason: 'FOOTPRINT_OUTSIDE_REGION',
-      userFeedback: 'Choose a little more space around the flower.',
+      userFeedback: cluster ? 'Choose a spot where the whole cluster fits.' : 'Choose a little more space around the flower.',
       detectedMonth: month,
     };
   }
@@ -144,14 +156,7 @@ export function validateFlowerPlacement({
       continue;
     }
 
-    const existingDef = getFlowerPlacementDefinition(existing.flowerName, existing.speciesCode);
-    const minDistance = r + existingDef.footprintRadius;
-
-    const dx = worldX - existing.worldX;
-    const dy = worldY - existing.worldY;
-    const distSq = dx * dx + dy * dy;
-
-    if (distSq < minDistance * minDistance) {
+    if (footprintsOverlap(own, placementFootprint(existing))) {
       return {
         isValid: false,
         reason: 'COLLIDES_WITH_FLOWER',

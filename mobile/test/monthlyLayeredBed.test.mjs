@@ -9,6 +9,7 @@ const layered=load('../flower-density-sandbox/monthly-growth/layeredBedModel');
 const catalog=load('../flower-density-sandbox/monthly-growth/growthCatalog');
 const masks=load('approvedPlantingMasks');
 const {validateFlowerPlacement}=load('placementValidator');
+const {clusterGeometry,footprintPoints}=load('approvedFlowerClusters');
 const {getFlowerPlacementDefinition}=load('flowerFootprintConfig');
 const {alphaAt}=load('../flower-density-sandbox/monthly-growth/growthCoverage');
 const records=model.monthlyGrowthRecords(6,30),base=model.buildMonthlyGrowth(records,6),before=JSON.stringify(base);
@@ -23,17 +24,24 @@ assert.equal(scene.pieces.length,591);assert.equal(scene.records.length,30);
 assert.equal(crypto.createHash('sha256').update(JSON.stringify(scene.pieces)).digest('hex'),
   '347f5a41794341e6032d88db308928a76e2e0b7e893010e776cbce2f2cec0f5c',
   'Rendering-boundary correction must preserve the exact pre-correction V1.1 composition');
+let fitting=0;
 for(const f of records){
   const params={flowerId:f.id,speciesCode:f.speciesCode,month:6,worldX:f.worldX,worldY:f.worldY,existingPlacements:[],
     definition:{...getFlowerPlacementDefinition(f.speciesCode),footprintRadius:f.footprintRadius}};
   assert.ok(masks.isFootprintInApprovedMonthMaskWorld(6,f.worldX,f.worldY,f.footprintRadius));
-  assert.equal(validateFlowerPlacement(params).isValid,true,'Parent planting still uses approved validity');
+  // Planting validates the whole approved cluster footprint against the same approved mask.
+  const cluster=clusterGeometry({...f,month:6});
+  const fits=footprintPoints(cluster.footprint).every(p=>masks.isPointInApprovedMonthMaskWorld(6,p.x,p.y));
+  assert.equal(validateFlowerPlacement(params).isValid,fits,'Parent planting still uses approved validity');
   assert.equal(validateFlowerPlacement({...params,worldX:0,worldY:0}).isValid,false,'Outside parent placement rejected');
+  if(!fits){assert.equal(validateFlowerPlacement(params).reason,'FOOTPRINT_OUTSIDE_REGION');continue;}
+  fitting++;
   const occupied={id:f.id,flowerName:f.speciesCode,worldX:f.worldX,worldY:f.worldY};
   assert.equal(validateFlowerPlacement({...params,existingPlacements:[occupied]}).reason,'COLLIDES_WITH_FLOWER');
   assert.equal(validateFlowerPlacement({...params,existingPlacements:[occupied],ignorePlacementId:f.id}).isValid,true,'Adjust Position still ignores only its own footprint');
   assert.equal(validateFlowerPlacement({...params,worldX:0,worldY:0,existingPlacements:[occupied],ignorePlacementId:f.id}).isValid,false,'Adjust Position cannot bypass mask validation');
 }
+assert.ok(fitting>=10,`Whole clusters still fit at many bed parents (${fitting}/${records.length})`);
 // Check visible alpha, not transparent PNG padding: botanical pixels already
 // cross the mask in the unchanged composition and must be allowed to render.
 for(const kind of ['primary','companion','filler']){

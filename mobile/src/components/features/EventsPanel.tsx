@@ -1,7 +1,7 @@
 import { EmotionalSafetyNote } from './EmotionalSafetyNote';
 import { AiOutputReport } from './AiPrivacySettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
 import { useEventJournal } from '../../hooks/useEventJournal';
@@ -9,17 +9,21 @@ import { emotionMessage, memoryMessage, PRIMARY_MOODS } from '../../services/eve
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { ui } from './FeatureUI';
 import { EventIllustration } from './EventIllustration';
+import { dispatchOnboarding, onboardingActive } from '../onboarding/onboardingSignals';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 
 export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void; onGardenChanged?: () => void }) {
   const { theme } = usePanelTheme();
   const styles = createStyles(theme);
   const journal = useEventJournal(onGardenChanged);
   const voice = useEventVoiceInput(journal.content, journal.setContent, journal.busy);
+  const hasText = Boolean(journal.content.trim());
+  useEffect(() => { dispatchOnboarding({ type: 'draftChanged', hasText }); }, [hasText]);
   return <View style={styles.body}>
     <Text style={styles.text}>A little moment, a new flower. Your Primary Mood is always your choice.</Text>
     <EmotionalSafetyNote text={journal.content} />
     <EventSection title="What happened?">
-      <View style={styles.inputWrap}><View pointerEvents="none" style={styles.inputLeaf}><Image accessible={false} source={require('../../../assets/garden/flowers/species/olive/components/batch/branch/leafy.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" /></View>
+      <View {...onboardingTarget('events.input')} style={styles.inputWrap}><View pointerEvents="none" style={styles.inputLeaf}><Image accessible={false} source={require('../../../assets/garden/flowers/species/olive/components/batch/branch/leafy.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" /></View>
       <TextInput accessibilityLabel="Event" placeholder="A small moment from today…" placeholderTextColor="#84998E"
         multiline maxLength={4000} value={journal.content} editable={!journal.busy}
         onChangeText={journal.setContent} style={styles.input} />
@@ -45,19 +49,19 @@ export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void;
       {voice.overflow ? <Text selectable style={styles.text}>{voice.overflow}</Text> : null}
     </EventSection>
       <View style={styles.moodHeading}><Text style={styles.sectionTitle}>Choose your Primary Mood</Text><View style={styles.rule} /></View>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Primary Mood" style={styles.moods}>
+      <View {...onboardingTarget('events.moods')} accessibilityRole="radiogroup" accessibilityLabel="Primary Mood" style={styles.moods}>
         {PRIMARY_MOODS.map((mood, index) => {
           const selected = journal.mood === mood;
           const label = mood.replace('_BLOOM', '').toLowerCase();
           return <Pressable key={mood} accessibilityRole="radio" accessibilityLabel={label}
             accessibilityState={{ checked: selected, selected, disabled: journal.busy }} disabled={journal.busy}
-            onPress={() => journal.setMood(mood)} style={({ pressed }) => [styles.mood, selected && styles.selected, pressed && ui.pressed, journal.busy && ui.disabled]}>
+            onPress={() => { journal.setMood(mood); dispatchOnboarding({ type: 'moodSelected' }); }} style={({ pressed }) => [styles.mood, selected && styles.selected, pressed && ui.pressed, journal.busy && ui.disabled]}>
             <EventIllustration index={index + 1} size={32} /><Text style={[styles.moodText, selected && styles.selectedText]}>{label}</Text>{selected ? <Text style={styles.selectedMark}>✓</Text> : null}
           </Pressable>;
         })}
       </View>
-      <EventAction title={journal.busy ? 'Saving Event…' : 'Save Event'} onPress={() => void journal.saveEvent()}
-        disabled={journal.busy || voice.active || !journal.content.trim() || !journal.mood} />
+      <View {...onboardingTarget('events.save')}><EventAction title={journal.busy ? 'Saving Event…' : 'Save Event'} onPress={() => void journal.saveEvent()}
+        disabled={journal.busy || voice.active || !journal.content.trim() || !journal.mood} /></View>
       {journal.flowersToday?.limit != null ? <Text style={styles.caption}>{journal.flowersLeft
         ? `${journal.flowersLeft} of ${journal.flowersToday.limit} flowers left to grow today.`
         : `You've grown today's ${journal.flowersToday.limit} flowers. Events still save; new flowers tomorrow.`}</Text> : null}
@@ -80,7 +84,7 @@ export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void;
       <Text style={styles.sectionTitle}>Your next bloom starts here</Text>
       <Text style={styles.text}>Save an Event to grow a flower in your Garden.</Text>
     </View> : null}
-    {journal.flowers.map(flower => {
+    {journal.flowers.map((flower, index) => {
       const placed = journal.placements.some(item => item.flowerId === flower.id);
       return <EventSection key={flower.id}>
         <View style={ui.row}>
@@ -93,9 +97,11 @@ export function EventsPanel({ onClose, onGardenChanged }: { onClose: () => void;
         {flower.event ? <Text style={styles.text}>{flower.event}</Text> : null}
         <Text style={styles.caption}>AI emotion suggestions (not a diagnosis): {flower.sourceEvent?.secondaryEmotions.join(', ') || 'None'}</Text>
         {flower.sourceEventId ? <AiOutputReport kind="event" outputId={flower.sourceEventId} /> : null}
-        <EventAction secondary title={placed ? 'Adjust position' : 'Plant flower'} onPress={() => {
+        <View {...(index === 0 ? onboardingTarget('events.plant') : {})}><EventAction secondary title={placed ? 'Adjust position' : 'Plant flower'} onPress={() => {
+          // In the first-time tour the Garden itself starts planting, framed on this month's bed.
+          if (onboardingActive() && !placed) { dispatchOnboarding({ type: 'plantRequested', flowerId: flower.id }); onClose(); return; }
           onClose(); journal.placeFlower(flower);
-        }} />
+        }} /></View>
       </EventSection>;
     })}
     <EventAction secondary title="Refresh flowers" onPress={() => void journal.refresh()} disabled={journal.loading} />

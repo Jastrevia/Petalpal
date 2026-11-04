@@ -184,6 +184,112 @@ test('Event panel controller requires a user-selected Primary and retries a fail
 
 });
 
+test('Save Event never stores a response without its Event: explicit error, no crash, same-key retry', async () => {
+  const hooks = hookHarness(); const calls = [];
+  const session = { user: { id: 'owner' } }; let gardenRefreshes = 0;
+  const event = { id: 'event-ok', primaryGardenMood: 'GENTLE_BLOOM', secondaryEmotions: [], emotionStatus: 'SKIPPED', localDate: '2026-10-27' };
+  const replies = [{ flower: { id: 'orphan-flower' } }, undefined, { event: {}, flower: null }, { event, flower: null, memoryJob: null }];
+  const { load } = setup(async () => response({}), {
+    'expo-router': { router: { navigate() {} } },
+    '../services/auth': { useAuth: () => ({ session }) },
+    '../services/events': { eventFlowers: async () => [], loadFlowersToday: async () => null,
+      createEvent: async (content, mood, key) => { calls.push(key); return replies[calls.length - 1]; } },
+  }, hooks.react);
+  const { useEventJournal } = load('../../../hooks/useEventJournal');
+  let state = hooks.mount(() => useEventJournal(() => { gardenRefreshes++; }));
+  state.setContent('Malformed response check'); state.setMood('GENTLE_BLOOM'); state = await hooks.flush();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await state.saveEvent(); state = await hooks.flush();
+    assert.equal(state.result, null, 'a malformed response is never stored');
+    assert.match(state.error, /could not confirm this Event/);
+    assert.equal(state.content, 'Malformed response check', 'the draft is kept for the retry');
+  }
+  await state.saveEvent(); state = await hooks.flush();
+  assert.equal(new Set(calls).size, 1, 'every retry reuses one idempotency key, so the server cannot create a duplicate');
+  assert.equal(state.result.event.id, 'event-ok'); assert.equal(state.error, ''); assert.equal(gardenRefreshes, 1);
+});
+
+test('Event status read-backs without an Event keep the saved Event and report a status error', async () => {
+  const hooks = hookHarness();
+  const session = { user: { id: 'owner' } };
+  const event = { id: 'event-status', primaryGardenMood: 'QUIET_BLOOM', secondaryEmotions: [], emotionStatus: 'SUCCESS', localDate: '2026-10-27' };
+  const { load } = setup(async () => response({}), {
+    'expo-router': { router: { navigate() {} } },
+    '../services/auth': { useAuth: () => ({ session }) },
+    '../services/events': { eventFlowers: async () => [], loadFlowersToday: async () => null,
+      createEvent: async () => ({ event, flower: null, memoryJob: null }), readEvent: async () => undefined },
+  }, hooks.react);
+  const { useEventJournal } = load('../../../hooks/useEventJournal');
+  let state = hooks.mount(() => useEventJournal());
+  state.setContent('Status check'); state.setMood('QUIET_BLOOM'); state = await hooks.flush();
+  await state.saveEvent(); state = await hooks.flush();
+  await state.refreshEventStatus(); state = await hooks.flush();
+  assert.equal(state.result.event.id, 'event-status', 'the saved Event is kept and still renders');
+  assert.match(state.pollError, /unavailable/);
+});
+
+test('local preview: Save Event -> Plant flower -> Garden placement keeps one Event and one Flower', async () => {
+  const navigations = [], owner = 'onboarding-preview-owner';
+  const session = { user: { id: owner, timezone: 'UTC' } };
+  const journalHooks = hookHarness(), gardenHooks = hookHarness();
+  const preview = (react, extra = {}) => loadPlantingModules(undefined, react, undefined, true, {
+    'expo-router': { router: { navigate: href => navigations.push(href) }, useFocusEffect: fn => react.useEffect(fn, [fn]) },
+    '../services/auth': { useAuth: () => ({ session }) },
+    '../components/onboarding/onboardingSignals': { dispatchOnboarding() {} },
+    '../../onboarding/onboardingSignals': { dispatchOnboarding() {} },
+    ...extra,
+  }, true);
+  const journalLoad = preview(journalHooks.react);
+  const backend = journalLoad('../../onboarding/preview/previewBackend');
+  const transport = (path, method, body) => backend.previewRequest(path, method, body);
+  journalLoad('../../../services/api').setPreviewApiTransport(transport);
+  journalLoad('plantingPersistence').setPreviewPlacementMemory(owner);
+  backend.previewBackend.reset(); backend.previewBackend.prepareFor('done', 'en');
+  const gardenFlowers = async () => (await transport(`/users/${owner}/garden`, 'GET')).flowers;
+  const before = (await gardenFlowers()).length;
+
+  const { useEventJournal } = journalLoad('../../../hooks/useEventJournal');
+  let journal = journalHooks.mount(() => useEventJournal()); journal = await journalHooks.flush();
+  journal.setContent('Synthetic preview Event'); journal.setMood('FIRE_BLOOM'); journal = await journalHooks.flush();
+  await journal.saveEvent(); journal = await journalHooks.flush();
+  assert.equal(journal.error, ''); assert.ok(journal.result.event.id); assert.ok(journal.result.flower.id, 'the preview response carries its Flower');
+  const afterSave = await gardenFlowers();
+  assert.equal(afterSave.length, before + 1, 'one Save Event grows exactly one Flower');
+  assert.equal(afterSave.filter(f => f.sourceEventId === journal.result.event.id).length, 1);
+  assert.deepEqual(Array.from(journal.flowers, f => f.id), [journal.result.flower.id]);
+
+  journal.placeFlower(journal.flowers[0]);
+  const params = navigations.at(-1).params;
+  assert.equal(params.mode, 'plant'); assert.equal(params.flowerId, journal.result.flower.id);
+
+  // GardenScene passes these params to startPlanting; drive the real PlantingProvider in backend mode.
+  const gardenLoad = preview(gardenHooks.react);
+  gardenLoad('../../../services/api').setPreviewApiTransport(transport);
+  gardenLoad('plantingPersistence').setPreviewPlacementMemory(owner);
+  const Provider = gardenLoad('PlantingContext').PlantingProvider;
+  let garden = gardenHooks.mount(() => { const root = Provider({ children: null, backendMode: true, session }); return root.type(root.props).props.value; });
+  garden = await gardenHooks.flush();
+  await garden.startPlanting({ flowerId: params.flowerId, journalEntryId: params.journalEntryId, plantedDate: params.plantedDate,
+    month: Number(params.month), flowerName: params.flowerName, speciesCode: params.speciesCode, mood: params.mood });
+  garden = await gardenHooks.flush();
+  const land = `Land${String(Number(params.month)).padStart(2, '0')}`;
+  assert.equal(garden.activeMode, 'planting'); assert.equal(garden.previewLandId, land);
+  assert.equal(garden.validationResult.isValid, true, garden.validationResult.userFeedback);
+  assert.equal(await garden.confirmPlacement(), true); garden = await gardenHooks.flush();
+  const planted = garden.placements.filter(p => p.flowerId === params.flowerId);
+  assert.equal(planted.length, 1); assert.equal(planted[0].landId, land);
+
+  // Reload with the device cache cleared (as sign-in does): the saved position comes back.
+  gardenLoad('plantingPersistence').setPreviewPlacementMemory(owner);
+  const reloaded = await gardenLoad('gardenHydration').loadGardenPlacements(owner, owner, 'UTC');
+  const restored = reloaded.filter(p => p.flowerId === params.flowerId);
+  assert.equal(restored.length, 1);
+  assert.deepEqual([restored[0].worldX, restored[0].worldY, restored[0].landId, restored[0].placementOrigin],
+    [planted[0].worldX, planted[0].worldY, land, 'SERVER']);
+  assert.equal(restored[0].sourceEventId, journal.result.event.id, 'the Flower keeps its Event');
+  assert.equal((await gardenFlowers()).length, before + 1, 'planting created no extra Flower');
+});
+
 test('current Event displays only its canonical Flower, retains old pending flowers, and refreshes without creating duplicates', async () => {
   const hooks = hookHarness();
   const session = { user: { id: 'owner' } };
@@ -511,6 +617,7 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
     '../../services/auth': { useAuth: () => ({ session: { user: { id: 'owner' } } }) },
     '../../components/garden/GardenScene': { __esModule: true, default: 'GardenScene' },
     '../../components/features/FeatureUI': { FEATURE_COLORS: {}, FeatureActionButton: 'Action', ui: {} },
+    '../../components/encouragement/VisitorEncouragement': { VisitorEncouragement: 'VisitorEncouragement' },
   }, hooks.react);
   api.configureApi({ apiBaseUrl: '', getAccessToken: async () => 'test-token' });
   const Screen = load('../../../app/visit/[ownerId]').default;
@@ -519,6 +626,8 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
   assert.ok(garden); assert.equal(garden.props.gardenOwnerUserId, 'alex');
   assert.equal(garden.props.session.user.id, 'owner'); assert.equal(garden.props.readOnly, true);
   assert.equal(garden.props.backendMode, true);
+  // Daily Support / note actions appear only inside an allowed visit, for this owner.
+  assert.equal(featureNodes(tree).find(node => node.type === 'VisitorEncouragement').props.ownerId, 'alex');
   assert.deepEqual(calls.slice(0, 2).map(call => call.url), ['/users/alex/garden-access', '/visit']);
   assert.deepEqual(calls[1].body, { hostUserId: 'alex' });
   const home = featureNodes(tree).find(node => node.props?.testID === 'visitor-return-home');
@@ -530,6 +639,7 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
   ownerId = 'jenny'; tree = hooks.render(); tree = await hooks.flush();
   assert.ok(calls.some(call => call.url === '/leave' && call.body.hostUserId === 'alex'));
   assert.equal(featureNodes(tree).find(node => node.type === 'GardenScene'), undefined);
+  assert.equal(featureNodes(tree).find(node => node.type === 'VisitorEncouragement'), undefined);
   assert.match(featureText(tree), /private or unavailable/);
   assert.equal(featureNodes(tree).find(node => node.props?.testID === 'visitor-return-home'), undefined);
   assert.equal(calls.filter(call => call.url === '/visit').length, 1, 'Denied route never starts a visit');

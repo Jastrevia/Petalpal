@@ -4,7 +4,7 @@ import { AiPrivacySettings } from './AiPrivacySettings';
 import { ReportLanguageSettings } from './ReportLanguageSettings';
 import { CommunityGuidelines } from './CommunityGuidelines';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,8 @@ import { AvatarPicker } from '../avatars/AvatarPicker';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
+import { dispatchOnboarding } from '../onboarding/onboardingSignals';
+import { onboardingScrollHandler, onboardingTarget, registerOnboardingScroller } from '../onboarding/onboardingTargets';
 
 type Feature = typeof GARDEN_FEATURES[number];
 const messages: Record<string, [string, string]> = {
@@ -39,6 +41,15 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const insets = useSafeAreaInsets();
   const [addingFriend, setAddingFriend] = useState(false);
   useEffect(() => { setAddingFriend(false); }, [feature?.id]);
+  // The first-time tour follows the Events and Friends panels opening and closing.
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    const id = feature?.id;
+    if (id !== 'events' && id !== 'friends') return;
+    dispatchOnboarding({ type: 'featureOpened', feature: id });
+    const unregister = registerOnboardingScroller('panel', scroll);
+    return () => { unregister(); dispatchOnboarding({ type: 'featureClosed', feature: id }); };
+  }, [feature?.id]);
   if (!feature) return null;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
@@ -58,13 +69,13 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
           </Pressable>
         </View>
         </> : null}
-        <ScrollView style={[styles.scroll, feature.id === 'events' && styles.eventsScroll]} contentContainerStyle={[styles.content, feature.id === 'events' && styles.eventsContent]} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroll} onScroll={onboardingScrollHandler('panel')} scrollEventThrottle={32} style={[styles.scroll, feature.id === 'events' && styles.eventsScroll]} contentContainerStyle={[styles.content, feature.id === 'events' && styles.eventsContent]} keyboardShouldPersistTaps="handled">
           <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings}
             addingFriend={addingFriend} onAddFriend={() => setAddingFriend(true)} onCloseAddFriend={() => setAddingFriend(false)} />
         </ScrollView>
         <View style={[styles.footer, feature.id === 'friends' && styles.friendsFooter, feature.id === 'events' && styles.eventsFooter, feature.id === 'friends' && light && styles.eventsFooter]}>
           <View style={styles.footerIcon}><SymbolView name={{ ios: 'leaf.fill', android: 'local_florist', web: 'local_florist' }} size={23} tintColor={colors.ink} /></View>
-          <View style={{ flex: 1 }}>{(feature.id === 'friends' || feature.id === 'events')
+          <View {...onboardingTarget(feature.id === 'friends' ? 'friends.return' : `${feature.id}.return`)} style={{ flex: 1 }}>{(feature.id === 'friends' || feature.id === 'events')
             ? <Pressable accessibilityRole="button" accessibilityLabel="Return to Garden" onPress={onClose}
                 style={({ pressed }) => [styles.friendsReturn, pressed && ui.pressed]}>
                 <Text style={styles.friendsReturnText}>Return to Garden  ›</Text>
@@ -73,7 +84,14 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
         </View>
       </View>
     </KeyboardAvoidingView>
+    {feature.id === 'events' || feature.id === 'friends' ? <TourPanelLayer surface={feature.id} /> : null}
   </Modal>;
+}
+
+// The first-time tour's layer for this panel, drawn inside the panel's own modal (loaded on use).
+function TourPanelLayer({ surface }: { surface: 'events' | 'friends' }) {
+  const { OnboardingPanelLayer } = require('../onboarding/OnboardingStepView') as typeof import('../onboarding/OnboardingStepView');
+  return <OnboardingPanelLayer surface={surface} />;
 }
 
 function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, addingFriend, onAddFriend, onCloseAddFriend }: {

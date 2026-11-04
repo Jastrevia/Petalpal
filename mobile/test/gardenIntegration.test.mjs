@@ -102,11 +102,16 @@ test('Garden hydration rejects mismatched owner responses and drops in-flight da
   const wrong = setup(async () => response({ ...fixture(), owner: { id: 'bob' } }));
   await assert.rejects(wrong.garden.loadGarden('alice', 'alice'), /load this Garden/);
 });
+const positionSaves = [];
+let failNextSave = false;
 function providerSetup(fetch, storage) {
   const hooks = hookHarness();
   const { load } = setup(fetch, hooks.react, {
     './flowerDetailApi': { loadFlowerSession: async () => null, subscribeToFlowerUpdates: () => () => {},
-      loadFlowerSource: async () => fixture().flowers[0], deleteSourceFlower: async () => {} },
+      loadFlowerSource: async () => fixture().flowers[0], deleteSourceFlower: async () => {},
+      saveFlowerPosition: async (ownerId, placement) => {
+        if (failNextSave) { failNextSave = false; throw new Error('Unable to save this position. Try again.'); }
+        positionSaves.push({ ownerId, ...placement }); return placement; } },
     './placementValidator': { validateFlowerPlacement: () => ({ isValid: true }) },
   }, storage);
   const Provider = load('PlantingContext').PlantingProvider;
@@ -136,13 +141,38 @@ test('Garden hydration saves and deletes one flower without dropping unplaced ba
   await current.resetAllPlacements(); current = await state.hooks.flush(); assert.equal(current.placements.length, 3);
   const daily = current.placements.find(p => p.flowerId === 'daily');
   current.startAdjusting(daily); current = await state.hooks.flush();
+  positionSaves.length = 0;
   assert.equal(await current.confirmPlacement(), true); current = await state.hooks.flush();
+  // Signed-in Gardens persist the confirmed position on the owner's Flower.
+  assert.deepEqual(positionSaves.map(s => [s.ownerId, s.flowerId, s.worldX, s.worldY, s.landId]),
+    [['alice', 'daily', daily.worldX, daily.worldY, daily.landId]]);
   assert.equal(current.placements.length, 3);
   assert.equal(current.placements.find(p => p.flowerId === 'daily').placementOrigin, 'LOCAL');
   const saved = JSON.parse([...items.values()][0]); assert.equal(saved.length, 1); assert.equal(saved[0].flowerId, 'daily');
   current.openFlowerDetail(current.placements.find(p => p.flowerId === 'event')); current = await state.hooks.flush();
   assert.equal(await current.deleteSelectedFlower(), true); current = await state.hooks.flush();
   assert.deepEqual(plain(current.placements.map(p => p.flowerId)), ['daily', 'historical']);
+});
+test('Garden placement save failure keeps the last saved position, stays retryable and caches nothing', async () => {
+  const items = new Map();
+  const state = providerSetup(async () => response(fixture()),
+    { getItem: key => items.get(key) || null, setItem: (key, value) => items.set(key, value) });
+  let current = await state.hooks.flush();
+  const daily = current.placements.find(p => p.flowerId === 'daily');
+  current.startAdjusting(daily); current = await state.hooks.flush();
+  current.updatePreview(daily.worldX + 3, daily.worldY); current = await state.hooks.flush();
+  failNextSave = true; positionSaves.length = 0;
+  assert.equal(await current.confirmPlacement(), false); current = await state.hooks.flush();
+  assert.equal(positionSaves.length, 0);
+  assert.equal(current.activeMode, 'adjusting', 'the owner can retry or cancel');
+  assert.equal(current.isSaving, false);
+  const after = current.placements.find(p => p.flowerId === 'daily');
+  assert.deepEqual([after.worldX, after.worldY, after.placementOrigin], [daily.worldX, daily.worldY, daily.placementOrigin],
+    'the Garden keeps the last saved position');
+  assert.equal(items.size, 0, 'a failed save is not cached on the device');
+  assert.equal(await current.confirmPlacement(), true, 'a retry succeeds'); current = await state.hooks.flush();
+  assert.deepEqual(positionSaves.map(s => [s.flowerId, s.worldX]), [['daily', daily.worldX + 3]]);
+  assert.equal(current.placements.find(p => p.flowerId === 'daily').worldX, daily.worldX + 3);
 });
 test('Garden HUD opens local overlays without navigation/refresh and closes to the same Garden', async () => {
   const hooks = hookHarness();

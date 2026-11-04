@@ -7,6 +7,7 @@ import { useAuth } from '../../services/auth';
 import { gardenVisitAccess, startGardenVisit, leaveGardenVisit } from '../../services/gardenVisits';
 import GardenScene from '../../components/garden/GardenScene';
 import { FEATURE_COLORS as colors, FeatureActionButton, ui } from '../../components/features/FeatureUI';
+import { VisitorEncouragement } from '../../components/encouragement/VisitorEncouragement';
 
 export default function VisitGardenScreen() {
   const { session } = useAuth();
@@ -39,6 +40,7 @@ export default function VisitGardenScreen() {
   return <GestureHandlerRootView style={styles.root}>
     {visiting ? <GardenScene key={`${viewerId}:${ownerId}`} session={session} gardenOwnerUserId={ownerId}
       backendMode readOnly showDevControls={false} initialWaterfallVersion="v2" /> : null}
+    {visiting ? <VisitorEncouragement key={`encouragement:${viewerId}:${ownerId}`} ownerId={ownerId} /> : null}
     {visiting ? <Pressable accessibilityRole="button" accessibilityLabel="Return to My Garden"
       accessibilityHint="Leave this friend's Garden and return to your own"
       testID="visitor-return-home" onPress={() => router.dismissTo('/')}

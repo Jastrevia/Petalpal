@@ -42,6 +42,20 @@ export function useAuth() {
   if (!value) throw new Error('AuthProvider required');
   return value;
 }
+/** DEV-only: a signed-in synthetic owner for local previews. No Firebase, no Render, no real account. */
+export function PreviewAuthProvider({ user, children }: { user: SessionUser; children: ReactNode }) {
+  const [avatar, setAvatar] = useState(user.avatar);
+  if (!__DEV__) throw new Error('Preview accounts are development-only');
+  const owner = { ...user, avatar };
+  const idle = async () => {};
+  const value: AuthState = {
+    phase: 'signedIn', session: { user: owner }, identity: { uid: owner.id, email: owner.email || '' }, error: '', message: '',
+    experience: { user: owner, fairyState: null, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true, gardenOwnerId: owner.id },
+    loading: false, needsProfile: false, login: idle, register: idle, resendVerification: idle, checkVerification: idle,
+    completeProfile: idle, updateAvatar: async next => setAvatar(next), logout: idle, deleteAccount: idle, retry: idle,
+  };
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthSnapshot>(() => emptyState());
   useEffect(() => { setNativeSecurityExpectedOwner(state.session?.user.id || null); }, [state.session?.user.id]);

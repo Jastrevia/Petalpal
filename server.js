@@ -71,6 +71,7 @@ import {
   nextUnlockableFairy
 } from "./lib/fairy-config.js";
 import { monthFromLocalDate, normalizeProgress } from "./lib/fairy-progress.js";
+import { onboardingTutorialState, OnboardingTutorialError, updateOnboardingTutorial } from "./lib/onboarding-tutorial.js";
 import { resolveDailyFlowerEmotion } from "./lib/daily-flower-input.js";
 import {
   AI_JOB_TYPES,
@@ -112,6 +113,14 @@ import {
   sendFlowerMessage,
   withGardenFlowerSupportState
 } from "./lib/flower-support.js";
+import {
+  GardenEncouragementError,
+  getGardenEncouragementState,
+  giveGardenSupport,
+  leaveGardenNote,
+  listGardenEncouragements,
+  markGardenEncouragementsRead
+} from "./lib/garden-encouragement.js";
 import http from "http";
 import { Server } from "socket.io";
 import {
@@ -870,6 +879,36 @@ app.patch("/users/me/garden-privacy", allowBodyFields(["allowGardenVisits"]), as
   }
 });
 
+// Daily Garden encouragement received by the signed-in owner (lib/garden-encouragement.js).
+app.get("/users/me/garden-encouragements", async (req, res) => {
+  const cursor = req.query.cursor;
+  if (Object.keys(req.query).some(key => key !== "cursor") ||
+      (cursor !== undefined && !validId(cursor))) {
+    return res.status(400).json({ error: "Invalid query" });
+  }
+  try {
+    res.json(await listGardenEncouragements(prisma, { ownerUserId: req.auth.userId, cursor }));
+  } catch (err) {
+    if (err instanceof GardenEncouragementError) return res.status(err.status).json({ error: err.message, code: err.code });
+    logServerError("GET /users/me/garden-encouragements error", err);
+    res.status(500).json({ error: "Failed to load Garden encouragement" });
+  }
+});
+
+app.post("/users/me/garden-encouragements/read", allowBodyFields(["messageIds", "supports"]), async (req, res) => {
+  const { messageIds = [], supports = false } = req.body;
+  if (!Array.isArray(messageIds) || messageIds.length > 50 || !messageIds.every(validId) ||
+      typeof supports !== "boolean") {
+    return res.status(400).json({ error: "messageIds must be up to 50 ids and supports a boolean" });
+  }
+  try {
+    res.json(await markGardenEncouragementsRead(prisma, { ownerUserId: req.auth.userId, messageIds, supports }));
+  } catch (err) {
+    logServerError("POST /users/me/garden-encouragements/read error", err);
+    res.status(500).json({ error: "Failed to update Garden encouragement" });
+  }
+});
+
 app.get("/users/:userId/garden-access", async (req, res) => {
   try {
     const access = await withSocialLocks(prisma, [req.params.userId, req.auth.userId], async tx => {
@@ -1554,19 +1593,57 @@ app.get("/session", async (req, res) => {
 });
 
 // Private journals never enter Daily Grow, Events, or AI processing.
+// Create and edit share one content rule; on rejection the response is already sent.
+function privateJournalContent(req, res) {
+  const content = req.body?.content;
+  if (typeof content !== "string" || !content.trim()) {
+    res.status(400).json({ error: "Write something before saving your journal" }); return null;
+  }
+  if (content.length > 2000) { res.status(413).json({ error: "Journal must be 2000 characters or fewer" }); return null; }
+  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) { res.status(422).json(contentSafetyResponse(req,error)); return null; } throw error; }
+  return content.trim();
+}
 app.post("/users/:userId/journals",
   (req, res, next) => { if (requireOwnUser(req, res, req.params.userId)) next(); },
   allowBodyFields(["content"]), async (req, res) => {
-  const content = req.body?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    return res.status(400).json({ error: "Write something before saving your journal" });
-  }
-  if (content.length > 2000) return res.status(413).json({ error: "Journal must be 2000 characters or fewer" });
-  try { assertContentAllowed(content); } catch (error) { if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error)); throw error; }
+  const content = privateJournalContent(req, res);
+  if (content === null) return;
   const journal = await prisma.journal.create({
-    data: { userId: req.auth.userId, content: content.trim() }
+    data: { userId: req.auth.userId, content }
   });
   res.status(201).json(journal);
+});
+
+// Only standalone Treehouse journals can change. A journal written through a Daily Grow
+// check-in is the source of that Flower's history, so it stays read-only (409).
+const LOCKED_JOURNAL = { error: "This journal belongs to a flower in your Flower History, so it can't be changed here.", code: "JOURNAL_LOCKED" };
+async function ownedPrivateJournal(req, res) {
+  const journal = await prisma.journal.findFirst({
+    where: { id: req.params.journalId, userId: req.auth.userId }, select: { id: true, dailyCheckInId: true }
+  });
+  if (!journal) { res.status(404).json({ error: "Journal not found" }); return null; }
+  if (journal.dailyCheckInId) { res.status(409).json(LOCKED_JOURNAL); return null; }
+  return journal;
+}
+app.patch("/users/:userId/journals/:journalId",
+  (req, res, next) => { if (requireOwnUser(req, res, req.params.userId)) next(); },
+  allowBodyFields(["content"]), async (req, res) => {
+  const content = privateJournalContent(req, res);
+  if (content === null || !await ownedPrivateJournal(req, res)) return;
+  // The owner and standalone checks repeat in the write so a concurrent change cannot slip past them.
+  const result = await prisma.journal.updateMany({
+    where: { id: req.params.journalId, userId: req.auth.userId, dailyCheckInId: null }, data: { content }
+  });
+  if (!result.count) return res.status(404).json({ error: "Journal not found" });
+  res.json({ id: req.params.journalId, content });
+});
+app.delete("/users/:userId/journals/:journalId", async (req, res) => {
+  if (!requireOwnUser(req, res, req.params.userId) || !await ownedPrivateJournal(req, res)) return;
+  const result = await prisma.journal.deleteMany({
+    where: { id: req.params.journalId, userId: req.auth.userId, dailyCheckInId: null }
+  });
+  if (!result.count) return res.status(404).json({ error: "Journal not found" });
+  res.json({ success: true, id: req.params.journalId });
 });
 
 app.get("/users/:userId/journals/:journalId/cover", async (req, res) => {
@@ -1609,7 +1686,8 @@ app.get("/users/:userId/journals", async (req, res) => {
     localDate: journal.dailyCheckIn?.localDate || new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit"
     }).format(journal.createdAt),
-    journal: { id: journal.id, content: journal.content },
+    // locked: written through a Daily Grow check-in, so the Treehouse cannot edit or delete it.
+    journal: { id: journal.id, content: journal.content, locked: Boolean(journal.dailyCheckIn) },
     emotionResult: journal.dailyCheckIn?.emotionResult || null,
     flower: journal.dailyCheckIn?.flower || null
   }));
@@ -1633,6 +1711,34 @@ app.get("/users/:userId/check-ins", async (req, res) => {
   });
 
   res.json(checkIns);
+});
+
+// The Treehouse journal's left pages: the owner's Events for one calendar month, read-only, by their stored local
+// date (no timezone conversion). Includes Events that grew no flower (the daily flower quota), which the garden
+// route cannot reach. No content beyond what GET /events/:eventId already returns to the owner.
+const EVENT_MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
+app.get("/users/:userId/events", async (req, res) => {
+  if (!requireOwnUser(req, res, req.params.userId)) return;
+  const month = typeof req.query.month === "string" ? req.query.month : "";
+  if (!EVENT_MONTH.test(month) || Object.keys(req.query).some(key => key !== "month")) {
+    return res.status(400).json({ error: "Invalid month" });
+  }
+  try {
+    const events = await prisma.event.findMany({
+      where: { ownerId: req.auth.userId, localDate: { gte: `${month}-01`, lte: `${month}-31` } },
+      select: {
+        id: true, content: true, localDate: true, occurredAt: true, primaryGardenMood: true, secondaryEmotions: true,
+        emotionStatus: true, emotionOutcome: true,
+        flower: { select: { id: true, name: true, img: true, mood: true, meaning: true, speciesCode: true, colorAccent: true, createdAt: true } }
+      },
+      orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      take: 500
+    });
+    return res.json({ events });
+  } catch (error) {
+    logServerError("GET /users/:userId/events error", error);
+    return res.status(500).json({ error: "Failed to load Events" });
+  }
 });
 
 app.get("/users/:userId/fairy-state", async (req, res) => {
@@ -1967,6 +2073,31 @@ app.post("/api/petal-cards/draw", allowBodyFields(["position"]), (req, res, next
   next();
 }, petalDrawRoute("POST /api/petal-cards/draw",
   req => drawPetalCard(prisma, { userId: req.auth.userId, position: req.body.position, now: new Date() })));
+
+// First-time guided tour (lib/onboarding-tutorial.js): owner-scoped progress, the Fairy's name
+// and links to the owner's first real Event and Flower. Identity always comes from the token.
+function sendOnboardingTutorialError(req, res, error, label) {
+  if (error instanceof OnboardingTutorialError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(label, error);
+  return res.status(500).json({ error: "Unable to update the tour" });
+}
+
+app.get("/api/onboarding", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store").json(await onboardingTutorialState(prisma, { userId: req.auth.userId }));
+  } catch (error) {
+    sendOnboardingTutorialError(req, res, error, "GET /api/onboarding error");
+  }
+});
+
+app.patch("/api/onboarding", allowBodyFields(["step", "fairyName", "firstEventId", "firstFlowerId", "flowerPlanted", "complete"]), async (req, res) => {
+  try {
+    const progress = await updateOnboardingTutorial(prisma, { userId: req.auth.userId, body: req.body, lock: lockTransaction });
+    res.set("Cache-Control", "no-store").json(progress);
+  } catch (error) {
+    sendOnboardingTutorialError(req, res, error, "PATCH /api/onboarding error");
+  }
+});
 
 app.put("/users/:userId/fairy-state", async (req, res) => {
   if (!requireOwnUser(req, res, req.params.userId)) return;
@@ -3239,6 +3370,78 @@ app.post("/users/:userId/flowers/:flowerId/support", requireSocialGardenAccess, 
     }
   );
 
+
+// Daily Garden encouragement from a visiting friend: one Support and one note per
+// visitor, owner and visitor-local day. The database unique index enforces the limit;
+// a repeat returns 409 with the authoritative state (lib/garden-encouragement.js).
+function sendGardenEncouragementError(req, res, error, label) {
+  if (error instanceof GardenEncouragementError) {
+    return res.status(error.status).json({ error: error.message, code: error.code, ...(error.state ? { state: error.state } : {}) });
+  }
+  if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req, error));
+  if (error?.code === "COMMUNITY_ACCEPTANCE_REQUIRED") return res.status(428).json({ error: error.message, code: error.code });
+  if (sendSocialError(res, error)) return;
+  logServerError(label, error);
+  res.status(500).json({ error: "Failed to update Garden encouragement" });
+}
+
+app.get("/users/:userId/garden-encouragement", requireSocialGardenAccess, async (req, res) => {
+  try {
+    res.json(await getGardenEncouragementState(prisma, {
+      ownerUserId: req.params.userId, viewerUserId: req.auth.userId
+    }));
+  } catch (error) {
+    sendGardenEncouragementError(req, res, error, "GET /users/:userId/garden-encouragement error");
+  }
+});
+
+app.post("/users/:userId/garden-encouragement/support", requireSocialGardenAccess, allowBodyFields([]), async (req, res) => {
+  try {
+    const state = await giveGardenSupport(prisma, { ownerUserId: req.params.userId, viewerUserId: req.auth.userId });
+    res.status(201).json(state);
+  } catch (error) {
+    sendGardenEncouragementError(req, res, error, "POST /users/:userId/garden-encouragement/support error");
+  }
+});
+
+app.post("/users/:userId/garden-encouragement/message", requireSocialGardenAccess, allowBodyFields(["text"]), async (req, res) => {
+  try {
+    const state = await leaveGardenNote(prisma, {
+      ownerUserId: req.params.userId, viewerUserId: req.auth.userId, text: req.body.text
+    });
+    res.status(201).json(state);
+  } catch (error) {
+    sendGardenEncouragementError(req, res, error, "POST /users/:userId/garden-encouragement/message error");
+  }
+});
+
+// Garden position of a planted flower cluster. Reuses the existing Flower position columns (no
+// migration): left/top hold world coordinates, regionId the logical Land. layoutVersion 2 marks
+// these, so legacy random left/top values (layoutVersion 1) are never read as Garden positions.
+const FLOWER_WORLD_LAYOUT_VERSION = 2;
+const GARDEN_LAND_IDS = new Set(Array.from({ length: 12 }, (_, index) => `Land${String(index + 1).padStart(2, "0")}`));
+app.patch("/users/:userId/flowers/:flowerId/placement",
+  allowBodyFields(["worldX", "worldY", "landId", "scale", "rotation"]), async (req, res) => {
+  if (!requireOwnUser(req, res, req.params.userId)) return;
+  const { worldX, worldY, landId, scale = 1, rotation = 0 } = req.body;
+  const finite = value => typeof value === "number" && Number.isFinite(value);
+  if (!finite(worldX) || !finite(worldY) || worldX < 0 || worldX >= 2400 || worldY < 0 || worldY >= 1800 ||
+      !GARDEN_LAND_IDS.has(landId) || !finite(scale) || scale < 0.25 || scale > 4 ||
+      !finite(rotation) || rotation < -180 || rotation > 180) {
+    return res.status(400).json({ error: "Invalid flower position" });
+  }
+  try {
+    const updated = await prisma.flower.updateMany({
+      where: { id: req.params.flowerId, userId: req.auth.userId },
+      data: { left: worldX, top: worldY, regionId: landId, scale, rotation, layoutVersion: FLOWER_WORLD_LAYOUT_VERSION }
+    });
+    if (updated.count !== 1) return res.status(404).json({ error: "Flower not found" });
+    res.json({ id: req.params.flowerId, worldX, worldY, landId, scale, rotation });
+  } catch (err) {
+    logServerError("PATCH flower placement error", err);
+    res.status(500).json({ error: "Failed to save flower position" });
+  }
+});
 
 app.delete("/users/:userId/flowers/:flowerId", async (req, res) => {
   try {

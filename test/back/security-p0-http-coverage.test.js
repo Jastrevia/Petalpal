@@ -8,6 +8,7 @@ const routes = [
   ["PUT /users/:userId/profile", "requireOwnUser and explicit preferredLocale"],
   ["PUT /api/fairies/:fairyId/active", "owned Fairy query uses req.auth.userId"],
   ["PUT /users/:userId/fairy-state", "requireOwnUser and allowlisted fields"],
+  ["PATCH /api/onboarding", "owner is req.auth.userId; body allowlist; Event/Flower links re-checked against the owner under an advisory lock"],
   ["POST /api/fairy/moments/:momentId/like", "updateMany scopes the Moment to req.auth.userId"],
   ["PUT /api/fairy/moments/avatar", "updateMany scopes the active Fairy to req.auth.userId; library ids only"],
   ["PUT /api/fairy/moments/cover", "updateMany scopes the active Fairy to req.auth.userId; cover library ids only; body allowlist"],
@@ -22,9 +23,15 @@ const routes = [
   ["POST /friends/requests/:requestId/accept", "receiver is checked against req.auth.userId"],
   ["POST /friends/requests/:requestId/reject", "receiver is checked against req.auth.userId"],
   ["POST /friends/remove", "userId is req.auth.userId"],
+  ["PATCH /users/:userId/journals/:journalId", "requireOwnUser; content allowlist; updateMany scopes the Journal to req.auth.userId and standalone (dailyCheckInId null)"],
+  ["DELETE /users/:userId/journals/:journalId", "requireOwnUser; deleteMany scopes the Journal to req.auth.userId and standalone (dailyCheckInId null)"],
   ["POST /users/:userId/flowers", "requireOwnUser; all created ownership fields use user.id"],
   ["POST /users/:userId/flowers/:flowerId/support", "visitorUserId is req.auth.userId; target owner is resource path"],
   ["POST /users/:userId/flowers/:flowerId/message", "visitorUserId is req.auth.userId; target owner is resource path"],
+  ["POST /users/:userId/garden-encouragement/support", "viewerUserId is req.auth.userId; owner is resource path; empty body; daily unique index"],
+  ["POST /users/:userId/garden-encouragement/message", "viewerUserId is req.auth.userId; owner is resource path; text-only body; daily unique index"],
+  ["POST /users/me/garden-encouragements/read", "updateMany scopes rows to ownerId req.auth.userId; id/boolean allowlist"],
+  ["PATCH /users/:userId/flowers/:flowerId/placement", "requireOwnUser; updateMany scopes the Flower to req.auth.userId; position/Land body allowlist"],
   ["DELETE /users/:userId/flowers/:flowerId", "requireOwnUser and flower query scopes userId"],
   ["POST /visit", "visitorUserId is req.auth.userId; host is explicit social target"],
   ["POST /visit/move", "visitorUserId is req.auth.userId; active visitor is token-scoped"],
@@ -41,7 +48,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 27);
+  assert.equal(routes.length, 34);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

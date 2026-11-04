@@ -59,3 +59,18 @@ export function getApprovedMonthCentroid(month: number): { x: number; y: number 
   const offset = getMaskRefinementOffset(APPROVED_MASK_REFINEMENTS[month]);
   return landLocalToWorld(local.x + offset.offsetX, local.y + offset.offsetY, getParentLand(cal.parentLandAsset));
 }
+
+/** World bounding box of a month's approved bed (its mask rectangle through the same transforms as the centroid). */
+export function getApprovedMonthWorldBounds(month: number): { x: number; y: number; width: number; height: number } {
+  const meta = MONTH_REGION_METAS[month];
+  const cal = APPROVED_MASK_CALIBRATION[month];
+  const offset = getMaskRefinementOffset(APPROVED_MASK_REFINEMENTS[month]);
+  const land = getParentLand(cal.parentLandAsset);
+  const corners = [[0, 0], [meta.bbox.width, 0], [0, meta.bbox.height], [meta.bbox.width, meta.bbox.height]].map(([u, v]) => {
+    const local = maskLocalToLandLocal(u, v, cal, meta);
+    return landLocalToWorld(local.x + offset.offsetX, local.y + offset.offsetY, land);
+  });
+  const xs = corners.map(p => p.x), ys = corners.map(p => p.y);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+}

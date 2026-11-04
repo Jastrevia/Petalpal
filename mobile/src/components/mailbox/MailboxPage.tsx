@@ -16,6 +16,10 @@ import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 import { MagicLevitationAura } from './MagicLevitationAura';
 import { MOCK_LETTERS, RELEASE_LETTERS } from './mockLetters';
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
+import { loadReceivedEncouragement, markEncouragementRead } from '../../services/gardenEncouragement';
+import {
+  noteIdFromLetter, noteToLetter, supportSummary, type ReceivedEncouragement,
+} from '../encouragement/encouragementFormat';
 
 const BACKGROUND_IMAGE = require('../../../assets/mailbox/mailbox_bg_clean.jpg');
 const LETTERS = __DEV__ ? MOCK_LETTERS : RELEASE_LETTERS;
@@ -54,9 +58,20 @@ export const MailboxPage = memo(function MailboxPage() {
   const toggleHelp = useCallback(() => setIsHelpOpen((prev) => !prev), []);
   const closeHelp = useCallback(() => setIsHelpOpen(false), []);
 
+  // Notes friends left in the Garden arrive from the server as letters, newest first.
+  // Their read state is the server's; opening one marks it read there too.
+  const [received, setReceived] = useState<ReceivedEncouragement | null>(null);
+  const unreadNoteIds = useRef(new Set<string>());
+  const userActed = useRef(false);
+
   // Mark letter as read deterministically upon successful physical opening
   const markLetterAsRead = useCallback((id: string) => {
-    sessionReadLetterIds.add(id);
+    const noteId = noteIdFromLetter(id);
+    if (noteId) {
+      if (unreadNoteIds.current.delete(noteId)) {
+        void markEncouragementRead({ messageIds: [noteId] }).catch(() => {});
+      }
+    } else sessionReadLetterIds.add(id);
     setLetters((prev) =>
       prev.map((letter) => (letter.id === id ? { ...letter, read: true } : letter))
     );
@@ -80,6 +95,27 @@ export const MailboxPage = memo(function MailboxPage() {
     return () => clearTimers();
   }, [clearTimers]);
 
+  useEffect(() => {
+    let active = true;
+    loadReceivedEncouragement().then((next) => {
+      if (!active) return;
+      setReceived(next);
+      const now = new Date();
+      const notes = next.messages.items.map((note) => noteToLetter(note, now));
+      unreadNoteIds.current = new Set(next.messages.items.filter((note) => !note.read).map((note) => note.id));
+      setLetters((prev) => [...notes, ...prev.filter((letter) => !noteIdFromLetter(letter.id))]);
+      // Seeing the Support count is seeing the Support.
+      if (next.support.unread > 0) void markEncouragementRead({ supports: true }).catch(() => {});
+      // A new note opens first unless the reader has already picked a letter.
+      const newest = notes.find((letter) => !letter.read);
+      if (newest && !userActed.current) {
+        setSelectedLetterId(newest.id);
+        markLetterAsRead(newest.id);
+      }
+    }).catch(() => { /* Signed out or offline: PetalPal's own letters still show. */ });
+    return () => { active = false; };
+  }, [markLetterAsRead]);
+
   const isReading = visualState === 'reading' || phase === 'reading';
 
   // Currently active letter
@@ -100,6 +136,7 @@ export const MailboxPage = memo(function MailboxPage() {
     (nextLetterId: string) => {
       if (isTransitioning) return;
       if (nextLetterId === selectedLetterId && isReading) return;
+      userActed.current = true;
 
       clearTimers();
 
@@ -210,6 +247,7 @@ export const MailboxPage = memo(function MailboxPage() {
   // Toggle between State 1 (holding stack) and State 3 (reading letter)
   const handleToggleState = useCallback(() => {
     if (isTransitioning) return;
+    userActed.current = true;
     clearTimers();
 
     if (isReading) {
@@ -348,6 +386,16 @@ export const MailboxPage = memo(function MailboxPage() {
             </Pressable>
           </View>
         </View>
+
+        {received && supportSummary(received.support) ? (
+          <View accessibilityRole="text" style={styles.supportPill} testID="mailbox-support-summary">
+            <Text style={styles.supportText}>
+              ✧ {supportSummary(received.support)}
+              {received.support.today > 0 && received.support.total > received.support.today
+                ? ` · ${received.support.total} in all` : ''}
+            </Text>
+          </View>
+        ) : null}
 
         {/* Note: HelpFeedbackTrigger and HelpFeedbackPanel are now globally mounted in the root application shell */}
 
@@ -515,6 +563,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
+  },
+  supportPill: {
+    marginTop: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: 'rgba(251, 244, 223, 0.86)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(227, 211, 168, 0.9)',
+    zIndex: 20,
+  },
+  supportText: {
+    color: '#3F5A3B',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    fontFamily:
+      Platform.OS === 'web'
+        ? '"Cormorant Garamond", Georgia, serif'
+        : Platform.OS === 'ios'
+          ? 'Georgia'
+          : 'serif',
   },
   mainArea: {
     flex: 1,

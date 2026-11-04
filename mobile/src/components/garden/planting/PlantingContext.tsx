@@ -22,7 +22,9 @@ import {
   ValidationResult,
   validateFlowerPlacement,
 } from './placementValidator';
-import { getApprovedMonthCentroid } from './approvedPlantingMasks';
+import { nearestAcceptedPoint } from './approvedFlowerClusters';
+import { getApprovedMonthCentroid, getApprovedRegionAtWorld } from './approvedPlantingMasks';
+import { dispatchOnboarding } from '../../onboarding/onboardingSignals';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { findJournalEntry } from '../../../data/journalEntries';
 import { mergeFlowerSource, ownsFlower, type FlowerSourceDetail } from './flowerDetailData';
@@ -32,6 +34,7 @@ import {
   leaveFlowerMessage,
   loadFlowerSession,
   loadFlowerSource,
+  saveFlowerPosition,
   subscribeToFlowerUpdates,
   type FlowerSession,
 } from './flowerDetailApi';
@@ -48,6 +51,8 @@ interface PlantingContextValue {
   activeMode: PlantingMode;
   targetFlower: FlowerPlacementRecord | null;
   previewCoords: { worldX: number; worldY: number } | null;
+  /** Logical Land under the preview (sets the cluster size); the last Land while over paths or water. */
+  previewLandId: string | null;
   validationResult: ValidationResult | null;
   selectedFlower: FlowerPlacementRecord | null;
   isSaving: boolean;
@@ -118,6 +123,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const [activeMode, setActiveMode] = useState<PlantingMode>('normal');
   const [targetFlower, setTargetFlower] = useState<FlowerPlacementRecord | null>(null);
   const [previewCoords, setPreviewCoords] = useState<{ worldX: number; worldY: number } | null>(null);
+  const [previewLandId, setPreviewLandId] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [selectedFlower, setSelectedFlower] = useState<FlowerPlacementRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -261,8 +267,14 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         } catch (error) { setDetailError((error as Error).message); return; }
       }
       const journal = backendMode ? undefined : findJournalEntry(flower.flowerId, flower.journalEntryId);
-      // Pick initial preview at calibrated month centroid or fallback
-      const centroid = getApprovedMonthCentroid(flower.month);
+      // Start the preview at the calibrated month centroid, or the nearest spot where the whole cluster fits.
+      const monthCentroid = getApprovedMonthCentroid(flower.month);
+      // A flower already shown in the Garden (e.g. at a fallback spot) never collides with itself.
+      const ownId = flower.id || `flower-${flower.flowerId}`;
+      const nearest = nearestAcceptedPoint(monthCentroid, (worldX, worldY) => validateFlowerPlacement({ flowerId: flower.flowerId,
+        month: flower.month, worldX, worldY, existingPlacements: placements, ignorePlacementId: ownId,
+        flowerName: flower.flowerName, speciesCode: flower.speciesCode }).isValid);
+      const centroid = nearest ? { x: nearest.worldX, y: nearest.worldY } : monthCentroid;
       const fullRecord: FlowerPlacementRecord = {
         id: flower.id || `flower-${flower.flowerId}`,
         flowerId: flower.flowerId,
@@ -293,6 +305,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
 
       setTargetFlower(fullRecord);
       setPreviewCoords({ worldX: centroid.x, worldY: centroid.y });
+      setPreviewLandId(fullRecord.landId || null);
       setActiveMode('planting');
       setSelectedFlower(null);
       detailVersion.current++; detailWorking.current = false; setIsDetailWorking(false);
@@ -304,6 +317,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         worldX: centroid.x,
         worldY: centroid.y,
         existingPlacements: placements,
+        ignorePlacementId: fullRecord.id,
         flowerName: fullRecord.flowerName,
         speciesCode: fullRecord.speciesCode,
       });
@@ -320,6 +334,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       }
       setTargetFlower(flower);
       setPreviewCoords({ worldX: flower.worldX, worldY: flower.worldY });
+      setPreviewLandId(flower.landId || MONTH_REGION_METAS[flower.month]?.landId || null);
       setActiveMode('adjusting');
       setSelectedFlower(null);
       detailVersion.current++; detailWorking.current = false; setIsDetailWorking(false);
@@ -343,6 +358,9 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     (worldX: number, worldY: number) => {
       if (!targetFlower || activeMode === 'normal') return;
       setPreviewCoords({ worldX, worldY });
+      // The destination Land decides the preview cluster's size, even before it is valid there.
+      const region = getApprovedRegionAtWorld(worldX, worldY, targetFlower.month);
+      if (region) setPreviewLandId(MONTH_REGION_METAS[region].landId);
 
       const res = validateFlowerPlacement({
         flowerId: targetFlower.flowerId,
@@ -350,7 +368,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         worldX,
         worldY,
         existingPlacements: placements,
-        ignorePlacementId: activeMode === 'adjusting' ? targetFlower.id : undefined,
+        ignorePlacementId: targetFlower.id,
         flowerName: targetFlower.flowerName,
         speciesCode: targetFlower.speciesCode,
       });
@@ -370,9 +388,9 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     setIsSaving(true);
     try {
       // Revalidate before writing coordinates against the approved mask and
-      // current occupied footprints, ignoring self only during Adjust.
+      // current occupied footprints, ignoring only the flower being placed.
       const confirmed = validateAt(previewCoords.worldX, previewCoords.worldY, targetFlower.month,
-        targetFlower.flowerName, activeMode === 'adjusting' ? targetFlower.id : undefined, targetFlower.speciesCode);
+        targetFlower.flowerName, targetFlower.id, targetFlower.speciesCode);
       if (!confirmed.isValid) {
         setValidationResult(confirmed);
         return false;
@@ -386,9 +404,13 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         placementOrigin: 'LOCAL',
       };
 
-      if (backendMode && session) await loadFlowerSource(session.user.id, committed.flowerId);
+      // Signed-in Gardens persist the position on the owner's Flower (owner-only endpoint). The
+      // private device cache is erased on every sign-in, so it is only a same-session cache here.
+      if (backendMode && session) await saveFlowerPosition(session.user.id, committed);
       if (version !== gardenVersion.current) return false;
-      const updated = await addOrUpdateFlowerPlacement(committed, cacheSession);
+      const updated = backendMode
+        ? await addOrUpdateFlowerPlacement(committed, cacheSession).catch(() => [])
+        : await addOrUpdateFlowerPlacement(committed, cacheSession);
       if (version !== gardenVersion.current) return false;
       if (backendMode) setPlacements(current => current.some(p => p.flowerId === committed.flowerId)
         ? current.map(p => p.flowerId === committed.flowerId ? committed : p) : [...current, committed]);
@@ -396,7 +418,9 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       setActiveMode('normal');
       setTargetFlower(null);
       setPreviewCoords(null);
+      setPreviewLandId(null);
       setValidationResult(null);
+      if (activeMode === 'planting') dispatchOnboarding({ type: 'planted', flowerId: committed.flowerId });
       return true;
     } catch (err) {
       console.error('[PlantingContext] Unable to save placement.');
@@ -410,6 +434,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     setActiveMode('normal');
     setTargetFlower(null);
     setPreviewCoords(null);
+    setPreviewLandId(null);
     setValidationResult(null);
   }, []);
 
@@ -529,6 +554,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
         activeMode,
         targetFlower,
         previewCoords,
+        previewLandId,
         validationResult,
         selectedFlower,
         isSaving,

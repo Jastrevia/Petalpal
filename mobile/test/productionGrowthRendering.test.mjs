@@ -8,7 +8,7 @@ const effects=[];
 const react={memo:fn=>fn,useMemo:fn=>fn(),useCallback:fn=>fn,useEffect:()=>{},
   useState:()=>[new Proxy({}, {get:()=> 'decoded-image'}),()=>{}]};
 const load=loadPlantingModules(undefined,react,undefined,true,{
-  'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',ImageShader:'ImageShader',Rect:'Rect',Shader:'Shader',Circle:'Circle',
+  'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',Oval:'Oval',ImageShader:'ImageShader',Rect:'Rect',Shader:'Shader',Circle:'Circle',
     ColorType:{RGBA_8888:4},AlphaType:{Unpremul:3},
     Skia:{RuntimeEffect:{Make:source=>{const effect={source};effects.push(effect);return effect;}}},
     useImage:source=>{imageSources.push(source);return source?'decoded-image':null;}},
@@ -70,25 +70,39 @@ function images(node){if(Array.isArray(node))return node.flatMap(images);if(!nod
   if(node.type===botanicalImage)return [node];
   if(typeof node.type==='function')return images(node.type(node.props));
   return images(node.props?.children);}
+// One planted record = one complete approved cluster; the procedural bed is no longer drawn.
+const {ClusterFlower}=load('ClusterFlowerArt'),clusterApi=load('approvedFlowerClusters');
+const drawnClusters=tree=>nodes(tree).filter(n=>n.type===ClusterFlower);
 for(const pass of ['all','behind-tea-set','foreground']){
-  const tree=render({depthPass:pass}),scenes=nodes(tree).filter(n=>n.type===layer);
-  assert.deepEqual(scenes.map(n=>n.props.growth.records[0].id),pass==='all'?['real-6','real-10']:pass==='behind-tea-set'?['real-6']:['real-10']);
-  assert.deepEqual(scenes.map(n=>n.props.month),pass==='all'?[6,10]:pass==='behind-tea-set'?[6]:[10],
-    'The production route supplies each region to the live composition pass');
-  assert.ok(images(tree).length,'Neutral rendering works with __DEV__ false');
-  assert.ok(nodes(tree).every(n=>!n.props?.clip),'Botanical pixels are not clipped to planting mask');
+  const tree=render({depthPass:pass}),drawn=drawnClusters(tree);
+  assert.deepEqual(drawn.map(n=>n.props.anchor.id),pass==='all'?['real-6','real-10']:pass==='behind-tea-set'?['real-6']:['real-10'],
+    'Each depth pass draws its own months, one cluster per record');
+  assert.deepEqual(drawn.map(n=>n.props.geometry.size),pass==='all'?['SMALL','LARGE']:pass==='behind-tea-set'?['SMALL']:['LARGE'],
+    'Land06 grows Small clusters and Land10 Large ones');
+  assert.ok(drawn.every(n=>n.props.image==='decoded-image'),'Neutral rendering works with __DEV__ false');
+  assert.equal(nodes(tree).filter(n=>n.type===layer).length,0,'No scattered bed is drawn around a planted flower');
+  assert.ok(nodes(tree).every(n=>!n.props?.clip),'Cluster pixels are not clipped to planting mask');
 }
 const before=JSON.stringify(records);
 state.activeMode='adjusting';state.targetFlower=records[0];state.previewCoords={worldX:records[0].worldX+10,worldY:records[0].worldY+5};
-const tree=render({depthPass:'behind-tea-set'}),growths=nodes(tree).filter(n=>n.type===layer);
-assert.equal(growths.length,1,'Adjust replaces original visual field instead of drawing twice');
-assert.equal(growths[0].props.growth.records[0].worldX,records[0].worldX,'MAIN keeps its committed field during adjustment');
+const adjusting=drawnClusters(render({depthPass:'behind-tea-set'}));
+assert.equal(adjusting.length,1,'Adjust draws the moving flower once, at its preview pose');
+assert.deepEqual([adjusting[0].props.anchor.worldX,adjusting[0].props.anchor.worldY],[records[0].worldX+10,records[0].worldY+5]);
 assert.equal(JSON.stringify(records),before);
 state.activeMode='planting';state.targetFlower={...records[0],id:'pending',flowerId:'pending'};
-const pending=nodes(render({depthPass:'behind-tea-set'})).filter(n=>n.type===layer);
-assert.equal(pending.length,2);assert.notEqual(pending[1].props.cacheStatic,true);assert.equal(pending[1].props.growth.companions.length,0);
-assert.ok(pending[1].props.growth.pieces.every(p=>p.kind==='primary'));
-assert.equal(nodes(render({depthPass:'foreground'})).filter(n=>n.type===layer).length,1);
+const pending=drawnClusters(render({depthPass:'behind-tea-set'}));
+assert.equal(pending.length,2,'Planting adds exactly one preview cluster');
+assert.deepEqual(plain(pending[1].props.geometry),plain(clusterApi.clusterGeometry({...state.targetFlower,...state.previewCoords})),
+  'The preview is exactly the cluster that Plant Here will commit');
+assert.ok(pending[1].props.opacity<1);
+// Planting a flower that is already shown (e.g. an unplaced historical flower at its fallback spot)
+// draws it once, at the preview, never twice.
+state.targetFlower=records[0];
+const historical=drawnClusters(render({depthPass:'behind-tea-set'}));
+assert.equal(historical.length,1,'A flower entering planting is not drawn twice');
+assert.deepEqual([historical[0].props.anchor.worldX,historical[0].props.anchor.worldY],[state.previewCoords.worldX,state.previewCoords.worldY]);
+state.targetFlower={...records[0],id:'pending',flowerId:'pending'};
+assert.equal(drawnClusters(render({depthPass:'foreground'})).length,1);
 const single=api.productionGrowth([records[0]])[0].growth,painted=images(layer({growth:single}));
 assert.equal(painted.length,single.pieces.length);
 const composed=load('productionBedComposition').composeProductionBed(single,6);

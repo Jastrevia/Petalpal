@@ -13,6 +13,11 @@ import AppTabs from '@/components/app-tabs';
 import { FeedbackDraftProvider, GlobalHelpFeedback } from '../components/feedback';
 import { WorldTimeProvider } from '@/components/garden/world-time';
 
+// Onboarding preview shell (/onboarding-preview): DEV-only, a synthetic signed-in owner and an
+// in-memory API instead of Firebase and Render. Production never loads it.
+const onboardingPreview: typeof import('../components/onboarding/preview/OnboardingPreviewShell') | null = __DEV__
+  ? require('../components/onboarding/preview/OnboardingPreviewShell') : null;
+
 // Partner login/entrance preview host: DEV-only, so production keeps its plain Stack.
 const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> = __DEV__
   ? require('../components/auth/LoginEntranceTransitionHost').LoginEntranceTransitionHost
@@ -21,9 +26,14 @@ const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> =
 SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
+  const pathname = usePathname();
   if (__DEV__ && nativeSecurityEnabled) {
     const HarnessScreen = require('../components/NativeSecurityHarnessScreen').default;
     return <AuthProvider><HarnessScreen /></AuthProvider>;
+  }
+  if (onboardingPreview?.usesOnboardingPreviewShell(pathname)) {
+    const { OnboardingPreviewShell } = onboardingPreview;
+    return <OnboardingPreviewShell><AuthGate><RoutedContent /></AuthGate></OnboardingPreviewShell>;
   }
   return <AuthProvider><AuthGate><RoutedContent /></AuthGate></AuthProvider>;
 }
@@ -63,6 +73,7 @@ function TabLayout() {
           {__DEV__ && <Stack.Screen name="water-test" options={{ title: 'Water preview' }} />}
           {__DEV__ && <Stack.Screen name="player-preview" options={{ headerShown: false, animation: 'none' }} />}
           {__DEV__ && <Stack.Screen name="login-preview" options={{ headerShown: false, animation: 'none' }} />}
+          {__DEV__ && <Stack.Screen name="onboarding-preview" options={{ headerShown: false, animation: 'none' }} />}
           {__DEV__ && <Stack.Screen name="fairy-loading-test" options={{ headerShown: false }} />}
         </Stack>
         </DevLoginEntranceHost>

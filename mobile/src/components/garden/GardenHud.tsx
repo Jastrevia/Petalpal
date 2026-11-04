@@ -15,6 +15,8 @@ import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
 import { momentLocale } from '../moments/momentFormat';
+import { OwnerEncouragementChip } from '../encouragement/OwnerEncouragementChip';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 
 // One navigation model; only its sizing changes with the viewport.
 export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) {
@@ -58,7 +60,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   if (activeMode !== 'normal' || selectedFlower) return null;
   const navigationItem = (feature: typeof GARDEN_FEATURES[number]) => {
     const selected = openFeature === feature.id || (feature.id === 'profile' && openFeature === 'settings') || (feature.id === 'garden' && !openFeature);
-    return <Pressable key={feature.id} accessibilityRole="button"
+    return <Pressable key={feature.id} {...onboardingTarget(`nav.${feature.id}`)} accessibilityRole="button"
       accessibilityLabel={`${feature.label}, ${feature.status}${feature.id === 'fairy' && fairyDot ? ', something new' : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
       onFocus={() => setHighlightedFeature(feature.id)} onBlur={() => setHighlightedFeature(undefined)}
@@ -99,6 +101,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       <Pressable accessibilityRole="button" onPress={() => router.push('/garden-history' as Href)}>
         <Text style={styles.label}>Garden history</Text>
       </Pressable>
+      <OwnerEncouragementChip />
     </View>
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}
       momentsOn={moments.enabled} momentsUnread={moments.unread} onClose={() => setEntryOpen(false)}

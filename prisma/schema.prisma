@@ -63,6 +63,8 @@ model User {
   yearlyReports           YearlyReport[]
   aiJobs                  AiJob[]
   aiEvidence              AiEvidence[]
+  encouragementsSent      GardenEncouragement[]    @relation("EncouragementSender")
+  encouragementsReceived  GardenEncouragement[]    @relation("EncouragementOwner")
 }
 
 model Garden {
@@ -154,6 +156,27 @@ model VisitRecord {
   @@unique([visitorId, flowerId, localDate])
 }
 
+// Daily Garden encouragement (lib/garden-encouragement.js). kind is SUPPORT or MESSAGE;
+// text is set only for MESSAGE. localDate is the sender's account-timezone day, and the
+// unique index is the authoritative once-per-day limit for each kind.
+model GardenEncouragement {
+  id        String    @id @default(cuid())
+  senderId  String
+  ownerId   String
+  kind      String    @db.VarChar(16)
+  text      String?   @db.VarChar(200)
+  localDate String    @db.VarChar(10)
+  timezone  String    @db.VarChar(64)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  sender User @relation("EncouragementSender", fields: [senderId], references: [id], onDelete: Cascade)
+  owner  User @relation("EncouragementOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, ownerId, kind, localDate])
+  @@index([ownerId, kind, createdAt])
+}
+
 model Friendship {
   id        String   @id @default(cuid())
   userId    String
@@ -239,6 +262,15 @@ model FairyState {
   userId              String    @unique
   onboardingStep      String    @default("EMPTY_GARDEN") @db.VarChar(64)
   onboardingCompleted Boolean   @default(false)
+  /// First-time guided tour (lib/onboarding-tutorial.js): furthest step reached, never rewound.
+  tutorialStep            String?   @db.VarChar(64)
+  tutorialCompletedAt     DateTime?
+  /// When the owner named the starter Fairy (her name lives on UserFairy.name).
+  fairyNamedAt            DateTime?
+  /// The owner's first Event and its Flower made during the tour (plain ids; owner-checked on write).
+  tutorialFirstEventId    String?   @db.VarChar(128)
+  tutorialFirstFlowerId   String?   @db.VarChar(128)
+  tutorialFlowerPlantedAt DateTime?
   lastEvent           String?   @db.VarChar(64)
   unlockedFeatures    Json      @default("[]")
   /// Deprecated runtime columns retained temporarily for a safe production migration.

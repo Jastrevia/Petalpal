@@ -3,27 +3,39 @@ import {loadPlantingModules} from './loadPlantingModules.mjs';
 const jsx=(type,props)=>({type,props});let cursor=0,calls=0;const slots=[];
 const react={memo:f=>f,useState:init=>[init,()=>{}],useCallback:f=>f,useEffect:()=>{},useMemo(fn,deps){const i=cursor++;const old=slots[i];if(old&&deps.every((d,j)=>d===old.deps[j]))return old.value;return(slots[i]={deps,value:fn()}).value;}};
 const state={placements:[],activeMode:'normal',targetFlower:null,previewCoords:null,validationResult:{isValid:true}};
-const dependencies={'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',Skia:{RuntimeEffect:{Make:()=>null}},Circle:'Circle',useImage:()=>null},'./PlantingContext':{usePlanting:()=>state},'../flower-mood-effects/GardenMoodEffects':{GardenMoodEffectsLayer:'MoodEffects'}};
+const dependencies={'react/jsx-runtime':{jsx,jsxs:jsx},'@shopify/react-native-skia':{Group:'Group',Image:'Image',Skia:{RuntimeEffect:{Make:()=>null}},Circle:'Circle',Oval:'Oval',Rect:'Rect',useImage:()=>null},'./PlantingContext':{usePlanting:()=>state},'../flower-mood-effects/GardenMoodEffects':{GardenMoodEffectsLayer:'MoodEffects'}};
 const load=loadPlantingModules(new Proxy({}, {get(){throw Error('No placement writes in preview test');}}),react,undefined,true,dependencies);
-const api=load('productionGrowth'),parents=load('productionGrowthQAData').productionQARecords(30);
-dependencies['./productionGrowth']={productionGrowth:p=>{calls++;return api.productionGrowth(p);}};
-const {ProductionPlantedFlowers}=load('ProductionPlantedFlowers'),{ProductionGrowthLayer}=load('ProductionGrowthLayer');
+const parents=load('productionGrowthQAData').productionQARecords(30);
+const {ProductionPlantedFlowers}=load('ProductionPlantedFlowers'),{ClusterFlower}=load('ClusterFlowerArt');
+dependencies['./productionGrowth']={gardenSpecies:()=>null,productionGrowth:()=>{calls++;throw Error('The procedural bed is not built');}};
 function nodes(n){return Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];}
 function render(){cursor=0;return nodes(ProductionPlantedFlowers({depthPass:'behind-tea-set'}));}
-state.placements=parents;const saved=JSON.stringify(parents),first=render().find(n=>n.type===ProductionGrowthLayer).props.growth;
-assert.equal(first.pieces.length,591);assert.equal(calls,1);
-state.activeMode='adjusting';state.targetFlower=parents[0];
+const clustersOf=tree=>tree.filter(n=>n.type===ClusterFlower);
+state.placements=parents;const saved=JSON.stringify(parents),first=clustersOf(render());
+assert.ok(first.length>0);assert.equal(calls,0);
+const committedGeometry=new Map(first.map(n=>[n.props.anchor.id,n.props.geometry]));
+state.activeMode='adjusting';state.targetFlower=first[0].props.anchor;
+let adjustFrame=null;
 for(let i=1;i<=60;i++){
- state.previewCoords={worldX:parents[0].worldX+i/20,worldY:parents[0].worldY+i/20};
- const tree=render();assert.equal(tree.find(n=>n.type===ProductionGrowthLayer).props.growth,first);
- assert.ok(tree.some(n=>n.type==='Circle'&&n.props.cx===state.previewCoords.worldX&&n.props.cy===state.previewCoords.worldY));
+ state.previewCoords={worldX:state.targetFlower.worldX+i/20,worldY:state.targetFlower.worldY+i/20};
+ const tree=render(),drawn=clustersOf(tree);
+ assert.equal(drawn.length,first.length,'The moving flower is drawn once, never twice');
+ adjustFrame??=new Map(drawn.map(n=>[n.props.anchor.id,n.props.geometry]));
+ for(const n of drawn)if(n.props.anchor.id!==state.targetFlower.id){
+  assert.deepEqual(n.props.geometry,committedGeometry.get(n.props.anchor.id),'Other clusters are unchanged');
+  assert.equal(n.props.geometry,adjustFrame.get(n.props.anchor.id),'Pointer moves reuse the other clusters without recomputing them');
+ }
+ const moving=drawn.find(n=>n.props.anchor.id===state.targetFlower.id);
+ assert.deepEqual([moving.props.anchor.worldX,moving.props.anchor.worldY],[state.previewCoords.worldX,state.previewCoords.worldY]);
+ assert.ok(tree.some(n=>n.type==='Oval'),'The footprint ring follows the preview');
 }
-assert.equal(calls,1,'60 pointer updates never invoke productionGrowth again');
-state.activeMode='normal';state.previewCoords=null;assert.equal(render().find(n=>n.type===ProductionGrowthLayer).props.growth,first);assert.equal(calls,1);
+assert.equal(calls,0,'60 pointer updates never build a procedural bed');
+state.activeMode='normal';state.previewCoords=null;state.targetFlower=null;
+const cancelled=clustersOf(render());
+assert.deepEqual(cancelled.map(n=>n.props.geometry),first.map(n=>committedGeometry.get(n.props.anchor.id)),'Cancel reuses the committed clusters');
 assert.equal(JSON.stringify(parents),saved,'Cancel leaves real parent data untouched');
-state.placements=parents.map((p,i)=>i===0?{...p,worldX:p.worldX+2,worldY:p.worldY+1}:p);
-const confirmed=render().find(n=>n.type===ProductionGrowthLayer).props.growth;
-assert.equal(calls,2,'Confirmed placements invalidate once');assert.notEqual(confirmed,first);
-assert.equal(JSON.stringify(confirmed),JSON.stringify(api.productionGrowth(state.placements)[0].growth),'Confirm produces the original deterministic engine output exactly');
-assert.equal(JSON.stringify(parents),saved);
-console.log('Adjust: 60 validated ring previews cause zero growth rebuilds, Cancel reuses the same 591-piece field, Confirm rebuilds once with exact engine output, no stored data changes.');
+state.placements=parents.map((p,i)=>p.id===first[0].props.anchor.id?{...p,worldX:p.worldX+2,worldY:p.worldY+1}:p);
+const confirmed=clustersOf(render()),moved=confirmed.find(n=>n.props.anchor.id===first[0].props.anchor.id);
+assert.equal(moved.props.anchor.worldX,first[0].props.anchor.worldX+2,'Confirm draws the cluster at its new position');
+assert.equal(confirmed.length,first.length);assert.equal(JSON.stringify(parents),saved);
+console.log('Adjust: 60 preview updates move one cluster, reuse every other cluster, build no procedural bed, Cancel and Confirm change no stored data.');

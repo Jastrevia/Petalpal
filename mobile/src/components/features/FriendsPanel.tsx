@@ -10,6 +10,7 @@ import { loadFriends, loadFriendRequests, searchFriends, sendFriendRequest, resp
   removeFriend, type FriendUser, type FriendRequest, type FriendRequests } from '../../services/friends';
 import { FEATURE_COLORS as colors, FeatureActionButton, ui } from './FeatureUI';
 import { UserAvatar } from '../avatars/UserAvatar';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 
 export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onCloseAddFriend = () => {}, onClose = () => {} }: {
   addingFriend?: boolean; onAddFriend?: () => void; onCloseAddFriend?: () => void; onClose?: () => void;
@@ -127,7 +128,7 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
           <Text style={styles.subtitle}>GOOD FRIENDS{ '\n' }BRIGHTER GARDENS</Text></View>
       </View>
       <View style={styles.topActions}>
-        <View style={styles.topAction}>
+        <View {...onboardingTarget('friends.add')} style={styles.topAction}>
           <Pressable accessibilityRole="button" accessibilityLabel="Add Friends" disabled={!!busy}
             onPress={onAddFriend} style={({ pressed }) => [styles.circle, !!busy && ui.disabled, pressed && ui.pressed]}>
             <SymbolView name={{ ios: 'person.badge.plus', android: 'person_add', web: 'person_add' }} size={26} tintColor="#235650" />
@@ -182,6 +183,7 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
       </View>
     </View>)}
     {!busy && !requests.incoming.length ? <Text style={styles.caption}>No pending requests.</Text> : null}
+    <View {...onboardingTarget('friends.list')} style={styles.body}>
     <Text style={styles.sectionTitle}>My Friends  ·  {friends.length}</Text>
       {!busy && !friends.length ? <Text style={styles.caption}>You have not added any friends yet.</Text> : null}
       {friends.filter(friend => `${friend.displayName || ''} ${friend.name} ${friend.accountId || ''} ${friend.id}`.toLowerCase().includes(filter.trim().toLowerCase())).map(friend => {
@@ -201,6 +203,7 @@ export function FriendsPanel({ addingFriend = false, onAddFriend = () => {}, onC
           </Pressable>
         </View>;
       })}
+    </View>
       {removing ? <View style={ui.notice}>
         <Text style={styles.caption}>Remove {removing.name} from your friends list?</Text>
         <FeatureActionButton secondary title="Cancel removal" disabled={!!busy} onPress={() => setRemoving(null)} />
