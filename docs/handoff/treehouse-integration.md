@@ -55,5 +55,17 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
   invisible on parchment, in English too) and now uses the page's ink. NOT checked: voice input
   (its strings are in the table), Flower History (no entry button). The Petal Ring card prompt that
   appears over the Treehouse is another feature and is still English.
+- Writing on a phone's browser (owner's report 2026-11-04, iPhone Safari, live: the words were very large and jumped
+  while typing): react-native-web reports the part of the page above the on-screen keyboard as the window, so the
+  open journal page was laid out again to that half-height as the keyboard opened (shrunk to about half its width, so
+  the words looked huge on it) and again each time the suggestion / Chinese candidate bar came and went. The Treehouse
+  now lays out to the app's own height (`book3d/layoutWindow.ts` `useLayoutWindow`: #root, 100dvh), and the writing
+  page ends its writing area above the keyboard from the visible part of the page (`useWebVisibleBottom`). On the
+  web the writing box takes its height from the same words set invisibly in the same type (a text area's scroll
+  height never shrank back, so the box stayed tall and scrolled to empty space). Checked in the local preview at
+  402×760 by giving the page iOS's keyboard viewport (visible height 424, then 380 for a candidate bar): the page
+  stays 386×574 with 18.5 px words, the words do not move as the keyboard opens, the newest line and Save stay above
+  the keyboard; at 1280×800 the desk still follows the window. NOT checked on a real iPhone (the simulator's typing
+  was unreliable).
 - Flower History has no entry button in the new Treehouse (the sheet is still in bookhouse.tsx).
 - Not checked on a device or in the native app; nothing pushed or deployed.

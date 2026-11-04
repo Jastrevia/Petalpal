@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EmotionalSafetyNote } from '../../features/EmotionalSafetyNote';
 import { useSafetyWatch } from '../../features/SafetySupport';
 import { useEventVoiceInput } from '../../../hooks/useEventVoiceInput';
@@ -7,6 +7,7 @@ import { formatLocalDate, journalLocked, savePrivateJournal, updatePrivateJourna
 import { JournalCover } from '../JournalCover';
 import { Icon, LOCK_ICON } from '../TreehouseArt';
 import { treehouseZh, tt } from '../../../services/treehouseCopy';
+import { useLayoutWindow, useWebVisibleBottom } from './layoutWindow';
 import { rightPageOf } from './usePageFaces';
 import { joinJournal, splitJournal, type Draft, type ReadingMetrics } from './readingLayout';
 export type { Draft } from './readingLayout';
@@ -81,14 +82,17 @@ export const WritingPage = forwardRef<WritingPageHandle, {
   };
 
   // The keyboard covers the lower part of the screen: the page's writing area ends above it (the paper stays put).
-  const { height: screenH } = useWindowDimensions();
+  // In the apps the Keyboard events give its height; in a phone's browser the visible part of the page does.
+  const { height: screenH } = useLayoutWindow();
   const [keyboard, setKeyboard] = useState(0);
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', e => setKeyboard(e.endCoordinates.height));
     const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboard(0));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  const covered = Math.max(0, rect.y + rect.height - (screenH - keyboard) + 6);
+  const webVisibleBottom = useWebVisibleBottom();
+  const visibleBottom = Platform.OS === 'web' ? webVisibleBottom ?? screenH : screenH - keyboard;
+  const covered = Math.max(0, rect.y + rect.height - visibleBottom + 6);
   const bottomPad = Math.max(m.padBottom, covered);
 
   const scroll = useRef<ScrollView>(null);
@@ -104,6 +108,8 @@ export const WritingPage = forwardRef<WritingPageHandle, {
     scroll.current?.scrollTo({ y: Math.max(0, bottom - viewport + 24), animated: false });
   }, [bodyHeight, viewport, caretAtEnd]);
 
+  const bodyText = { fontSize: m.body.size, lineHeight: m.body.line, color: '#43361F' };
+  const minBody = Math.max(m.body.line * 4, viewport - noteHeight - 28);
   const regular = { fontFamily: fontRegular }, italic = { fontFamily: fontItalic, fontStyle: fontItalic ? undefined : 'italic' as const };
   const status = tt(state === 'saving' ? 'Saving…' : state === 'failed' ? 'Save failed' : state === 'unsaved' ? 'Unsaved changes'
     : state === 'saved' ? 'Saved' : '');
@@ -153,15 +159,24 @@ export const WritingPage = forwardRef<WritingPageHandle, {
         <ScrollView ref={scroll} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator
           onLayout={e => setViewport(e.nativeEvent.layout.height)} contentContainerStyle={{ paddingBottom: 12 }}>
           <View onLayout={e => { bodyTop.current = e.nativeEvent.layout.y; }}>
-            {editable ? <TextInput testID="journal-body" accessibilityLabel={tt('Private journal')} accessibilityHint={tt('Only for you. Not sent to AI or saved as an Event memory.')}
-              placeholder={tt('Write your thoughts here…')} placeholderTextColor="#A8916C" value={text.body} multiline scrollEnabled={false} maxLength={MAX - text.title.length}
-              editable={!busy && !voice.active} textAlignVertical="top" autoFocus={active && which.kind === 'new' && !text.body}
-              onChangeText={body => setText({ ...text, body })}
-              onSelectionChange={e => setCaretAtEnd(e.nativeEvent.selection.end >= text.body.length - 1)}
-              onContentSizeChange={e => setBodyHeight(e.nativeEvent.contentSize.height)}
-              style={[regular, styles.input, { fontSize: m.body.size, lineHeight: m.body.line, color: '#43361F', minHeight: Math.max(m.body.line * 4, viewport - noteHeight - 28),
-                height: Platform.OS === 'web' ? Math.max(m.body.line * 4, viewport - noteHeight - 28, bodyHeight) : undefined }]} />
-              : <Text selectable style={[regular, { fontSize: m.body.size, lineHeight: m.body.line, color: '#43361F' }]}>{text.body}</Text>}
+            {editable ? (() => {
+              const input = <TextInput testID="journal-body" accessibilityLabel={tt('Private journal')} accessibilityHint={tt('Only for you. Not sent to AI or saved as an Event memory.')}
+                placeholder={tt('Write your thoughts here…')} placeholderTextColor="#A8916C" value={text.body} multiline scrollEnabled={false} maxLength={MAX - text.title.length}
+                editable={!busy && !voice.active} textAlignVertical="top" autoFocus={active && which.kind === 'new' && !text.body}
+                onChangeText={body => setText({ ...text, body })}
+                onSelectionChange={e => setCaretAtEnd(e.nativeEvent.selection.end >= text.body.length - 1)}
+                onContentSizeChange={Platform.OS === 'web' ? undefined : e => setBodyHeight(e.nativeEvent.contentSize.height)}
+                style={[regular, styles.input, bodyText, Platform.OS === 'web' ? StyleSheet.absoluteFill : { minHeight: minBody }]} />;
+              if (Platform.OS !== 'web') return input;
+              // Web: a text area does not grow with its words (and its scroll height never shrinks back), so the same
+              // words, set invisibly in the same type and width, give it its height; it fills that. Their height is
+              // where the newest line ends (kept in view while typing at the end).
+              return <View style={{ minHeight: minBody }}>
+                <Text aria-hidden onLayout={e => setBodyHeight(e.nativeEvent.layout.height)} style={[regular, bodyText, { color: 'transparent' }]}>{text.body}{'\u200b'}</Text>
+                {input}
+              </View>;
+            })()
+              : <Text selectable style={[regular, bodyText]}>{text.body}</Text>}
           </View>
           {editable && <View style={{ marginTop: 10 }} onLayout={e => setNoteHeight(e.nativeEvent.layout.height)}><EmotionalSafetyNote text={`${text.title}\n${text.body}`}
             style={{ fontFamily: fontRegular, fontSize: 12, lineHeight: 17, color: SOFT }} /></View>}

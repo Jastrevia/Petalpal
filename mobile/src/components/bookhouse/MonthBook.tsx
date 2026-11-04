@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, runOnJS, useAnimatedReaction, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Canvas, Picture, createPicture, type SkImage } from '@shopify/react-native-skia';
@@ -11,6 +11,7 @@ import { pullAt, pullOrigin, ROOM_ARTWORK, type PullGeometry } from './book3d/sc
 import { drawBook, drawFloatShadow, pageShade } from './book3d/engine';
 import { SPEC } from './book3d/math';
 import { bookLayout, deskBookLayout, closeTiming, CLOSE_MS, CLOSE_STAGES, DESK_CLOSE_MS, DESK_CLOSE_STAGES, DESK_HANDOFF_T, DESK_OPEN_MS, DESK_OPEN_STAGES, focusOffsets, LEAN_MS, OPEN_MS, OPEN_STAGES, openTiming, openingFrame, pageCentres, projectPoint, pullOf, readingFrame, RIFFLE_STAGGER, TURN_MS, turnPages, type ShelfOrigin } from './book3d/motion';
+import { useLayoutWindow } from './book3d/layoutWindow';
 import { RecordsPage } from './book3d/RecordsPage';
 import { SaveCeremony } from './book3d/SaveCeremony';
 import { defaultSlot, rightPageOf, usePageFaces } from './book3d/usePageFaces';
@@ -90,7 +91,7 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
   /** Reloads the shelf after a confirmed save; resolves once the new journals are in `days`. */
   onSaved: (journalId: string) => Promise<void>; onActions: (entry: JournalCheckIn) => void;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useLayoutWindow();
   const insets = useSafeAreaInsets();
   const deskColumn = scene.column;
   const footerRoom = scene.footer ?? 0;

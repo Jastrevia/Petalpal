@@ -1,7 +1,7 @@
 import { useWorldTime } from '../components/garden/world-time';
 import type { PanelTheme } from '../components/features/PanelTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { useAnimatedStyle, useReducedMotion, useSharedValue } from 'react-native-reanimated';
@@ -21,6 +21,7 @@ import { ICONS, ParchmentButton, RoundButton, TitlePlaque, TreehouseBackdrop } f
 import { measureBook, shelfLayout, TreehouseShelf, type ShelfRect, type ShelfSlot } from '../components/bookhouse/TreehouseShelf';
 import { MonthBook, type BookMode, type ClosedTo } from '../components/bookhouse/MonthBook';
 import { pullTarget } from '../components/bookhouse/book3d/desk';
+import { useLayoutWindow } from '../components/bookhouse/book3d/layoutWindow';
 import { DeskLayer } from '../components/bookhouse/book3d/DeskLayer';
 import { pullTarget as roomPullTarget } from '../components/bookhouse/book3d/roomDesk';
 import { RoomBack, RoomFront } from '../components/bookhouse/book3d/RoomLayers';
@@ -59,7 +60,7 @@ export default function Bookhouse() {
   setTreehouseLocale(useAppLocale());
   // Guest mode (services/guest.tsx): the Treehouse is to look at; opening a month's book asks for an account.
   const guest = useGuest();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useLayoutWindow();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
