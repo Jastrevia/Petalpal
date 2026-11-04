@@ -6,6 +6,7 @@ import {
   BlendMode, FontSlant, FontWeight, Skia, TextAlign, TileMode, type SkCanvas, type SkImage, type SkTypefaceFontProvider,
 } from '@shopify/react-native-skia';
 import { SPEC } from './math';
+import { journalCount, treehouseZh, tt } from '../../../services/treehouseCopy';
 
 /** Page faces in book units (the top page between the squares and the gutter), painted at 1.25 px per unit. */
 export const PAGE = { width: SPEC.W - SPEC.over - SPEC.gap, height: SPEC.H - 2 * SPEC.over, density: 1 };
@@ -175,7 +176,7 @@ export function frontispiece(o: { parchment: SkImage; spine: SkImage; fonts: SkT
     vine(canvas, w / 2 + plateW / 2 + 52, plateTop + 50, plateTop + plateH - 30, -1);
     text(canvas, o.fonts, o.flower, 0, plateTop + plateH + 26, w, { size: 40, italic: true, align: TextAlign.Center, color: INK });
     text(canvas, o.fonts, o.latin, 0, plateTop + plateH + 76, w, { size: 28, italic: true, align: TextAlign.Center, color: SOFT });
-    text(canvas, o.fonts, o.count ? `${o.count} ${o.count === 1 ? 'journal' : 'journals'}` : 'No journals yet', 0, h - 112, w,
+    text(canvas, o.fonts, o.count ? journalCount(o.count) : tt('No journals yet'), 0, h - 112, w,
       { size: 27, align: TextAlign.Center, spacing: 3, color: SOFT });
   });
 }
@@ -189,7 +190,9 @@ export type RecordsFace = {
   moods: { title: string; secondary: string[]; source: string }[];
 };
 function sectionLabel(canvas: SkCanvas, fonts: SkTypefaceFontProvider, label: string, x: number, y: number, inner: number) {
-  const h = text(canvas, fonts, label.toUpperCase(), x, y, inner, { size: 23, spacing: 5, color: '#8C7148' });
+  // The leading spaces leave room for the sprig; the words after them are looked up in the owner's language.
+  const pad = label.slice(0, label.length - label.trimStart().length), words = label.trim();
+  const h = text(canvas, fonts, (pad + tt(words)).toUpperCase(), x, y, inner, { size: 23, spacing: treehouseZh() ? 2 : 5, color: '#8C7148' });
   canvas.drawLine(x, y + h + 4, x + inner, y + h + 4, stroke('#C2A06B88', 1.2));
   return h + 14;
 }
@@ -245,22 +248,22 @@ export function recordsPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvid
       y += art + 6;
       y += text(canvas, o.fonts, flower.name, 0, y, w, { size: 42, italic: true, color: INK, align: TextAlign.Center, maxLines: 1 });
       if (flower.meaning) y += text(canvas, o.fonts, flower.meaning, x, y, inner, { size: 27, color: SOFT, align: TextAlign.Center, maxLines: 1 });
-      y += text(canvas, o.fonts, (flower.source === 'Event' ? 'Grew from an Event' : 'Grew from Daily Grow').toUpperCase(), 0, y + 2, w, { size: 18, spacing: 4, color: '#9A8463', align: TextAlign.Center }) + 4;
-      if (d.flowers.length > 1) y += text(canvas, o.fonts, `Also grew: ${d.flowers.slice(1).map(f => f.name).join(', ')}`, x, y, inner, { size: 24, italic: true, color: SOFT, align: TextAlign.Center, maxLines: 1 });
+      y += text(canvas, o.fonts, tt(flower.source === 'Event' ? 'Grew from an Event' : 'Grew from Daily Grow').toUpperCase(), 0, y + 2, w, { size: 18, spacing: 4, color: '#9A8463', align: TextAlign.Center }) + 4;
+      if (d.flowers.length > 1) y += text(canvas, o.fonts, `${tt('Also grew')}${treehouseZh() ? '：' : ': '}${d.flowers.slice(1).map(f => f.name).join(treehouseZh() ? '、' : ', ')}`, x, y, inner, { size: 24, italic: true, color: SOFT, align: TextAlign.Center, maxLines: 1 });
       y += 12;
     } else {
       sprig(canvas, x - 2, y + 2, '#B48D4C');
       y += sectionLabel(canvas, o.fonts, "    The day's flower", x, y, inner);
-      y += text(canvas, o.fonts, 'No flower grew on this day.', x, y + 2, inner, { size: 30, italic: true, color: EMPTY }) + 16;
+      y += text(canvas, o.fonts, tt('No flower grew on this day.'), x, y + 2, inner, { size: 30, italic: true, color: EMPTY }) + 16;
     }
     // Event
     sprig(canvas, x - 2, y + 2, '#B48D4C');
-    y += sectionLabel(canvas, o.fonts, d.events.length > 1 ? `    Events · ${d.events.length}` : '    Event', x, y, inner);
+    y += sectionLabel(canvas, o.fonts, d.events.length > 1 ? `    ${tt('Events')} · ${d.events.length}` : '    Event', x, y, inner);
     if (eventText) {
       y += text(canvas, o.fonts, eventText, x, y, inner, { size: 29, color: INK, line: 1.25, maxLines: eventLines }) + 4;
-      if (d.events.length > 1) y += text(canvas, o.fonts, `and ${d.events.length - 1} more — tap to read`, x, y, inner, { size: 23, italic: true, color: SOFT }) + 4;
+      if (d.events.length > 1) y += text(canvas, o.fonts, treehouseZh() ? `还有 ${d.events.length - 1} 条 · 点书页阅读` : `and ${d.events.length - 1} more — tap to read`, x, y, inner, { size: 23, italic: true, color: SOFT }) + 4;
     } else {
-      y += text(canvas, o.fonts, 'No Event recorded.', x, y + 2, inner, { size: 30, italic: true, color: EMPTY }) + 6;
+      y += text(canvas, o.fonts, tt('No Event recorded.'), x, y + 2, inner, { size: 30, italic: true, color: EMPTY }) + 6;
     }
     y += 12;
     // Mood analysis
@@ -270,7 +273,7 @@ export function recordsPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvid
       y += text(canvas, o.fonts, d.moods.length > 1 ? `${mood.title} · ${d.moods.slice(1).map(m => m.title).join(' · ')}` : mood.title, x, y, inner, { size: 34, italic: true, color: INK, maxLines: 1 }) + 2;
       if (mood.secondary.length) text(canvas, o.fonts, mood.secondary.join(' · '), x, y, inner, { size: 26, color: SOFT, maxLines: 1 });
     } else {
-      y += text(canvas, o.fonts, 'No mood recorded.', x, y + 2, inner, { size: 30, italic: true, color: EMPTY });
+      y += text(canvas, o.fonts, tt('No mood recorded.'), x, y + 2, inner, { size: 30, italic: true, color: EMPTY });
     }
     // Nothing recorded at all: a faint botanical line drawing in the blank space, so the page looks intentional.
     if (!flower && !d.events.length && !mood) {
@@ -278,7 +281,7 @@ export function recordsPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvid
       if (room > 120) drawBotanicalWatermark(canvas, w / 2, y + 20 + room / 2, Math.min(300, room * .85));
     }
     flourish(canvas, w / 2, h - 96, 60);
-    text(canvas, o.fonts, 'Tap the page to read', 0, h - 80, w, { size: 25, italic: true, align: TextAlign.Center, color: SOFT });
+    text(canvas, o.fonts, tt('Tap the page to read'), 0, h - 80, w, { size: 25, italic: true, align: TextAlign.Center, color: SOFT });
   });
 }
 /** Right page with no journal to show: today's open page with its writing prompt, or a past day's quiet note. */
@@ -295,14 +298,14 @@ export function writingPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvid
     canvas.drawLine(x, y, x + inner, y, stroke(RULE, 1.4));
     y += 30;
     if (o.kind === 'today') {
-      text(canvas, o.fonts, 'Write your thoughts here…', x, y, inner, { size: 44, italic: true, color: '#A8916C' });
+      text(canvas, o.fonts, tt('Write your thoughts here…'), x, y, inner, { size: 44, italic: true, color: '#A8916C' });
       // Faint ruled lines, like a fresh journal page.
       for (let ly = y + 110; ly < h - 150; ly += 62) canvas.drawLine(x, ly, x + inner, ly, stroke('#C9B48D55', 1.2));
       flourish(canvas, w / 2, h - 122, 70);
-      text(canvas, o.fonts, 'Tap the page to write', 0, h - 104, w, { size: 30, italic: true, align: TextAlign.Center, color: SOFT });
+      text(canvas, o.fonts, tt('Tap the page to write'), 0, h - 104, w, { size: 30, italic: true, align: TextAlign.Center, color: SOFT });
     } else {
-      text(canvas, o.fonts, 'No private journal on this day.', x, y + 10, inner, { size: 38, italic: true, color: INK });
-      text(canvas, o.fonts, 'New journals are written on today’s page.', x, y + 74, inner, { size: 28, color: SOFT });
+      text(canvas, o.fonts, tt('No private journal on this day.'), x, y + 10, inner, { size: 38, italic: true, color: INK });
+      text(canvas, o.fonts, tt('New journals are written on today’s page.'), x, y + 74, inner, { size: 28, color: SOFT });
       flourish(canvas, w / 2, h - 122, 70);
     }
   });
@@ -335,13 +338,13 @@ export function entryPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvider
     const footer = h - 150;
     if (o.entry.grown) {
       lockGlyph(canvas, x + 12, y + 18, 1.1, '#8A6A3A');
-      y += text(canvas, o.fonts, 'From Daily Grow · read-only', x + 34, y, inner - 34, { size: 28, italic: true, color: '#7C6A3E' }) + 14;
+      y += text(canvas, o.fonts, tt('From Daily Grow · read-only'), x + 34, y, inner - 34, { size: 28, italic: true, color: '#7C6A3E' }) + 14;
     }
     const lineH = 42 * 1.4;
     const lines = Math.floor((footer - y) / lineH);
     if (o.entry.body && lines > 0) text(canvas, o.fonts, o.entry.body, x, y, inner, { size: 42, line: 1.4, color: INK, maxLines: lines });
     flourish(canvas, w / 2, h - 122, 70);
-    text(canvas, o.fonts, o.entry.hint ?? 'Tap the page to read', 0, h - 104, w, { size: 30, italic: true, align: TextAlign.Center, color: SOFT });
+    text(canvas, o.fonts, o.entry.hint ?? tt('Tap the page to read'), 0, h - 104, w, { size: 30, italic: true, align: TextAlign.Center, color: SOFT });
     text(canvas, o.fonts, o.entry.folio, 0, h - 64, w, { size: 24, align: TextAlign.Center, color: '#9A8463', spacing: 3 });
   });
 }
@@ -394,7 +397,7 @@ export function readingFace(o: { background: SkImage; fonts: SkTypefaceFontProvi
   y += m.weekday.line;
   lines(o.fonts, c.date, textW, m.date.size, m.date.line, { italic: true }).paint(canvas, x, y);
   y += m.date.line;
-  if (c.grown) { lines(o.fonts, 'From Daily Grow · kept as written', textW, m.grown.size, m.grown.line, { italic: true, color: '#7C6A3E' }).paint(canvas, x, y); y += m.grown.line; }
+  if (c.grown) { lines(o.fonts, tt('From Daily Grow · kept as written'), textW, m.grown.size, m.grown.line, { italic: true, color: '#7C6A3E' }).paint(canvas, x, y); y += m.grown.line; }
   y = Math.max(y, m.padTop + m.actions.size);
   const bx = x + inner - m.actions.size / 2, by = m.padTop + m.actions.size / 2;
   canvas.drawCircle(bx, by, m.actions.size / 2, fill('#F7EBD2E6'));
@@ -430,12 +433,12 @@ export function readingFace(o: { background: SkImage; fonts: SkTypefaceFontProvi
       canvas.drawRect(Skia.XYWHRect(px - 5, py - 5, pw + 10, ph + 10 + 25), stroke('#C1A47A', 1));
       const img = o.photo, crop = Math.min(img.width(), img.height() * (pw / ph)), cropH = crop / (pw / ph);
       canvas.drawImageRect(img, Skia.XYWHRect((img.width() - crop) / 2, (img.height() - cropH) / 2, crop, cropH), Skia.XYWHRect(px, py, pw, ph), Skia.Paint());
-      lines(o.fonts, 'Change photo', pw + 10, 11, 14, { color: '#79613F', align: TextAlign.Center }).paint(canvas, px - 5, py + ph + 7);
+      lines(o.fonts, tt('Change photo'), pw + 10, 11, 14, { color: '#79613F', align: TextAlign.Center }).paint(canvas, px - 5, py + ph + 7);
     } else if (o.sprig) {
       // The empty photo slot: the same violet sprig the live page shows.
       const s = o.sprig, cell = s.width() / 4;
       canvas.drawImageRect(s, Skia.XYWHRect(2 * cell, 3 * cell, cell, cell), Skia.XYWHRect(cx - size * .4, photo.y + 5, size * .8, size * .85), Skia.Paint());
-      lines(o.fonts, 'Add a photo', size, 11, 14, { color: '#79613F', align: TextAlign.Center }).paint(canvas, cx - size / 2, photo.y + 5 + size * .85 + 7);
+      lines(o.fonts, tt('Add a photo'), size, 11, 14, { color: '#79613F', align: TextAlign.Center }).paint(canvas, cx - size / 2, photo.y + 5 + size * .85 + 7);
     }
     canvas.restore();
   }
@@ -470,9 +473,9 @@ export function plainPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvider
         canvas.restore();
       }
       // A month with no days at all: nothing recorded, and today is not in it.
-      text(canvas, o.fonts, 'No journal or records\nfor this month.', 0, 420, w, { size: 48, italic: true, align: TextAlign.Center, color: INK, line: 1.15 });
+      text(canvas, o.fonts, tt('No journal or records\nfor this month.'), 0, 420, w, { size: 48, italic: true, align: TextAlign.Center, color: INK, line: 1.15 });
       flourish(canvas, w / 2, 556, 70);
-      text(canvas, o.fonts, 'New journals are written\non today’s page.', 0, 582, w, { size: 32, align: TextAlign.Center, color: SOFT, line: 1.3 });
+      text(canvas, o.fonts, tt('New journals are written\non today’s page.'), 0, 582, w, { size: 32, align: TextAlign.Center, color: SOFT, line: 1.3 });
     }
   });
 }

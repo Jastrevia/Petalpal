@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import { BlurStyle, Canvas, Picture, Skia, TileMode, createPicture } from '@shopify/react-native-skia';
+import { tt } from '../../../services/treehouseCopy';
 
 type Point = { x: number; y: number };
 const MS = 3400;
@@ -91,7 +92,7 @@ export function SaveCeremony({ from, to, label, run, reducedMotion, onDone }: {
   return <View pointerEvents="none" style={StyleSheet.absoluteFill}>
     <Canvas style={StyleSheet.absoluteFill}><Picture picture={picture} /></Canvas>
     <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: label.y, alignItems: 'center' }, labelStyle]}>
-      <View accessibilityLiveRegion="polite" accessibilityLabel="Journal saved" style={styles.label}><Text style={styles.text}>❦  Journal saved</Text></View>
+      <View accessibilityLiveRegion="polite" accessibilityLabel={tt('Journal saved')} style={styles.label}><Text style={styles.text}>{tt('❦  Journal saved')}</Text></View>
     </Animated.View>
   </View>;
 }

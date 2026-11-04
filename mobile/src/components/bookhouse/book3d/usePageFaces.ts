@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PixelRatio } from 'react-native';
 import { ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
-import { dayRecords, formatLocalDate, journalLocked, MONTH_NAMES, moodTitle, weekdayOf, type JournalDay } from '../../../services/bookhouse';
+import { dayRecords, formatLocalDate, journalLocked, moodTitle, weekdayOf, type JournalDay } from '../../../services/bookhouse';
+import { flowerName, MONTH_FLOWERS_ZH, monthLong, treehouseZh, tt } from '../../../services/treehouseCopy';
 import { localFlowerArtwork } from '../../garden/planting/localFlowerArtwork';
 import { FLOWERS, hasCjk, LATIN, retainBookImages, sharedPaperSources, useBookImages, useJournalFonts } from './assets';
 import { useAppLocale } from '../../../services/locale';
@@ -72,7 +73,7 @@ export function usePageFaces({ month, year, days, today, page }: {
     let front: SkImage | null | undefined, empty: SkImage | null | undefined;
     return {
       cover: coverTexture(img.cover, fonts, year),
-      get front() { return front === undefined ? (front = frontispiece({ parchment, spine, fonts, monthName: MONTH_NAMES[month - 1], year, flower: FLOWERS[month - 1], latin: LATIN[month - 1], count: journalCount })) : front; },
+      get front() { return front === undefined ? (front = frontispiece({ parchment, spine, fonts, monthName: monthLong(month), year, flower: treehouseZh() ? MONTH_FLOWERS_ZH[month - 1] : FLOWERS[month - 1], latin: LATIN[month - 1], count: journalCount })) : front; },
       flyleaf: sharedPaper('flyleaf', () => plainPage({ parchment, fonts, kind: 'flyleaf' })),
       get empty() { return empty === undefined ? (empty = plainPage({ parchment, fonts, kind: 'empty', spine })) : empty; },
       // Paper with its border and corners only: under a page's text while it changes arrangement.
@@ -81,7 +82,9 @@ export function usePageFaces({ month, year, days, today, page }: {
       // The live close-up pages show exactly this paper (an encoded copy for React Native's Image).
       readingBackgroundUri: sharedPaper(`reading-uri|${px}`, () => `data:image/jpeg;base64,${background.encodeToBase64(ImageFormat.JPEG, 92)}`),
     };
-  }, [fonts, img.cover, img.spine, img.parchment, img.grain, img.edges, month, year, journalCount, page.width, density]);
+    // (locale: a language change repaints every page.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fonts, img.cover, img.spine, img.parchment, img.grain, img.edges, month, year, journalCount, page.width, density, locale]);
 
   // Each flower's own Garden artwork, loaded once per species for the records page. Painting a page only notes which
   // artwork it would like (render stays free of side effects); the loads start after the render commits.
@@ -132,7 +135,7 @@ export function usePageFaces({ month, year, days, today, page }: {
     const r = dayRecords(day);
     return {
       weekday: weekdayOf(day.localDate), date: formatLocalDate(day.localDate),
-      flowers: r.flowers.map(f => ({ name: f.name, meaning: f.meaning, source: f.source, art: art.get(`${f.speciesCode}|${f.name}`) ?? null })),
+      flowers: r.flowers.map(f => ({ name: flowerName(f.name), meaning: f.meaning, source: f.source, art: art.get(`${f.speciesCode}|${f.name}`) ?? null })),
       events: r.events,
       moods: r.moods.map(m => ({ title: moodTitle(m.label), secondary: m.secondary.map(moodTitle).filter(Boolean), source: m.source })),
     };
@@ -163,8 +166,8 @@ export function usePageFaces({ month, year, days, today, page }: {
       const locked = journalLocked(entry);
       const n = day.journals.length;
       return remember(`r|${entry.id}|${entry.journal?.content}|${which.index}|${n}`, () => entryPage({ parchment: img.parchment!, fonts, month,
-        entry: { weekday, date, title: parts.title, body: parts.body, grown: locked, folio: n > 1 ? `Journal ${which.index + 1} of ${n}` : '',
-          hint: locked ? 'Tap the page to read' : 'Tap the page to read or write' } }));
+        entry: { weekday, date, title: parts.title, body: parts.body, grown: locked, folio: n > 1 ? (treehouseZh() ? `第 ${which.index + 1} / ${n} 篇` : `Journal ${which.index + 1} of ${n}`) : '',
+          hint: tt(locked ? 'Tap the page to read' : 'Tap the page to read or write') } }));
     }
     return remember(`w|${day.localDate}|${which.kind}`, () => writingPage({ parchment: img.parchment!, fonts, weekday, date, kind: which.kind === 'new' ? 'today' : 'past' }));
   }, [base, img.parchment, fonts, days, today, month]);

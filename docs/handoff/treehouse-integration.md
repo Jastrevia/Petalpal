@@ -41,7 +41,16 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
 
 - The walk is a hop with the idle clip's first pose: there is no real walk-cycle clip of the
   squirrel yet (would need a generated clip — paid, needs the owner's go-ahead).
-- The new Treehouse is English only: main's zh-Hans copy for the old Bookhouse does not apply to
-  the new components.
+- Chinese (branch `feat/treehouse-zh`): the painted pages use Noto Serif SC (`e65ba524`), and the
+  Treehouse words come from `mobile/src/services/treehouseCopy.ts` (`tt()` looks an English phrase
+  up in a table; months, dates, counts and moods are written per language; anything missing stays
+  English). The screen sets the language once per render (`setTreehouseLocale`). Checked in the
+  local preview at 390×844 in 简体中文: the shelf (title, years, spines, locked labels), the open
+  book's left page (flower, event and mood headings, empty-state lines), the right page's prompt
+  and the date caption. NOT checked yet: a day that has a journal, edit mode, voice input, the
+  photo and delete menus, Flower History, the save ceremony, `RecordsPage.tsx`/`WritingPage.tsx`
+  (the readable-text versions). Strings those screens show that are not in the table are still
+  English. The Petal Ring card prompt that appears over the Treehouse is another feature and is
+  still English.
 - Flower History has no entry button in the new Treehouse (the sheet is still in bookhouse.tsx).
 - Not checked on a device or in the native app; nothing pushed or deployed.

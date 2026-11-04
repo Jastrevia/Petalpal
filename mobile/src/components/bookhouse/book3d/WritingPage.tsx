@@ -6,6 +6,7 @@ import { useEventVoiceInput } from '../../../hooks/useEventVoiceInput';
 import { formatLocalDate, journalLocked, savePrivateJournal, updatePrivateJournal, weekdayOf, type JournalDay } from '../../../services/bookhouse';
 import { JournalCover } from '../JournalCover';
 import { Icon, LOCK_ICON } from '../TreehouseArt';
+import { treehouseZh, tt } from '../../../services/treehouseCopy';
 import { rightPageOf } from './usePageFaces';
 import { joinJournal, splitJournal, type Draft, type ReadingMetrics } from './readingLayout';
 export type { Draft } from './readingLayout';
@@ -74,7 +75,7 @@ export const WritingPage = forwardRef<WritingPageHandle, {
     } catch (e) {
       // The draft stays on the page; nothing claims it was saved.
       setState('failed');
-      setError(`${e instanceof Error ? e.message : 'Unable to save your journal.'}${journal ? '' : ' If the connection was interrupted, check this page before saving again.'}`);
+      setError(`${e instanceof Error ? e.message : tt('Unable to save your journal.')}${journal ? '' : tt(' If the connection was interrupted, check this page before saving again.')}`);
       onFailed();
     } finally { saving.current = false; }
   };
@@ -104,8 +105,8 @@ export const WritingPage = forwardRef<WritingPageHandle, {
   }, [bodyHeight, viewport, caretAtEnd]);
 
   const regular = { fontFamily: fontRegular }, italic = { fontFamily: fontItalic, fontStyle: fontItalic ? undefined : 'italic' as const };
-  const status = state === 'saving' ? 'Saving…' : state === 'failed' ? 'Save failed' : state === 'unsaved' ? 'Unsaved changes'
-    : state === 'saved' ? 'Saved' : '';
+  const status = tt(state === 'saving' ? 'Saving…' : state === 'failed' ? 'Save failed' : state === 'unsaved' ? 'Unsaved changes'
+    : state === 'saved' ? 'Saved' : '');
   const tabs = day.journals.length + (day.localDate === today ? 1 : 0);
   const canSave = writable && dirty && !!joinJournal(text) && !voice.active && !busy;
 
@@ -119,32 +120,32 @@ export const WritingPage = forwardRef<WritingPageHandle, {
           <Text style={[regular, { fontSize: m.weekday.size, lineHeight: m.weekday.line, letterSpacing: m.weekday.spacing, color: SOFT }]}>{weekdayOf(day.localDate).toUpperCase()}</Text>
           <Text accessibilityRole="header" style={[italic, { fontSize: m.date.size, lineHeight: m.date.line, color: INK }]}>{formatLocalDate(day.localDate)}</Text>
         </View>
-        {!!status && <View accessibilityLiveRegion="polite" accessibilityLabel={`Save state: ${status}`} style={[styles.chip, state === 'failed' && styles.chipFailed, state === 'unsaved' && styles.chipUnsaved]}>
+        {!!status && <View accessibilityLiveRegion="polite" accessibilityLabel={treehouseZh() ? `保存状态：${status}` : `Save state: ${status}`} style={[styles.chip, state === 'failed' && styles.chipFailed, state === 'unsaved' && styles.chipUnsaved]}>
           {state === 'saving' && <ActivityIndicator size="small" color="#7A5A2E" style={{ transform: [{ scale: .7 }] }} />}
           <Text style={[regular, styles.chipText, state === 'failed' && { color: '#8A3B2A' }]}>{status}</Text>
         </View>}
-        {journal && writable && !editing && <Pressable accessibilityRole="button" accessibilityLabel="Edit this journal" onPress={() => setEditing(true)} hitSlop={6}
-          style={({ pressed }) => [styles.edit, { height: m.actions.size }, pressed && { opacity: .7 }]}><Text style={[italic, styles.editText]}>Edit</Text></Pressable>}
-        {journal && !locked && <Pressable accessibilityRole="button" accessibilityLabel="Journal actions" onPress={onActions} hitSlop={6} style={[styles.more, { width: m.actions.size, height: m.actions.size, borderRadius: m.actions.size / 2 }]}>
+        {journal && writable && !editing && <Pressable accessibilityRole="button" accessibilityLabel={tt('Edit this journal')} onPress={() => setEditing(true)} hitSlop={6}
+          style={({ pressed }) => [styles.edit, { height: m.actions.size }, pressed && { opacity: .7 }]}><Text style={[italic, styles.editText]}>{tt('Edit')}</Text></Pressable>}
+        {journal && !locked && <Pressable accessibilityRole="button" accessibilityLabel={tt('Journal actions')} onPress={onActions} hitSlop={6} style={[styles.more, { width: m.actions.size, height: m.actions.size, borderRadius: m.actions.size / 2 }]}>
           <View style={{ flexDirection: 'row', gap: 3.3 }}>{[0, 1, 2].map(i => <View key={i} style={styles.dot} />)}</View>
         </Pressable>}
       </View>
-      {tabs > 1 && <View accessibilityRole="tablist" accessibilityLabel={`Journals on ${formatLocalDate(day.localDate)}`} style={styles.tabs}>
-        {day.journals.map((_, i) => <Pressable key={i} accessibilityRole="tab" accessibilityLabel={`Journal ${i + 1} of ${day.journals.length}`} accessibilityState={{ selected: slot === i }}
+      {tabs > 1 && <View accessibilityRole="tablist" accessibilityLabel={treehouseZh() ? `${formatLocalDate(day.localDate)}的日记` : `Journals on ${formatLocalDate(day.localDate)}`} style={styles.tabs}>
+        {day.journals.map((_, i) => <Pressable key={i} accessibilityRole="tab" accessibilityLabel={treehouseZh() ? `第 ${i + 1} 篇，共 ${day.journals.length} 篇` : `Journal ${i + 1} of ${day.journals.length}`} accessibilityState={{ selected: slot === i }}
           disabled={busy} onPress={() => onSlot(i)} hitSlop={4} style={[styles.tab, slot === i && styles.tabOn]}><Text style={[regular, styles.tabText, slot === i && styles.tabTextOn]}>{i + 1}</Text></Pressable>)}
-        {day.localDate === today && <Pressable accessibilityRole="tab" accessibilityLabel="Write another journal for today" accessibilityState={{ selected: which.kind === 'new' }}
+        {day.localDate === today && <Pressable accessibilityRole="tab" accessibilityLabel={tt('Write another journal for today')} accessibilityState={{ selected: which.kind === 'new' }}
           disabled={busy} onPress={() => onSlot(day.journals.length)} hitSlop={4} style={[styles.tab, which.kind === 'new' && styles.tabOn]}>
           <Text style={[regular, styles.tabText, which.kind === 'new' && styles.tabTextOn]}>+</Text></Pressable>}
       </View>}
       {locked && <View style={styles.lockRow}>
         <Icon source={LOCK_ICON} size={18} />
-        <Text style={[italic, { flex: 1, fontSize: m.grown.size, lineHeight: m.grown.line, color: '#6E5A32' }]}>From Daily Grow · read-only. It grew a flower, so it stays as written to keep your Flower History whole.</Text>
+        <Text style={[italic, { flex: 1, fontSize: m.grown.size, lineHeight: m.grown.line, color: '#6E5A32' }]}>{tt('From Daily Grow · read-only. It grew a flower, so it stays as written to keep your Flower History whole.')}</Text>
       </View>}
       {which.kind === 'none' ? <View style={{ flex: 1, justifyContent: 'center', gap: 10 }}>
-        <Text style={[italic, { fontSize: m.title.size, lineHeight: m.title.line, color: INK }]}>No private journal on this day.</Text>
-        <Text style={[regular, { fontSize: m.body.size * .9, lineHeight: m.body.line * .9, color: SOFT }]}>New journals are written on today’s page — tap the Today bookmark.</Text>
+        <Text style={[italic, { fontSize: m.title.size, lineHeight: m.title.line, color: INK }]}>{tt('No private journal on this day.')}</Text>
+        <Text style={[regular, { fontSize: m.body.size * .9, lineHeight: m.body.line * .9, color: SOFT }]}>{tt('New journals are written on today’s page — tap the Today bookmark.')}</Text>
       </View> : <>
-        {editable ? <TextInput accessibilityLabel="Journal title (optional)" placeholder="Title (optional)" placeholderTextColor="#A8916C" value={text.title}
+        {editable ? <TextInput accessibilityLabel={tt('Journal title (optional)')} placeholder={tt('Title (optional)')} placeholderTextColor="#A8916C" value={text.title}
           onChangeText={title => setText({ ...text, title: title.replace(/\n/g, ' ') })} maxLength={60} editable={!busy} returnKeyType="next" blurOnSubmit
           style={[italic, styles.input, { marginTop: m.title.gap, fontSize: m.title.size, lineHeight: m.title.line, minHeight: m.title.line + 6, color: INK }]} />
           : !!text.title && <Text style={[italic, { marginTop: m.title.gap, fontSize: m.title.size, lineHeight: m.title.line, color: INK }]}>{text.title}</Text>}
@@ -152,8 +153,8 @@ export const WritingPage = forwardRef<WritingPageHandle, {
         <ScrollView ref={scroll} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator
           onLayout={e => setViewport(e.nativeEvent.layout.height)} contentContainerStyle={{ paddingBottom: 12 }}>
           <View onLayout={e => { bodyTop.current = e.nativeEvent.layout.y; }}>
-            {editable ? <TextInput testID="journal-body" accessibilityLabel="Private journal" accessibilityHint="Only for you. Not sent to AI or saved as an Event memory."
-              placeholder="Write your thoughts here…" placeholderTextColor="#A8916C" value={text.body} multiline scrollEnabled={false} maxLength={MAX - text.title.length}
+            {editable ? <TextInput testID="journal-body" accessibilityLabel={tt('Private journal')} accessibilityHint={tt('Only for you. Not sent to AI or saved as an Event memory.')}
+              placeholder={tt('Write your thoughts here…')} placeholderTextColor="#A8916C" value={text.body} multiline scrollEnabled={false} maxLength={MAX - text.title.length}
               editable={!busy && !voice.active} textAlignVertical="top" autoFocus={active && which.kind === 'new' && !text.body}
               onChangeText={body => setText({ ...text, body })}
               onSelectionChange={e => setCaretAtEnd(e.nativeEvent.selection.end >= text.body.length - 1)}
@@ -164,30 +165,30 @@ export const WritingPage = forwardRef<WritingPageHandle, {
           </View>
           {editable && <View style={{ marginTop: 10 }} onLayout={e => setNoteHeight(e.nativeEvent.layout.height)}><EmotionalSafetyNote text={`${text.title}\n${text.body}`} /></View>}
           {journal && <View style={{ marginTop: 14 }}><JournalCover key={journal.id} userId={userId} journalId={journal.id} size={112} readOnly={writable && !editing} /></View>}
-          {!journal && editable && <Text style={[italic, { marginTop: 12, fontSize: 13, color: SOFT }]}>Photos can be added once the journal is saved.</Text>}
+          {!journal && editable && <Text style={[italic, { marginTop: 12, fontSize: 13, color: SOFT }]}>{tt('Photos can be added once the journal is saved.')}</Text>}
         </ScrollView>
         {!!error && <Text accessibilityRole="alert" style={[regular, styles.error]}>{error}</Text>}
         {voice.active && <View style={styles.voiceRow}>
-          <Text accessibilityLiveRegion="polite" style={[regular, styles.small]}>{voice.phase === 'recording' ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…'}</Text>
-          {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel="Done recording" onPress={() => void voice.done()} style={styles.textButton}><Text style={[regular, styles.small]}>Done</Text></Pressable>}
-          <Pressable accessibilityRole="button" accessibilityLabel="Cancel voice input" onPress={() => void voice.cancel()} style={styles.textButton}><Text style={[regular, styles.small]}>Cancel</Text></Pressable>
+          <Text accessibilityLiveRegion="polite" style={[regular, styles.small]}>{voice.phase === 'recording' ? `${tt('Recording')} ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, '0')} / 3:00` : tt(voice.phase === 'transcribing' ? 'Transcribing…' : 'Preparing microphone…')}</Text>
+          {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel={tt('Done recording')} onPress={() => void voice.done()} style={styles.textButton}><Text style={[regular, styles.small]}>{tt('Done')}</Text></Pressable>}
+          <Pressable accessibilityRole="button" accessibilityLabel={tt('Cancel voice input')} onPress={() => void voice.cancel()} style={styles.textButton}><Text style={[regular, styles.small]}>{tt('Cancel')}</Text></Pressable>
         </View>}
         {!!voice.error && <Text accessibilityRole="alert" style={[regular, styles.error]}>{voice.error}</Text>}
         {!!voice.overflow && <Text selectable style={[regular, styles.small]}>{voice.overflow}</Text>}
         {editable && <View style={styles.footer}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Dictate private journal" accessibilityHint="Record up to three minutes, then review before saving"
+          <Pressable accessibilityRole="button" accessibilityLabel={tt('Dictate private journal')} accessibilityHint={tt('Record up to three minutes, then review before saving')}
             disabled={busy || voice.active} onPress={() => void voice.start()} style={{ width: 44, height: 44, opacity: busy || voice.active ? .45 : 1 }}>
             <Image accessible={false} source={require('../../../../assets/events/microphone.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
           </Pressable>
           <Text style={[regular, styles.small, { flex: 1 }]}>{joinJournal(text).length} / {MAX}</Text>
           {/* Editing a saved journal with nothing changed: "Done" goes back to reading; any change makes it "Save". */}
-          {journal && !dirty && state !== 'failed' && !busy ? <Pressable accessibilityRole="button" accessibilityLabel="Done editing" onPress={() => { Keyboard.dismiss(); setEditing(false); setState('clean'); }}
-            style={({ pressed }) => [styles.save, styles.done, pressed && { transform: [{ scale: .97 }] }]}><Text style={[italic, styles.saveText]}>Done</Text></Pressable>
+          {journal && !dirty && state !== 'failed' && !busy ? <Pressable accessibilityRole="button" accessibilityLabel={tt('Done editing')} onPress={() => { Keyboard.dismiss(); setEditing(false); setState('clean'); }}
+            style={({ pressed }) => [styles.save, styles.done, pressed && { transform: [{ scale: .97 }] }]}><Text style={[italic, styles.saveText]}>{tt('Done')}</Text></Pressable>
           : <View ref={saveRef} collapsable={false}>
-            <Pressable accessibilityRole="button" accessibilityLabel={state === 'failed' ? 'Retry saving journal' : journal ? 'Save changes' : 'Save private journal'}
+            <Pressable accessibilityRole="button" accessibilityLabel={tt(state === 'failed' ? 'Retry saving journal' : journal ? 'Save changes' : 'Save private journal')}
               accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={() => safety.guard(() => void save())}
               style={({ pressed }) => [styles.save, !canSave && { opacity: .5 }, pressed && { transform: [{ scale: .97 }] }]}>
-              <Text style={[italic, styles.saveText]}>{busy ? 'Saving…' : state === 'failed' ? 'Retry' : 'Save'}</Text>
+              <Text style={[italic, styles.saveText]}>{tt(busy ? 'Saving…' : state === 'failed' ? 'Retry' : 'Save')}</Text>
             </Pressable>
           </View>}
         </View>}
