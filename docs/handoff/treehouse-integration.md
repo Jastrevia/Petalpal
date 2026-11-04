@@ -19,6 +19,9 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
   camera like the room, fading in as the camera settles on the desk. `Scrollkeeper` got a `roam`
   mode: from its first idle pose it now and then hops to another spot (facing where it goes),
   still folds into a journal now and then, and is frozen with reduced motion.
+- Wide windows (computer, tablet): the desk view keeps the illustration's phone-shaped column (its scale is set by
+  the window's height) and fills the sides with the same room art, enlarged about the desk edge, blurred and darkened
+  (`ReferenceScene.tsx`, ground layer), instead of plain dark wood. Phones are unchanged (the art already spans them).
 - Carried over from main into the new screen: the caring safety window on save
   (`useSafetyWatch` in `book3d/WritingPage.tsx`) and guest mode (a guest tapping a book is asked
   for an account).
@@ -29,7 +32,7 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
 - `test/back/private-journals.test.js` and `journal-month-events.test.js` pass.
 - `test/back/security-p0-http-coverage.test.js` fails on `POST /reports missing`, the same as on
   main eca6d88e (not from this change).
-- Web local preview (375×812): book opens to the desk, squirrel sits there, hops left ~100 px
+- Web local preview at 375×812, 768×1024 and 1280×800 (desk view checked at all three). At 375×812: book opens to the desk, squirrel sits there, hops left ~100 px
   and turns, folds into a journal; guest tap asks for an account.
 
 ## Not done / known gaps
