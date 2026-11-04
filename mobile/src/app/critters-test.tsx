@@ -8,7 +8,7 @@ import { Critter, PairSceneClip } from '@/components/garden/critters/GardenCritt
 import { PUPPY_ACTIONS, PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
 import { Otter } from '@/components/garden/spirits/MemoryOtter';
 import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
-import { CRITTER_IDS, CRITTERS, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
+import { CRITTER_IDS, CRITTERS, MALTESE_RUN_SPEED, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
 // painting and motion can be judged up close. Not part of production navigation.
@@ -46,7 +46,7 @@ export default function CrittersTestScreen() {
     const spec = CRITTERS[id], puppyMove = id === 'puppy' || id === 'maltese' ? move : 'walk';
     const acting = id === 'puppy' && (puppyMove === 'eat' || puppyMove === 'pat');
     const running = puppyMove === 'run', sitting = puppyMove === 'sit' || acting;
-    const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? (id === 'maltese' ? spec.speed * 1.9 : RUN_SPEED) : spec.speed;
+    const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? (id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED) : spec.speed;
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
     const lead = id === 'silktail' ? 10 : acting ? 10 : sitting ? 7 : FADE_SECONDS;
     return { key: round, id, path, start, duration: lead + travelSeconds(length / speed, rhythm), speed, rhythm,

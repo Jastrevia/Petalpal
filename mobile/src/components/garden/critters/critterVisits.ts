@@ -25,6 +25,10 @@ export type CritterSpec = {
 // (Its sheet's cells are 293 px wide; 62 units makes it stand about 42 units tall, some six tenths of
 // the puppy. Its painted walk covers 45 units a stride cycle in 1.8 s: 27 units a second is its own pace.)
 export const MALTESE_SIZE = 62, MALTESE_SPEED = 27;
+// Its gallop: two strides of about 38.5 units each loop. A small dog's strides are short and quick:
+// it takes two to each of the puppy's (the puppy's gallop: 178 units a stride at RUN_SPEED, 1.23 s),
+// so it runs a loop in 1.23 s, a little under half the puppy's speed.
+export const MALTESE_RUN_SPEED = 63;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
@@ -459,7 +463,7 @@ export function planFollow({ visit, now, here, leader, path, random, aside = nul
     route.push({ x: a.x + (b.x - a.x) * left / length, y: a.y + (b.y - a.y) * left / length }); left = 0;
   }
   if (route.length < 2 || pathLength(route) < 4) return { ...visit, start: now, lead: 1, duration: 1.05, path: [here, { x: here.x + 0.5, y: here.y }], fadeIn: false, walked, sits: false, following: true };
-  const far = gap > FOLLOW_STRETCH * 2, speed = spec.speed * (far ? 1.6 : 1);
+  const far = gap > FOLLOW_STRETCH * 2, speed = far ? (visit.id === 'maltese' ? MALTESE_RUN_SPEED : spec.speed * 1.6) : spec.speed;
   // Sitting: it gets up first (its sit played back), then sets off.
   const rising = Boolean(visit.sits), lead = rising ? RISE_SECONDS * 0.7 : 0.15;
   return { ...visit, path: route, start: now, lead, duration: lead + pathLength(route) / speed, speed, rhythm: RHYTHMS[visit.id],
@@ -479,9 +483,7 @@ export const leadSpell = (random: () => number) => between(LEAD_SPELL, random);
 // then both sit down together (the Maltese facing it) and `ends` is when hearts may rise.
 export const PLAY_NEAR = 110;
 export const PLAY_CHANCE = 0.35;
-const DASH = 1.9, PULL_UP = APART + 8;
-// The puppy's dash when the Maltese chases it: a playful lope, slow enough for its little friend.
-const PUPPY_DASH = 70;
+const PULL_UP = APART + 8;
 // `path` without its last `by` units.
 export function trimEnd(path: Point[], by: number): Point[] {
   let keep = pathLength(path) - by;
@@ -503,7 +505,8 @@ export function planPlay({ maltese, puppy, now, dash, chase, runner = 'maltese' 
   // Maltese scampers after it (both on their painted runs).
   if (!dash || dash.length < 2 || pathLength(dash) < 60 || !chase || chase.length < 1 || puppy.held || puppy.chase || maltese.held) return null;
   const run = runner === 'maltese' ? maltese : puppy, after = runner === 'maltese' ? puppy : maltese;
-  const speed = runner === 'maltese' ? CRITTERS.maltese.speed * DASH : PUPPY_DASH;
+  // Each at its own natural run: the Maltese's quick little gallop, the puppy's long one.
+  const speed = runner === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED;
   const walked = run.walked + visitDistance(run, Math.min(now, run.start + run.duration));
   const dashing: Visit = { ...run, path: dash, start: now, lead: 0.2, duration: 0.2 + pathLength(dash) / speed, speed,
     rhythm: runner === 'maltese' ? RHYTHMS.maltese : RUNNING, fadeIn: false, walked, sits: false, rising: false,
@@ -513,10 +516,13 @@ export function planPlay({ maltese, puppy, now, dash, chase, runner = 'maltese' 
   // It sets off once the runner is a body length ahead along the trail.
   const delay = Math.max(0.6, (APART - pathLength(chase)) / speed + 0.2);
   if (trail.length < 2 || pathLength(trail) < 40) return null;
-  const rising = Boolean(after.sits) && now + delay < after.start + after.lead;
-  const lead = rising ? RISE_SECONDS : 0.15, start = now + delay;
-  const travel = Math.max(0.5, arrives - start - lead);
-  const pace = Math.min(runner === 'maltese' ? RUN_SPEED : PUPPY_DASH * 1.4, pathLength(trail) / travel);
+  // The chaser runs at its own pace too: the puppy, much faster, sets off late enough to pull up
+  // behind the Maltese just as it stops; the Maltese, slower, simply runs after the puppy and gets
+  // there after it.
+  const pace = runner === 'maltese' ? RUN_SPEED : MALTESE_RUN_SPEED;
+  const startAt = runner === 'maltese' ? Math.max(now + delay, arrives - pathLength(trail) / pace - 0.15) : now + delay;
+  const rising = Boolean(after.sits) && startAt < after.start + after.lead;
+  const lead = rising ? RISE_SECONDS : 0.15, start = rising ? startAt - RISE_SECONDS + 0.15 : startAt;
   const chasing: Visit = { ...after, path: trail, start, lead, duration: lead + pathLength(trail) / pace, speed: pace,
     rhythm: runner === 'maltese' ? RUNNING : RHYTHMS.maltese, fadeIn: false, walked: after.walked + visitDistance(after, Math.min(now, after.start + after.duration)),
     sits: false, rising, chase: runner === 'maltese', play: runner === 'puppy', running: runner === 'puppy', following: false };
