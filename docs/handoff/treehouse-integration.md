@@ -24,6 +24,13 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
   always fills the width; on short phone screens (a browser under its address bar) the upper rows and the sign go past
   the top — close the book to pick those months. Tablets and computers show the illustration at its own size with plain
   dark sides. (Version b14ea35b's blurred sides were removed.)
+- The bookshelf itself (before a book is opened), the same rule (owner's report 2026-11-04, iPhone Safari: the sides
+  were "杂景"): on phones (≤ 600 wide) the shelf is always as wide as the screen (`shelfFills` in app/bookhouse.tsx:
+  `shelfLayout(…, fill)`, more of its own backboard at the same scale). On short screens (390×664, a phone browser) it
+  used to be narrower than the screen, and the room picture behind it (TreehouseBackdrop, interior.png at another
+  scale) showed in a strip each side, with cut-off lanterns and vines. Tablets and computers show the bookcase on plain
+  dark wood (`REFERENCE_GROUND`), not that enlarged second copy of the room. Checked at 390×664, 768×1024 and 1280×800,
+  shelf and desk view.
 - Carried over from main into the new screen: the caring safety window on save
   (`useSafetyWatch` in `book3d/WritingPage.tsx`) and guest mode (a guest tapping a book is asked
   for an account).

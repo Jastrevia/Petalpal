@@ -27,8 +27,8 @@ import { pullTarget as roomPullTarget } from '../components/bookhouse/book3d/roo
 import { RoomBack, RoomFront } from '../components/bookhouse/book3d/RoomLayers';
 import { ROOM_ARTWORK, ROOM_LAYOUT, ROOM_SCENE, shelfTransform, type PullGeometry } from '../components/bookhouse/book3d/scene';
 import { ComposedDesk, ComposedRoom } from '../components/bookhouse/book3d/ComposedRoom';
-import { ReferenceFront, ReferenceRoom, ReferenceSquirrel } from '../components/bookhouse/book3d/ReferenceScene';
-import { composedAt, composedPoint, composedRestRect, composedTarget, deskShelfFade, deskShelfFrame, portraitColumn, PORTRAIT_FOOTER, REF, referenceColumn, referenceShelfWidth } from '../components/bookhouse/book3d/composed';
+import { REFERENCE_GROUND, ReferenceFront, ReferenceRoom, ReferenceSquirrel } from '../components/bookhouse/book3d/ReferenceScene';
+import { composedAt, composedPoint, composedRestRect, composedTarget, deskShelfFade, deskShelfFrame, PHONE_WIDTH, portraitColumn, PORTRAIT_FOOTER, REF, referenceColumn, referenceShelfWidth } from '../components/bookhouse/book3d/composed';
 import { TreehouseWalls } from '../components/bookhouse/book3d/TreehouseWalls';
 import { compositeEnd, DESK_DEPTH } from '../components/bookhouse/book3d/walls';
 import { bookLayout, deskBookLayout, inOpenBookZone } from '../components/bookhouse/book3d/motion';
@@ -165,7 +165,7 @@ export default function Bookhouse() {
   const openMonth = (y: number, m: number, rect: ShelfRect | null) => {
     if (!rect || book) return;
     if (!session) { guest?.requestAccount(); return; }
-    const rest = shelfLayout(column, cabinetTop, cabinetBottom);
+    const rest = shelfLayout(column, cabinetTop, cabinetBottom, shelfFills);
     // The scene is chosen in book3d/scene.ts: the Treehouse room (ROOM_SCENE) or the painted desk alone (fallback).
     const painted = pullTarget({ width: rest.width, cabinetBottom, sceneHeight }, width, desk.deskEdge, sceneY.current);
     const geometry: PullGeometry = ROOM_ARTWORK
@@ -258,6 +258,11 @@ export default function Bookhouse() {
     await reload();
   };
   const plaqueWidth = Math.min(300, inner - 40);
+  // Phones (owner's choice 2026-11-04: original art only, nothing beside it): the bookshelf is always as wide as the
+  // screen, showing more of its own backboard, so the room picture behind it never shows at its sides (short screens
+  // left a strip of it each side, with cut-off lanterns and vines). Wider windows keep the narrower bookcase on plain
+  // dark wood (below), as the desk view does.
+  const shelfFills = ROOM_LAYOUT === 'reference' && width <= PHONE_WIDTH;
   // The shelf fills the phone: the title sign rests on the painted top beam and the buttons sit below the last shelf.
   // Tiny or landscape windows scroll instead of shrinking the books.
   const sceneHeight = Math.max(height, 640);
@@ -268,11 +273,11 @@ export default function Bookhouse() {
   const portrait = ROOM_SCENE && (ROOM_LAYOUT === 'portrait' || ROOM_LAYOUT === 'reference') && !ROOM_ARTWORK;
   const deskColumn = useMemo(() => {
     if (!portrait) return Math.min(width, 560);
-    const rest = shelfLayout(column, cabinetTop, cabinetBottom);
+    const rest = shelfLayout(column, cabinetTop, cabinetBottom, shelfFills);
     const restGeometry = { width: rest.width, scale: rest.scale, cabinetTop, sceneHeight, rootX: (width - rest.width) / 2, slices: rest.slices };
     const title = { top: insets.top + TOP_BAR, safeTop: insets.top + TITLE_CLEARANCE };
     return ROOM_LAYOUT === 'reference' ? referenceColumn({ width, height }, insets, restGeometry, title) : portraitColumn({ width, height }, insets, restGeometry, title);
-  }, [portrait, width, height, insets, column, cabinetTop, cabinetBottom, sceneHeight]);
+  }, [portrait, width, height, insets, column, cabinetTop, cabinetBottom, sceneHeight, shelfFills]);
   const deskFooter = portrait ? PORTRAIT_FOOTER : 0;
   const desk = useMemo(() => ROOM_ARTWORK ? deskBookLayout(width, height, insets) : bookLayout(width, height, insets, 0, deskColumn, deskFooter), [width, height, insets, deskColumn, deskFooter]);
   // The title sign hangs on the shelf's top beam, so it recedes with the shelf: the same uniform scale about the
@@ -348,7 +353,8 @@ export default function Bookhouse() {
 
   return <Animated.View style={[s.root, { opacity: arrival }]}>
     {/* Around the receding shelf (and beside it on wide windows) the rest of the room stays softly out of focus. */}
-    <TreehouseBackdrop width={width} height={height} night={lit} dim={width > column + 40 || (book && book.geometry.kind !== 'room') ? .3 : 0} />
+    {ROOM_LAYOUT === 'reference' ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: REFERENCE_GROUND }]} />
+      : <TreehouseBackdrop width={width} height={height} night={lit} dim={width > column + 40 || (book && book.geometry.kind !== 'room') ? .3 : 0} />}
     {book && book.geometry.kind === 'composed' && (book.geometry.variant === 'reference' ? <ReferenceRoom pull={pull} geometry={book.geometry} /> : <ComposedRoom pull={pull} geometry={book.geometry} />)}
     {/* The Treehouse around the bookshelf, revealed as the camera pulls back (behind the shelf). */}
     {book && book.geometry.kind === 'treehouse' && <TreehouseWalls pull={pull} geometry={book.geometry} />}
@@ -360,7 +366,7 @@ export default function Bookhouse() {
             takes the taps). */}
         <View pointerEvents={book ? 'none' : 'box-none'} importantForAccessibility={book ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={!!book}
           style={{ width: column, height: sceneHeight, alignItems: 'center' }}>
-        <TreehouseShelf column={column} height={sceneHeight} cabinetTop={cabinetTop} cabinetBottom={cabinetBottom} railBottom={sceneHeight - insets.bottom - 6}
+        <TreehouseShelf fill={shelfFills} column={column} height={sceneHeight} cabinetTop={cabinetTop} cabinetBottom={cabinetBottom} railBottom={sceneHeight - insets.bottom - 6}
           years={years} year={year} today={today} counts={counts} reducedMotion={reducedMotion}
           onSelectYear={setShelfYear} onOpenMonth={openMonth} onLocked={setNotice}
           hiddenMonth={book ? shownMonths : null} bookNodes={bookNodes}
@@ -406,7 +412,7 @@ export default function Bookhouse() {
     {session && [book, nextBook].map(b => b && <MonthBook key={`${b.year}-${b.month}`} year={b.year} month={b.month} shelfRect={b.rect} days={daysOf(b)}
       userId={session.user.id} today={today} reducedMotion={reducedMotion} night={lit} closeSignal={closeSignal} drafts={drafts}
       returnTo={b === book ? returnTo : null} waiting={b === nextBook && nextWaiting}
-      scene={{ pull, geometry: b.geometry, rootX: (width - shelfLayout(column, cabinetTop, cabinetBottom).width) / 2, scrollY: b.scrollY, column: deskColumn, footer: deskFooter,
+      scene={{ pull, geometry: b.geometry, rootX: (width - shelfLayout(column, cabinetTop, cabinetBottom, shelfFills).width) / 2, scrollY: b.scrollY, column: deskColumn, footer: deskFooter,
         held: b.held, deskRect: b.deskRect }}
       onShown={() => showMonth(monthKey(b.year, b.month), true)} onClosed={b === book ? bookClosed : () => undefined} onMode={onBookMode}
       onHomeward={b === book ? () => setNextWaiting(false) : undefined}
