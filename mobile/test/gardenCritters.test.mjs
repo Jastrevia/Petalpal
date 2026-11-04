@@ -349,3 +349,23 @@ test('every catalog piece has its wardrobe icon', async () => {
     assert.ok(fs.existsSync(new URL(`../${icons[id].replace('@/', '')}`, import.meta.url)), id);
   }
 });
+
+test('the Maltese comes only with the puppy and follows it, sitting beside it once close', () => {
+  const random = seeded(3);
+  assert.equal(visits.planFriendVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, random }), null);
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  assert.equal(puppy.id, 'puppy');
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random });
+  assert.equal(friend.id, 'maltese');
+  assert.equal(visits.planFriendVisit({ key: 4, now: 0, active: [puppy, friend], network: WALK_NETWORK, edges, random }), null);
+  // Close by: it sits down facing the puppy.
+  const here = { x: 100, y: 100 };
+  const sit = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 140, y: 100 }, path: null, random });
+  assert.equal(sit.sits, true);
+  assert.ok(sit.path[1].x > sit.path[0].x, 'faces the puppy');
+  // Far: it goes a stretch of the way, stopping short of the puppy, faster when far behind.
+  const far = visits.planFollow({ visit: friend, now: 10, here, leader: { x: 700, y: 100 }, path: [here, { x: 400, y: 100 }, { x: 700, y: 100 }], random });
+  assert.equal(far.sits, false);
+  assert.ok(visits.pathLength(far.path) <= 160 + 1e-6);
+  assert.ok(far.speed > visits.CRITTERS.maltese.speed);
+});

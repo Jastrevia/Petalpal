@@ -38,6 +38,13 @@ Not done yet (next work, in the owner's order):
    the bare puppy and set 1's cape (4 clips, 2 bowl key frames), then hats and necklaces tracked
    onto them like the walks.
 4. **The other four pets** (hedgehog, butterfly, rabbit, bluebird) have no outfit art yet.
+   *New pet, 2026-11-05:* a Maltese, the puppy's tiny best friend (`maltese` in `critterVisits.ts`,
+   `maltese-walk.webp` / `maltese-sit.webp`). The owner chose its look (a realistic fluffy white
+   puppy, gpt-image key frame `~/dev/petalpal-motion/maltese/M0-chosen.png`; it need not match the
+   puppy's painted style) and asked that it be small. Walk loop and walk-to-sit are oil-motion clips
+   (minimax h3 highspeed) cut with crop 190,30,920,690 into 293 × 220 cells. It comes only with the
+   puppy (`planFriendVisit`, a little way from it), then follows it along the paths and sits beside
+   it facing it (`planFollow`). No ring menu or wardrobe for it yet.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

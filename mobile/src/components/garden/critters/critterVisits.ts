@@ -10,7 +10,7 @@ import { distance, type Network, type Point } from '../fairy/walkNetwork';
 // for a Journal milestone (when exactly is still to be designed), so it is left out of CRITTER_IDS.
 // Nor are the bluebird and the butterfly any more: they live on the Garden's perches and stones
 // (spirits/Bluebird.tsx, Butterfly.tsx).
-export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail';
+export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail' | 'maltese';
 export type CritterKind = 'flyer' | 'walker';
 export type CritterSpec = {
   id: CritterId; kind: CritterKind;
@@ -21,6 +21,10 @@ export type CritterSpec = {
   // Height above the path for flyers (world units).
   altitude: [number, number];
 };
+// The Maltese's drawn size and walking pace (world units), from its painted walk.
+// (Its sheet's cells are 293 px wide; 62 units makes it stand about 42 units tall, some six tenths of
+// the puppy. Its painted walk covers 78.8 units a loop: 30 units a second steps it quickly, a small dog.)
+export const MALTESE_SIZE = 62, MALTESE_SPEED = 30;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
@@ -33,9 +37,13 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   puppy: { id: 'puppy', kind: 'walker', size: 113, speed: 38, altitude: [0, 0] },
   // The fox runs: its pace matches its painted gallop, 394 units each 3.92 s.
   silktail: { id: 'silktail', kind: 'walker', size: 170, speed: 100.6, altitude: [0, 0] },
+  // The Maltese, the puppy's tiny best friend (follows it: planFollow). Size and pace set from its
+  // painted walk (GardenCritters ART.maltese).
+  maltese: { id: 'maltese', kind: 'walker', size: MALTESE_SIZE, speed: MALTESE_SPEED, altitude: [0, 0] },
 };
-export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird' && id !== 'butterfly');
-// The rabbit, the hedgehog and the puppy can all be in at once.
+// (The Maltese is not one of them: it comes with the puppy, planFriendVisit.)
+export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird' && id !== 'butterfly' && id !== 'maltese');
+// The rabbit, the hedgehog and the puppy can all be in at once (and the puppy's friend, the Maltese).
 export const MAX_VISITORS = 3;
 // Seconds between one visitor arriving and the next.
 export const VISIT_GAP: [number, number] = [10, 35];
@@ -44,7 +52,7 @@ export const FADE_SECONDS = 0.8;
 export const AWAY_SECONDS = 10 * 60;
 // Seconds a visitor rests where a leg ended before the next one (the bluebird flies on).
 export const REST: Readonly<Record<CritterId, [number, number]>> = {
-  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10], silktail: [12, 24],
+  butterfly: [0.4, 2.5], bluebird: [0, 0], rabbit: [2, 7], hedgehog: [3, 9], puppy: [3, 10], silktail: [12, 24], maltese: [2, 5],
 };
 
 // How a visitor moves: in bursts of `moving` (fraction) of every `cycle` seconds, still otherwise
@@ -54,7 +62,7 @@ export type Rhythm = { cycle: number; moving: number };
 export const RHYTHMS: Readonly<Record<CritterId, Rhythm>> = {
   butterfly: { cycle: 0, moving: 1 }, bluebird: { cycle: 0, moving: 1 },
   rabbit: { cycle: 1.1, moving: 0.5 }, hedgehog: { cycle: 4, moving: 0.65 }, puppy: { cycle: 7, moving: 0.8 },
-  silktail: { cycle: 0, moving: 1 },
+  silktail: { cycle: 0, moving: 1 }, maltese: { cycle: 0, moving: 1 },
 };
 // World units covered in one burst (the rabbit: one hop).
 export const burstLength = (id: CritterId) => CRITTERS[id].speed * RHYTHMS[id].cycle * RHYTHMS[id].moving;
@@ -389,4 +397,54 @@ export function burstPhase(visit: Visit, seconds: number) {
   const elapsed = Math.max(0, seconds - visit.start - visit.lead);
   const within = elapsed % cycle;
   return within < cycle * moving ? within / (cycle * moving) : 0;
+}
+
+// The Maltese comes only with the puppy, to play with it: once the puppy is here (and the Maltese
+// is not), it turns up somewhere on the paths and sets off after it (planFollow).
+export function planFriendVisit({ key, now, active, network, edges, random }: {
+  key: number; now: number; active: readonly Visit[]; network: Network; edges: Network['edges']; random: () => number;
+}): Visit | null {
+  const puppy = active.find(visit => visit.id === 'puppy' && !visit.leaving);
+  if (!puppy || active.some(visit => visit.id === 'maltese')) return null;
+  // It turns up a little way from the puppy (a path crossing 100–260 units off), in sight of it.
+  const at = visitPose(puppy, now), linked = new Set(edges.flatMap(edge => [edge.a, edge.b]));
+  const near = network.nodes.map((node, i) => ({ i, d: distance(node, at) })).filter(({ i, d }) => linked.has(i) && d >= 100 && d <= 260);
+  const from = near.length ? near[Math.floor(random() * near.length)].i : undefined;
+  const spec = CRITTERS.maltese, path = planWalk(network, edges, random, from === undefined ? undefined : 1, from);
+  if (!path || path.length < 2) return null;
+  const rhythm = RHYTHMS.maltese;
+  return { key, id: 'maltese', path, start: now, duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, rhythm), speed: spec.speed, rhythm,
+    lead: FADE_SECONDS, fadeIn: true, walked: 0 };
+}
+
+// The Maltese plays with the puppy: whenever a leg ends it heads for its friend along the paths
+// (a short stretch at a time, so it keeps up as the puppy moves on), trotting a little faster when
+// it has fallen far behind; once beside it, it sits down facing it for a while, then checks again.
+// `path`: the route to the puppy (walkNetwork route), null when none; `leader`: the puppy's pose now.
+export const FOLLOW_NEAR = 60;
+const FOLLOW_STRETCH = 160;
+export function planFollow({ visit, now, here, leader, path, random }: {
+  visit: Visit; now: number; here: Point; leader: Point; path: Point[] | null; random: () => number;
+}): Visit {
+  const spec = CRITTERS[visit.id], walked = visit.walked + visitDistance(visit, visit.start + visit.duration);
+  const gap = distance(here, leader);
+  if (gap <= FOLLOW_NEAR || !path || path.length < 2) {
+    // Beside it (or no way there): sit down facing the puppy.
+    const facing = leader.x >= here.x ? 1 : -1;
+    const lead = between(REST[visit.id], random) + 1.5;
+    return { ...visit, path: [here, { x: here.x + facing * 0.5, y: here.y }], start: now, lead, duration: lead + 0.05,
+      speed: spec.speed, rhythm: RHYTHMS[visit.id], fadeIn: false, walked, sits: true, rising: false, chase: false };
+  }
+  // Stop a little short of the puppy, and go only a stretch of the way before looking again.
+  const route: Point[] = [path[0]];
+  let left = Math.min(FOLLOW_STRETCH, Math.max(0, pathLength(path) - FOLLOW_NEAR * 0.6));
+  for (let i = 1; i < path.length && left > 1e-6; i++) {
+    const a = path[i - 1], b = path[i], length = distance(a, b);
+    if (length <= left) { route.push(b); left -= length; continue; }
+    route.push({ x: a.x + (b.x - a.x) * left / length, y: a.y + (b.y - a.y) * left / length }); left = 0;
+  }
+  if (route.length < 2 || pathLength(route) < 4) return { ...visit, start: now, lead: 1, duration: 1.05, path: [here, { x: here.x + 0.5, y: here.y }], fadeIn: false, walked, sits: false };
+  const speed = spec.speed * (gap > FOLLOW_STRETCH * 2 ? 1.6 : 1);
+  return { ...visit, path: route, start: now, lead: 0.15, duration: 0.15 + pathLength(route) / speed, speed, rhythm: RHYTHMS[visit.id],
+    fadeIn: false, walked, sits: false, rising: false, chase: false };
 }

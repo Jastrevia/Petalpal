@@ -7,10 +7,10 @@ import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
 import { ACTION_FPS, actionSeconds, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type PuppyAction, type PuppyLook } from './puppyLooks';
-import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
+import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, holdVisit, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, FOLLOW_NEAR, holdVisit, planFollow, planFriendVisit, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -40,6 +40,10 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The puppy walks, gallops after the bluebird and sits down where it caught up in its outfit's
   // paintings (puppyLooks.ts; bare when it has nothing on), all sharing one crop, ground and scale.
   puppy: { source: PUPPY_LOOKS.bare.source, w: 418, h: 300, frames: PUPPY_LOOKS.bare },
+  // The Maltese, the puppy's tiny friend: an oil-motion walk (one 5 s loop, 40 frames kept) and a
+  // walk-to-sit (20 frames), cut with one crop (190,30,920,690) so they lie on the same cells.
+  maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
+    frames: { columns: 8, count: 40, ground: 216, loop: 78.8, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -123,6 +127,9 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
         network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: excluded.current });
       if (visit) setVisits(current => [...current, visit]);
+      // The puppy's friend follows it in now and then.
+      const friend = Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
+      if (friend) setVisits(current => (current.some(v => v.id === 'maltese') ? current : [...current, friend]));
       timer = setTimeout(arrive, nextGap(Math.random) * 1000);
     };
     // The first visitor comes a few seconds after the Garden opens.
@@ -138,6 +145,14 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         if (visit.leaving) return [];
         const lawn = visit.lawn;
         if (lawn !== undefined && (!lawns.current.unplanted.includes(lawn) || lawns.current.taken(visit.id).includes(lawn))) return [leaveVisit(visit, now)];
+        // The Maltese goes after its friend the puppy (and sits beside it) while it is here.
+        const friend = visit.id === 'maltese' ? current.find(v => v.id === 'puppy' && !v.leaving) : undefined;
+        if (friend) {
+          const end = visitPose(visit, visit.start + visit.duration), mate = visitPose(friend, now);
+          const here = { x: end.x, y: end.y }, leader = { x: mate.x, y: mate.y };
+          const path = distance(here, leader) > FOLLOW_NEAR ? route(here, leader, isGardenGroundBlocked) : null;
+          return [planFollow({ visit, now, here, leader, path, random: Math.random })];
+        }
         return [planNextLeg({ visit, now, network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current }) ?? visit];
       }));
     }, 150);
@@ -194,6 +209,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     (window as unknown as { __gardenCritters?: unknown }).__gardenCritters = {
       visits: () => visitsRef.current.map(visit => ({ id: visit.id, from: visit.path[0], to: visit.path.at(-1), chase: Boolean(visit.chase), sits: Boolean(visit.sits) })),
       clear: () => setVisits([]),
+      // Where each visitor is now (world units).
+      poses: () => visitsRef.current.map(visit => { const pose = visitPose(visit, clock.value); return { id: visit.id, x: Math.round(pose.x), y: Math.round(pose.y), sits: Boolean(visit.sits), opacity: Math.round(pose.opacity * 100) / 100, leaving: Boolean(visit.leaving), held: Boolean(visit.held), left: Math.round(visit.start + visit.duration - clock.value) }; }),
       // Send the puppy after the bluebird as if it had just taken off for `to`.
       chase: (to: Point) => chase.current(to),
       // Dress the puppy as if its outfit were `to` ('bare', 'hat', 'cape-hat' …; undefined: back
@@ -201,6 +218,11 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       dress: (to?: PuppyLook) => setDressed(to),
       unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
       spawn: (id: CritterId) => {
+        if (id === 'maltese') {
+          const friend = planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random });
+          if (friend) setVisits(current => [...current, friend]);
+          return !!friend;
+        }
         for (let attempt = 0; attempt < 40; attempt++) {
           const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current });
           if (visit?.id === id) {
