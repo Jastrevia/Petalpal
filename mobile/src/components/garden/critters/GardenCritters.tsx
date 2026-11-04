@@ -46,9 +46,9 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // in a loop made it slide.
   maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
     frames: { columns: 8, count: 43, ground: 216, loop: 45, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
-      // Its run, same cells: a trot in diagonal pairs (one cycle, 26 frames, 36 units), chasing the
-      // puppy or dashing off in a game.
-      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 26, loop: 36 } } },
+      // Its run, same cells: a gallop (painted from a mid-stride key frame; 59 frames, 73.6 units),
+      // chasing the puppy or dashing off in a game.
+      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 59, loop: 73.6 } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
