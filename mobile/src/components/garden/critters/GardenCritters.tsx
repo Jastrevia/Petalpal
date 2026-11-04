@@ -25,7 +25,10 @@ import {
 // `trail`: a painted petal it sheds behind it while it moves.
 type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number;
   rest?: { source: number; count: number; rise: number; always?: boolean };
-  run?: { source: number; columns: number; count: number; loop: number }; trail?: number };
+  run?: { source: number; columns: number; count: number; loop: number;
+    // A run in bigger cells than the walk's (a gallop stretches past them): their size, and where
+    // their top left lies in the walk's cell, in walk-cell pixels.
+    cell?: { w: number; h: number; x: number; y: number } }; trail?: number };
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -46,9 +49,11 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // in a loop made it slide.
   maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
     frames: { columns: 8, count: 43, ground: 216, loop: 45, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
-      // Its run, same cells: a gallop (painted from a mid-stride key frame; 59 frames, 73.6 units),
-      // chasing the puppy or dashing off in a game.
-      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 59, loop: 73.6 } } },
+      // Its run: a gallop (painted from a mid-stride key frame; 59 frames, 77 units), chasing the
+      // puppy or dashing off in a game. Stretched out it is longer than the walk's cells, so it is cut
+      // wider (crop 100,10,1120,710 into 374 × 237 cells) and drawn offset onto them.
+      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 59, loop: 77,
+        cell: { w: 374 * 0.9986, h: 237 * 0.9986, x: -30, y: -6.67 } } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -466,7 +471,9 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     {frames.trail ? <PetalTrail visit={visit} clock={clock} source={frames.trail} reduced={!!reduced} /> : null}
     <Group transform={transform}>
       <Group opacity={walkOpacity}>{running && runSheet
-        ? <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />
+        ? (frames.run!.cell ? <Group transform={[{ translateX: frames.run!.cell.x }, { translateY: frames.run!.cell.y }, { scale: 0.9986 }]}>
+            <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={374} h={237} /></Group>
+          : <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />)
         : <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />}</Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
       {actions ? (['eat', 'pat'] as const).map(kind => <ActionClip key={kind} kind={kind} spec={actions[kind]} visit={visit} clock={clock} shown={actionShown} w={w} ground={frames.ground} />) : null}
