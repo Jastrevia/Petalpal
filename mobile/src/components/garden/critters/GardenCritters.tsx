@@ -517,7 +517,7 @@ const PAIR_SCENES: Record<SceneKind, { source: number; columns: number; count: n
   hug: { source: require('@/assets/garden/critters/pair-hug.webp'), columns: 8, count: 71, w: 428, h: 220, anchor: [124, 211.8], k: 0.3072 },
 };
 const SCENE_FPS = 12;
-function PairSceneClip({ scene, clock }: { scene: Scene; clock: SharedValue<number> }) {
+export function PairSceneClip({ scene, clock }: { scene: Scene; clock: SharedValue<number> }) {
   const spec = PAIR_SCENES[scene.kind];
   const sheet = useImage(spec.source);
   const frame = useDerivedValue(() => Math.max(0, Math.min(spec.count - 1, Math.floor((clock.value - scene.start) * SCENE_FPS))), [scene, spec]);
