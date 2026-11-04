@@ -24,20 +24,23 @@ const SIN = Math.sin(Math.PI / 3);
 const clamp = (v: number, low: number, high: number) => Math.min(high, Math.max(low, v));
 
 // The ring around the pet's body, to its right (its left when the right has no room), moved just
-// enough to stay whole on the screen. `panel`: the wider arc that lists foods or pieces.
+// enough to stay whole on the screen. `panel`: the same plate listing foods or pieces, with room
+// for its title above and its page dots just outside it.
 export function ringLayout(pet: PetSpot, viewport: Viewport, panel = false): RingLayout {
   const { width, height } = viewport;
   // Small enough to sit beside the pet without covering the Garden (owner, 2026-11-05: big enough
-  // to read, no bigger); each segment still a comfortable tap.
+  // to read, no bigger); each segment still a comfortable tap. The food and wardrobe panels are
+  // the very same plate as the ring (owner: the same size), their cards along its middle.
   const inner = clamp(pet.body * 0.5, 30, 70);
-  const outer = inner + (panel ? clamp(width * 0.3, 112, 126) : 58);
+  const outer = inner + 58;
   const header = panel ? 52 : 0;
+  const room = outer + (panel ? 24 : 0);
   let cx = pet.x;
   const cy0 = pet.y - pet.body * 0.38;
-  const right = cx + outer <= width - MARGIN, left = cx - outer >= MARGIN;
+  const right = cx + room <= width - MARGIN, left = cx - room >= MARGIN;
   const side: 1 | -1 = right ? 1 : left ? -1 : cx <= width / 2 ? 1 : -1;
-  if (side === 1) cx = Math.max(Math.min(cx, width - MARGIN - outer), MARGIN - inner * 0.5);
-  else cx = Math.min(Math.max(cx, MARGIN + outer), width - MARGIN + inner * 0.5);
+  if (side === 1) cx = Math.max(Math.min(cx, width - MARGIN - room), MARGIN - inner * 0.5);
+  else cx = Math.min(Math.max(cx, MARGIN + room), width - MARGIN + inner * 0.5);
   const half = outer * SIN;
   const cy = Math.max(TOP_CLEAR + header + half, Math.min(cy0, height - BOTTOM_CLEAR - half));
   return { cx, cy, side, inner, outer, header };
@@ -57,10 +60,11 @@ export function ringPoint(layout: RingLayout, r: number, t: number) {
 // Where a screen point falls: outside the ring (null), or `t` along it and the segment (0 top).
 export function ringSpot(layout: RingLayout, x: number, y: number) {
   const dx = x - layout.cx, dy = y - layout.cy, r = Math.hypot(dx, dy);
-  if (r < layout.inner || r > layout.outer) return null;
+  // (A press with no position, as from a keyboard, is outside: NaN fails every comparison.)
+  if (!(r >= layout.inner && r <= layout.outer)) return null;
   const a = Math.atan2(dy, dx); // (-π, π]
   const t = layout.side === 1 ? a / (Math.PI / 3) : (Math.PI - (a < 0 ? a + 2 * Math.PI : a)) / (Math.PI / 3);
-  if (t < -1 || t > 1) return null;
+  if (!(t >= -1 && t <= 1)) return null;
   return { t, segment: Math.min(RING_ACTIONS.length - 1, Math.floor((t + 1) / 2 * RING_ACTIONS.length)) };
 }
 

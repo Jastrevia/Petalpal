@@ -312,6 +312,9 @@ test('the pet ring is a 120° third of a ring beside the pet, whole on a phone s
     }
   }
   // Room to its right: it opens to the right; at the right edge, to the left.
+  // A press without a position (keyboard) is outside the ring, never an unknown segment.
+  assert.equal(ring.ringSpot(ring.ringLayout({ x: 200, y: 400, body: 40 }, phone), undefined, undefined), null);
+  assert.equal(ring.ringSpot(ring.ringLayout({ x: 200, y: 400, body: 40 }, phone), NaN, 400), null);
   assert.equal(ring.ringLayout({ x: 60, y: 400, body: 40 }, phone).side, 1);
   assert.equal(ring.ringLayout({ x: 340, y: 400, body: 40 }, phone).side, -1);
   const left = ring.ringLayout({ x: 340, y: 400, body: 40 }, phone), up = ring.ringPoint(left, left.outer, -1);

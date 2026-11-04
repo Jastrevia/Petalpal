@@ -39,7 +39,7 @@ const FOOD_ICONS: Record<string, string> = { 'berry-tart': '🥧', 'flower-cooki
 const ACTION_ICONS: Record<RingAction, string | number> = { feed: '🥣', pat: '✋', dress: ACCESSORY_ICONS['lilac-cape'] };
 
 const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
-const ITEM_H = 60, CARD = 42;
+const ITEM_H = 50, CARD = 32;
 type Mode = 'ring' | 'feed' | 'dress';
 
 export type PetRingProps = { petId: PetId; pet: PetSpot; viewport: Viewport; locale: 'en' | 'zh-Hans'; onClose: () => void };
@@ -264,7 +264,7 @@ function ArcList({ layout, cards, busy, copy }: { layout: RingLayout; cards: Car
     const to = Math.max(0, Math.min(pages - 1, page + by));
     ref.current?.scrollTo({ y: to * perPage * ITEM_H, animated: true });
   };
-  const dotsX = cx + side * (outer - 15);
+  const dotsX = cx + side * (outer + 12);
   return <>
     <ScrollView ref={ref} onScroll={event => { scrollY.value = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16} showsVerticalScrollIndicator={false}
       style={{ position: 'absolute', left: boxLeft, top: boxTop, width: boxWidth, height: boxHeight }}
@@ -272,7 +272,7 @@ function ArcList({ layout, cards, busy, copy }: { layout: RingLayout; cards: Car
       {cards.map((card, i) => <ArcCard key={card.key} card={card} index={i} scrollY={scrollY} busy={busy}
         geometry={{ cy, side, cx, mid, full, reach, boxTop, boxLeft, pad }} />)}
     </ScrollView>
-    {pages > 1 ? <View style={[styles.dots, { left: dotsX - 13, top: cy - 62 }]}>
+    {pages > 1 ? <View style={[styles.dots, { left: dotsX - 13, top: cy - 44 }]}>
       <Pressable onPress={() => go(-1)} accessibilityRole="button" accessibilityLabel={copy.up} hitSlop={6}><Text style={[styles.arrow, page === 0 && styles.arrowOff]}>▲</Text></Pressable>
       {Array.from({ length: Math.min(pages, 7) }, (_, i) => <View key={i} style={[styles.dot, i === Math.min(page, 6) && styles.dotOn]} />)}
       <Pressable onPress={() => go(1)} accessibilityRole="button" accessibilityLabel={copy.down} hitSlop={6}><Text style={[styles.arrow, page >= pages - 1 && styles.arrowOff]}>▼</Text></Pressable>
@@ -346,17 +346,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 244, 224, 0.92)', borderWidth: 1.5, borderColor: 'rgba(233, 201, 121, 0.7)' },
   cardWorn: { borderColor: GOLD, borderWidth: 2.5 },
   cardDim: { opacity: 0.5 },
-  cardEmoji: { fontSize: 20 },
-  cardImage: { width: CARD - 6, height: CARD - 6 },
-  cardLabel: { ...text, fontSize: 10, marginTop: 1, maxWidth: CARD + 24, textShadowColor: '#2A1638', textShadowRadius: 3 },
+  cardEmoji: { fontSize: 16 },
+  cardImage: { width: CARD - 4, height: CARD - 4 },
+  cardLabel: { ...text, fontSize: 9.5, marginTop: 1, maxWidth: CARD + 24, textShadowColor: '#2A1638', textShadowRadius: 3 },
   cardLabelDim: { opacity: 0.7 },
   cardSub: { ...text, fontSize: 9, opacity: 0.75 },
-  badge: { position: 'absolute', right: 6, top: CARD - 14, minWidth: 22, paddingHorizontal: 3, borderRadius: 9, backgroundColor: '#6B3F7E', borderWidth: 1, borderColor: GOLD, alignItems: 'center' },
-  badgeText: { ...text, fontSize: 9.5 },
-  check: { position: 'absolute', right: 8, top: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#E2B84E', borderWidth: 1, borderColor: '#FFF3D6', alignItems: 'center', justifyContent: 'center' },
-  checkText: { color: '#4A2A10', fontSize: 10, fontWeight: '700', lineHeight: 13 },
-  lock: { position: 'absolute', right: 8, top: CARD - 16, width: 16, height: 16, borderRadius: 8, backgroundColor: 'rgba(60, 38, 78, 0.9)', alignItems: 'center', justifyContent: 'center' },
-  lockText: { fontSize: 8, lineHeight: 11 },
+  badge: { position: 'absolute', right: 6, top: CARD - 12, minWidth: 18, paddingHorizontal: 2, borderRadius: 9, backgroundColor: '#6B3F7E', borderWidth: 1, borderColor: GOLD, alignItems: 'center' },
+  badgeText: { ...text, fontSize: 8.5 },
+  check: { position: 'absolute', right: 8, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#E2B84E', borderWidth: 1, borderColor: '#FFF3D6', alignItems: 'center', justifyContent: 'center' },
+  checkText: { color: '#4A2A10', fontSize: 9, fontWeight: '700', lineHeight: 12 },
+  lock: { position: 'absolute', right: 8, top: CARD - 13, width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(60, 38, 78, 0.9)', alignItems: 'center', justifyContent: 'center' },
+  lockText: { fontSize: 7, lineHeight: 10 },
   dots: { position: 'absolute', width: 26, alignItems: 'center', gap: 5 },
   arrow: { ...text, fontSize: 12, color: GOLD },
   arrowOff: { opacity: 0.35 },
