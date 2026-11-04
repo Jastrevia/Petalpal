@@ -22,3 +22,16 @@ equivalent and resolve dataset permissions first. An MIT badge is not sufficient
 
 Exact sources, provenance blockers and technical assessment:
 [docs/content-safety.md](docs/content-safety.md#dependency-and-licensing-assessment).
+
+## Treehouse journal books — EB Garamond
+
+The 3D monthly journal books (`mobile/src/components/bookhouse/book3d/`) letter their
+covers and pages in EB Garamond, redistributed unmodified in `mobile/assets/fonts/`:
+
+| Font files | Source | License |
+| --- | --- | --- |
+| `EBGaramond-Regular.ttf`, `EBGaramond-MediumItalic.ttf` | `@expo-google-fonts/eb-garamond@0.4.3` (npm) | SIL Open Font License 1.1 — Copyright 2017 The EB Garamond Project Authors |
+
+The full license text ships beside the fonts as `mobile/assets/fonts/EBGaramond-OFL.txt`.
+The book textures in `mobile/assets/bookhouse/journal/` are derived from PetalPal's own
+spine artwork (see `mobile/scripts/journal-books/README.md`); no third-party artwork is included.
