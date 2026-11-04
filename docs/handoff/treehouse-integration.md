@@ -47,10 +47,13 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
   English). The screen sets the language once per render (`setTreehouseLocale`). Checked in the
   local preview at 390×844 in 简体中文: the shelf (title, years, spines, locked labels), the open
   book's left page (flower, event and mood headings, empty-state lines), the right page's prompt
-  and the date caption. NOT checked yet: a day that has a journal, edit mode, voice input, the
-  photo and delete menus, Flower History, the save ceremony, `RecordsPage.tsx`/`WritingPage.tsx`
-  (the readable-text versions). Strings those screens show that are not in the table are still
-  English. The Petal Ring card prompt that appears over the Treehouse is another feature and is
-  still English.
+  and the date caption. Also checked (375×812, 简体中文): a day with a journal (spread and close-up
+  page), edit mode (unsaved chip 「未保存」, save button, 「❦ 日记已保存」), the actions menu and the
+  delete confirmation, the photo button; a scan of the open book found no English left besides the
+  owner's own writing. Fixed on the way: the unsaved chip was too long and pushed the date onto two
+  lines; the safety note on the writing page was drawn in the dark-panel colour (pale teal, nearly
+  invisible on parchment, in English too) and now uses the page's ink. NOT checked: voice input
+  (its strings are in the table), Flower History (no entry button). The Petal Ring card prompt that
+  appears over the Treehouse is another feature and is still English.
 - Flower History has no entry button in the new Treehouse (the sheet is still in bookhouse.tsx).
 - Not checked on a device or in the native app; nothing pushed or deployed.

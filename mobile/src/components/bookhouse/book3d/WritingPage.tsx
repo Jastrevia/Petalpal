@@ -163,7 +163,8 @@ export const WritingPage = forwardRef<WritingPageHandle, {
                 height: Platform.OS === 'web' ? Math.max(m.body.line * 4, viewport - noteHeight - 28, bodyHeight) : undefined }]} />
               : <Text selectable style={[regular, { fontSize: m.body.size, lineHeight: m.body.line, color: '#43361F' }]}>{text.body}</Text>}
           </View>
-          {editable && <View style={{ marginTop: 10 }} onLayout={e => setNoteHeight(e.nativeEvent.layout.height)}><EmotionalSafetyNote text={`${text.title}\n${text.body}`} /></View>}
+          {editable && <View style={{ marginTop: 10 }} onLayout={e => setNoteHeight(e.nativeEvent.layout.height)}><EmotionalSafetyNote text={`${text.title}\n${text.body}`}
+            style={{ fontFamily: fontRegular, fontSize: 12, lineHeight: 17, color: SOFT }} /></View>}
           {journal && <View style={{ marginTop: 14 }}><JournalCover key={journal.id} userId={userId} journalId={journal.id} size={112} readOnly={writable && !editing} /></View>}
           {!journal && editable && <Text style={[italic, { marginTop: 12, fontSize: 13, color: SOFT }]}>{tt('Photos can be added once the journal is saved.')}</Text>}
         </ScrollView>

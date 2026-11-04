@@ -121,7 +121,7 @@ const ZH: Record<string, string> = {
   'Only for you. Not sent to AI or saved as an Event memory.': '只属于你，不会发送给 AI，也不会存成事件记忆。',
   'Saving…': '正在保存…',
   'Save failed': '保存失败',
-  'Unsaved changes': '有未保存的修改',
+  'Unsaved changes': '未保存',
   'Saved': '已保存',
   'Edit': '编辑',
   'Edit this journal': '编辑这篇日记',
