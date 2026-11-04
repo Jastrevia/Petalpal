@@ -15,7 +15,8 @@ import { Scrollkeeper } from '../Scrollkeeper';
 const BACK = require('../../../../assets/bookhouse/reference/room-back.webp');
 const FRONT = require('../../../../assets/bookhouse/reference/room-front.webp');
 /** Beyond the illustration (wide windows): the room's own darkest wood tone. */
-const GROUND = '#1C1008';
+export const REFERENCE_GROUND = '#1C1008';
+const GROUND = REFERENCE_GROUND;
 
 function useRoomPicture(source: number, pull: SharedValue<number>, geometry: ComposedGeometry, ground: boolean) {
   const image = useImage(source);
