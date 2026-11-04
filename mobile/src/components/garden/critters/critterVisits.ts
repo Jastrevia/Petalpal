@@ -23,8 +23,8 @@ export type CritterSpec = {
 };
 // The Maltese's drawn size and walking pace (world units), from its painted walk.
 // (Its sheet's cells are 293 px wide; 62 units makes it stand about 42 units tall, some six tenths of
-// the puppy. Its painted walk covers 78.8 units a loop: 30 units a second steps it quickly, a small dog.)
-export const MALTESE_SIZE = 62, MALTESE_SPEED = 30;
+// the puppy. Its painted walk covers 45 units a stride cycle in 1.8 s: 27 units a second is its own pace.)
+export const MALTESE_SIZE = 62, MALTESE_SPEED = 27;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },

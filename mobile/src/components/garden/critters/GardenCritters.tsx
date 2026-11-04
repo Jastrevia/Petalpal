@@ -40,12 +40,15 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The puppy walks, gallops after the bluebird and sits down where it caught up in its outfit's
   // paintings (puppyLooks.ts; bare when it has nothing on), all sharing one crop, ground and scale.
   puppy: { source: PUPPY_LOOKS.bare.source, w: 418, h: 300, frames: PUPPY_LOOKS.bare },
-  // The Maltese, the puppy's tiny friend: an oil-motion walk (one 5 s loop, 40 frames kept) and a
-  // walk-to-sit (20 frames), cut with one crop (190,30,920,690) so they lie on the same cells.
+  // The Maltese, the puppy's tiny friend: an oil-motion walk (a four-beat walk, one stride cycle of
+  // 43 frames, 45 units of ground) and a walk-to-sit (20 frames), cut with one crop (190,30,920,690)
+  // so they lie on the same cells. Only frames where its legs are moving are kept: a still stretch
+  // in a loop made it slide.
   maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
-    frames: { columns: 8, count: 40, ground: 216, loop: 78.8, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
-      // Its run (one 5 s loop, 32 frames kept), same cells: chasing the puppy or dashing off in a game.
-      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 32, loop: 178.4 } } },
+    frames: { columns: 8, count: 43, ground: 216, loop: 45, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
+      // Its run, same cells: a trot in diagonal pairs (one cycle, 26 frames, 36 units), chasing the
+      // puppy or dashing off in a game.
+      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 26, loop: 36 } } },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
