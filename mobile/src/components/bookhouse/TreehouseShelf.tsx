@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Reanimated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { MONTH_NAMES, MONTHS, monthKey, monthLocked, yearLocked } from '../../services/bookhouse';
+import { monthKey, monthLocked, yearLocked } from '../../services/bookhouse';
+import { journalCount, monthShort, monthYear, treehouseZh, tt } from '../../services/treehouseCopy';
 import { BookhouseArt } from './BookhouseArt';
 import { ArtWindow, Icon, LOCK_ICON, palette, serif } from './TreehouseArt';
 import { useShelfImages } from './book3d/assets';
@@ -158,7 +159,7 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
     <View {...targets.shelf} pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: cabinetTop, height: cabinetBottom - cabinetTop }} />
     <YearRail layout={layout} cabinetTop={cabinetTop} railBottom={railBottom} years={years} year={year} today={today} counts={counts}
       onSelectYear={onSelectYear} onLocked={onLocked} target={targets.years} />
-    <Animated.View {...targets.books} accessibilityLabel={`${year} bookshelf`}
+    <Animated.View {...targets.books} accessibilityLabel={treehouseZh() ? `${year}年的书架` : `${year} bookshelf`}
       style={{ position: 'absolute', left: booksLeft, top: cabinetTop, width: layout.interior[1] - layout.interior[0] + layout.overlap * 2, height: cabinetBottom - cabinetTop, opacity: fade }}>
       {drawn && <ShelfBooks width={layout.interior[1] - layout.interior[0] + layout.overlap * 2} height={cabinetBottom - cabinetTop}
         camera={scene.camera} books={scene.books} images={images} />}
@@ -174,7 +175,7 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
           }}
           onPressIn={() => setPressed(slot.month)} onPressOut={() => setPressed(month => month === slot.month ? null : month)}
           onPress={() => void measureBook(bookNodes.current?.get(key)).then(rect => onOpenMonth(year, slot.month, rect))}
-          onLocked={() => onLocked('This month has not arrived yet.')} />;
+          onLocked={() => onLocked(tt('This month has not arrived yet.'))} />;
       })}
     </Animated.View>
     <Reanimated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, footerStyle]}>{footer(layout.rail[1] + 6, 8)}</Reanimated.View>
@@ -186,11 +187,11 @@ function Book({ month, year, count, locked, drawn, left, top, width, height, hid
   hitSlop?: { left: number; right: number; top: number; bottom: number };
   hidden: boolean; register: (node: View | null) => void; onPress: () => void; onPressIn: () => void; onPressOut: () => void; onLocked: () => void;
 }) {
-  const name = `${MONTH_NAMES[month - 1]} ${year}`;
+  const name = monthYear(year, month);
   const lock = Math.max(14, Math.min(19, width * .44));
   return <Pressable ref={register} testID={`book-${monthKey(year, month)}`} accessibilityRole="button"
-    accessibilityLabel={locked ? `${name}, locked` : `${name}, ${count ? `${count} ${count === 1 ? 'journal' : 'journals'}` : 'no journals yet'}`}
-    accessibilityHint={locked ? 'This month has not arrived yet.' : undefined} accessibilityState={{ disabled: locked }}
+    accessibilityLabel={`${name}${treehouseZh() ? '，' : ', '}${locked ? tt('locked') : count ? journalCount(count) : tt('no journals yet')}`}
+    accessibilityHint={locked ? tt('This month has not arrived yet.') : undefined} accessibilityState={{ disabled: locked }}
     onPress={locked ? onLocked : onPress} onPressIn={locked ? undefined : onPressIn} onPressOut={onPressOut} hitSlop={hitSlop || { left: 2, right: 2, top: 4, bottom: 4 }}
     disabled={hidden} style={({ pressed }) => [{ position: 'absolute', left, top, width, height, opacity: hidden ? 0 : 1 }, pressed && !locked && { transform: [{ translateY: -4 }] }]}>
     {/* The web ignores hitSlop: there the wider touch area is an invisible margin around the book (the measured slot
@@ -208,7 +209,7 @@ function Book({ month, year, count, locked, drawn, left, top, width, height, hid
       {locked && <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.veil]}><BookhouseArt index={month - 1} width={width} height={height} tint="#F4EEE3" /></View>}
     </View></>}
     <View pointerEvents="none" style={[styles.label, locked && styles.labelLocked, { top: height * .2 }]}>
-      <Text numberOfLines={1} style={[styles.labelText, locked && { color: '#4A453C' }, { fontSize: Math.max(11, Math.min(15, width * .34)) }]}>{MONTHS[month - 1]}</Text>
+      <Text numberOfLines={1} style={[styles.labelText, locked && { color: '#4A453C' }, { fontSize: Math.max(11, Math.min(15, width * .34)) }]}>{monthShort(month)}</Text>
     </View>
     {locked && <View pointerEvents="none" style={[styles.lock, { top: height * .045, right: -lock * .32 }]}><Icon source={LOCK_ICON} size={lock} /></View>}
     {!!count && <View pointerEvents="none" style={[styles.ribbon, { right: width * .16 }]}><View style={styles.ribbonNotch} /></View>}
@@ -231,16 +232,16 @@ function YearRail({ layout, cabinetTop, railBottom, years, year, today, counts, 
   return <View {...target} pointerEvents={inert ? 'none' : 'auto'} accessibilityElementsHidden={inert} importantForAccessibility={inert ? 'no-hide-descendants' : 'auto'}
     style={{ position: 'absolute', left, width: right - left, top: cabinetTop, height: railBottom - cabinetTop }}>
     <ScrollView scrollEnabled={contentHeight > railBottom - cabinetTop + 1} showsVerticalScrollIndicator={false} bounces={false}
-      accessibilityRole="tablist" accessibilityLabel="Journal years" contentContainerStyle={{ height: contentHeight }}>
+      accessibilityRole="tablist" accessibilityLabel={tt('Journal years')} contentContainerStyle={{ height: contentHeight }}>
       {years.map((value, i) => {
         const saved = Array.from({ length: 12 }, (_, m) => counts.get(monthKey(value, m + 1)) || 0).reduce((a, b) => a + b, 0);
         const locked = yearLocked(value, today, saved);
         const selected = value === year;
         const slotTop = i === 0 ? 0 : tops[i - 1] + label - cabinetTop;
         return <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected, disabled: locked }}
-          accessibilityLabel={`${value}${value === current ? ', this year' : ''}${locked ? ', locked' : saved ? `, ${saved} ${saved === 1 ? 'journal' : 'journals'}` : ''}`}
-          accessibilityHint={locked ? 'This year has not arrived yet.' : undefined}
-          onPress={() => locked ? onLocked(`${value} has not arrived yet.`) : onSelectYear(value)}
+          accessibilityLabel={`${value}${value === current ? `, ${tt('this year')}` : ''}${locked ? `, ${tt('locked')}` : saved ? `, ${journalCount(saved)}` : ''}`}
+          accessibilityHint={locked ? tt('This year has not arrived yet.') : undefined}
+          onPress={() => locked ? onLocked(treehouseZh() ? `${value}年还没到。` : `${value} has not arrived yet.`) : onSelectYear(value)}
           style={{ position: 'absolute', left: 0, right: 0, top: slotTop, height: tops[i] + label - cabinetTop - slotTop, justifyContent: 'flex-end', alignItems: 'center' }}>
           <View style={[styles.year, selected ? styles.yearSelected : locked ? styles.yearLocked : value === current ? styles.yearCurrent : styles.yearInlay]}>
             <Text numberOfLines={1} style={[styles.yearText, selected ? styles.yearSelectedText : locked ? styles.yearLockedText : value === current ? styles.yearCurrentText : null]}>{value}</Text>

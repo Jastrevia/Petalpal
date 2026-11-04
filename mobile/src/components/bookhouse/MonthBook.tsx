@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, runOnJS, useAnimatedReaction, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Canvas, Picture, createPicture, type SkImage } from '@shopify/react-native-skia';
 import { useFonts } from 'expo-font';
-import { formatLocalDate, journalLocked, MONTH_NAMES, MONTHS, weekdayOf, type JournalCheckIn, type JournalDay } from '../../services/bookhouse';
+import { formatLocalDate, journalLocked, weekdayOf, type JournalCheckIn, type JournalDay } from '../../services/bookhouse';
+import { journalCount, monthDay, monthYear, treehouseZh, tt } from '../../services/treehouseCopy';
 import { clothRgb, CLOTH, LIGHT_CLOTH } from './book3d/assets';
 import { pullAt, pullOrigin, ROOM_ARTWORK, type PullGeometry } from './book3d/scene';
 import { drawBook, drawFloatShadow, pageShade } from './book3d/engine';
 import { SPEC } from './book3d/math';
 import { bookLayout, deskBookLayout, closeTiming, CLOSE_MS, CLOSE_STAGES, DESK_CLOSE_MS, DESK_CLOSE_STAGES, DESK_HANDOFF_T, DESK_OPEN_MS, DESK_OPEN_STAGES, focusOffsets, LEAN_MS, OPEN_MS, OPEN_STAGES, openTiming, openingFrame, pageCentres, projectPoint, pullOf, readingFrame, RIFFLE_STAGGER, TURN_MS, turnPages, type ShelfOrigin } from './book3d/motion';
+import { useLayoutWindow } from './book3d/layoutWindow';
 import { RecordsPage } from './book3d/RecordsPage';
 import { SaveCeremony } from './book3d/SaveCeremony';
 import { defaultSlot, rightPageOf, usePageFaces } from './book3d/usePageFaces';
@@ -89,7 +91,7 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
   /** Reloads the shelf after a confirmed save; resolves once the new journals are in `days`. */
   onSaved: (journalId: string) => Promise<void>; onActions: (entry: JournalCheckIn) => void;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useLayoutWindow();
   const insets = useSafeAreaInsets();
   const deskColumn = scene.column;
   const footerRoom = scene.footer ?? 0;
@@ -479,17 +481,19 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
     {/* The whole spread on the desk: tap a page to bring it close; bookmarks stand out of the fore-edge. */}
     {spread && <>
       {day && mode === 'idle' && <View {...swipe.panHandlers} style={{ position: 'absolute', left: lx0, top: ry0, width: rx1 - lx0, height: ry1 - ry0, flexDirection: 'row' }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Records for ${formatLocalDate(day.localDate)}`} accessibilityHint="Brings the left page close: the day's flower, Event and mood"
+        <Pressable accessibilityRole="button" accessibilityLabel={treehouseZh() ? `${formatLocalDate(day.localDate)}的记录` : `Records for ${formatLocalDate(day.localDate)}`} accessibilityHint={tt("Brings the left page close: the day's flower, Event and mood")}
           onPress={() => leanIn(-1)} style={{ width: rx0 - lx0, height: '100%' }} />
-        <Pressable accessibilityRole="button" accessibilityLabel={which.kind === 'new' ? `Write today's journal, ${formatLocalDate(day.localDate)}` : which.kind === 'journal' ? `${entry && journalLocked(entry) ? 'Read' : 'Read or write'} the journal for ${formatLocalDate(day.localDate)}` : `Journal page for ${formatLocalDate(day.localDate)}`}
-          accessibilityHint="Brings the right page close" onPress={() => leanIn(1)} style={{ flex: 1, height: '100%' }} />
+        <Pressable accessibilityRole="button" accessibilityLabel={treehouseZh()
+            ? `${formatLocalDate(day.localDate)}${which.kind === 'new' ? '，写今天的日记' : which.kind === 'journal' ? (entry && journalLocked(entry) ? '，阅读日记' : '，阅读或编辑日记') : '的日记页'}`
+            : which.kind === 'new' ? `Write today's journal, ${formatLocalDate(day.localDate)}` : which.kind === 'journal' ? `${entry && journalLocked(entry) ? 'Read' : 'Read or write'} the journal for ${formatLocalDate(day.localDate)}` : `Journal page for ${formatLocalDate(day.localDate)}`}
+          accessibilityHint={tt('Brings the right page close')} onPress={() => leanIn(1)} style={{ flex: 1, height: '100%' }} />
       </View>}
       {days.length > 0 && <View style={{ position: 'absolute', left: L.tabLeft, top: L.tabTop, width: L.width - L.tabLeft, height: L.tabHeight }}>
         {/* More bookmarks above or below: small brass arrows page the column (inside the rail, never past the book). */}
-        {tabsScroll && <Pressable accessibilityRole="button" accessibilityLabel="Earlier bookmarks" disabled={tabOffset <= 2} onPress={() => pageTabs(-1)} hitSlop={{ top: 6, bottom: 2, left: 8, right: 8 }}
+        {tabsScroll && <Pressable accessibilityRole="button" accessibilityLabel={tt('Earlier bookmarks')} disabled={tabOffset <= 2} onPress={() => pageTabs(-1)} hitSlop={{ top: 6, bottom: 2, left: 8, right: 8 }}
           style={[styles.tabArrow, { top: 1 }, tabOffset <= 2 && styles.tabArrowOff]}><Text style={styles.tabArrowText}>▴</Text></Pressable>}
         <View style={{ position: 'absolute', left: 0, right: 0, top: tabsScroll ? TAB_ARROW : 0, height: tabView, overflow: 'hidden' }}>
-          <ScrollView ref={tabs} showsVerticalScrollIndicator={false} accessibilityRole="tablist" accessibilityLabel="Date bookmarks"
+          <ScrollView ref={tabs} showsVerticalScrollIndicator={false} accessibilityRole="tablist" accessibilityLabel={tt('Date bookmarks')}
             onContentSizeChange={() => showTab(false)} scrollEventThrottle={16} onScroll={event => setTabOffset(event.nativeEvent.contentOffset.y)}
             scrollEnabled={tabsScroll} bounces={false} overScrollMode="never" decelerationRate="fast"
             contentContainerStyle={{ gap: TAB_GAP, paddingVertical: tabsScroll ? 0 : Math.max(0, (tabView - tabsHeight) / 2) }}>
@@ -501,7 +505,7 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
               top: (tabView - Math.max(18, tabView * tabView / tabsHeight)) * Math.max(0, Math.min(1, tabOffset / Math.max(1, tabMax))) }]} />
           </View>}
         </View>
-        {tabsScroll && <Pressable accessibilityRole="button" accessibilityLabel="Later bookmarks" disabled={tabOffset >= tabMax - 2} onPress={() => pageTabs(1)} hitSlop={{ top: 2, bottom: 6, left: 8, right: 8 }}
+        {tabsScroll && <Pressable accessibilityRole="button" accessibilityLabel={tt('Later bookmarks')} disabled={tabOffset >= tabMax - 2} onPress={() => pageTabs(1)} hitSlop={{ top: 2, bottom: 6, left: 8, right: 8 }}
           style={[styles.tabArrow, { top: L.tabHeight - TAB_ARROW + 3 }, tabOffset >= tabMax - 2 && styles.tabArrowOff]}><Text style={styles.tabArrowText}>▾</Text></Pressable>}
       </View>}
     </>}
@@ -529,24 +533,26 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
     {settled && <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {/* Top buttons stay where the Treehouse's own are (the window's column), even when the book's column is narrower. */}
       <View style={{ position: 'absolute', top: insets.top + 3, left: (width - Math.min(width, 560)) / 2 + 12 }}>
-        {closeUp ? <RoundButton label="Back to both pages" icon={ICONS.back} disabled={mode !== 'focused'} onPress={() => leanOut()} />
-          : <RoundButton label="Back to bookshelf" icon={ICONS.back} disabled={mode !== 'idle'} onPress={close} />}
+        {closeUp ? <RoundButton label={tt('Back to both pages')} icon={ICONS.back} disabled={mode !== 'focused'} onPress={() => leanOut()} />
+          : <RoundButton label={tt('Back to bookshelf')} icon={ICONS.back} disabled={mode !== 'idle'} onPress={close} />}
       </View>
       {/* (No close button: a tap anywhere off the open book — the desk, the bookcase behind it — closes it; see the
           Treehouse screen. The back button above does too.) */}
       {spread && <View style={[styles.controls, { top: L.below + 8, left: L.side + 12, right: L.side + 12 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Previous day" disabled={target <= 0} onPress={() => turnTo(viewRef.current.index - 1)}
+        <Pressable accessibilityRole="button" accessibilityLabel={tt('Previous day')} disabled={target <= 0} onPress={() => turnTo(viewRef.current.index - 1)}
           style={[styles.turn, target <= 0 && { opacity: .35 }]}><Text style={styles.arrow}>‹</Text></Pressable>
         <View accessibilityLiveRegion="polite" style={{ flex: 1, alignItems: 'center' }}>
-          <Text numberOfLines={1} style={[styles.pageNumber, { fontFamily: italicFace }]}>{shownDay ? `${weekdayOf(shownDay.localDate)}, ${MONTHS[Number(shownDay.localDate.slice(5, 7)) - 1]} ${Number(shownDay.localDate.slice(8))}` : `${MONTH_NAMES[month - 1]} ${year}`}</Text>
+          <Text numberOfLines={1} style={[styles.pageNumber, { fontFamily: italicFace }]}>{shownDay ? (treehouseZh()
+            ? `${monthDay(Number(shownDay.localDate.slice(5, 7)), Number(shownDay.localDate.slice(8)))} ${weekdayOf(shownDay.localDate)}`
+            : `${weekdayOf(shownDay.localDate)}, ${monthDay(Number(shownDay.localDate.slice(5, 7)), Number(shownDay.localDate.slice(8)))}`) : monthYear(year, month)}</Text>
           {/* An unsaved draft on this day is never mistaken for a saved journal: it replaces the month line. */}
           {shownDay && [...drafts.keys()].some(k => k.startsWith(`${shownDay.localDate}|`))
-            ? <Text numberOfLines={1} style={[styles.pageSub, styles.draftNote, { fontFamily: italicFace }]}>Unsaved draft · tap the page to finish</Text>
-            : <Text numberOfLines={1} style={[styles.pageSub, { fontFamily: italicFace }]}>{shownDay ? `${MONTH_NAMES[month - 1]} ${year} · ${target + 1} of ${days.length}` : 'No journals or records this month'}</Text>}
+            ? <Text numberOfLines={1} style={[styles.pageSub, styles.draftNote, { fontFamily: italicFace }]}>{tt('Unsaved draft · tap the page to finish')}</Text>
+            : <Text numberOfLines={1} style={[styles.pageSub, { fontFamily: italicFace }]}>{shownDay ? `${monthYear(year, month)} · ${treehouseZh() ? `第 ${target + 1} / ${days.length} 页` : `${target + 1} of ${days.length}`}` : tt('No journals or records this month')}</Text>}
         </View>
-        {todayIndex >= 0 && target !== todayIndex ? <Pressable accessibilityRole="button" accessibilityLabel="Turn to today" onPress={() => turnTo(todayIndex)} style={styles.today}>
-          <Text style={[styles.todayText, { fontFamily: italicFace }]}>Today</Text></Pressable> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Next day" disabled={target >= days.length - 1} onPress={() => turnTo(viewRef.current.index + 1)}
+        {todayIndex >= 0 && target !== todayIndex ? <Pressable accessibilityRole="button" accessibilityLabel={tt('Turn to today')} onPress={() => turnTo(todayIndex)} style={styles.today}>
+          <Text style={[styles.todayText, { fontFamily: italicFace }]}>{tt('Today')}</Text></Pressable> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel={tt('Next day')} disabled={target >= days.length - 1} onPress={() => turnTo(viewRef.current.index + 1)}
           style={[styles.turn, target >= days.length - 1 && { opacity: .35 }]}><Text style={styles.arrow}>›</Text></Pressable>
       </View>}
     </View>}
@@ -583,7 +589,7 @@ function hexRgb(hex: string, k = 1): [number, number, number] {
 
 function Bookmark({ day, today, selected, ribbon, height, onPress }: { day: JournalDay; today: boolean; selected: boolean; ribbon: string; height: number; onPress: () => void }) {
   const n = day.journals.length;
-  const label = `${formatLocalDate(day.localDate)}${today ? ', today' : ''}${n ? `, ${n} ${n === 1 ? 'journal' : 'journals'}` : ', no journal'}`;
+  const label = `${formatLocalDate(day.localDate)}${today ? `, ${tt('today')}` : ''}, ${n ? journalCount(n) : tt('no journal')}`;
   return <Pressable accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} hitSlop={{ top: 1.5, bottom: 1.5, left: 4, right: 10 }}
     style={[styles.bookmark, { height, width: selected ? 38 : 32 }, today && !selected && styles.bookmarkToday, selected && { backgroundColor: ribbon, borderColor: '#D9B56A' }]}>
     {!selected && <View style={[styles.bookmarkBand, { backgroundColor: today ? '#B98E45' : ribbon }]} />}

@@ -41,7 +41,31 @@ Branch `feat/treehouse-integration`, cut from `main` eca6d88e. It brings in the 
 
 - The walk is a hop with the idle clip's first pose: there is no real walk-cycle clip of the
   squirrel yet (would need a generated clip — paid, needs the owner's go-ahead).
-- The new Treehouse is English only: main's zh-Hans copy for the old Bookhouse does not apply to
-  the new components.
+- Chinese (branch `feat/treehouse-zh`): the painted pages use Noto Serif SC (`e65ba524`), and the
+  Treehouse words come from `mobile/src/services/treehouseCopy.ts` (`tt()` looks an English phrase
+  up in a table; months, dates, counts and moods are written per language; anything missing stays
+  English). The screen sets the language once per render (`setTreehouseLocale`). Checked in the
+  local preview at 390×844 in 简体中文: the shelf (title, years, spines, locked labels), the open
+  book's left page (flower, event and mood headings, empty-state lines), the right page's prompt
+  and the date caption. Also checked (375×812, 简体中文): a day with a journal (spread and close-up
+  page), edit mode (unsaved chip 「未保存」, save button, 「❦ 日记已保存」), the actions menu and the
+  delete confirmation, the photo button; a scan of the open book found no English left besides the
+  owner's own writing. Fixed on the way: the unsaved chip was too long and pushed the date onto two
+  lines; the safety note on the writing page was drawn in the dark-panel colour (pale teal, nearly
+  invisible on parchment, in English too) and now uses the page's ink. NOT checked: voice input
+  (its strings are in the table), Flower History (no entry button). The Petal Ring card prompt that
+  appears over the Treehouse is another feature and is still English.
+- Writing on a phone's browser (owner's report 2026-11-04, iPhone Safari, live: the words were very large and jumped
+  while typing): react-native-web reports the part of the page above the on-screen keyboard as the window, so the
+  open journal page was laid out again to that half-height as the keyboard opened (shrunk to about half its width, so
+  the words looked huge on it) and again each time the suggestion / Chinese candidate bar came and went. The Treehouse
+  now lays out to the app's own height (`book3d/layoutWindow.ts` `useLayoutWindow`: #root, 100dvh), and the writing
+  page ends its writing area above the keyboard from the visible part of the page (`useWebVisibleBottom`). On the
+  web the writing box takes its height from the same words set invisibly in the same type (a text area's scroll
+  height never shrank back, so the box stayed tall and scrolled to empty space). Checked in the local preview at
+  402×760 by giving the page iOS's keyboard viewport (visible height 424, then 380 for a candidate bar): the page
+  stays 386×574 with 18.5 px words, the words do not move as the keyboard opens, the newest line and Save stay above
+  the keyboard; at 1280×800 the desk still follows the window. NOT checked on a real iPhone (the simulator's typing
+  was unreliable).
 - Flower History has no entry button in the new Treehouse (the sheet is still in bookhouse.tsx).
 - Not checked on a device or in the native app; nothing pushed or deployed.

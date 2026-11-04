@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Easing, Modal, Pressable, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookhouseArt } from './BookhouseArt';
 import { Icon, ICONS, palette, serif } from './TreehouseArt';
+import { treehouseZh, tt } from '../../services/treehouseCopy';
 
 // Styled action sheet for a journal page. Delete always passes through a confirmation step.
 type SheetState = 'menu' | 'confirm' | 'deleting';
@@ -24,35 +25,35 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
   const remove = async () => {
     setState('deleting'); setError('');
     try { await onDelete(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to delete this journal. Please try again.'); setState('confirm'); }
+    catch (e) { setError(e instanceof Error ? e.message : tt('Unable to delete this journal. Please try again.')); setState('confirm'); }
   };
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={close}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Close journal actions" onPress={close} style={styles.scrim} />
+    <Pressable accessibilityRole="button" accessibilityLabel={tt('Close journal actions')} onPress={close} style={styles.scrim} />
     <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 14, opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
       {state === 'menu' ? <>
-        {onEdit && <Pressable accessibilityRole="button" accessibilityLabel="Edit this journal" accessibilityState={{ disabled: locked }} disabled={locked} onPress={onEdit}
+        {onEdit && <Pressable accessibilityRole="button" accessibilityLabel={tt('Edit this journal')} accessibilityState={{ disabled: locked }} disabled={locked} onPress={onEdit}
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed, locked && styles.actionDisabled]}>
-          <Icon source={ICONS.pencil} size={22} /><Text style={styles.actionText}>Edit this journal</Text>
+          <Icon source={ICONS.pencil} size={22} /><Text style={styles.actionText}>{tt('Edit this journal')}</Text>
         </Pressable>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Delete this journal" accessibilityState={{ disabled: locked }} disabled={locked} onPress={() => setState('confirm')}
+        <Pressable accessibilityRole="button" accessibilityLabel={tt('Delete this journal')} accessibilityState={{ disabled: locked }} disabled={locked} onPress={() => setState('confirm')}
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed, locked && styles.actionDisabled]}>
-          <Icon source={ICONS.trash} size={22} /><Text style={styles.actionText}>Delete this journal</Text>
+          <Icon source={ICONS.trash} size={22} /><Text style={styles.actionText}>{tt('Delete this journal')}</Text>
         </Pressable>
-        {locked && <Text accessibilityLiveRegion="polite" style={styles.lockedNote}>This journal grew a flower through Daily Grow, so it stays as written to keep your Flower History whole.</Text>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={close} style={({ pressed }) => [styles.cancel, pressed && styles.actionPressed]}>
-          <Text style={styles.cancelText}>Cancel</Text>
+        {locked && <Text accessibilityLiveRegion="polite" style={styles.lockedNote}>{tt('This journal grew a flower through Daily Grow, so it stays as written to keep your Flower History whole.')}</Text>}
+        <Pressable accessibilityRole="button" accessibilityLabel={tt('Cancel')} onPress={close} style={({ pressed }) => [styles.cancel, pressed && styles.actionPressed]}>
+          <Text style={styles.cancelText}>{tt('Cancel')}</Text>
         </Pressable>
       </> : <View accessibilityViewIsModal style={{ gap: 12 }}>
         <BookhouseArt index={14} width={56} height={60} />
-        <Text accessibilityRole="header" style={styles.confirmTitle}>Delete this journal?</Text>
-        <Text style={styles.confirmBody}>Your {date} journal will be removed from the Treehouse. This can't be undone.</Text>
+        <Text accessibilityRole="header" style={styles.confirmTitle}>{tt('Delete this journal?')}</Text>
+        <Text style={styles.confirmBody}>{treehouseZh() ? `${date}的这篇日记会从树屋里删除，删除后无法恢复。` : `Your ${date} journal will be removed from the Treehouse. This can't be undone.`}</Text>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Keep journal" disabled={state === 'deleting'} onPress={() => setState('menu')}
-            style={({ pressed }) => [styles.cancel, { flex: 1, marginTop: 0 }, pressed && styles.actionPressed]}><Text style={styles.cancelText}>Keep it</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Confirm delete journal" disabled={state === 'deleting'} onPress={() => void remove()}
+          <Pressable accessibilityRole="button" accessibilityLabel={tt('Keep journal')} disabled={state === 'deleting'} onPress={() => setState('menu')}
+            style={({ pressed }) => [styles.cancel, { flex: 1, marginTop: 0 }, pressed && styles.actionPressed]}><Text style={styles.cancelText}>{tt('Keep it')}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={tt('Confirm delete journal')} disabled={state === 'deleting'} onPress={() => void remove()}
             style={({ pressed }) => [styles.danger, pressed && { opacity: .85 }]}>
-            {state === 'deleting' ? <ActivityIndicator color="#FFF3E6" /> : <Text style={styles.dangerText}>Delete</Text>}
+            {state === 'deleting' ? <ActivityIndicator color="#FFF3E6" /> : <Text style={styles.dangerText}>{tt('Delete')}</Text>}
           </Pressable>
         </View>
       </View>}

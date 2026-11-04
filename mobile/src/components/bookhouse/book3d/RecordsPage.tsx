@@ -3,6 +3,7 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Canvas, Picture, createPicture } from '@shopify/react-native-skia';
 import { FlowerThumb } from '../../garden/planting/FlowerThumb';
 import { dayRecords, formatLocalDate, moodTitle, weekdayOf, type JournalDay } from '../../../services/bookhouse';
+import { flowerName, tt } from '../../../services/treehouseCopy';
 import type { ReadingMetrics } from './readingLayout';
 import { drawBotanicalWatermark } from './watermark';
 
@@ -34,25 +35,25 @@ export function RecordsPage({ rect, m, background, shade, fontRegular, fontItali
       <Text style={[regular, { fontSize: m.weekday.size, lineHeight: m.weekday.line, letterSpacing: m.weekday.spacing, color: SOFT, textAlign: 'center' }]}>{weekdayOf(day.localDate).toUpperCase()}</Text>
       <Text accessibilityRole="header" style={[italic, { fontSize: m.date.size * 1.1, lineHeight: m.date.line * 1.1, color: INK, textAlign: 'center' }]}>{formatLocalDate(day.localDate)}</Text>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator onLayout={e => setViewport(e.nativeEvent.layout.height)}>
-        {label(r.flowers.length > 1 ? `The day's flowers · ${r.flowers.length}` : "The day's flower")}
+        {label(r.flowers.length > 1 ? `${tt("The day's flowers")} · ${r.flowers.length}` : tt("The day's flower"))}
         {r.flowers.length ? r.flowers.map(f => <View key={f.id} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 10 }}>
           <FlowerThumb speciesCode={f.speciesCode} name={f.name} image={f.img} size={Math.round(rect.width * .3)} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[italic, { fontSize: m.title.size * .9, lineHeight: m.title.line * .9, color: INK }]}>{f.name}</Text>
+            <Text style={[italic, { fontSize: m.title.size * .9, lineHeight: m.title.line * .9, color: INK }]}>{flowerName(f.name)}</Text>
             {!!f.meaning && <Text style={[regular, { fontSize: m.body.size * .88, lineHeight: m.body.line * .85, color: SOFT }]}>{f.meaning}</Text>}
             {!!f.mood && <Text style={[regular, { fontSize: 13, color: SOFT }]}>{moodTitle(f.mood)}</Text>}
-            <Text style={[regular, { fontSize: 11, letterSpacing: 1.6, color: EMPTY }]}>{f.source === 'Event' ? 'GREW FROM AN EVENT' : 'GREW FROM DAILY GROW'}</Text>
+            <Text style={[regular, { fontSize: 11, letterSpacing: 1.6, color: EMPTY }]}>{tt(f.source === 'Event' ? 'GREW FROM AN EVENT' : 'GREW FROM DAILY GROW')}</Text>
           </View>
-        </View>) : empty('No flower grew on this day.')}
-        {label(r.events.length > 1 ? `Events · ${r.events.length}` : 'Event')}
+        </View>) : empty(tt('No flower grew on this day.'))}
+        {label(r.events.length > 1 ? `${tt('Events')} · ${r.events.length}` : tt('Event'))}
         {r.events.length ? r.events.map((e, i) => <Text key={i} selectable style={[regular, { fontSize: m.body.size, lineHeight: m.body.line, color: '#43361F', marginBottom: 8 }]}>{e}</Text>)
-          : empty('No Event recorded.')}
-        {label('Mood analysis')}
+          : empty(tt('No Event recorded.'))}
+        {label(tt('Mood analysis'))}
         {r.moods.length ? r.moods.map((mood, i) => <View key={i} style={{ marginBottom: 10 }}>
           <Text style={[italic, { fontSize: m.title.size * .85, lineHeight: m.title.line * .85, color: INK }]}>{moodTitle(mood.label)}</Text>
           {mood.secondary.length > 0 && <Text style={[regular, { fontSize: m.body.size * .9, lineHeight: m.body.line * .85, color: SOFT }]}>{mood.secondary.map(moodTitle).join(' · ')}</Text>}
-          <Text style={[regular, { fontSize: 11, letterSpacing: 1.6, color: EMPTY }]}>{mood.source === 'Event' ? 'FROM AN EVENT' : 'FROM DAILY GROW'}</Text>
-        </View>) : empty('No mood recorded.')}
+          <Text style={[regular, { fontSize: 11, letterSpacing: 1.6, color: EMPTY }]}>{tt(mood.source === 'Event' ? 'FROM AN EVENT' : 'FROM DAILY GROW')}</Text>
+        </View>) : empty(tt('No mood recorded.'))}
         {nothing && <View onLayout={e => setBlank(e.nativeEvent.layout.y)} />}
         {nothing && art > 90 && <View pointerEvents="none" accessible={false} style={{ height: art }}>
           <Canvas style={{ width: artWidth, height: art }}><Picture picture={createPicture(c => drawBotanicalWatermark(c, artWidth / 2, art / 2, Math.min(170, art * .8)))} /></Canvas>

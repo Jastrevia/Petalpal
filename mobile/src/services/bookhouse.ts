@@ -1,5 +1,6 @@
 import { apiRequest } from './api';
 import type { BackendFlower } from './events';
+import { dateText, moodZh, weekdayName } from './treehouseCopy';
 
 export interface JournalCheckIn {
   id: string; localDate: string; createdAt: string;
@@ -20,15 +21,15 @@ export function journalYears(entries: JournalCheckIn[]) {
   return [...new Set([2026, 2027, 2028, 2029, 2030, ...entries.filter(e => e.journal).map(e => Number(e.localDate.slice(0, 4)))])].sort((a, b) => a - b);
 }
 export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 // localDate is already the owner's calendar day (YYYY-MM-DD); format it without any timezone conversion.
+// In the Treehouse's language (services/treehouseCopy.ts).
 export function formatLocalDate(localDate: string) {
   const [year, month, day] = localDate.split('-').map(Number);
-  return `${MONTHS[month - 1]} ${day}, ${year}`;
+  return dateText(year, month, day);
 }
 export function weekdayOf(localDate: string) {
   const [year, month, day] = localDate.split('-').map(Number);
-  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return weekdayName(new Date(Date.UTC(year, month - 1, day)).getUTCDay());
 }
 // Today's calendar day in the owner's timezone, used only to pick a default shelf and explain where a new journal lands.
 export function todayLocalDate(timezone: string, now = new Date()) {
@@ -186,6 +187,8 @@ export function dayRecords(day: JournalDay) {
 /** "SUNNY_BLOOM" → "Sunny bloom"; free labels ("calm") → "Calm". */
 export function moodTitle(label: string) {
   if (typeof label !== 'string') return '';
+  const zh = moodZh(label);
+  if (zh) return zh;
   const words = label.toLowerCase().split('_').filter(Boolean);
   if (!words.length) return '';
   return words.map((w, i) => i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');

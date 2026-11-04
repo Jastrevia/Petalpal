@@ -1,12 +1,14 @@
 import { useWorldTime } from '../components/garden/world-time';
 import type { PanelTheme } from '../components/features/PanelTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { useAnimatedStyle, useReducedMotion, useSharedValue } from 'react-native-reanimated';
 import { useAuth } from '../services/auth';
 import { useGuest } from '../services/guest';
+import { useAppLocale } from '../services/locale';
+import { monthLong, setTreehouseLocale, treehouseZh, tt } from '../services/treehouseCopy';
 import {
   defaultShelfYear, deletePrivateJournal, formatLocalDate, journalCounts, journalLocked, journalYears, MONTH_NAMES, monthDays, monthKey, monthLocked, readCheckIns, readJournals,
   readMonthEvents, todayLocalDate, type DailyCheckInRecord, type JournalCheckIn, type MonthEvent,
@@ -19,6 +21,7 @@ import { ICONS, ParchmentButton, RoundButton, TitlePlaque, TreehouseBackdrop } f
 import { measureBook, shelfLayout, TreehouseShelf, type ShelfRect, type ShelfSlot } from '../components/bookhouse/TreehouseShelf';
 import { MonthBook, type BookMode, type ClosedTo } from '../components/bookhouse/MonthBook';
 import { pullTarget } from '../components/bookhouse/book3d/desk';
+import { useLayoutWindow } from '../components/bookhouse/book3d/layoutWindow';
 import { DeskLayer } from '../components/bookhouse/book3d/DeskLayer';
 import { pullTarget as roomPullTarget } from '../components/bookhouse/book3d/roomDesk';
 import { RoomBack, RoomFront } from '../components/bookhouse/book3d/RoomLayers';
@@ -36,7 +39,7 @@ import { JournalActions } from '../components/bookhouse/JournalActions';
 
 const serif = Platform.select({ ios: 'Georgia', web: 'Georgia', default: 'serif' });
 const moodName = (mood: string) => { const word = mood.replace('_BLOOM', '').toLowerCase(); return word.charAt(0).toUpperCase() + word.slice(1); };
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unable to load your book. Please try again.';
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : tt('Unable to load your book. Please try again.');
 
 // The bookshelf is always mounted; a month opens as a book that flies out of its slot over it,
 // so the selected year and scroll position are still there when the book flies back.
@@ -53,9 +56,11 @@ const GUTTER = 12;
 
 export default function Bookhouse() {
   const { session } = useAuth();
+  // One language for the whole Treehouse, set before its shelves, books and pages are drawn.
+  setTreehouseLocale(useAppLocale());
   // Guest mode (services/guest.tsx): the Treehouse is to look at; opening a month's book asks for an account.
   const guest = useGuest();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useLayoutWindow();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
@@ -213,7 +218,7 @@ export default function Bookhouse() {
     // The open book's own slot in the desk-view bookcase (its book is hidden there, but laid out).
     const from = await measureBook(deskShelfNodes.current.get(monthKey(book.year, book.month)));
     setReturnTo({ run: Date.now(), rect: from });
-    if (keptDraft) setNotice(`Your ${MONTH_NAMES[book.month - 1]} draft is kept, not saved yet. Open ${MONTH_NAMES[book.month - 1]} again to finish it.`);
+    if (keptDraft) setNotice(treehouseZh() ? `${monthLong(book.month)}的草稿还留着，还没保存。再打开${monthLong(book.month)}就能接着写。` : `Your ${MONTH_NAMES[book.month - 1]} draft is kept, not saved yet. Open ${MONTH_NAMES[book.month - 1]} again to finish it.`);
   };
   const bookClosed = (to: ClosedTo) => {
     switching.current = null;
@@ -243,13 +248,13 @@ export default function Bookhouse() {
     daysCache.set(key, { inputs, days });
     return days;
   };
-  useEffect(() => { if (recordsFailed && book) setNotice('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.'); }, [recordsFailed, book]);
+  useEffect(() => { if (recordsFailed && book) setNotice(tt('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.')); }, [recordsFailed, book]);
   const removeEntry = async () => {
     if (!session || !actionEntry?.journal) return;
     await deletePrivateJournal(session.user.id, actionEntry.journal.id);
     for (const key of [...drafts.keys()]) if (key.endsWith(`|${actionEntry.journal.id}`)) drafts.delete(key);
     setActionEntry(null);
-    setNotice('Journal deleted.');
+    setNotice(tt('Journal deleted.'));
     await reload();
   };
   const plaqueWidth = Math.min(300, inner - 40);
@@ -378,10 +383,10 @@ export default function Bookhouse() {
         </Reanimated.View>}
         <View pointerEvents={book ? 'none' : 'box-none'} importantForAccessibility={book ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={!!book}
           style={{ position: 'absolute', left: 0, right: 0, top: insets.top }}>
-          <View style={s.topBar}><RoundButton label="Back to Garden" icon={ICONS.back} onPress={leave} /></View>
-          <Reanimated.View style={plaqueStyle}><TitlePlaque title="My Journals" width={plaqueWidth} onLongPress={__DEV__ ? () => setDevNight(value => !(value ?? worldNight)) : undefined} /></Reanimated.View>
+          <View style={s.topBar}><RoundButton label={tt('Back to Garden')} icon={ICONS.back} onPress={leave} /></View>
+          <Reanimated.View style={plaqueStyle}><TitlePlaque title={tt('My Journals')} width={plaqueWidth} onLongPress={__DEV__ ? () => setDevNight(value => !(value ?? worldNight)) : undefined} /></Reanimated.View>
         </View>
-        {!!error && <Text accessibilityRole="alert" onPress={() => void reload()} style={[s.inlineError, { position: 'absolute', top: cabinetTop + 8, left: 90, right: 12 }]}>{error} Tap to retry.</Text>}
+        {!!error && <Text accessibilityRole="alert" onPress={() => void reload()} style={[s.inlineError, { position: 'absolute', top: cabinetTop + 8, left: 90, right: 12 }]}>{error} {tt('Tap to retry.')}</Text>}
       </View>
     </ScrollView>
 
@@ -411,29 +416,33 @@ export default function Bookhouse() {
       onClose={() => setActionEntry(null)} onDelete={removeEntry}
       />}
     {history && session && <FlowerHistory userId={session.user.id} timezone={timezone} onClose={() => setHistory(false)} />}
-    {confirmSwitch && book && <Sheet title="Unsaved journal" onClose={() => setConfirmSwitch(null)}>
-      <Text style={s.body}>Your writing in {MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or open {MONTH_NAMES[confirmSwitch.month - 1]} now and
-        come back to it: the draft stays in {MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.</Text>
+    {confirmSwitch && book && <Sheet title={tt('Unsaved journal')} onClose={() => setConfirmSwitch(null)}>
+      <Text style={s.body}>{treehouseZh()
+        ? `你在${monthLong(book.month)}写的内容还没保存。你可以继续写，也可以先打开${monthLong(confirmSwitch.month)}，之后再回来：只要还在树屋里，草稿就留在${monthLong(book.month)}这本书里。点「保存」之后才会存进你的日记。`
+        : `Your writing in ${MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or open ${MONTH_NAMES[confirmSwitch.month - 1]} now and come back to it: the draft stays in ${MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.`}</Text>
       <View style={{ gap: 10, marginTop: 14 }}>
-        <ParchmentButton label="Keep writing" onPress={() => setConfirmSwitch(null)} />
-        <ParchmentButton secondary label={`Open ${MONTH_NAMES[confirmSwitch.month - 1]}, keep the draft`}
+        <ParchmentButton label={tt('Keep writing')} onPress={() => setConfirmSwitch(null)} />
+        <ParchmentButton secondary label={treehouseZh() ? `打开${monthLong(confirmSwitch.month)}，保留草稿` : `Open ${MONTH_NAMES[confirmSwitch.month - 1]}, keep the draft`}
           onPress={() => { const choice = confirmSwitch; setConfirmSwitch(null); void switchTo(choice, true); }} />
       </View>
     </Sheet>}
-    {confirmClose && book && <Sheet title="Unsaved journal" onClose={keepWriting}>
-      <Text style={s.body}>Your writing in {MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or close the book and come back to it: the
-        draft stays in {MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.</Text>
+    {confirmClose && book && <Sheet title={tt('Unsaved journal')} onClose={keepWriting}>
+      <Text style={s.body}>{treehouseZh()
+        ? `你在${monthLong(book.month)}写的内容还没保存。你可以继续写，也可以先合上书，之后再回来：只要还在树屋里，草稿就留在${monthLong(book.month)}这本书里。点「保存」之后才会存进你的日记。`
+        : `Your writing in ${MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or close the book and come back to it: the draft stays in ${MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.`}</Text>
       <View style={{ gap: 10, marginTop: 14 }}>
-        <ParchmentButton label="Keep writing" onPress={keepWriting} />
-        <ParchmentButton secondary label={confirmClose.year !== null ? `Close the book, keep the draft, show ${confirmClose.year}` : 'Close the book, keep the draft'}
+        <ParchmentButton label={tt('Keep writing')} onPress={keepWriting} />
+        <ParchmentButton secondary label={confirmClose.year !== null
+          ? (treehouseZh() ? `合上书，保留草稿，看${confirmClose.year}年` : `Close the book, keep the draft, show ${confirmClose.year}`)
+          : tt('Close the book, keep the draft')}
           onPress={() => { pendingYear.current = confirmClose.year; setConfirmClose(null); setCloseSignal(n => n + 1); }} />
       </View>
     </Sheet>}
-    {confirmLeave && <Sheet title="Unsaved journal" onClose={() => setConfirmLeave(false)}>
-      <Text style={s.body}>You have writing that hasn’t been saved yet. If you leave the Treehouse now, it will be lost.</Text>
+    {confirmLeave && <Sheet title={tt('Unsaved journal')} onClose={() => setConfirmLeave(false)}>
+      <Text style={s.body}>{tt('You have writing that hasn’t been saved yet. If you leave the Treehouse now, it will be lost.')}</Text>
       <View style={{ gap: 10, marginTop: 14 }}>
-        <ParchmentButton label="Keep writing" onPress={() => setConfirmLeave(false)} />
-        <ParchmentButton secondary label="Leave without saving" onPress={() => { drafts.clear(); setConfirmLeave(false); exit(); }} />
+        <ParchmentButton label={tt('Keep writing')} onPress={() => setConfirmLeave(false)} />
+        <ParchmentButton secondary label={tt('Leave without saving')} onPress={() => { drafts.clear(); setConfirmLeave(false); exit(); }} />
       </View>
     </Sheet>}
   </Animated.View>;
