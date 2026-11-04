@@ -69,6 +69,8 @@ export type Visit = {
   // The puppy: `chase`, running after the bluebird; `sits`, sitting where it caught up (its rest
   // is sitting down, sitting, getting up); `rising`, getting up before it runs off again.
   chase?: boolean; sits?: boolean; rising?: boolean;
+  // Tapped: sitting where it was while its ring menu is open (holdVisit, releaseVisit).
+  held?: boolean;
 };
 
 // The puppy chases the bluebird about half the times it takes off: it runs (its painted gallop,
@@ -93,6 +95,40 @@ export function planChase({ visit, now, path }: { visit: Visit; now: number; pat
 export function stopChase(visit: Visit, now: number): Visit {
   if (!visit.chase || now >= visit.start + visit.duration) return visit;
   return { ...visit, duration: Math.max(visit.lead, now - visit.start) };
+}
+
+// Tapped (its ring menu is open): it sits down where it is and stays sitting until let go. The
+// leg becomes a sit here followed by the rest of the path it was on, at its own pace (a chase is
+// given up). Already sitting, it simply sits on. At the end of its path, a hair's step back keeps
+// the way it faces.
+export const HOLD_SECONDS = 3600;
+export function holdVisit(visit: Visit, now: number): Visit {
+  if (visit.held) return visit;
+  const elapsed = now - visit.start;
+  if (visit.sits && !visit.rising && elapsed >= 0 && elapsed < visit.lead) {
+    const lead = elapsed + HOLD_SECONDS;
+    return { ...visit, held: true, lead, duration: visit.duration + lead - visit.lead };
+  }
+  const spec = CRITTERS[visit.id], gone = visitDistance(visit, now);
+  const pose = visitPose(visit, now), here = { x: pose.x, y: pose.y };
+  let ahead = visit.path.length;
+  for (let i = 1, along = 0; i < visit.path.length; i++) {
+    along += distance(visit.path[i - 1], visit.path[i]);
+    if (gone < along - 1e-6) { ahead = i; break; }
+  }
+  const rest = visit.path.slice(ahead);
+  const path = rest.length ? [here, ...rest] : [{ x: here.x - (pose.dx < 0 ? -1 : 1) * 1e-3, y: here.y }, here];
+  return { ...visit, path, start: now, lead: HOLD_SECONDS, fadeIn: false, walked: visit.walked + gone,
+    chase: false, rising: false, sits: true, held: true, speed: spec.speed, rhythm: RHYTHMS[visit.id],
+    duration: HOLD_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
+}
+
+// Let go (the ring menu closed): it finishes sitting down if it had only just begun (`settle`
+// seconds), gets up (`rise` seconds) and walks on along the rest of its path.
+export function releaseVisit(visit: Visit, now: number, settle: number, rise: number): Visit {
+  if (!visit.held) return visit;
+  const lead = Math.max(now - visit.start, settle) + rise;
+  return { ...visit, held: false, lead, duration: visit.duration - visit.lead + lead };
 }
 
 // The rabbit and the hedgehog play only on lawns with no flowers yet, one animal to a lawn (and

@@ -113,7 +113,9 @@ import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
 import Butterfly from './critters/Butterfly';
-import GardenCritters from './critters/GardenCritters';
+import GardenCritters, { type GardenPetsHandle } from './critters/GardenCritters';
+import PetRingMenu from './critters/PetRingMenu';
+import type { PetSpot } from './critters/petRing';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
 import GardenConnectionLayer from './GardenConnectionLayer';
@@ -773,6 +775,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   }, [calendarReducedMotion, cameraZoom, cameraX, cameraY, calendarPoint, calendarHighlight, viewport.width, viewport.height, baseX, baseY, fit]);
   // Another month's lawn: a small note says whose land it is, then goes by itself.
   const [lawnNote, setLawnNote] = useState<{ key: number; month: number } | null>(null);
+  // A tapped pet's ring menu (critters/PetRingMenu.tsx): it sits where it was until it closes.
+  const gardenPets = useRef<GardenPetsHandle | null>(null);
+  const [petRing, setPetRing] = useState<PetSpot | null>(null);
+  const closePetRing = useCallback(() => { gardenPets.current?.release('puppy'); setPetRing(null); }, []);
+  useEffect(() => { if (petRing && (!worldActive || activeMode !== 'normal' || selectedFlower)) closePetRing(); }, [petRing, worldActive, activeMode, selectedFlower, closePetRing]);
   const lawnNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showLawnNote = useCallback((month: number) => {
     setLawnNote(previous => ({ key: (previous?.key ?? 0) + 1, month }));
@@ -1073,6 +1080,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (month !== null && !nearLawn(month, worldX, worldY)) { cancelPlacement(); return; }
       updatePreview(worldX, worldY);
     } else {
+      // A pet (drawn over the flowers) answers first: its ring menu opens beside it. A little
+      // grace around its body keeps it easy to tap on a phone.
+      const pet = readOnly ? null : gardenPets.current?.petAt({ x: worldX, y: worldY }, 14 / (fit * currentZoom));
+      if (pet) {
+        gardenPets.current?.hold(pet.id);
+        const scale = fit * currentZoom;
+        setPetRing({ x: baseX + currentCamX + pet.x * scale, y: baseY + currentCamY + pet.y * scale, body: pet.size * scale });
+        return;
+      }
       const currentPlacements = placementsRef.current;
       let hitFlower: FlowerPlacementRecord | null = useMonthlyGrowth?hitCluster(currentPlacements,worldX,worldY):null;
       for (let i = currentPlacements.length - 1; !useMonthlyGrowth && i >= 0; i--) {
@@ -1607,7 +1623,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} />}
             {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
@@ -1691,6 +1707,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           cameraX.value -= viewport.width * 0.3;
           cameraY.value += viewport.height * 0.25;
         }} />}
+      {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
+        <PetRingMenu petId="puppy" pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing} />
+      </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>

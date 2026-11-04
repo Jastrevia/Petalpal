@@ -253,3 +253,96 @@ test('the puppy wears one painted look per outfit, one set at a time, and every 
   for (const [from, to] of Object.entries(looks.MATCHING_FRAME))
     for (const [clip, frames] of Object.entries(to)) assert.equal(frames.length, Object.values(looks.PUPPY_LOOKS).find(l => l.clip === from).count, `${from} -> ${clip}`);
 });
+
+test('a tapped puppy sits where it is until let go, then gets up and walks on along its path', () => {
+  const nodes = WALK_NETWORK.nodes, edge = edges[0];
+  const a = nodes[edge.a], b = nodes[edge.b];
+  const walking = { key: 1, id: 'puppy', path: [a, b], start: 0, lead: 0, fadeIn: false, walked: 5,
+    speed: visits.CRITTERS.puppy.speed, rhythm: visits.RHYTHMS.puppy, duration: visits.travelSeconds(visits.pathLength([a, b]) / visits.CRITTERS.puppy.speed, visits.RHYTHMS.puppy) };
+  const now = 1.5, there = visits.visitPose(walking, now);
+  const held = visits.holdVisit(walking, now);
+  assert.ok(held.held && held.sits && !held.chase && held.lead === visits.HOLD_SECONDS);
+  assert.equal(visits.holdVisit(held, now + 1), held, 'holding twice changes nothing');
+  for (const t of [now, now + 30, now + 600]) {
+    const pose = visits.visitPose(held, t);
+    assert.ok(Math.hypot(pose.x - there.x, pose.y - there.y) < 1e-6, 'stays where it was tapped');
+  }
+  assert.equal(Math.sign(visits.visitPose(held, now + 5).dx), Math.sign(there.dx), 'still faces the way it went');
+  assert.ok(Math.abs(held.walked - (walking.walked + visits.visitDistance(walking, now))) < 1e-9, 'its stride carries on');
+  assert.deepEqual(plain(held.path.at(-1)), plain(b), 'the rest of its path is kept');
+  // Let go a while later: it gets up (rise seconds) and walks the rest of the way.
+  const released = visits.releaseVisit(held, now + 20, 1.3, 1.25);
+  assert.ok(!released.held && Math.abs(released.lead - (20 + 1.25)) < 1e-9);
+  assert.ok(Math.abs(released.start + released.duration - (now + 21.25 + (held.duration - held.lead))) < 1e-9);
+  const end = visits.visitPose(released, released.start + released.duration + 1);
+  assert.ok(Math.hypot(end.x - b.x, end.y - b.y) < 1e-6);
+  // Let go at once: it still finishes sitting down before it gets up.
+  assert.ok(Math.abs(visits.releaseVisit(held, now + 0.2, 1.3, 1.25).lead - 2.55) < 1e-9);
+  assert.equal(visits.releaseVisit(walking, now, 1, 1), walking, 'only a held pet is let go');
+  // Tapped at the end of a leg, it sits on the path point it reached, and the next leg starts there.
+  const done = visits.holdVisit(walking, walking.duration + 2);
+  const next = visits.planNextLeg({ visit: visits.releaseVisit(done, walking.duration + 4, 1.3, 1.25), now: walking.duration + 9, network: WALK_NETWORK, edges, points, random: seeded(7) });
+  assert.ok(next && Math.hypot(next.path[0].x - b.x, next.path[0].y - b.y) < 1e-6);
+  // Sitting already (after a chase): it simply sits on.
+  const sitting = { ...walking, sits: true, lead: 10, duration: 10 + walking.duration };
+  const still = visits.holdVisit(sitting, 4);
+  assert.ok(still.held && still.start === sitting.start && still.lead === 4 + visits.HOLD_SECONDS);
+});
+
+test('the pet ring is a 120° third of a ring beside the pet, whole on a phone screen', () => {
+  const ring = load('../critters/petRing');
+  const phone = { width: 375, height: 740 };
+  for (const panel of [false, true]) {
+    for (const pet of [{ x: 60, y: 400, body: 40 }, { x: 340, y: 300, body: 40 }, { x: 190, y: 90, body: 60 }, { x: 200, y: 720, body: 30 }]) {
+      const layout = ring.ringLayout(pet, phone, panel);
+      assert.equal(ring.RING_DEGREES, 120);
+      assert.equal(ring.ringArc(layout).sweep, 120);
+      // Its corners and its outer edge stay on screen, clear of the Garden's top buttons and tab bar.
+      for (let t = -1; t <= 1; t += 0.25) for (const r of [layout.inner, layout.outer]) {
+        const p = ring.ringPoint(layout, r, t);
+        assert.ok(p.x >= 0 && p.x <= phone.width, `x ${p.x}`);
+        assert.ok(p.y >= ring.TOP_CLEAR && p.y <= phone.height - ring.BOTTOM_CLEAR + 1e-9, `y ${p.y}`);
+      }
+      // Top to bottom: feed, pat, dress up.
+      const spot = t => { const p = ring.ringPoint(layout, (layout.inner + layout.outer) / 2, t); return ring.ringSpot(layout, p.x, p.y); };
+      assert.deepEqual([spot(-0.7).segment, spot(0).segment, spot(0.7).segment], [0, 1, 2]);
+      assert.equal(ring.RING_ACTIONS.join(), 'feed,pat,dress');
+      assert.equal(ring.ringSpot(layout, layout.cx, layout.cy), null, 'the pet itself is not part of the ring');
+      assert.equal(ring.ringSpot(layout, layout.cx - layout.side * layout.outer * 0.8, layout.cy), null, 'nor the other side');
+    }
+  }
+  // Room to its right: it opens to the right; at the right edge, to the left.
+  assert.equal(ring.ringLayout({ x: 60, y: 400, body: 40 }, phone).side, 1);
+  assert.equal(ring.ringLayout({ x: 340, y: 400, body: 40 }, phone).side, -1);
+  const left = ring.ringLayout({ x: 340, y: 400, body: 40 }, phone), up = ring.ringPoint(left, left.outer, -1);
+  assert.ok(up.y < left.cy && up.x < left.cx, 'on the left it still runs from top to bottom');
+});
+
+test('the wardrobe shows every piece, sends the whole outfit, and only opened pieces can be chosen', () => {
+  const ring = load('../critters/petRing');
+  const piece = (id, row, unlocked = true) => ({ id, row, collection: 'c', name: id, unlocked, unlockedAtLevel: unlocked ? 4 : null });
+  const pieces = [piece('lilac-beret', 'hat'), piece('flower-sprig', 'hat'), piece('lilac-cape', 'collar', false), piece('compass-star', 'pendant')];
+  assert.deepEqual(ring.shelfOf(pieces, 'hat').map(p => p.id), ['lilac-beret', 'flower-sprig']);
+  assert.equal(ring.shelfOf(pieces, 'collar').length, 1, 'a piece not opened yet still shows');
+  const worn = { hat: null, collar: null, pendant: 'compass-star' };
+  assert.deepEqual(plain(ring.outfitWith(worn, pieces[0])), { hat: 'lilac-beret', collar: null, pendant: 'compass-star' }, 'all three slots');
+  assert.deepEqual(plain(ring.outfitWith(null, pieces[1])), { hat: 'flower-sprig', collar: null, pendant: null });
+  assert.deepEqual(plain(ring.outfitWith(worn, pieces[3])), { hat: null, collar: null, pendant: null }, 'a worn piece comes off');
+  assert.equal(ring.outfitWith(worn, pieces[2]), null, 'locked');
+  assert.ok(ring.isWorn(worn, pieces[3]) && !ring.isWorn(worn, pieces[0]));
+  // Worn but not shown: the other set's hat under a cape, and a pendant under any cape.
+  assert.deepEqual([...ring.puppyHiddenPieces({ hat: 'flower-sprig', collar: 'lilac-cape', pendant: 'compass-star' })].sort(), ['compass-star', 'flower-sprig']);
+  assert.deepEqual([...ring.puppyHiddenPieces({ hat: 'flower-sprig', collar: null, pendant: 'compass-star' })], ['compass-star']);
+  assert.equal(ring.puppyHiddenPieces({ hat: 'lilac-beret', collar: null, pendant: 'compass-star' }).size, 0);
+});
+
+test('every catalog piece has its wardrobe icon', async () => {
+  const fs = await import('node:fs');
+  const { PET_ACCESSORIES } = await import('../../lib/garden-pets.js');
+  const icons = load('../critters/accessoryIcons').ACCESSORY_ICONS;
+  assert.equal(Object.keys(icons).length, PET_ACCESSORIES.length);
+  for (const { id } of PET_ACCESSORIES) {
+    assert.ok(icons[id], id);
+    assert.ok(fs.existsSync(new URL(`../${icons[id].replace('@/', '')}`, import.meta.url)), id);
+  }
+});

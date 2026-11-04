@@ -1,5 +1,5 @@
 import { BlurMask, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
 import { usePetOutfit } from '@/services/gardenPets';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
@@ -10,7 +10,7 @@ import { MATCHING_FRAME, PUPPY_LOOKS, puppyLookOf, type PuppyLook } from './pupp
 import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, leaveVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, CRITTERS, holdVisit, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -59,11 +59,21 @@ const belowPerch = (perch: Point) => {
   return POINTS.reduce((best, p) => (Math.hypot(p.x - under.x, p.y - under.y) < Math.hypot(best.x - under.x, best.y - under.y) ? p : best));
 };
 
+// What the Garden asks of its pets (GardenScene: a tap on the puppy opens its ring menu).
+// `petAt`: the pet whose body is under a world point (`slop` world units of grace), where its
+// paws stand and how big it is drawn; `hold`: it sits down where it is until `release`.
+export type PetHit = { id: CritterId; x: number; y: number; size: number };
+export type GardenPetsHandle = {
+  petAt: (point: Point, slop: number) => PetHit | null;
+  hold: (id: CritterId) => void;
+  release: (id: CritterId) => void;
+};
+
 // Schedules the visitors: one now and then until MAX_VISITORS are here, only while the Garden is
 // active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
 // gone. The rabbit and the hedgehog keep to unplanted lawns (critterVisits.ts): when only one is
 // left, just one of them comes this session, picked when the Garden opens.
-export default memo(function GardenCritters({ clock, active }: { clock: SharedValue<number>; active: boolean }) {
+export default memo(function GardenCritters({ clock, active, pets }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null> }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
@@ -77,6 +87,7 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
   // The look it shows. Walking or sitting, a new outfit goes on at once; running after the
   // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
   const [shownLook, setShownLook] = useState(look);
+  const shownLookRef = useRef(shownLook); shownLookRef.current = shownLook;
   useEffect(() => {
     const now = clock.value;
     if (!visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && now < v.start + v.duration)) { setShownLook(look); return; }
@@ -130,7 +141,7 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
     chase.current = (to: Point) => {
       const now = clock.value, goal = belowPerch(to);
       setVisits(current => current.map(visit => {
-        if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead) return visit;
+        if (visit.id !== 'puppy' || visit.leaving || visit.held || visit.fadeIn && now < visit.start + visit.lead) return visit;
         const pose = visitPose(visit, now);
         return planChase({ visit, now, path: route({ x: pose.x, y: pose.y }, goal, isGardenGroundBlocked) }) ?? visit;
       }));
@@ -138,6 +149,34 @@ export default memo(function GardenCritters({ clock, active }: { clock: SharedVa
     const unwatch = onBirdFlight(flight => { if (Math.random() < CHASE_CHANCE) chase.current(flight.to); });
     return () => { clearTimeout(timer); clearInterval(legs); unwatch(); };
   }, [active, clock]);
+  // Only the puppy answers a tap so far (the other pets have no wardrobe yet). Its body is drawn
+  // about 0.9 of its size wide and 0.7 tall, standing on its paws.
+  useEffect(() => {
+    if (!pets) return;
+    const update = (id: CritterId, change: (visit: Visit, now: number) => Visit) => {
+      const now = clock.value;
+      visitsRef.current = visitsRef.current.map(v => (v.id === id ? change(v, now) : v));
+      setVisits(visitsRef.current);
+    };
+    pets.current = {
+      petAt: (point, slop) => {
+        const now = clock.value;
+        for (const visit of visitsRef.current) {
+          if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead) continue;
+          const pose = visitPose(visit, now), size = CRITTERS[visit.id].size;
+          if (Math.abs(point.x - pose.x) <= size * 0.45 + slop && point.y >= pose.y - size * 0.7 - slop && point.y <= pose.y + size * 0.08 + slop)
+            return { id: visit.id, x: pose.x, y: pose.y, size };
+        }
+        return null;
+      },
+      hold: id => update(id, holdVisit),
+      release: id => update(id, (visit, now) => {
+        const rest = PUPPY_LOOKS[shownLookRef.current].rest;
+        return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
+      }),
+    };
+    return () => { pets.current = null; };
+  }, [pets, clock]);
   // Development only: window.__gardenCritters.spawn('rabbit') brings one now; .visits lists them.
   useEffect(() => {
     if (!__DEV__ || typeof window === 'undefined') return;
