@@ -71,6 +71,8 @@ export type Visit = {
   chase?: boolean; sits?: boolean; rising?: boolean;
   // Tapped: sitting where it was while its ring menu is open (holdVisit, releaseVisit).
   held?: boolean;
+  // While held: eating or being patted (puppyLooks.ts PUPPY_ACTIONS), from `start` (clock seconds).
+  action?: { kind: 'eat' | 'pat'; start: number };
 };
 
 // The puppy chases the bluebird about half the times it takes off: it runs (its painted gallop,
@@ -128,7 +130,7 @@ export function holdVisit(visit: Visit, now: number): Visit {
 export function releaseVisit(visit: Visit, now: number, settle: number, rise: number): Visit {
   if (!visit.held) return visit;
   const lead = Math.max(now - visit.start, settle) + rise;
-  return { ...visit, held: false, lead, duration: visit.duration - visit.lead + lead };
+  return { ...visit, held: false, action: undefined, lead, duration: visit.duration - visit.lead + lead };
 }
 
 // The rabbit and the hedgehog play only on lawns with no flowers yet, one animal to a lawn (and

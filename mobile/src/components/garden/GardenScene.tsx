@@ -1708,7 +1708,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           cameraY.value += viewport.height * 0.25;
         }} />}
       {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
-        <PetRingMenu petId="puppy" pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing} />
+        <PetRingMenu petId="puppy" pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
+          onAction={kind => gardenPets.current?.act('puppy', kind) ?? 0} />
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />

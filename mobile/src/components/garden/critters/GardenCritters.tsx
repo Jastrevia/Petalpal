@@ -6,7 +6,7 @@ import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
-import { MATCHING_FRAME, PUPPY_LOOKS, puppyLookOf, type PuppyLook } from './puppyLooks';
+import { ACTION_FPS, actionSeconds, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type PuppyAction, type PuppyLook } from './puppyLooks';
 import { route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
@@ -67,6 +67,9 @@ export type GardenPetsHandle = {
   petAt: (point: Point, slop: number) => PetHit | null;
   hold: (id: CritterId) => void;
   release: (id: CritterId) => void;
+  // Plays the held pet's painted eating or being-patted clip; how many seconds it lasts, or 0 when
+  // its look has none (or motion is reduced): the menu then shows its plain hearts.
+  act: (id: CritterId, kind: PuppyAction) => number;
 };
 
 // Schedules the visitors: one now and then until MAX_VISITORS are here, only while the Garden is
@@ -88,6 +91,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
   const [shownLook, setShownLook] = useState(look);
   const shownLookRef = useRef(shownLook); shownLookRef.current = shownLook;
+  const reducedRef = useRef(false); reducedRef.current = !!useReducedMotion();
   useEffect(() => {
     const now = clock.value;
     if (!visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && now < v.start + v.duration)) { setShownLook(look); return; }
@@ -170,6 +174,13 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         return null;
       },
       hold: id => update(id, holdVisit),
+      act: (id, kind) => {
+        const frames = PUPPY_ACTIONS[shownLookRef.current]?.[kind];
+        const visit = visitsRef.current.find(v => v.id === id && v.held);
+        if (!frames || !visit || reducedRef.current) return 0;
+        update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
+        return actionSeconds(frames);
+      },
       release: id => update(id, (visit, now) => {
         const rest = PUPPY_LOOKS[shownLookRef.current].rest;
         return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
@@ -259,7 +270,8 @@ function Puppy({ visit, clock, look }: { visit: Visit; clock: SharedValue<number
 function PuppyLookWalker({ visit, clock, look, phase, fade, onReady }: { visit: Visit; clock: SharedValue<number>; look: PuppyLook; phase: number; fade?: DerivedValue<number>; onReady?: () => void }) {
   const sheet = useImage(PUPPY_LOOKS[look].source);
   if (!sheet) return null;
-  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={PUPPY_LOOKS[look]} w={ART.puppy.w} h={ART.puppy.h} phase={phase} fade={fade} onReady={onReady} />;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={PUPPY_LOOKS[look]} w={ART.puppy.w} h={ART.puppy.h} phase={phase} fade={fade} onReady={onReady}
+    actions={PUPPY_ACTIONS[look]} />;
 }
 
 // A walker in painted frames: which frame shows is set by how far it has come (over all its legs),
@@ -267,7 +279,7 @@ function PuppyLookWalker({ visit, clock, look, phase, fade, onReady }: { visit: 
 // frame and carries on from it.
 // `phase`: a fraction of the stride to start the walk from; `fade`: drawn fading out over another
 // look (no shadow of its own then); `onReady`: told once all its sheets are in.
-function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onReady }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number; phase?: number; fade?: DerivedValue<number>; onReady?: () => void }) {
+function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onReady, actions }: { visit: Visit; clock: SharedValue<number>; sheet: SkImage; frames: Frames; w: number; h: number; phase?: number; fade?: DerivedValue<number>; onReady?: () => void; actions?: Record<PuppyAction, ActionFrames> }) {
   const spec = CRITTERS[visit.id];
   const reduced = useReducedMotion();
   const scale = spec.size / Math.max(w, h);
@@ -300,8 +312,17 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     if (e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
     return rest.count - 1;
   }, [visit, frames, reduced]);
+  // Eating or being patted (held, sitting): its clip over the sitting frame, fading in and out
+  // over ACTION_FADE (its first and last frames are the sitting pose; the bowl comes and goes).
+  const actionShown = useDerivedValue(() => {
+    const action = visit.action, spec = action && actions?.[action.kind];
+    if (!action || !spec) return 0;
+    const e = clock.value - action.start, length = spec.count / ACTION_FPS;
+    if (e < 0 || e >= length) return 0;
+    return Math.min(1, e / ACTION_FADE, (length - e) / ACTION_FADE);
+  }, [visit, actions]);
   const walkOpacity = useDerivedValue(() => (restFrame.value < 0 ? 1 : 0), [restFrame]);
-  const restOpacity = useDerivedValue(() => (restFrame.value < 0 ? 0 : 1), [restFrame]);
+  const restOpacity = useDerivedValue(() => (restFrame.value < 0 ? 0 : 1 - actionShown.value), [restFrame, actionShown]);
   const restCell = useDerivedValue(() => Math.max(0, restFrame.value), [restFrame]);
   const shadow = useDerivedValue(() => {
     const pose = visitPose(visit, clock.value);
@@ -319,7 +340,26 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
         ? <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />
         : <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />}</Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
+      {actions ? (['eat', 'pat'] as const).map(kind => <ActionClip key={kind} kind={kind} spec={actions[kind]} visit={visit} clock={clock} shown={actionShown} w={w} ground={frames.ground} />) : null}
     </Group>
+  </Group>;
+}
+
+const ACTION_FADE = 0.2;
+// One painted action clip, placed so its puppy lies on the walker's (its centre and paws on the
+// walker's cell centre and ground row); drawn only while that action plays.
+function ActionClip({ kind, spec, visit, clock, shown, w, ground }: { kind: PuppyAction; spec: ActionFrames; visit: Visit; clock: SharedValue<number>; shown: DerivedValue<number>; w: number; ground: number }) {
+  const playing = visit.action?.kind === kind;
+  // Loaded once the ring menu is open (the puppy held), so the clip is in when Feed or Pat is chosen.
+  const sheet = useImage(visit.held ? spec.source : null);
+  const frame = useDerivedValue(() => {
+    const start = visit.action?.start ?? 0;
+    return Math.max(0, Math.min(spec.count - 1, Math.floor((clock.value - start) * ACTION_FPS)));
+  }, [visit, spec]);
+  const opacity = useDerivedValue(() => (playing ? shown.value : 0), [playing, shown]);
+  if (!playing || !sheet) return null;
+  return <Group opacity={opacity} transform={[{ translateX: w / 2 - spec.anchorX }, { translateY: ground - spec.ground }]}>
+    <SheetFrame sheet={sheet} frame={frame} columns={spec.columns} count={spec.count} w={spec.w} h={spec.h} />
   </Group>;
 }
 

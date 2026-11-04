@@ -268,6 +268,25 @@
         const flower = ownFlowers.find(item => item.id === ownFlower[1]);
         return flower ? json({ ...flower, messages: [{ id: 'msg1', author: 'Mira', authorUserId: 'friend-mira', text: 'This one is lovely.' }, { id: 'msg2', author: 'Jun', authorUserId: 'friend-jun', text: 'Thinking of you.' }], supportState: { isOwner: true, canSupport: false, supportedToday: false } }) : json({ error: 'Flower not found' }, 404);
       }
+      // The pets' outfit and feeding (before the catch-all below answers every other write).
+      const dressing = p.match(/^\/api\/fairy\/pets\/([a-z]+)\/(outfit|feed)$/);
+      if (dressing && dressing[2] === 'outfit' && method === 'PUT') {
+        const outfit = { hat: request.hat ?? null, collar: request.collar ?? null, pendant: request.pendant ?? null };
+        for (const slot of ['hat', 'collar', 'pendant']) {
+          const piece = petPieces.find(([id]) => id === outfit[slot]);
+          if (outfit[slot] && (!piece || piece[1] !== slot)) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
+          if (outfit[slot] && !petOpened.has(outfit[slot])) return json({ error: 'ACCESSORY_LOCKED' }, 409);
+        }
+        petOutfits[dressing[1]] = outfit;
+        return json({ outfit }, 200, 250);
+      }
+      if (dressing && dressing[2] === 'feed' && method === 'POST') {
+        const food = petFoods.find(([id]) => id === request.foodId);
+        if (!food) return json({ error: 'Unknown food' }, 400);
+        if (!food[3]) return json({ error: 'NO_FOOD' }, 409);
+        food[3] -= 1;
+        return json({ foodId: food[0], count: food[3] }, 200, 250);
+      }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
       if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: plantedToday, remaining: Math.max(0, 2 - plantedToday) });
@@ -298,24 +317,6 @@
       if (p === '/api/fairy/pets') return json({ locale: user.preferredLocale, level: 17, foods: petFoods.map(([id, en, zh, count]) => ({ id, name: user.preferredLocale === 'zh-Hans' ? zh : en, count })),
         outfits: Object.fromEntries(['puppy', 'hedgehog', 'butterfly', 'rabbit', 'bluebird'].map(id => [id, petOutfits[id] || { hat: null, collar: null, pendant: null }])),
         accessories: petPieces.map(([id, row, en, zh]) => ({ id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: petOpened.has(id), unlockedAtLevel: petOpened.has(id) ? 4 : null })) });
-      const dressing = p.match(/^\/api\/fairy\/pets\/([a-z]+)\/(outfit|feed)$/);
-      if (dressing && dressing[2] === 'outfit' && method === 'PUT') {
-        const outfit = { hat: request.hat ?? null, collar: request.collar ?? null, pendant: request.pendant ?? null };
-        for (const slot of ['hat', 'collar', 'pendant']) {
-          const piece = petPieces.find(([id]) => id === outfit[slot]);
-          if (outfit[slot] && (!piece || piece[1] !== slot)) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
-          if (outfit[slot] && !petOpened.has(outfit[slot])) return json({ error: 'ACCESSORY_LOCKED' }, 409);
-        }
-        petOutfits[dressing[1]] = outfit;
-        return json({ outfit }, 200, 250);
-      }
-      if (dressing && dressing[2] === 'feed' && method === 'POST') {
-        const food = petFoods.find(([id]) => id === request.foodId);
-        if (!food) return json({ error: 'Unknown food' }, 400);
-        if (!food[3]) return json({ error: 'NO_FOOD' }, 409);
-        food[3] -= 1;
-        return json({ foodId: food[0], count: food[3] }, 200, 250);
-      }
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });

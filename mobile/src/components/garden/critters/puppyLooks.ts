@@ -64,6 +64,23 @@ export const PUPPY_LOOKS: Record<PuppyLook, LookFrames> = {
     ...cape2Moves(require('@/assets/garden/critters/puppy-looks/run-cape2-hat.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape2-hat.webp')) },
 };
 
+// Eating and being patted (the ring menu's Feed and Pat), painted so far for set 2's petal cape
+// alone: oil-motion clips (minimax h3) that start and end on that look's sitting frame (sit sheet's
+// last cell), cut from the same video canvas at the same scale (300 / 660), so the clip lies exactly
+// over the sitting puppy. Eating brings its own bowl (it fades in and out with the clip); the pat
+// clip's cell is wider and taller, for the hand coming in from the top right (its edges fade).
+// `anchorX`, `ground`: where the puppy's centre and paws are in a cell (the sit sheets: 209, 277).
+export type PuppyAction = 'eat' | 'pat';
+export type ActionFrames = { source: number; columns: number; count: number; w: number; h: number; anchorX: number; ground: number };
+export const ACTION_FPS = 12;
+export const PUPPY_ACTIONS: Partial<Record<PuppyLook, Record<PuppyAction, ActionFrames>>> = {
+  cape2: {
+    eat: { source: require('@/assets/garden/critters/puppy-looks/eat-cape2.webp'), columns: 9, count: 71, w: 418, h: 300, anchorX: 209, ground: 277 },
+    pat: { source: require('@/assets/garden/critters/puppy-looks/pat-cape2.webp'), columns: 7, count: 71, w: 520, h: 314, anchorX: 209, ground: 291 },
+  },
+};
+export const actionSeconds = (frames: ActionFrames) => frames.count / ACTION_FPS;
+
 // Set 2's pieces (catalog ids, lib/garden-pets.js); every other piece the puppy wears is set 1.
 export const PUPPY_SET_2: ReadonlySet<string> = new Set(['flower-sprig', 'petal-capelet', 'crystal-drop']);
 const setOf = (id: string | null) => (id ? (PUPPY_SET_2.has(id) ? 2 : 1) : 0);

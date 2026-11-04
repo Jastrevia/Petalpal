@@ -28,7 +28,15 @@ Not done yet (next work, in the owner's order):
 2. **Wardrobe screen** that feels like a closet: every piece shows; pieces not yet opened show a
    small lock. Choosing a piece calls `PUT /api/fairy/pets/:petId/outfit`.
 3. **Eating and being-patted animations** for the puppy, as natural as its walk. These need new
-   painted motion clips (see "Art" below).
+   painted motion clips (see "Art" below). *Started 2026-11-05:* set 2's petal cape (look `cape2`)
+   has both (`PUPPY_ACTIONS` in `puppyLooks.ts`, `eat-cape2.webp` / `pat-cape2.webp`): oil-motion
+   clips (minimax h3 highspeed, 6 s, 24 fps kept at 12) that start and end on that look's sitting
+   frame, the eating clip from a key frame with a painted bowl added (gpt-image edit). Owner
+   approved them as made. Prompts, key frames and the packer (`action_sheet.py`) are in
+   `~/dev/petalpal-motion/dressed/actions/`. The ring menu plays them (Feed after a food is eaten,
+   Pat) and steps aside meanwhile; every other look still shows only rising hearts. Still to make:
+   the bare puppy and set 1's cape (4 clips, 2 bowl key frames), then hats and necklaces tracked
+   onto them like the walks.
 4. **The other four pets** (hedgehog, butterfly, rabbit, bluebird) have no outfit art yet.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;

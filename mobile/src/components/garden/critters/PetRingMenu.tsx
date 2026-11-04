@@ -42,9 +42,11 @@ const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
 const ITEM_H = 50, CARD = 32;
 type Mode = 'ring' | 'feed' | 'dress';
 
-export type PetRingProps = { petId: PetId; pet: PetSpot; viewport: Viewport; locale: 'en' | 'zh-Hans'; onClose: () => void };
+// `onAction`: plays the pet's painted eating or being-patted clip in the Garden; how long it lasts
+// (0: none for its look, the menu shows its hearts instead).
+export type PetRingProps = { petId: PetId; pet: PetSpot; viewport: Viewport; locale: 'en' | 'zh-Hans'; onClose: () => void; onAction?: (kind: 'eat' | 'pat') => number };
 
-export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose }: PetRingProps) {
+export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose, onAction }: PetRingProps) {
   const copy = COPY[locale];
   const [mode, setMode] = useState<Mode>('ring');
   const panel = mode === 'feed' || mode === 'dress';
@@ -53,6 +55,18 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hearts, setHearts] = useState(0);
+  // While a clip plays the menu steps aside (the hand comes in where it stands) and comes back
+  // after it, a heart or two rising as it ends.
+  const [playing, setPlaying] = useState(false);
+  const playTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (playTimer.current) clearTimeout(playTimer.current); }, []);
+  const perform = (kind: 'eat' | 'pat') => {
+    const seconds = onAction?.(kind) ?? 0;
+    if (!seconds) { setHearts(n => n + 1); return; }
+    setPlaying(true);
+    if (playTimer.current) clearTimeout(playTimer.current);
+    playTimer.current = setTimeout(() => { if (!live.current) return; setPlaying(false); setHearts(n => n + 1); }, seconds * 1000);
+  };
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
   const reload = useCallback(() => loadPets().then(next => { if (live.current) setPets(next); }).catch(() => { if (live.current) setNote(copy.failed); }), [copy]);
@@ -66,13 +80,14 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
 
   const act = (action: RingAction) => {
     setNote(null);
-    if (action === 'pat') { setHearts(n => n + 1); return; }
+    if (action === 'pat') { perform('pat'); return; }
     setMode(action);
   };
   const back = () => { setNote(null); setMode('ring'); };
   // Taps that miss every button: inside the ring or panel they do nothing (the ring's own
   // segments answer anywhere on them), outside it they close it.
   const onBackdrop = (event: GestureResponderEvent) => {
+    if (playing) return;
     const { locationX: x, locationY: y } = event.nativeEvent;
     const spot = ringSpot(layout, x, y);
     if (!spot) { onClose(); return; }
@@ -86,7 +101,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
       const { count } = await feedPet(petId, foodId);
       if (!live.current) return;
       setPets(current => current && { ...current, foods: current.foods.map(food => (food.id === foodId ? { ...food, count } : food)) });
-      setHearts(n => n + 1);
+      perform('eat');
     } catch (error) {
       if (!live.current) return;
       setNote(error instanceof ApiError && error.status === 409 ? copy.noneLeft : copy.failed);
@@ -113,7 +128,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
 
   return <View style={StyleSheet.absoluteFill} testID="pet-ring">
     <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} accessibilityRole="button" accessibilityLabel={copy.close} />
-    <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: appear }]}>
+    {playing ? null : <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: appear }]}>
       <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
         <RingShape layout={layout} segments={mode === 'ring' ? RING_ACTIONS.length : 1} />
       </Canvas>
@@ -123,7 +138,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
       {note && !panel ? <View pointerEvents="none" style={[styles.note, { top: Math.min(viewport.height - 130, layout.cy + layout.outer * 0.87 + 8),
         left: Math.max(8, Math.min(viewport.width - 248, layout.cx + layout.side * layout.outer * 0.5 - 120)) }]}>
         <Text style={styles.noteText}>{note}</Text></View> : null}
-    </Animated.View>
+    </Animated.View>}
     {hearts ? <Hearts key={hearts} x={pet.x} y={pet.y - pet.body * 0.7} /> : null}
   </View>;
 });
