@@ -1,0 +1,40 @@
+import { useEffect, useState } from 'react';
+import { ApiError, apiRequest } from './api';
+
+// The Garden pets' outfits (GET /api/fairy/pets, docs/product/FAIRY_CLOSENESS_API.md §6). The
+// route answers 404 while the closeness switch leaves the owner out; that reads as "nothing on".
+export type PetId = 'puppy' | 'hedgehog' | 'butterfly' | 'rabbit' | 'bluebird';
+export interface PetOutfit { hat: string | null; collar: string | null; pendant: string | null }
+export interface PetsSummary {
+  locale: 'en' | 'zh-Hans'; level: number;
+  accessories: { id: string; row: 'hat' | 'collar' | 'pendant'; collection: string; name: string; unlocked: boolean; unlockedAtLevel: number | null }[];
+  outfits: Record<PetId, PetOutfit>;
+  foods: { id: string; name: string; count: number }[];
+}
+
+export async function loadPets() {
+  try { return await apiRequest<PetsSummary>('/api/fairy/pets'); }
+  catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
+}
+
+// Whoever changes an outfit (the wardrobe) calls petsChanged(), so the Garden redresses its pets.
+const changeListeners = new Set<() => void>();
+export function onPetsChanged(listener: () => void) { changeListeners.add(listener); return () => { changeListeners.delete(listener); }; }
+export const petsChanged = () => changeListeners.forEach(listener => listener());
+
+// What `petId` is wearing, reloaded whenever the Garden becomes `active` again or an outfit
+// changes; null until the server answers (and while it is off or unreachable).
+export function usePetOutfit(petId: PetId, active: boolean) {
+  const [outfit, setOutfit] = useState<PetOutfit | null>(null);
+  const [changes, setChanges] = useState(0);
+  useEffect(() => onPetsChanged(() => setChanges(count => count + 1)), []);
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    loadPets()
+      .then(pets => { if (live) setOutfit(pets?.outfits[petId] ?? null); })
+      .catch(() => undefined); // offline: keep what it had on
+    return () => { live = false; };
+  }, [petId, active, changes]);
+  return outfit;
+}

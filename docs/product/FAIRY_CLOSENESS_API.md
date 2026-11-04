@@ -175,6 +175,42 @@
 { "awarded": 1, "levelUp": null }
 ```
 
+## 6. 花园宠物：配饰、食物（[lib/garden-pets.js](../../lib/garden-pets.js)）
+
+和亲密度同一个开关，没开时返回 404。
+
+**等级奖励**
+
+| 等级 | 奖励 |
+|---|---|
+| Lv3 | 小花仙朋友圈开放。已经有帖子的账号不受影响；不在亲密度开关里的账号照旧 |
+| Lv4–8 | 每升一级解锁 1 对第一行配饰（帽子，10 件） |
+| Lv9–15 | 每升一级随机解锁 1–3 对第三行配饰（挂饰，13 件），拿完为止 |
+| Lv16–20 | 每升一级随机解锁 1–2 对第二行配饰（披肩，9 件），拿完为止 |
+
+一对 = 同一行里随机搭的 2 件，两张配饰图的件混在一起，不重复。解锁只由账号和等级算出来，数据库里不存，所以老用户打开时已经拥有当前等级该有的全部配饰。顺序是帽子、挂饰、披肩：披肩对宠物外形改变最大，放在最后。数量算过：10 件 = 5 级 × 2 件，13 件 ≤ 7 级 × 至少 2 件，9 件 ≤ 5 级 × 至少 2 件，每行到该段最后一级一定发完。
+
+旧的 `unlocks` 列表保留给还没更新的 App。新版读 `GET /api/fairy/closeness` 的 `bondRewards`。Lv5 稀有信物概率和 Lv16 月度信物 16 天这两条效果还在，只是不再列出来。
+
+**食物来源**（`GardenPetFood` 流水，库存 = 求和）
+
+| 来源 | 数量 |
+|---|---|
+| 每日签到 | 1 个随机食物（`POST /api/fairy/check-in`，同一天重试不重复） |
+| 每升一级 | 5 个随机食物。下次打开宠物时补发，老用户已到的等级也补一次 |
+| 账号前 7 个本地日，当天第一次种花 | 3 个随机食物，最多 21 个（`POST /users/:userId/flowers/:flowerId/placement` 之后） |
+
+**接口**
+
+- `GET /api/fairy/pets`：`accessories`（32 件，`row` 是 `hat` / `collar` / `pendant`，`unlocked` 决定要不要小锁）、`outfits`（每只宠物穿什么）、`foods`（库存）。
+- `PUT /api/fairy/pets/:petId/outfit`，请求体 `{ hat, collar, pendant }`，传 `null` 是脱下。没解锁返回 409 `ACCESSORY_LOCKED`，不是这一行的件返回 400。
+- `POST /api/fairy/pets/:petId/feed`，请求体 `{ foodId }`，返回 `{ foodId, count }`。没有库存返回 409 `NO_FOOD`。
+- `petId`：`puppy` `hedgehog` `butterfly` `rabbit` `bluebird`。喂食和摸头不加亲密度。
+
+**花园里怎么显示（App，[puppyLooks.ts](../../mobile/src/components/garden/critters/puppyLooks.ts)）**
+
+目前只有小狗画了穿搭。它有两套自己的配饰，每套三件：第二套是 `flower-sprig`（头饰）、`petal-capelet`（披风）、`crystal-drop`（挂饰），其余的件都按第一套画。披风自带水晶扣，所以穿披风时不显示挂饰，不穿披风时挂饰显示成项链。一次只画一套：两套的件混穿时，以披风所在的那套为准，没披风就以头饰那套为准，另一套的件不显示。每种造型都有走、追鸟跑、坐下三组动画，同一只狗、同样大小；追鸟跑的时候换装，小狗先坐下再换。
+
 ## 后端自动加的亲密度（前端不用调）
 
 | 行为 | 加多少 | 每天上限 | 在哪里加 |

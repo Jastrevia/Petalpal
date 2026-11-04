@@ -210,7 +210,46 @@ test('the puppy chases the bluebird at a run, sits where it caught up, then stro
   // Off again while sitting: it gets up first.
   const again = visits.planChase({ visit: sitting, now: sitting.start + 2, path: [sitting.path[0], b] });
   if (again) assert.ok(again.rising && again.lead === visits.RISE_SECONDS);
+  // A change of outfit mid-run: the chase ends where it is, and the next leg is the sit.
+  const mid = chase.start + chase.lead + 0.5, stopped = visits.stopChase(chase, mid);
+  assert.ok(Math.abs(stopped.start + stopped.duration - mid) < 1e-9 && stopped.chase);
+  const held = visits.visitPose(stopped, mid + 3), there = visits.visitPose(chase, mid);
+  assert.ok(Math.hypot(held.x - there.x, held.y - there.y) < 1e-6, 'stays where it stopped');
+  const sitsDown = visits.planNextLeg({ visit: stopped, now: mid, network: WALK_NETWORK, edges, points, random: seeded(5) });
+  assert.ok(sitsDown && sitsDown.sits && !sitsDown.chase);
+  assert.equal(visits.stopChase(walking, 2), walking, 'only a run is stopped');
   // A walk after the sit is an ordinary one.
   const on = visits.planNextLeg({ visit: sitting, now: sitting.start + sitting.duration, network: WALK_NETWORK, edges, points, random: seeded(4) });
   assert.ok(on && !on.sits && !on.chase);
+});
+
+test('the puppy wears one painted look per outfit, one set at a time, and every look has its sheets', async () => {
+  const fs = await import('node:fs');
+  const looks = load('../critters/puppyLooks');
+  const of = (hat, collar, pendant) => looks.puppyLookOf({ hat, collar, pendant });
+  assert.equal(looks.puppyLookOf(null), 'bare');
+  assert.equal(of(null, null, null), 'bare');
+  // Set 1: a cape carries its own clasp, so a pendant shows only without one.
+  assert.equal(of('lilac-beret', null, null), 'hat');
+  assert.equal(of(null, null, 'compass-star'), 'necklace');
+  assert.equal(of('lilac-beret', null, 'compass-star'), 'hat-necklace');
+  assert.equal(of(null, 'lilac-cape', 'compass-star'), 'cape');
+  assert.equal(of('lilac-beret', 'lilac-cape', null), 'cape-hat');
+  // Set 2: the flower sprig, the petal capelet and the crystal drop.
+  assert.equal(of('flower-sprig', null, null), 'hat2');
+  assert.equal(of(null, null, 'crystal-drop'), 'necklace2');
+  assert.equal(of('flower-sprig', null, 'crystal-drop'), 'hat-necklace2');
+  assert.equal(of('flower-sprig', 'petal-capelet', 'crystal-drop'), 'cape2-hat');
+  // Mixed sets: the cape's set wins, else the hat's; the other set's piece is left off.
+  assert.equal(of('flower-sprig', 'lilac-cape', null), 'cape');
+  assert.equal(of('lilac-beret', 'petal-capelet', null), 'cape2');
+  assert.equal(of('flower-sprig', null, 'compass-star'), 'hat2');
+  for (const [name, look] of Object.entries(looks.PUPPY_LOOKS)) {
+    for (const source of [look.source, look.run.source, look.rest.source]) {
+      assert.ok(fs.existsSync(new URL(`../${source.replace('@/', '')}`, import.meta.url)), `${name}: ${source}`);
+    }
+  }
+  // Every clip can carry a step on into every other.
+  for (const [from, to] of Object.entries(looks.MATCHING_FRAME))
+    for (const [clip, frames] of Object.entries(to)) assert.equal(frames.length, Object.values(looks.PUPPY_LOOKS).find(l => l.clip === from).count, `${from} -> ${clip}`);
 });

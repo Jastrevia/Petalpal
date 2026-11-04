@@ -15,6 +15,8 @@ python3 video-frames.py <frames dir> <out.png> <cell height> <columns> [options]
     character's original canvas and foot pivot.
   --blend N: cross-fade the loop's last N frames into the N just before its start, so a loop
     whose ends do not quite match still wraps without a jump (needs N frames before it).
+  --keep-near PX: also keep pieces within PX video pixels of the animal (an accessory joined to
+    it only by thin stems), not only its largest solid region.
 Prints the cell size, frame count and the loop's ground distance in cell pixels. Needs numpy
 and Pillow.
 """
@@ -34,6 +36,7 @@ parser.add_argument("--masks")
 parser.add_argument("--region", choices=("legs", "all"), default="legs")
 parser.add_argument("--crop")
 parser.add_argument("--blend", type=int, default=0)
+parser.add_argument("--keep-near", type=int, default=0)
 args = parser.parse_args()
 
 paths = sorted(glob.glob(f"{args.frames}/*.png"))
@@ -94,7 +97,12 @@ def main_body(a):
                     label[ny, nx] = n; stack.append((ny, nx))
         sizes.append(count)
     if len(sizes) == 1: return np.ones_like(a)
-    keep = Image.fromarray(((label == int(np.argmax(sizes))) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
+    main = label == int(np.argmax(sizes))
+    if args.keep_near:
+        reach = 2 * (args.keep_near // 4) + 1  # on the quarter-size grid
+        near = np.asarray(Image.fromarray((main * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(reach))) > 0
+        main = np.isin(label, np.unique(label[near & (label > 0)]))
+    keep = Image.fromarray((main * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
     return np.asarray(keep.resize((a.shape[1], a.shape[0]), Image.BILINEAR)).astype(np.float32) / 255
 
 frames = [keyed(f, p) for f, p in zip(rgb, paths)]

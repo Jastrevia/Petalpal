@@ -1,0 +1,81 @@
+import type { PetOutfit } from '@/services/gardenPets';
+
+// The puppy, bare or dressed: one painted walk per look (scripts/critters/video-frames.py, all
+// cut with crop 200,30,920,660 into 418 × 300 cells, so every look is the same dog, same size).
+// The puppy has two sets of its own, three pieces each: a headpiece (hat row), a crystal pendant
+// (pendant row) and a cape (collar row); set 2 is the flower sprig, petal capelet and crystal
+// drop (PUPPY_SET_2), set 1 every other piece. A cape carries its own crystal clasp, so a pendant
+// only shows without a cape, as a necklace. Hats and necklaces are painted onto the bare walking
+// clip, each set's cape looks onto that cape's clip: putting a hat on or off never changes the gait. Each look also gallops (`run`, chasing the bluebird) and
+// sits down where it caught up (`rest`, from a run-to-sit clip that starts on the gallop's first
+// frame), painted the same way. `loop` is in Garden units (cell pixels × 113 / 418).
+export type PuppyLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat'
+  | 'hat2' | 'necklace2' | 'hat-necklace2' | 'cape2' | 'cape2-hat';
+export type Clip = 'walk' | 'cape' | 'cape2';
+export type LookFrames = { source: number; clip: Clip; columns: number; count: number; ground: number; loop: number;
+  run: { source: number; columns: number; count: number; loop: number }; rest: { source: number; count: number; rise: number } };
+const BARE_CLIP = { clip: 'walk' as const, columns: 6, count: 33, ground: 279, loop: 123.7 };
+const CAPE_CLIP = { clip: 'cape' as const, columns: 5, count: 15, ground: 280, loop: 43.3 };
+// The rest sheets share their walk's columns (GardenCritters draws them with the walk's grid).
+const bareMoves = (run: number, sit: number) => ({ run: { source: run, columns: 5, count: 25, loop: 178.2 }, rest: { source: sit, count: 16, rise: 1 } });
+const capeMoves = (run: number, sit: number) => ({ run: { source: run, columns: 5, count: 15, loop: 68.2 }, rest: { source: sit, count: 12, rise: 1 } });
+// The petal cape's walk measures 24.3 units a stride, short for the puppy's pace (its legs would
+// step half again too fast); 34 steps it at the velvet cape's cadence, at the cost of a little slide.
+const CAPE2_CLIP = { clip: 'cape2' as const, columns: 4, count: 12, ground: 277, loop: 34 };
+const cape2Moves = (run: number, sit: number) => ({ run: { source: run, columns: 5, count: 14, loop: 79.1 }, rest: { source: sit, count: 12, rise: 1 } });
+// For each frame of one clip, the frame of another whose legs are closest (compared on the leg
+// silhouettes), so a change between the clips carries on in the same step.
+export const MATCHING_FRAME: Record<Clip, Partial<Record<Clip, readonly number[]>>> = {
+  walk: {
+    cape: [9, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 6, 7, 1, 2, 3, 4, 5, 6, 8, 9, 11, 4, 5, 6, 7, 8, 9, 11, 12, 5, 6, 8],
+    cape2: [4, 10, 11, 1, 1, 3, 9, 10, 10, 11, 1, 2, 3, 3, 4, 5, 0, 1, 2, 3, 10, 11, 11, 1, 2, 3, 9, 10, 10, 11, 1, 2, 3],
+  },
+  cape: {
+    walk: [12, 13, 14, 15, 22, 23, 4, 5, 6, 7, 8, 28, 29, 10, 11],
+    cape2: [3, 3, 4, 6, 6, 1, 2, 3, 3, 4, 10, 11, 11, 8, 2],
+  },
+  cape2: {
+    walk: [3, 30, 31, 12, 1, 15, 15, 23, 10, 25, 1, 9],
+    cape: [3, 5, 6, 7, 2, 3, 3, 5, 6, 8, 10, 11],
+  },
+};
+export const PUPPY_LOOKS: Record<PuppyLook, LookFrames> = {
+  bare: { source: require('@/assets/garden/critters/puppy-looks/walk-bare.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-bare.webp'), require('@/assets/garden/critters/puppy-looks/sit-bare.webp')) },
+  hat: { source: require('@/assets/garden/critters/puppy-looks/walk-hat.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-hat.webp'), require('@/assets/garden/critters/puppy-looks/sit-hat.webp')) },
+  necklace: { source: require('@/assets/garden/critters/puppy-looks/walk-necklace.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-necklace.webp'), require('@/assets/garden/critters/puppy-looks/sit-necklace.webp')) },
+  'hat-necklace': { source: require('@/assets/garden/critters/puppy-looks/walk-hat-necklace.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-hat-necklace.webp'), require('@/assets/garden/critters/puppy-looks/sit-hat-necklace.webp')) },
+  cape: { source: require('@/assets/garden/critters/puppy-looks/walk-cape.webp'), ...CAPE_CLIP,
+    ...capeMoves(require('@/assets/garden/critters/puppy-looks/run-cape.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape.webp')) },
+  'cape-hat': { source: require('@/assets/garden/critters/puppy-looks/walk-cape-hat.webp'), ...CAPE_CLIP,
+    ...capeMoves(require('@/assets/garden/critters/puppy-looks/run-cape-hat.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape-hat.webp')) },
+  hat2: { source: require('@/assets/garden/critters/puppy-looks/walk-hat2.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-hat2.webp'), require('@/assets/garden/critters/puppy-looks/sit-hat2.webp')) },
+  necklace2: { source: require('@/assets/garden/critters/puppy-looks/walk-necklace2.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-necklace2.webp'), require('@/assets/garden/critters/puppy-looks/sit-necklace2.webp')) },
+  'hat-necklace2': { source: require('@/assets/garden/critters/puppy-looks/walk-hat-necklace2.webp'), ...BARE_CLIP,
+    ...bareMoves(require('@/assets/garden/critters/puppy-looks/run-hat-necklace2.webp'), require('@/assets/garden/critters/puppy-looks/sit-hat-necklace2.webp')) },
+  cape2: { source: require('@/assets/garden/critters/puppy-looks/walk-cape2.webp'), ...CAPE2_CLIP,
+    ...cape2Moves(require('@/assets/garden/critters/puppy-looks/run-cape2.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape2.webp')) },
+  'cape2-hat': { source: require('@/assets/garden/critters/puppy-looks/walk-cape2-hat.webp'), ...CAPE2_CLIP,
+    ...cape2Moves(require('@/assets/garden/critters/puppy-looks/run-cape2-hat.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape2-hat.webp')) },
+};
+
+// Set 2's pieces (catalog ids, lib/garden-pets.js); every other piece the puppy wears is set 1.
+export const PUPPY_SET_2: ReadonlySet<string> = new Set(['flower-sprig', 'petal-capelet', 'crystal-drop']);
+const setOf = (id: string | null) => (id ? (PUPPY_SET_2.has(id) ? 2 : 1) : 0);
+
+// The look for an outfit (null: not known, nothing on). Looks are painted one set at a time:
+// the cape's set wins, else the hat's, and a piece of the other set is left off.
+export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
+  if (!outfit) return 'bare';
+  const set = setOf(outfit.collar) || setOf(outfit.hat) || setOf(outfit.pendant);
+  if (!set) return 'bare';
+  const hat = setOf(outfit.hat) === set, pendant = setOf(outfit.pendant) === set, n = set === 2 ? '2' : '';
+  if (outfit.collar) return set === 2 ? (hat ? 'cape2-hat' : 'cape2') : (hat ? 'cape-hat' : 'cape');
+  if (pendant) return `${hat ? 'hat-' : ''}necklace${n}` as PuppyLook;
+  return hat ? `hat${n}` as PuppyLook : 'bare';
+}
