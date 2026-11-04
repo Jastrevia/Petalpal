@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Skia, useImage, type SkImage, type SkTypefaceFontProvider } from '@shopify/react-native-skia';
+import { Skia, useImage, type SkImage, type SkTypeface, type SkTypefaceFontProvider } from '@shopify/react-native-skia';
 import { loadAsset, type AssetSource } from './loadAsset';
 
 // Baked from the original spine artwork (see scripts/journal-books/README.md).
@@ -85,7 +85,7 @@ export function sharedPaperSources() { const parchment = decoded.get(PARCHMENT);
 export function retainBookImages() {
   openBooks++;
   let held = true;
-  return () => { if (!held) return; held = false; if (--openBooks === 0) { decoded.clear(); decoding.clear(); sharedFonts = null; } };
+  return () => { if (!held) return; held = false; if (--openBooks === 0) { decoded.clear(); decoding.clear(); sharedFonts = null; sharedCjkFonts = null; } };
 }
 export function useBookImages(month: number) {
   useEffect(() => retainBookImages(), []);
@@ -113,30 +113,60 @@ export function preloadBookImages(months: number[], onShared?: () => void) {
 // Web bundles resolve font files to URL strings, which Skia's loader expects wrapped as { uri }.
 const asset = (module: number | string) => (typeof module === 'string' ? { uri: module } : module) as number;
 const GARAMOND = [asset(require('../../../../assets/fonts/EBGaramond-Regular.ttf')), asset(require('../../../../assets/fonts/EBGaramond-MediumItalic.ttf'))];
+// EB Garamond has no Chinese: Chinese on the painted pages (zh-Hans copy, journals written in Chinese) falls back to
+// Noto Serif SC, cut to GB2312's 6,763 characters plus punctuation (2.8 MB). It is loaded only when a book needs it.
+const CJK = asset(require('../../../../assets/fonts/NotoSerifSC-Regular.otf'));
+export const CJK_FAMILY = 'Noto Serif SC';
+const HAS_CJK = /[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/;
+export const hasCjk = (text: string) => HAS_CJK.test(text);
 // Shared like the pictures above while any book is open (a switch to another month never waits for the fonts again).
 let sharedFonts: SkTypefaceFontProvider | null = null;
+let sharedCjkFonts: SkTypefaceFontProvider | null = null;
+let garamondFaces: SkTypeface[] | null = null;
 let loadingFonts: Promise<SkTypefaceFontProvider | null> | null = null;
+let loadingCjk: Promise<SkTypefaceFontProvider | null> | null = null;
 function loadJournalFonts() {
   if (sharedFonts) return Promise.resolve(sharedFonts);
   if (!loadingFonts) {
     loadingFonts = Promise.all(GARAMOND.map(source => loadAsset(source, data => Skia.Typeface.MakeFreeTypeFaceFromData(data)))).then(faces => {
       loadingFonts = null;
       if (faces.some(face => !face)) return null;
+      garamondFaces = faces as SkTypeface[];
       const provider = Skia.TypefaceFontProvider.Make();
-      faces.forEach(face => provider.registerFont(face!, 'EB Garamond'));
+      garamondFaces.forEach(face => provider.registerFont(face, 'EB Garamond'));
       if (openBooks > 0) sharedFonts = provider;
       return provider;
     }, () => { loadingFonts = null; return null; });
   }
   return loadingFonts;
 }
-export function useJournalFonts() {
-  const [fonts, setFonts] = useState<SkTypefaceFontProvider | null>(() => sharedFonts);
+/** EB Garamond with the Chinese fallback face (null if either cannot be loaded: the Garamond-only fonts stay). */
+function loadCjkFonts() {
+  if (sharedCjkFonts) return Promise.resolve(sharedCjkFonts);
+  if (!loadingCjk) {
+    loadingCjk = Promise.all([loadJournalFonts(), loadAsset(CJK, data => Skia.Typeface.MakeFreeTypeFaceFromData(data))]).then(([base, cjk]) => {
+      loadingCjk = null;
+      if (!base || !cjk || !garamondFaces) return null;
+      const provider = Skia.TypefaceFontProvider.Make();
+      garamondFaces.forEach(face => provider.registerFont(face, 'EB Garamond'));
+      provider.registerFont(cjk, CJK_FAMILY);
+      if (openBooks > 0) sharedCjkFonts = provider;
+      return provider;
+    }, () => { loadingCjk = null; return null; });
+  }
+  return loadingCjk;
+}
+/** The painted pages' fonts. `cjk`: the book shows Chinese — the Garamond fonts come first (English text never waits),
+ *  then the same fonts with the Chinese fallback, and the pages are painted again. */
+export function useJournalFonts(cjk = false) {
+  const [fonts, setFonts] = useState<SkTypefaceFontProvider | null>(() => (cjk && sharedCjkFonts) || sharedFonts);
   useEffect(() => {
     let alive = true;
+    if (cjk && sharedCjkFonts) { setFonts(sharedCjkFonts); return; }
     if (sharedFonts) setFonts(sharedFonts);
-    else void loadJournalFonts().then(value => { if (alive) setFonts(value); });
+    else void loadJournalFonts().then(value => { if (alive && value) setFonts(current => current ?? value); });
+    if (cjk) void loadCjkFonts().then(value => { if (alive && value) setFonts(value); });
     return () => { alive = false; };
-  }, []);
+  }, [cjk]);
   return fonts;
 }

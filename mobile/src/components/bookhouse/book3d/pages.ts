@@ -10,7 +10,8 @@ import { SPEC } from './math';
 /** Page faces in book units (the top page between the squares and the gutter), painted at 1.25 px per unit. */
 export const PAGE = { width: SPEC.W - SPEC.over - SPEC.gap, height: SPEC.H - 2 * SPEC.over, density: 1 };
 const INK = '#4A3B27', SOFT = '#7A6447', RULE = '#C2A06B', GOLD = '#B98E45', GOLD_LIGHT = '#F1D99A', GOLD_DARK = '#6E4E1E';
-const FAMILY = ['EB Garamond'];
+// Chinese falls back to Noto Serif SC (assets.ts CJK_FAMILY), registered only when a book needs it.
+const FAMILY = ['EB Garamond', 'Noto Serif SC'];
 
 function paint(width: number, height: number, density: number, draw: (canvas: SkCanvas) => void): SkImage | null {
   const surface = Skia.Surface.Make(Math.round(width * density), Math.round(height * density));

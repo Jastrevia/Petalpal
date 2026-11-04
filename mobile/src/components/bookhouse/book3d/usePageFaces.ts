@@ -3,7 +3,8 @@ import { PixelRatio } from 'react-native';
 import { ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
 import { dayRecords, formatLocalDate, journalLocked, MONTH_NAMES, moodTitle, weekdayOf, type JournalDay } from '../../../services/bookhouse';
 import { localFlowerArtwork } from '../../garden/planting/localFlowerArtwork';
-import { FLOWERS, LATIN, retainBookImages, sharedPaperSources, useBookImages, useJournalFonts } from './assets';
+import { FLOWERS, hasCjk, LATIN, retainBookImages, sharedPaperSources, useBookImages, useJournalFonts } from './assets';
+import { useAppLocale } from '../../../services/locale';
 import { coverTexture, entryPage, frontispiece, plainPage, readingBackground, recordsPage, writingPage, type FlowerArt, type RecordsFace } from './pages';
 import { entryParts, readingMetrics } from './readingLayout';
 import { loadAsset, type AssetSource } from './loadAsset';
@@ -52,7 +53,10 @@ export function usePageFaces({ month, year, days, today, page }: {
   month: number; year: number; days: JournalDay[]; today: string; page: { width: number; height: number };
 }) {
   const img = useBookImages(month);
-  const fonts = useJournalFonts();
+  // Chinese on these pages (the zh-Hans copy, or anything written or named in Chinese) needs the Chinese font.
+  const locale = useAppLocale();
+  const cjk = useMemo(() => locale === 'zh-Hans' || hasCjk(JSON.stringify(days)), [locale, days]);
+  const fonts = useJournalFonts(cjk);
   const density = paperDensity();
   const metrics = useMemo(() => readingMetrics(page.width, page.height), [page.width, page.height]);
   const journalCount = days.reduce((n, d) => n + d.journals.length, 0);

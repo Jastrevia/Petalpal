@@ -33,5 +33,13 @@ covers and pages in EB Garamond, redistributed unmodified in `mobile/assets/font
 | `EBGaramond-Regular.ttf`, `EBGaramond-MediumItalic.ttf` | `@expo-google-fonts/eb-garamond@0.4.3` (npm) | SIL Open Font License 1.1 — Copyright 2017 The EB Garamond Project Authors |
 
 The full license text ships beside the fonts as `mobile/assets/fonts/EBGaramond-OFL.txt`.
+
+Chinese on the same painted pages falls back to Noto Serif SC (EB Garamond has no Chinese):
+
+| Font file | Source | License |
+| --- | --- | --- |
+| `NotoSerifSC-Regular.otf` | `notofonts/noto-cjk` on GitHub, `Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf`, subset with fontTools to GB2312's 6,763 characters, ASCII and CJK/fullwidth punctuation (no reserved font name) | SIL Open Font License 1.1 — © 2017-2024 Adobe (http://www.adobe.com/); Noto is a trademark of Google Inc. |
+
+Its license text ships beside it as `mobile/assets/fonts/NotoSerifSC-OFL.txt`.
 The book textures in `mobile/assets/bookhouse/journal/` are derived from PetalPal's own
 spine artwork (see `mobile/scripts/journal-books/README.md`); no third-party artwork is included.
