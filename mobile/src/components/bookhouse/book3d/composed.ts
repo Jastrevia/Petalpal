@@ -72,17 +72,28 @@ export const WALLS = { left: 170, rightFrom: 905, rightTo: 1123, rows: 1300 };
  *  two, so the bottom plank rests on the desk; the canopy above the sign is left out of frame. The room around the
  *  bookcase is the painting itself, carried on past its edges by the side walls; the desk, nearer the camera, spans the
  *  window's width. */
+/** Up to this window width the illustrated scene is enlarged to fill the width (phones). */
+export const PHONE_WIDTH = 600;
+
 export function composedTarget(rest: ComposedRest, view: { width: number; height: number }, deskEdge: number, scrollY: number,
   title: { top: number; safeTop: number }, variant: 'v1' | 'v2' | 'portrait' | 'reference' = 'v2'): ComposedGeometry {
   const xEnd = sliceEnd(rest);
   // (The reference scene shows a little of the compartment under the last row, as its painting does.)
   const yBottom = rest.cabinetTop + ((variant === 'reference' ? REF.bottomRow : BOTTOM_ROW) - SHELF.top) * rest.scale;      // shelf-local
-  const k1 = Math.max(.15, Math.min(1, (deskEdge - title.safeTop) / (yBottom - title.top)));
+  let k1 = Math.max(.15, Math.min(1, (deskEdge - title.safeTop) / (yBottom - title.top)));
+  // Phones (the illustrated scene): the original illustration is enlarged until it spans the window's width, so its
+  // edges never show — on a short phone screen (a browser under its address bar) the camera stops closer, the bottom
+  // plank still on the desk, and the upper rows and the sign go past the top (owner's choice, 2026-11-03).
+  let fromDesk = false;
+  if (variant === 'reference' && view.width <= PHONE_WIDTH) {
+    const cover = Math.min(1, view.width * 1.01 / REF.width * REF.rowRatio / rest.scale);
+    if (cover > k1) { k1 = cover; fromDesk = true; }
+  }
   // Shelf-local point (x, y) → window: rootX + ax + (x − ax)·k + tx, ay + (y − ay)·k + ty − scrollY. The shelf stays
-  // centred (it is centred at rest); its sign arrives at safeTop.
+  // centred (it is centred at rest); its sign arrives at safeTop (or, enlarged on a phone, its bottom plank at deskEdge).
   const ax = rest.width / 2, ay = 0;
   const tx1 = 0;
-  const ty1 = title.safeTop + scrollY - title.top * k1;
+  const ty1 = fromDesk ? deskEdge + scrollY - yBottom * k1 : title.safeTop + scrollY - title.top * k1;
   return { k1, tx1, ty1, ax, ay, scrollY, rest, xEnd, view, deskEdge, variant };
 }
 

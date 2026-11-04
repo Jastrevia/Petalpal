@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 import Reanimated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { Canvas, Picture, Skia, TileMode, createPicture, useImage } from '@shopify/react-native-skia';
+import { Canvas, Picture, Skia, createPicture, useImage } from '@shopify/react-native-skia';
 import { composedAt, REF, referenceAt, referenceScale, type ComposedGeometry } from './composed';
 import { Scrollkeeper } from '../Scrollkeeper';
 
@@ -24,27 +24,12 @@ function useRoomPicture(source: number, pull: SharedValue<number>, geometry: Com
     if (!image || p <= 0) return;
     const s = composedAt(p, geometry), r = referenceAt(s, geometry);
     const w = image.width(), h = image.height();
+    // Beyond the illustration (tablets, computers; phones are filled, composed.ts PHONE_WIDTH): plain dark wood.
     if (ground) {
-      const fade = Math.min(1, p * 6), view = geometry.view;
       const paint = Skia.Paint();
       paint.setColor(Skia.Color(GROUND));
-      paint.setAlphaf(fade);
-      canvas.drawRect(Skia.XYWHRect(0, 0, view.width, view.height), paint);
-      // Wide windows (a computer, a tablet): the room carries on past the illustration's edges, out of focus — the same
-      // art enlarged about the desk's back edge (so its desk lines up with the sharp one), blurred and darkened.
-      const artW = w * r.k;
-      if (artW < view.width - 1) {
-        const f = view.width / artW * 1.04, ax = r.x + artW / 2, ay = r.y + REF.edge * r.k;
-        const soft = Skia.Paint();
-        soft.setAntiAlias(true);
-        soft.setAlphaf(fade);
-        soft.setImageFilter(Skia.ImageFilter.MakeBlur(14, 14, TileMode.Clamp, null));
-        canvas.drawImageRect(image, Skia.XYWHRect(0, 0, w, h), Skia.XYWHRect(ax - artW * f / 2, ay - REF.edge * r.k * f, artW * f, h * r.k * f), soft);
-        const shade = Skia.Paint();
-        shade.setColor(Skia.Color(GROUND));
-        shade.setAlphaf(.42 * fade);
-        canvas.drawRect(Skia.XYWHRect(0, 0, view.width, view.height), shade);
-      }
+      paint.setAlphaf(Math.min(1, p * 6));
+      canvas.drawRect(Skia.XYWHRect(0, 0, geometry.view.width, geometry.view.height), paint);
     }
     const paint = Skia.Paint();
     paint.setAntiAlias(true);
