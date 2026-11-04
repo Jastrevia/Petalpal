@@ -6,15 +6,40 @@
 
 <p>A privacy-first social reflection app that turns everyday emotions and meaningful moments into a living virtual garden.</p>
 
+<p>
+<a href="https://www.youtube.com/watch?v=X4YzB332bxQ"><img src="https://img.shields.io/badge/%E2%96%B6%20Watch%20the%20film-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch the PetalPal film on YouTube"></a>
+&nbsp;
+<a href="https://petalpal-web.netlify.app/"><img src="https://img.shields.io/badge/%F0%9F%8C%B8%20Visit%20the%20website-petalpal--web-8E6CC8?style=for-the-badge" alt="Visit the PetalPal website"></a>
+</p>
+
 ![React Native](https://img.shields.io/badge/React%20Native-Expo-000000?logo=expo&logoColor=white)
 ![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-2F6B3B)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20Prisma-315D8A)
 ![AI](https://img.shields.io/badge/AI-Cloudflare%20Workers%20AI%20%2B%20Claude-F38020)
 ![Art](https://img.shields.io/badge/Art-Painted%20%2B%20AI%20Motion-B07CC6)
 
-[Product](#-product) · [Technology](#-technology-stack) · [Architecture](#-system-architecture) · [Status](#-project-status) · [Getting Started](#-getting-started) · [Team](#-team)
+[See PetalPal](#-see-petalpal) · [Product](#-product) · [Technology](#-technology-stack) · [Architecture](#-system-architecture) · [Status](#-project-status) · [Getting Started](#-getting-started) · [Team](#-team)
 
 </div>
+
+---
+
+## 🎬 See PetalPal
+
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+<a href="https://www.youtube.com/watch?v=X4YzB332bxQ"><img src="https://img.youtube.com/vi/X4YzB332bxQ/maxresdefault.jpg" alt="Watch the PetalPal film" width="100%"></a>
+<br><b><a href="https://www.youtube.com/watch?v=X4YzB332bxQ">▶ Watch the film</a></b>
+<br><sub>A short film introducing PetalPal</sub>
+</td>
+<td width="50%" align="center" valign="top">
+<a href="https://petalpal-web.netlify.app/"><img src="docs/readme/petalpal-web.webp" alt="The PetalPal website" width="100%"></a>
+<br><b><a href="https://petalpal-web.netlify.app/">🌐 Visit the website</a></b>
+<br><sub>petalpal-web.netlify.app</sub>
+</td>
+</tr>
+</table>
 
 ---
 
