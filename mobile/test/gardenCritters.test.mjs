@@ -449,3 +449,17 @@ test('the puppy eats and is patted in every look: each has both painted sheets, 
     }
   }
 });
+
+test('the Maltese walks, sits and runs in both its looks, about half the puppy\'s size', async () => {
+  const fs = await import('node:fs');
+  const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
+  const block = source.slice(source.indexOf('const MALTESE_LOOKS'), source.indexOf('const ART:'));
+  for (const look of ['bare', 'petal']) {
+    const part = block.slice(block.indexOf(`  ${look}: {`));
+    const sheets = [...part.matchAll(/require\('@\/(assets\/garden\/critters\/[^']+)'\)/g)].slice(0, 3).map(m => m[1]);
+    assert.equal(sheets.length, 3, `${look}: walk, sit and run`);
+    for (const sheet of sheets) assert.ok(fs.existsSync(new URL(`../${sheet}`, import.meta.url)), sheet);
+  }
+  const ratio = visits.CRITTERS.maltese.size / visits.CRITTERS.puppy.size;
+  assert.ok(ratio > 0.4 && ratio < 0.5, `${ratio}`);
+});

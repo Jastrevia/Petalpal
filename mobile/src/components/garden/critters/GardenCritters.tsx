@@ -29,6 +29,25 @@ type Frames = { columns: number; count: number; ground: number; loop: number; fp
     // A run in bigger cells than the walk's (a gallop stretches past them): their size, and where
     // their top left lies in the walk's cell, in walk-cell pixels.
     cell?: { w: number; h: number; x: number; y: number } }; trail?: number };
+// The Maltese (Xiaobai), from the owner's Holopix painting of it in its petal outfit (2026-11-05;
+// ~/dev/petalpal-motion/maltese/v2): that painting on green is the dressed look, the same painting
+// with every piece taken off the bare one. Each look: an oil-motion walk (a four-beat walk, one
+// stride), a walk-to-sit (20 frames) and a gallop (two strides, painted from a mid-stride key
+// frame), all cut with the walk's scale (crop 190,30,920,690 into 293 × 220 cells; the gallop is
+// longer, so it is cut wider, 40,0,1240,744 into 395 × 237 cells, and drawn offset onto them, its
+// landing paws on the walk's ground). `loop` is the ground the planted paws cover (measured by
+// video-frames.py) at MALTESE_SIZE. It wears its look when the puppy has an outfit on.
+export type MalteseLook = 'bare' | 'petal';
+const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
+  bare: { source: require('@/assets/garden/critters/maltese-walk.webp'), columns: 8, count: 48, ground: 216, loop: 47.9,
+    rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 60, loop: 66.3,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -16.1 } } },
+  petal: { source: require('@/assets/garden/critters/maltese-petal-walk.webp'), columns: 8, count: 42, ground: 216, loop: 34.6,
+    rest: { source: require('@/assets/garden/critters/maltese-petal-sit.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-petal-run.webp'), columns: 8, count: 59, loop: 64.4,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -22.2 } } },
+};
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -43,17 +62,8 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The puppy walks, gallops after the bluebird and sits down where it caught up in its outfit's
   // paintings (puppyLooks.ts; bare when it has nothing on), all sharing one crop, ground and scale.
   puppy: { source: PUPPY_LOOKS.bare.source, w: 418, h: 300, frames: PUPPY_LOOKS.bare },
-  // The Maltese, the puppy's tiny friend: an oil-motion walk (a four-beat walk, one stride cycle of
-  // 43 frames, 45 units of ground) and a walk-to-sit (20 frames), cut with one crop (190,30,920,690)
-  // so they lie on the same cells. Only frames where its legs are moving are kept: a still stretch
-  // in a loop made it slide.
-  maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
-    frames: { columns: 8, count: 43, ground: 216, loop: 45, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
-      // Its run: a gallop (painted from a mid-stride key frame; 59 frames, 77 units), chasing the
-      // puppy or dashing off in a game. Stretched out it is longer than the walk's cells, so it is cut
-      // wider (crop 100,10,1120,710 into 374 × 237 cells) and drawn offset onto them.
-      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 59, loop: 77,
-        cell: { w: 374 * 0.9986, h: 237 * 0.9986, x: -30, y: -6.67 } } } },
+  // The Maltese, the puppy's tiny friend (bare, or in its own look: MALTESE_LOOKS).
+  maltese: { source: MALTESE_LOOKS.bare.source, w: 293, h: 220, frames: MALTESE_LOOKS.bare },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -358,15 +368,42 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   </>;
 });
 
-export function Critter({ visit, clock, zoom = 1, look = 'bare' }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook }) {
+export function Critter({ visit, clock, zoom = 1, look = 'bare', malteseLook }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook; malteseLook?: MalteseLook }) {
   const art = ART[visit.id];
-  const image = useImage(visit.id === 'puppy' ? null : art.source);
+  const image = useImage(visit.id === 'puppy' || visit.id === 'maltese' ? null : art.source);
   if (visit.id === 'puppy') return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}><Puppy visit={visit} clock={clock} look={look} /></Group>;
+  // The Maltese matches its friend: in its own look while the puppy has an outfit on.
+  if (visit.id === 'maltese') return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
+    <Maltese visit={visit} clock={clock} look={malteseLook ?? (look === 'bare' ? 'bare' : 'petal')} /></Group>;
   if (!image) return null;
   return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
     {art.frames && CRITTERS[visit.id].kind === 'walker' ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
       : <Flyer visit={visit} clock={clock} image={image} />}
   </Group>;
+}
+
+// The Maltese in its look. Both looks stay drawn (the one not worn invisible), so their sheets are
+// in and a change shows at once; never mid-run: a new look waits until its run has ended.
+function Maltese({ visit, clock, look }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook }) {
+  const [shown, setShown] = useState(look);
+  const visitRef = useRef(visit); visitRef.current = visit;
+  useEffect(() => {
+    if (look === shown) return;
+    const running = () => { const v = visitRef.current; return !!(v.chase || v.running) && clock.value < v.start + v.duration; };
+    let timer = setTimeout(function wear() {
+      if (running()) { timer = setTimeout(wear, 300); return; }
+      setShown(look);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [look, shown, clock]);
+  const hidden = useDerivedValue(() => 0, []);
+  return <>{(['bare', 'petal'] as const).map(name => <MalteseLookWalker key={name} visit={visit} clock={clock} look={name} fade={name === shown ? undefined : hidden} />)}</>;
+}
+
+function MalteseLookWalker({ visit, clock, look, fade }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook; fade?: DerivedValue<number> }) {
+  const sheet = useImage(MALTESE_LOOKS[look].source);
+  if (!sheet) return null;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} />;
 }
 
 // The puppy in its outfit. A new outfit simply goes on: the old look fades off the new one in a

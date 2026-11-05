@@ -59,6 +59,24 @@ Not done yet (next work, in the owner's order):
    and the belly gap filled in every frame from Kiro's repaint (`belly_paste.py`). The puppy never
    changes outfit while running: it stops, sits, then changes, and no game or chase starts
    meanwhile. Dressed, it only plays chase with the Maltese (the tug and hug clips paint it bare).
+   *New Maltese painting and its outfit (2026-11-05, branch `feat/maltese-holopix`):* the owner
+   dressed the Maltese on Holopix (Outfit Transfer template, `creativeTemplateId=139`) after its
+   design sheet (flower clip, lilac capelet, bow and charms) and chose that painting for the dog
+   itself, so it replaces M0: on green it is the petal look (`dressed.png`, the capelet refitted
+   over the back by one gpt-image edit), and the same painting with every piece taken off is the bare
+   look (`bare.png`), both in `~/dev/petalpal-motion/maltese/v2/`. Each look has its own walk, walk-to-
+   sit and gallop (`MALTESE_LOOKS` in GardenCritters.tsx; `maltese-*.webp`, `maltese-petal-*.webp`);
+   tug and hug were regenerated with the new bare Maltese. Its head is bigger than M0's, so it is
+   drawn at 0.8 of the old size (`MALTESE_SIZE` 49.6, about 0.44 of the puppy), and the pair first
+   frames use that scale (the tug frame is itself at 0.79 of the puppy's video scale: k 0.342).
+   The bare sit clip's backdrop turned pink half way: it is keyed per frame (`sit-masks/`). The
+   videos paint a dark shadow between its legs and belly (dark on the lawn): in all six sheets, dark
+   patches of 25 px or more in the bottom 22% of each cell fade to transparent (`maltese/v2/belly_clear.py`;
+   originals in `maltese/v2/sheets-before-belly/`); the bottom band keeps the red bow out.
+   It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
+   ground covered, so the painted stride stays and its steps come quicker. It has
+   no wardrobe of its own (the server's PetId has no `maltese`): it wears its petal look while the
+   puppy has any outfit on, and like the puppy never changes look mid-run.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

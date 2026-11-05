@@ -22,13 +22,17 @@ export type CritterSpec = {
   altitude: [number, number];
 };
 // The Maltese's drawn size and walking pace (world units), from its painted walk.
-// (Its sheet's cells are 293 px wide; 62 units makes it stand about 42 units tall, some six tenths of
-// the puppy. Its painted walk covers 45 units a stride cycle in 1.8 s: 27 units a second is its own pace.)
-export const MALTESE_SIZE = 62, MALTESE_SPEED = 27;
-// Its gallop: two strides of about 38.5 units each loop. A small dog's strides are short and quick:
+// (Its sheet's cells are 293 px wide. Its painting since 2026-11-05 has a bigger head than the
+// first one, so it is drawn at 0.8 of the first one's 62 units, keeping it about half the puppy's
+// size. Its painted walk covers 47.9 units a 48-frame stride, 34.6 a 42-frame one in its petal
+// look. It walks as fast as the puppy (the owner's choice, 2026-11-05): its frames follow the ground
+// it covers, so its stride stays the painted one and its little legs simply step quicker, about 1.7
+// times the video's own pace.)
+export const MALTESE_SIZE = 49.6, MALTESE_SPEED = 38;
+// Its gallop: two strides of about 33 units each loop. A small dog's strides are short and quick:
 // it takes two to each of the puppy's (the puppy's gallop: 178 units a stride at RUN_SPEED, 1.23 s),
-// so it runs a loop in 1.23 s, a little under half the puppy's speed.
-export const MALTESE_RUN_SPEED = 63;
+// so it runs a loop in about 1.23 s.
+export const MALTESE_RUN_SPEED = 53;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
@@ -593,8 +597,8 @@ export function clearOf(candidates: readonly (Visit | null)[], other: Point): Vi
 // puppy (`apart` units from it, on its side) and the scene plays there, both held for it.
 export type SceneKind = 'tug' | 'hug';
 export const SCENE_SPECS: Readonly<Record<SceneKind, { seconds: number; apart: number; sits: boolean }>> = {
-  tug: { seconds: 71 / 12, apart: 106.6, sits: false },
-  hug: { seconds: 71 / 12, apart: 65.3, sits: true },
+  tug: { seconds: 71 / 12, apart: 102.5, sits: false },
+  hug: { seconds: 71 / 12, apart: 63.9, sits: true },
 };
 export type Scene = { key: number; kind: SceneKind; start: number; end: number; x: number; y: number; dir: 1 | -1 };
 export function planScene({ key, kind, maltese, puppy, now, mAt, pAt, approach }: {
