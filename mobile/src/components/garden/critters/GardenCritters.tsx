@@ -109,6 +109,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const pair = useRef<{ leader: PairLeader; until: number }>({ leader: 'maltese', until: 0 });
   const [hearts, setHearts] = useState<{ key: number; x: number; y: number; start: number }[]>([]);
   const forcePlay = useRef(false);
+  // An outfit waiting to go on until the puppy has stopped running.
+  const lookPending = useRef(false);
   const forceKind = useRef<'chase' | 'tug' | 'hug' | null>(null);
   const lastTry = useRef<unknown>(null);
   const [sceneList, setScenes] = useState<Scene[]>([]);
@@ -116,10 +118,16 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const reducedRef = useRef(false); reducedRef.current = !!useReducedMotion();
   useEffect(() => {
     const now = clock.value;
-    if (!visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && now < v.start + v.duration)) { setShownLook(look); return; }
+    const running = () => visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && clock.value < v.start + v.duration);
+    if (!running()) { setShownLook(look); return; }
+    // Never mid-run: it stops, sits down, and only then changes; meanwhile no game sets it running.
+    lookPending.current = true;
     setVisits(current => current.map(v => (v.id === 'puppy' ? stopChase(v, now) : v)));
-    const timer = setTimeout(() => setShownLook(look), SIT_DOWN_MS);
-    return () => clearTimeout(timer);
+    let timer = setTimeout(function wear() {
+      if (running()) { timer = setTimeout(wear, 300); return; }
+      lookPending.current = false; setShownLook(look);
+    }, SIT_DOWN_MS);
+    return () => { clearTimeout(timer); lookPending.current = false; };
   }, [look, clock]);
   const unplanted = useMemo(() => {
     const planted = new Set(placements.filter(p => !awaitsPlanting(p)).map(p => p.month));
@@ -178,12 +186,14 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           lastTry.current = { check: true, busyM: !!busy(maltese), busyP: !!busy(puppy), gap: Math.round(Math.hypot(m.x - p.x, m.y - p.y)) };
         }
-        if (maltese && puppy && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
+        if (maltese && puppy && !lookPending.current && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           const here = { x: m.x, y: m.y }, mate = { x: p.x, y: p.y };
           if (distance(here, mate) <= PLAY_NEAR * 1.6) {
             // Which game: chasing each other (either one runs), tug-of-war, or a hug.
-            const kind = forceKind.current ?? (['chase', 'chase', 'tug', 'hug'] as const)[Math.floor(Math.random() * 4)];
+            // (The tug and hug clips paint the puppy bare: dressed, it only plays chase, in its outfit.)
+            const dressedUp = shownLookRef.current !== 'bare';
+            const kind = dressedUp ? 'chase' : forceKind.current ?? (['chase', 'chase', 'tug', 'hug'] as const)[Math.floor(Math.random() * 4)];
             if (kind === 'chase') {
               const runner: PairLeader = Math.random() < 0.5 ? 'maltese' : 'puppy';
               const from = runner === 'maltese' ? here : mate, other = runner === 'maltese' ? mate : here;
@@ -262,7 +272,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     chase.current = (to: Point) => {
       const now = clock.value, goal = belowPerch(to);
       setVisits(current => current.map(visit => {
-        if (visit.id !== 'puppy' || visit.leaving || visit.held || visit.fadeIn && now < visit.start + visit.lead) return visit;
+        if (visit.id !== 'puppy' || visit.leaving || visit.held || lookPending.current || visit.fadeIn && now < visit.start + visit.lead) return visit;
         const pose = visitPose(visit, now);
         return planChase({ visit, now, path: route({ x: pose.x, y: pose.y }, goal, isGardenGroundBlocked) }) ?? visit;
       }));

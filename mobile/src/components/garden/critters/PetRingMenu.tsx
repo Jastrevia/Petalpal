@@ -16,16 +16,17 @@ import {
 // whole closet: every piece, a small lock on those not opened yet, a gold check on those worn).
 // Choosing a piece saves the whole outfit and goes back to the ring. A tap anywhere outside it
 // closes it. While it is open the pet sits where it is (GardenCritters `hold`).
-// There is no painted patting or eating clip yet: the pet sits and small hearts float up.
+// The puppy plays its painted eating or patting clip in whatever it wears (puppyLooks.ts
+// PUPPY_ACTIONS), then small hearts float up; with reduced motion only the hearts show.
 
 const COPY = {
-  en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', loading: 'Opening…',
+  en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', closeShort: 'Close', loading: 'Opening…',
     shelves: { hat: 'Hats', collar: 'Capes', pendant: 'Pendants' } as Record<Shelf, string>,
     noFood: 'No food yet: check-ins and new Bond levels bring some.', noneLeft: 'None left',
     locked: 'Opens at a higher Bond level', takeOff: 'Tap a worn piece again to take it off',
     hidden: 'not shown', failed: "That didn't go through. Try again.", off: 'Pets are not open for this account yet.',
     up: 'Scroll up', down: 'Scroll down', worn: 'worn', lockedShort: 'locked' },
-  'zh-Hans': { feed: '喂食', pat: '摸头', dress: '换装', back: '返回', close: '关闭菜单', loading: '正在打开…',
+  'zh-Hans': { feed: '喂食', pat: '摸头', dress: '换装', back: '返回', close: '关闭菜单', closeShort: '关闭', loading: '正在打开…',
     shelves: { hat: '帽子', collar: '披肩', pendant: '挂饰' } as Record<Shelf, string>,
     noFood: '还没有食物：每天签到、亲密度升级都会得到。', noneLeft: '吃完了',
     locked: '亲密度升级后打开', takeOff: '再点一次穿着的那件就脱下',
@@ -132,6 +133,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
       <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
         <RingShape layout={layout} segments={mode === 'ring' ? RING_ACTIONS.length : 1} />
       </Canvas>
+      {mode === 'ring' ? <CloseButton layout={layout} viewport={viewport} label={copy.closeShort} a11y={copy.close} onPress={onClose} /> : null}
       {mode === 'ring'
         ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={ACTION_ICONS[action]} onPress={() => act(action)} />)
         : <Panel layout={layout} viewport={viewport} copy={copy} mode={mode} pets={pets} petId={petId} busy={busy} note={note} onBack={back} onFeed={feed} onDress={dress} />}
@@ -199,6 +201,16 @@ function Blossom({ x, y }: { x: number; y: number }) {
   </Group>;
 }
 
+// The ring's own close button, just past its top end (away from the pet): × closes the menu.
+function CloseButton({ layout, viewport, label, a11y, onPress }: { layout: RingLayout; viewport: Viewport; label: string; a11y: string; onPress: () => void }) {
+  const p = ringPoint(layout, layout.outer, -1), w = 72;
+  const left = Math.max(8, Math.min(viewport.width - w - 8, p.x - w / 2 + layout.side * 10)), top = Math.max(8, p.y - 40);
+  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={a11y} testID="pet-ring-close" hitSlop={8}
+    style={({ pressed }) => [styles.close, { left, top, minWidth: w }, pressed && styles.pressed]}>
+    <Text style={styles.closeText}>✕ {label}</Text>
+  </Pressable>;
+}
+
 function RingButton({ layout, index, label, icon, onPress }: { layout: RingLayout; index: number; label: string; icon: string | number; onPress: () => void }) {
   const t = -1 + (2 * index + 1) / RING_ACTIONS.length;
   const p = ringPoint(layout, (layout.inner + layout.outer) / 2, t);
@@ -217,7 +229,7 @@ function Panel({ layout, viewport, copy, mode, pets, petId, busy, note, onBack, 
 }) {
   const [shelf, setShelf] = useState<Shelf>('hat');
   const { cx, cy, side, inner, outer } = layout;
-  const headerWidth = 236;
+  const headerWidth = 268;
   const headerLeft = Math.max(8, Math.min(viewport.width - headerWidth - 8, cx + side * outer * 0.5 - headerWidth / 2));
   const headerTop = cy - outer * 0.87 - layout.header;
   const outfit = pets?.outfits[petId] ?? null;
@@ -234,13 +246,17 @@ function Panel({ layout, viewport, copy, mode, pets, petId, busy, note, onBack, 
   const empty = pets && mode === 'feed' && pets.foods.every(food => food.count === 0) ? copy.noFood : null;
   const sub = note ?? (pets === null ? copy.off : empty) ?? (mode === 'dress' && pets ? (outfit && (outfit.hat || outfit.collar || outfit.pendant) ? copy.takeOff : copy.locked) : null);
   return <>
-    <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={copy.back} testID="pet-ring-back" style={styles.back}>
-      <Text style={styles.backText}>←</Text>
-    </Pressable>
     <View style={[styles.header, { left: headerLeft, top: headerTop, width: headerWidth }]}>
-      <View style={styles.titleRow}>
-        {mode === 'feed' ? <Text style={styles.titleIcon}>🥣</Text> : <Image source={ACTION_ICONS.dress as number} style={styles.titleImage} />}
-        <Text style={styles.title}>{mode === 'feed' ? copy.feed : copy.dress}</Text>
+      {/* Back sits on the panel itself, beside its title: one step back to the ring (then × closes it). */}
+      <View style={styles.headerRow}>
+        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={copy.back} testID="pet-ring-back" hitSlop={8}
+          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+          <Text style={styles.backText}>‹ {copy.back}</Text>
+        </Pressable>
+        <View style={styles.titleRow}>
+          {mode === 'feed' ? <Text style={styles.titleIcon}>🥣</Text> : <Image source={ACTION_ICONS.dress as number} style={styles.titleImage} />}
+          <Text style={styles.title}>{mode === 'feed' ? copy.feed : copy.dress}</Text>
+        </View>
       </View>
       {mode === 'dress' ? <View style={styles.tabs}>
         {SHELVES.map(row => {
@@ -319,7 +335,7 @@ function ArcCard({ card, index, scrollY, busy, geometry }: { card: CardSpec; ind
   </Reanimated.View>;
 }
 
-// Small pink hearts floating up from the pet's head (no painted patting or eating clip yet).
+// Small pink hearts floating up from the pet's head (after its eating or patting clip).
 function Hearts({ x, y }: { x: number; y: number }) {
   const reduced = useReducedMotion();
   const rise = useRef(new Animated.Value(0)).current;
@@ -341,9 +357,14 @@ const styles = StyleSheet.create({
   ringIcon: { fontSize: 18, lineHeight: 22 },
   ringImage: { width: 22, height: 22 },
   ringLabel: { ...text, fontSize: 11.5, marginTop: 1, textShadowColor: '#2A1638', textShadowRadius: 3 },
-  back: { position: 'absolute', left: 12, top: 8, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pressed: { opacity: 0.7 },
+  close: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 15,
     backgroundColor: MAUVE, borderWidth: 1, borderColor: GOLD },
-  backText: { ...text, fontSize: 20, lineHeight: 24 },
+  closeText: { ...text, fontSize: 12.5 },
+  back: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, height: 32, borderRadius: 16,
+    backgroundColor: MAUVE, borderWidth: 1, borderColor: GOLD },
+  backText: { ...text, fontSize: 13.5, lineHeight: 18 },
   header: { position: 'absolute', alignItems: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 4, borderRadius: 16,
     backgroundColor: MAUVE, borderWidth: 1, borderColor: GOLD },
