@@ -79,7 +79,12 @@ Not done yet (next work, in the owner's order):
    no wardrobe of its own (the server's PetId has no `maltese`): it wears the kinds of piece in the
    puppy's outfit (`malteseLookOfOutfit` in `puppyLooks.ts`, any set): hat, necklace, cape, any of
    them together (all three: its petal look). Unlike the puppy's capes it can wear a necklace with
-   its cape. Like the puppy it never changes look mid-run, and a change loads only the new look's
+   its cape. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
+   walking or sitting. Running (the bluebird chase, a game of chase, the Maltese catching up) is cut
+   short: both sit down where they are (`sitDown`), then change. A hug or a tug-of-war is never
+   interrupted: a tap does nothing during it, and an outfit waits until it has played out, then
+   both sit and change. Tapping the puppy (its ring menu) sits the Maltese down where it is
+   too, and both get up when the menu closes. A change loads only the new look's
    sheets. Eight looks: bare, hat, necklace, hat-necklace, cape, cape-hat, cape-necklace, petal.
    *Its own pieces (2026-11-05):* the owner chose Xiaobai's own flower clip (its hat) and pink bow
    with two charms on the ribbon from under its ear (its necklace), cut from the Holopix painting

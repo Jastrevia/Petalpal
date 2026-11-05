@@ -11,7 +11,7 @@ export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -102,6 +102,8 @@ const REST_FPS = 12;
 // From the end of a run to sitting still: the longest settling-down sheet (16 frames at REST_FPS)
 // plus the check that starts the next leg.
 const SIT_DOWN_MS = 1600;
+// How long the pair sit after a run is given up for an outfit, before they walk on.
+const SIT_SECONDS = 3.5;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 // Where the puppy waits for a bird landing on `perch`: the path point nearest below it.
@@ -140,10 +142,14 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const look = dressed !== undefined ? dressed : puppyLookOf(outfit);
   // Its friend the Maltese wears the same kinds of piece (a cape with a necklace too, unlike it).
   const malteseLook = dressed !== undefined ? malteseLookOf(dressed) : malteseLookOfOutfit(outfit);
-  // The look it shows. Walking or sitting, a new outfit goes on at once; running after the
-  // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
+  // The looks they show, changed together. Walking or sitting, a new outfit goes on at once.
+  // Running (after the bluebird, or a game of chase) they both stop and sit down where they are
+  // (about SIT_DOWN_MS), then change sitting; a hug or a tug-of-war plays out first, then they sit
+  // and change. Meanwhile no game sets them running.
   const [shownLook, setShownLook] = useState(look);
   const shownLookRef = useRef(shownLook); shownLookRef.current = shownLook;
+  const [shownMaltese, setShownMaltese] = useState(malteseLook);
+  const shownMalteseRef = useRef(shownMaltese); shownMalteseRef.current = shownMaltese;
   // Who leads the pair's walks (critterVisits.ts pickLeader), and hearts rising after a game.
   const pair = useRef<{ leader: PairLeader; until: number }>({ leader: 'maltese', until: 0 });
   const [hearts, setHearts] = useState<{ key: number; x: number; y: number; start: number }[]>([]);
@@ -156,18 +162,26 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const scenes = useRef(sceneList); scenes.current = sceneList;
   const reducedRef = useRef(false); reducedRef.current = !!useReducedMotion();
   useEffect(() => {
-    const now = clock.value;
-    const running = () => visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && clock.value < v.start + v.duration);
-    if (!running()) { setShownLook(look); return; }
-    // Never mid-run: it stops, sits down, and only then changes; meanwhile no game sets it running.
+    const pairNow = (v: Visit) => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving;
+    const running = () => visitsRef.current.some(v => pairNow(v) && isRunning(v, clock.value));
+    const playingScene = () => scenes.current.some(scene => clock.value < scene.end);
+    const wear = () => { lookPending.current = false; setShownLook(look); setShownMaltese(malteseLook); };
+    if (!running() && !playingScene()) { wear(); return; }
     lookPending.current = true;
-    setVisits(current => current.map(v => (v.id === 'puppy' ? stopChase(v, now) : v)));
-    let timer = setTimeout(function wear() {
-      if (running()) { timer = setTimeout(wear, 300); return; }
-      lookPending.current = false; setShownLook(look);
-    }, SIT_DOWN_MS);
+    let timer: ReturnType<typeof setTimeout>;
+    const settle = () => {
+      if (playingScene()) { timer = setTimeout(settle, 300); return; }
+      const now = clock.value;
+      visitsRef.current = visitsRef.current.map(v => (pairNow(v) && !v.held ? sitDown(v, now, SIT_SECONDS) : v));
+      setVisits(visitsRef.current);
+      timer = setTimeout(function wearSitting() {
+        if (running()) { timer = setTimeout(wearSitting, 300); return; }
+        wear();
+      }, SIT_DOWN_MS);
+    };
+    settle();
     return () => { clearTimeout(timer); lookPending.current = false; };
-  }, [look, clock]);
+  }, [look, malteseLook, clock]);
   const unplanted = useMemo(() => {
     const planted = new Set(placements.filter(p => !awaitsPlanting(p)).map(p => p.month));
     return Array.from({ length: 12 }, (_, i) => i + 1).filter(month => !planted.has(month));
@@ -339,7 +353,12 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         }
         return null;
       },
-      hold: id => update(id, holdVisit),
+      // The puppy's friend stops and sits with it while its menu is open (it does not answer a tap
+      // itself yet), and gets up with it.
+      hold: id => {
+        update(id, holdVisit);
+        if (id === 'puppy') update('maltese', (v, now) => (v.leaving || v.fadeIn && now < v.start + v.lead || v.inScene && now < v.inScene.end ? v : holdVisit(v, now)));
+      },
       act: (id, kind) => {
         const frames = PUPPY_ACTIONS[shownLookRef.current]?.[kind];
         const visit = visitsRef.current.find(v => v.id === id && v.held);
@@ -347,10 +366,16 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
         return actionSeconds(frames);
       },
-      release: id => update(id, (visit, now) => {
-        const rest = PUPPY_LOOKS[shownLookRef.current].rest;
-        return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
-      }),
+      release: id => {
+        update(id, (visit, now) => {
+          const rest = PUPPY_LOOKS[shownLookRef.current].rest;
+          return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
+        });
+        if (id === 'puppy') update('maltese', (visit, now) => {
+          const rest = MALTESE_LOOKS[shownMalteseRef.current].rest!;
+          return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
+        });
+      },
     };
     return () => { pets.current = null; };
   }, [pets, clock]);
@@ -391,7 +416,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     };
   }, [clock]);
   return <>
-    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} malteseLook={malteseLook} />)}
+    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} malteseLook={shownMaltese} />)}
     {sceneList.map(scene => <PairSceneClip key={scene.key} scene={scene} clock={clock} />)}
     {hearts.map(heart => <PlayHearts key={heart.key} x={heart.x} y={heart.y} start={heart.start} clock={clock} />)}
   </>;

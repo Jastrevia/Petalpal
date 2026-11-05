@@ -483,3 +483,31 @@ test('the Maltese wears the kinds of piece its friend wears: hat, necklace, cape
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(PUPPY_LOOKS).sort());
   for (const [look, maltese] of Object.entries(expected)) assert.equal(malteseLookOf(look), maltese, look);
 });
+
+test('a new outfit stops a game: both sit down where they are, out of their run, then walk on', () => {
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random: seeded(11) });
+  const game = visits.planPlay({ maltese: friend, puppy, now: 50, dash: [{ x: 100, y: 100 }, { x: 300, y: 100 }], chase: [{ x: 60, y: 100 }, { x: 100, y: 100 }] });
+  const now = game.maltese.start + 1.2;
+  assert.ok(visits.isRunning(game.maltese, now) && visits.isRunning(game.puppy, now), 'both are in the game');
+  for (const runner of [game.maltese, game.puppy]) {
+    const at = visits.visitPose(runner, now);
+    const sat = visits.sitDown(runner, now, 3.5);
+    assert.equal(visits.isRunning(sat, now + 0.1), false, `${runner.id} is no longer running`);
+    assert.equal(sat.sits, true); assert.equal(sat.held, false); assert.equal(sat.running, false); assert.equal(sat.play, false); assert.equal(sat.chase, false);
+    const still = visits.visitPose(sat, now + 3);
+    assert.ok(Math.hypot(still.x - at.x, still.y - at.y) < 1, `${runner.id} sits where it stopped`);
+    assert.ok(sat.start + sat.duration >= now + 3.5, 'it sits a while, then walks on');
+  }
+  assert.equal(visits.isRunning(game.maltese, game.maltese.start + game.maltese.duration + 0.01), false, 'a run that is over is not running');
+});
+
+test('tapping the puppy holds its friend too: a running Maltese sits with it, not on its gallop', () => {
+  const puppy = visits.planVisit({ key: 2, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(5), excluded: ['rabbit', 'hedgehog'] });
+  const friend = visits.planFriendVisit({ key: 3, now: 0, active: [puppy], network: WALK_NETWORK, edges, random: seeded(11) });
+  const game = visits.planPlay({ maltese: friend, puppy, now: 50, dash: [{ x: 100, y: 100 }, { x: 300, y: 100 }], chase: [{ x: 60, y: 100 }, { x: 100, y: 100 }] });
+  const held = visits.holdVisit(game.maltese, game.maltese.start + 1);
+  assert.equal(held.held, true); assert.equal(held.sits, true); assert.equal(held.running, false); assert.equal(held.play, false);
+  const up = visits.releaseVisit(held, held.start + 10, 20 / 12, 19 / 12);
+  assert.equal(up.held, false);
+});

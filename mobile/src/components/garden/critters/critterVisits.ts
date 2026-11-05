@@ -128,10 +128,15 @@ export function stopChase(visit: Visit, now: number): Visit {
 export const HOLD_SECONDS = 3600;
 export function holdVisit(visit: Visit, now: number): Visit {
   if (visit.held) return visit;
+  return sitDown(visit, now, HOLD_SECONDS, true);
+}
+// Sitting down where it is for `seconds` (a run, a game or a walk given up), then on along the
+// rest of its path at its own pace; `held` keeps it sitting until let go.
+export function sitDown(visit: Visit, now: number, seconds: number, held = false): Visit {
   const elapsed = now - visit.start;
   if (visit.sits && !visit.rising && elapsed >= 0 && elapsed < visit.lead) {
-    const lead = elapsed + HOLD_SECONDS;
-    return { ...visit, held: true, lead, duration: visit.duration + lead - visit.lead };
+    const lead = Math.max(visit.lead, elapsed + seconds);
+    return { ...visit, held: held || !!visit.held, lead, duration: visit.duration + lead - visit.lead };
   }
   const spec = CRITTERS[visit.id], gone = visitDistance(visit, now);
   const pose = visitPose(visit, now), here = { x: pose.x, y: pose.y };
@@ -142,10 +147,13 @@ export function holdVisit(visit: Visit, now: number): Visit {
   }
   const rest = visit.path.slice(ahead);
   const path = rest.length ? [here, ...rest] : [{ x: here.x - (pose.dx < 0 ? -1 : 1) * 1e-3, y: here.y }, here];
-  return { ...visit, path, start: now, lead: HOLD_SECONDS, fadeIn: false, walked: visit.walked + gone,
-    chase: false, rising: false, sits: true, held: true, speed: spec.speed, rhythm: RHYTHMS[visit.id],
-    duration: HOLD_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
+  // (No longer running or playing: a sitting Maltese is drawn with its sit, not its gallop.)
+  return { ...visit, path, start: now, lead: seconds, fadeIn: false, walked: visit.walked + gone,
+    chase: false, play: false, running: false, rising: false, sits: true, held: held || !!visit.held, speed: spec.speed, rhythm: RHYTHMS[visit.id],
+    duration: seconds + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
 }
+// Running (after the bluebird or in a game with its friend): such a leg is not yet over.
+export const isRunning = (visit: Visit, now: number) => !!(visit.chase || visit.running || visit.play) && now < visit.start + visit.duration;
 
 // Let go (the ring menu closed): it finishes sitting down if it had only just begun (`settle`
 // seconds), gets up (`rise` seconds) and walks on along the rest of its path.
