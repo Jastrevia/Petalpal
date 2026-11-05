@@ -1,7 +1,7 @@
 import { BlurMask, Group, Image, Oval, Path, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
-import { usePetOutfit } from '@/services/gardenPets';
+import { usePetOutfits } from '@/services/gardenPets';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
@@ -136,12 +136,16 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const awaySince = useRef<number | null>(null);
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
-  // What the puppy has on (its wardrobe, lib/garden-pets.js); `dressed` overrides it in development.
-  const outfit = usePetOutfit('puppy', active);
+  // What the puppy and the Maltese have on (their wardrobes, lib/garden-pets.js); `dressed`
+  // overrides the puppy's in development.
+  const outfits = usePetOutfits(active);
+  const outfit = outfits?.puppy ?? null;
   const [dressed, setDressed] = useState<PuppyLook | undefined>(undefined);
   const look = dressed !== undefined ? dressed : puppyLookOf(outfit);
-  // Its friend the Maltese wears the same kinds of piece (a cape with a necklace too, unlike it).
-  const malteseLook = dressed !== undefined ? malteseLookOf(dressed) : malteseLookOfOutfit(outfit);
+  // The Maltese wears its own outfit; on a server from before it had one (no `maltese` entry), and
+  // in the development override, the same kinds of piece as its friend.
+  const malteseLook = dressed !== undefined ? malteseLookOf(dressed)
+    : malteseLookOfOutfit(outfits && 'maltese' in outfits ? outfits.maltese ?? null : outfit);
   // The looks they show, changed together. Walking or sitting, a new outfit goes on at once.
   // Running (after the bluebird, or a game of chase) they both stop and sit down where they are
   // (about SIT_DOWN_MS), then change sitting; a hug or a tug-of-war plays out first, then they sit
@@ -333,8 +337,10 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     const unwatch = onBirdFlight(flight => { if (Math.random() < CHASE_CHANCE) chase.current(flight.to); });
     return () => { clearTimeout(timer); clearInterval(legs); unwatch(); };
   }, [active, clock]);
-  // Only the puppy answers a tap so far (the other pets have no wardrobe yet). Its body is drawn
-  // about 0.9 of its size wide and 0.7 tall, standing on its paws.
+  // The puppy and the Maltese answer a tap (the other pets have no wardrobe yet). A body is drawn
+  // about 0.9 of its size wide and 0.7 tall, standing on its paws. The pair go together: a tap on
+  // either sits both down where they are until its menu closes; a hug or a tug-of-war plays out
+  // first (no tap during it).
   useEffect(() => {
     if (!pets) return;
     const update = (id: CritterId, change: (visit: Visit, now: number) => Visit) => {
@@ -346,32 +352,32 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       petAt: (point, slop) => {
         const now = clock.value;
         for (const visit of visitsRef.current) {
-          if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead || visit.inScene && now < visit.inScene.end) continue;
+          if (visit.id !== 'puppy' && visit.id !== 'maltese' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead || visit.inScene && now < visit.inScene.end) continue;
           const pose = visitPose(visit, now), size = CRITTERS[visit.id].size;
           if (Math.abs(point.x - pose.x) <= size * 0.45 + slop && point.y >= pose.y - size * 0.7 - slop && point.y <= pose.y + size * 0.08 + slop)
             return { id: visit.id, x: pose.x, y: pose.y, size };
         }
         return null;
       },
-      // The puppy's friend stops and sits with it while its menu is open (it does not answer a tap
-      // itself yet), and gets up with it.
-      hold: id => {
-        update(id, holdVisit);
-        if (id === 'puppy') update('maltese', (v, now) => (v.leaving || v.fadeIn && now < v.start + v.lead || v.inScene && now < v.inScene.end ? v : holdVisit(v, now)));
+      hold: () => {
+        const sittable = (v: Visit, now: number) => !(v.leaving || v.fadeIn && now < v.start + v.lead || v.inScene && now < v.inScene.end);
+        update('puppy', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
+        update('maltese', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
       },
       act: (id, kind) => {
-        const frames = PUPPY_ACTIONS[shownLookRef.current]?.[kind];
+        // (The Maltese has no painted eating or patting yet: its menu shows hearts.)
+        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind] : undefined;
         const visit = visitsRef.current.find(v => v.id === id && v.held);
         if (!frames || !visit || reducedRef.current) return 0;
         update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
         return actionSeconds(frames);
       },
-      release: id => {
-        update(id, (visit, now) => {
+      release: () => {
+        update('puppy', (visit, now) => {
           const rest = PUPPY_LOOKS[shownLookRef.current].rest;
           return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
         });
-        if (id === 'puppy') update('maltese', (visit, now) => {
+        update('maltese', (visit, now) => {
           const rest = MALTESE_LOOKS[shownMalteseRef.current].rest!;
           return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
         });

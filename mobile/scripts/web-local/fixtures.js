@@ -275,6 +275,8 @@
         for (const slot of ['hat', 'collar', 'pendant']) {
           const piece = petPieces.find(([id]) => id === outfit[slot]);
           if (outfit[slot] && (!piece || piece[1] !== slot)) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
+          // The Maltese wears only its own three pieces (lib/garden-pets.js PET_OWN_PIECES).
+          if (outfit[slot] && dressing[1] === 'maltese' && ({ hat: 'flower-sprig', collar: 'petal-capelet', pendant: 'crystal-drop' })[slot] !== outfit[slot]) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
           if (outfit[slot] && !petOpened.has(outfit[slot])) return json({ error: 'ACCESSORY_LOCKED' }, 409);
         }
         petOutfits[dressing[1]] = outfit;
@@ -315,7 +317,7 @@
       // The Garden pets (lib/garden-pets.js): a Bond level that has opened every hat, two capes
       // and four pendants, so locks, both puppy sets and the cape-hides-the-pendant rule can be tried.
       if (p === '/api/fairy/pets') return json({ locale: user.preferredLocale, level: 17, foods: petFoods.map(([id, en, zh, count]) => ({ id, name: user.preferredLocale === 'zh-Hans' ? zh : en, count })),
-        outfits: Object.fromEntries(['puppy', 'hedgehog', 'butterfly', 'rabbit', 'bluebird'].map(id => [id, petOutfits[id] || { hat: null, collar: null, pendant: null }])),
+        outfits: Object.fromEntries(['puppy', 'hedgehog', 'butterfly', 'rabbit', 'bluebird', 'maltese'].map(id => [id, petOutfits[id] || { hat: null, collar: null, pendant: null }])),
         accessories: petPieces.map(([id, row, en, zh]) => ({ id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: petOpened.has(id), unlockedAtLevel: petOpened.has(id) ? 4 : null })) });
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });

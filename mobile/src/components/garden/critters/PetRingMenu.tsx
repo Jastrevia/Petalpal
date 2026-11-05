@@ -1,12 +1,12 @@
 import { BlurMask, Canvas, Circle, Group, Line, LinearGradient, Path, Skia, vec } from '@shopify/react-native-skia';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Reanimated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useReducedMotion, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { ApiError } from '@/services/api';
 import { dressPet, feedPet, loadPets, petsChanged, type PetId, type PetsSummary } from '@/services/gardenPets';
-import { ACCESSORY_ICONS } from './accessoryIcons';
+import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from './accessoryIcons';
 import {
-  arcOffset, isWorn, outfitWith, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES, shelfOf,
+  arcOffset, isWorn, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
   type Piece, type PetSpot, type RingAction, type RingLayout, type Shelf, type Viewport,
 } from './petRing';
 
@@ -18,6 +18,8 @@ import {
 // closes it. While it is open the pet sits where it is (GardenCritters `hold`).
 // The puppy plays its painted eating or patting clip in whatever it wears (puppyLooks.ts
 // PUPPY_ACTIONS), then small hearts float up; with reduced motion only the hearts show.
+// Xiaobai (the Maltese) has the same menu in the Garden's forest green (its own TONE), a closet of
+// its own three pieces (petRing.ts PET_OWN_PIECES), and hearts for feeding and patting.
 
 const COPY = {
   en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', closeShort: 'Close', loading: 'Opening…',
@@ -25,13 +27,13 @@ const COPY = {
     noFood: 'No food yet: check-ins and new Bond levels bring some.', noneLeft: 'None left',
     locked: 'Opens at a higher Bond level', takeOff: 'Tap a worn piece again to take it off',
     hidden: 'not shown', failed: "That didn't go through. Try again.", off: 'Pets are not open for this account yet.',
-    up: 'Scroll up', down: 'Scroll down', worn: 'worn', lockedShort: 'locked' },
+    up: 'Scroll up', down: 'Scroll down', worn: 'worn', lockedShort: 'locked', notYet: 'Almost ready. Check back soon.' },
   'zh-Hans': { feed: '喂食', pat: '摸头', dress: '换装', back: '返回', close: '关闭菜单', closeShort: '关闭', loading: '正在打开…',
     shelves: { hat: '帽子', collar: '披肩', pendant: '挂饰' } as Record<Shelf, string>,
     noFood: '还没有食物：每天签到、亲密度升级都会得到。', noneLeft: '吃完了',
     locked: '亲密度升级后打开', takeOff: '再点一次穿着的那件就脱下',
     hidden: '暂不显示', failed: '没有成功，再试一次。', off: '这个账号还没有开放宠物。',
-    up: '向上翻', down: '向下翻', worn: '穿着', lockedShort: '未打开' },
+    up: '向上翻', down: '向下翻', worn: '穿着', lockedShort: '未打开', notYet: '这里马上就准备好了，稍后再来看看。' },
 };
 type Copy = typeof COPY.en;
 
@@ -40,6 +42,18 @@ const FOOD_ICONS: Record<string, string> = { 'berry-tart': '🥧', 'flower-cooki
 const ACTION_ICONS: Record<RingAction, string | number> = { feed: '🥣', pat: '✋', dress: ACCESSORY_ICONS['lilac-cape'] };
 
 const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
+// Each pet's plate: the puppy's translucent mauve, Xiaobai's the Garden's forest green (the theme's
+// forest #183530, raised #21443D, #2B524A), both with the same gold rim and cream text.
+type Tone = { fill: string; top: string; bottom: string; shade: string; on: string; shadow: string; badge: string };
+const TONES: Record<'mauve' | 'forest', Tone> = {
+  mauve: { fill: MAUVE, top: 'rgba(112, 78, 128, 0.82)', bottom: 'rgba(70, 46, 92, 0.8)', shade: 'rgba(60, 38, 78, 0.72)',
+    on: 'rgba(124, 88, 140, 0.92)', shadow: '#2A1638', badge: '#6B3F7E' },
+  forest: { fill: 'rgba(24, 53, 48, 0.88)', top: 'rgba(43, 82, 74, 0.86)', bottom: 'rgba(24, 53, 48, 0.84)', shade: 'rgba(24, 53, 48, 0.8)',
+    on: 'rgba(43, 82, 74, 0.96)', shadow: '#0B1C18', badge: '#21443D' },
+};
+const ToneContext = createContext<Tone>(TONES.mauve);
+const toneOf = (petId: PetId) => (petId === 'maltese' ? TONES.forest : TONES.mauve);
+const dressIconOf = (petId: PetId) => OWN_PIECE_ICONS[petId]?.['petal-capelet'] ?? (ACTION_ICONS.dress as number);
 const ITEM_H = 50, CARD = 32;
 type Mode = 'ring' | 'feed' | 'dress';
 
@@ -49,6 +63,7 @@ export type PetRingProps = { petId: PetId; pet: PetSpot; viewport: Viewport; loc
 
 export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose, onAction }: PetRingProps) {
   const copy = COPY[locale];
+  const tone = toneOf(petId);
   const [mode, setMode] = useState<Mode>('ring');
   const panel = mode === 'feed' || mode === 'dress';
   const layout = useMemo(() => ringLayout(pet, viewport, panel), [pet, viewport, panel]);
@@ -97,6 +112,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
 
   const feed = async (foodId: string) => {
     if (busy) return;
+    if (pets && !(petId in pets.outfits)) { setNote(copy.notYet); return; }
     setBusy(true); setNote(null);
     try {
       const { count } = await feedPet(petId, foodId);
@@ -111,7 +127,8 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
   };
   const dress = async (piece: Piece) => {
     if (busy || !pets) return;
-    const next = outfitWith(pets.outfits[petId], piece);
+    if (!(petId in pets.outfits)) { setNote(copy.notYet); return; }
+    const next = outfitWith(pets.outfits[petId] ?? null, piece);
     if (!next) { setNote(copy.locked); return; }
     setBusy(true); setNote(null);
     try {
@@ -127,27 +144,28 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
     } finally { if (live.current) setBusy(false); }
   };
 
-  return <View style={StyleSheet.absoluteFill} testID="pet-ring">
+  return <ToneContext.Provider value={tone}><View style={StyleSheet.absoluteFill} testID="pet-ring">
     <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} accessibilityRole="button" accessibilityLabel={copy.close} />
     {playing ? null : <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { opacity: appear }]}>
       <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-        <RingShape layout={layout} segments={mode === 'ring' ? RING_ACTIONS.length : 1} />
+        <RingShape layout={layout} segments={mode === 'ring' ? RING_ACTIONS.length : 1} tone={tone} />
       </Canvas>
       {mode === 'ring' ? <CloseButton layout={layout} viewport={viewport} label={copy.closeShort} a11y={copy.close} onPress={onClose} /> : null}
       {mode === 'ring'
-        ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={ACTION_ICONS[action]} onPress={() => act(action)} />)
-        : <Panel layout={layout} viewport={viewport} copy={copy} mode={mode} pets={pets} petId={petId} busy={busy} note={note} onBack={back} onFeed={feed} onDress={dress} />}
+        ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={action === 'dress' ? dressIconOf(petId) : ACTION_ICONS[action]} onPress={() => act(action)} />)
+        : <Panel layout={layout} viewport={viewport} copy={copy} locale={locale} mode={mode} pets={pets} petId={petId} busy={busy} note={note} onBack={back} onFeed={feed} onDress={dress} />}
       {note && !panel ? <View pointerEvents="none" style={[styles.note, { top: Math.min(viewport.height - 130, layout.cy + layout.outer * 0.87 + 8),
         left: Math.max(8, Math.min(viewport.width - 248, layout.cx + layout.side * layout.outer * 0.5 - 120)) }]}>
         <Text style={styles.noteText}>{note}</Text></View> : null}
     </Animated.View>}
     {hearts ? <Hearts key={hearts} x={pet.x} y={pet.y - pet.body * 0.7} /> : null}
-  </View>;
+  </View></ToneContext.Provider>;
 });
 
-// The ring (or the panel): a translucent mauve sector, a soft gold glow along a thin gold rim,
-// gold lines with a sparkle between segments, and small blossoms on its two ends.
-function RingShape({ layout, segments }: { layout: RingLayout; segments: number }) {
+// The ring (or the panel): a translucent sector in the pet's tone, a soft gold glow along a thin
+// gold rim, gold lines with a sparkle between segments, and small blossoms on its two ends. (Drawn
+// in a Skia canvas, which React context does not reach: its tone comes as a prop.)
+function RingShape({ layout, segments, tone }: { layout: RingLayout; segments: number; tone: Tone }) {
   const { cx, cy, inner, outer } = layout;
   const path = useMemo(() => {
     const { start, sweep } = ringArc(layout);
@@ -160,8 +178,8 @@ function RingShape({ layout, segments }: { layout: RingLayout; segments: number 
   const joints = Array.from({ length: segments - 1 }, (_, i) => -1 + 2 * (i + 1) / segments);
   const top = ringPoint(layout, outer, -1), bottom = ringPoint(layout, outer, 1);
   return <Group>
-    <Path path={path} color={MAUVE}>
-      <LinearGradient start={vec(cx, cy - outer)} end={vec(cx, cy + outer)} colors={['rgba(112, 78, 128, 0.82)', 'rgba(70, 46, 92, 0.8)']} />
+    <Path path={path} color={tone.fill}>
+      <LinearGradient start={vec(cx, cy - outer)} end={vec(cx, cy + outer)} colors={[tone.top, tone.bottom]} />
     </Path>
     <Path path={path} style="stroke" strokeWidth={5} color="rgba(255, 214, 140, 0.4)"><BlurMask blur={5} style="normal" /></Path>
     <Path path={path} style="stroke" strokeWidth={1.4} color={GOLD} />
@@ -205,8 +223,9 @@ function Blossom({ x, y }: { x: number; y: number }) {
 function CloseButton({ layout, viewport, label, a11y, onPress }: { layout: RingLayout; viewport: Viewport; label: string; a11y: string; onPress: () => void }) {
   const p = ringPoint(layout, layout.outer, -1), w = 72;
   const left = Math.max(8, Math.min(viewport.width - w - 8, p.x - w / 2 + layout.side * 10)), top = Math.max(8, p.y - 40);
+  const tone = useContext(ToneContext);
   return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={a11y} testID="pet-ring-close" hitSlop={8}
-    style={({ pressed }) => [styles.close, { left, top, minWidth: w }, pressed && styles.pressed]}>
+    style={({ pressed }) => [styles.close, { left, top, minWidth: w, backgroundColor: tone.fill }, pressed && styles.pressed]}>
     <Text style={styles.closeText}>✕ {label}</Text>
   </Pressable>;
 }
@@ -214,17 +233,18 @@ function CloseButton({ layout, viewport, label, a11y, onPress }: { layout: RingL
 function RingButton({ layout, index, label, icon, onPress }: { layout: RingLayout; index: number; label: string; icon: string | number; onPress: () => void }) {
   const t = -1 + (2 * index + 1) / RING_ACTIONS.length;
   const p = ringPoint(layout, (layout.inner + layout.outer) / 2, t);
+  const tone = useContext(ToneContext);
   return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} testID={`pet-ring-${RING_ACTIONS[index]}`}
     style={[styles.ringButton, { left: p.x - 28, top: p.y - 25 }]}>
     {typeof icon === 'string' ? <Text style={styles.ringIcon}>{icon}</Text> : <Image source={icon} style={styles.ringImage} />}
-    <Text style={styles.ringLabel}>{label}</Text>
+    <Text style={[styles.ringLabel, { textShadowColor: tone.shadow }]}>{label}</Text>
   </Pressable>;
 }
 
 // The wide arc: a title (and, for the wardrobe, its three shelves) above it, the back button at
 // the top left, the cards along its middle arc, and arrows with page dots on its outer edge.
-function Panel({ layout, viewport, copy, mode, pets, petId, busy, note, onBack, onFeed, onDress }: {
-  layout: RingLayout; viewport: Viewport; copy: Copy; mode: 'feed' | 'dress'; pets: PetsSummary | null | undefined; petId: PetId; busy: boolean; note: string | null;
+function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, onBack, onFeed, onDress }: {
+  layout: RingLayout; viewport: Viewport; copy: Copy; locale: 'en' | 'zh-Hans'; mode: 'feed' | 'dress'; pets: PetsSummary | null | undefined; petId: PetId; busy: boolean; note: string | null;
   onBack: () => void; onFeed: (foodId: string) => void; onDress: (piece: Piece) => void;
 }) {
   const [shelf, setShelf] = useState<Shelf>('hat');
@@ -232,37 +252,40 @@ function Panel({ layout, viewport, copy, mode, pets, petId, busy, note, onBack, 
   const headerWidth = 268;
   const headerLeft = Math.max(8, Math.min(viewport.width - headerWidth - 8, cx + side * outer * 0.5 - headerWidth / 2));
   const headerTop = cy - outer * 0.87 - layout.header;
+  const tone = useContext(ToneContext);
   const outfit = pets?.outfits[petId] ?? null;
+  // A server from before this pet: its corner is shown, nothing in it can be chosen yet.
+  const known = !pets || petId in pets.outfits;
   const hidden = useMemo(() => (petId === 'puppy' ? puppyHiddenPieces(outfit) : new Set<string>()), [petId, outfit]);
   const cards: CardSpec[] = !pets ? [] : mode === 'feed'
     ? pets.foods.map(food => ({ key: food.id, label: food.name, icon: FOOD_ICONS[food.id] ?? '🍽️', badge: `×${food.count}`, dim: food.count === 0,
-      a11y: `${food.name} ×${food.count}`, onPress: food.count > 0 ? () => onFeed(food.id) : undefined }))
-    : shelfOf(pets.accessories, shelf).map(piece => {
+      a11y: `${food.name} ×${food.count}`, onPress: food.count > 0 && known ? () => onFeed(food.id) : undefined }))
+    : petShelf(pets.accessories, shelf, petId, locale).map(piece => {
       const worn = isWorn(outfit, piece);
-      return { key: piece.id, label: piece.name, icon: ACCESSORY_ICONS[piece.id], locked: !piece.unlocked, worn,
+      return { key: piece.id, label: piece.name, icon: OWN_PIECE_ICONS[petId]?.[piece.id] ?? ACCESSORY_ICONS[piece.id], locked: !piece.unlocked, worn,
         sub: worn && hidden.has(piece.id) ? copy.hidden : undefined, dim: !piece.unlocked,
-        a11y: `${piece.name}${worn ? `, ${copy.worn}` : ''}${piece.unlocked ? '' : `, ${copy.lockedShort}`}`, onPress: () => onDress(piece) };
+        a11y: `${piece.name}${worn ? `, ${copy.worn}` : ''}${piece.unlocked ? '' : `, ${copy.lockedShort}`}`, onPress: known ? () => onDress(piece) : undefined };
     });
   const empty = pets && mode === 'feed' && pets.foods.every(food => food.count === 0) ? copy.noFood : null;
-  const sub = note ?? (pets === null ? copy.off : empty) ?? (mode === 'dress' && pets ? (outfit && (outfit.hat || outfit.collar || outfit.pendant) ? copy.takeOff : copy.locked) : null);
+  const sub = note ?? (pets === null ? copy.off : !known ? copy.notYet : empty) ?? (mode === 'dress' && pets ? (outfit && (outfit.hat || outfit.collar || outfit.pendant) ? copy.takeOff : copy.locked) : null);
   return <>
     <View style={[styles.header, { left: headerLeft, top: headerTop, width: headerWidth }]}>
       {/* Back sits on the panel itself, beside its title: one step back to the ring (then × closes it). */}
       <View style={styles.headerRow}>
         <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={copy.back} testID="pet-ring-back" hitSlop={8}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+          style={({ pressed }) => [styles.back, { backgroundColor: tone.fill }, pressed && styles.pressed]}>
           <Text style={styles.backText}>‹ {copy.back}</Text>
         </Pressable>
-        <View style={styles.titleRow}>
-          {mode === 'feed' ? <Text style={styles.titleIcon}>🥣</Text> : <Image source={ACTION_ICONS.dress as number} style={styles.titleImage} />}
+        <View style={[styles.titleRow, { backgroundColor: tone.fill }]}>
+          {mode === 'feed' ? <Text style={styles.titleIcon}>🥣</Text> : <Image source={dressIconOf(petId)} style={styles.titleImage} />}
           <Text style={styles.title}>{mode === 'feed' ? copy.feed : copy.dress}</Text>
         </View>
       </View>
       {mode === 'dress' ? <View style={styles.tabs}>
         {SHELVES.map(row => {
-          const all = pets ? shelfOf(pets.accessories, row) : [];
+          const all = pets ? petShelf(pets.accessories, row, petId, locale) : [];
           return <Pressable key={row} onPress={() => setShelf(row)} accessibilityRole="tab" accessibilityState={{ selected: shelf === row }}
-            testID={`pet-shelf-${row}`} style={[styles.tab, shelf === row && styles.tabOn]}>
+            testID={`pet-shelf-${row}`} style={[styles.tab, { backgroundColor: tone.shade }, shelf === row && [styles.tabOn, { backgroundColor: tone.on }]]}>
             <Text style={[styles.tabText, shelf === row && styles.tabTextOn]}>{copy.shelves[row]} {all.filter(p => p.unlocked).length}/{all.length}</Text>
           </Pressable>;
         })}
@@ -271,7 +294,7 @@ function Panel({ layout, viewport, copy, mode, pets, petId, busy, note, onBack, 
     {pets === undefined ? <ActivityIndicator color={CREAM} style={{ position: 'absolute', left: cx + side * (inner + outer) / 2 - 10, top: cy - 10 }} accessibilityLabel={copy.loading} />
       : <ArcList key={`${mode}-${shelf}`} layout={layout} cards={cards} busy={busy} copy={copy} />}
     {sub ? <View style={[styles.sub, { top: cy + outer * 0.87 + 6, left: headerLeft, width: headerWidth }]}>
-      <Text style={[styles.subText, sub === note && styles.subNote]}>{sub}</Text></View> : null}
+      <Text style={[styles.subText, { backgroundColor: tone.shade }, sub === note && styles.subNote]}>{sub}</Text></View> : null}
   </>;
 }
 
@@ -314,6 +337,7 @@ function ArcList({ layout, cards, busy, copy }: { layout: RingLayout; cards: Car
 type Geometry = { cy: number; side: 1 | -1; cx: number; mid: number; full: number; reach: number; boxTop: number; boxLeft: number; pad: number };
 function ArcCard({ card, index, scrollY, busy, geometry }: { card: CardSpec; index: number; scrollY: SharedValue<number>; busy: boolean; geometry: Geometry }) {
   const { cy, side, cx, mid, full, reach, boxTop, boxLeft, pad } = geometry;
+  const tone = useContext(ToneContext);
   const style = useAnimatedStyle(() => {
     const centre = boxTop + pad + index * ITEM_H + ITEM_H / 2 - scrollY.value, dy = centre - cy;
     const x = cx + side * arcOffset(mid, dy);
@@ -326,10 +350,10 @@ function ArcCard({ card, index, scrollY, busy, geometry }: { card: CardSpec; ind
       <View style={[styles.cardCircle, card.worn && styles.cardWorn, card.dim && styles.cardDim]}>
         {typeof card.icon === 'string' ? <Text style={styles.cardEmoji}>{card.icon}</Text> : <Image source={card.icon} style={styles.cardImage} resizeMode="contain" />}
       </View>
-      {card.badge ? <View style={styles.badge}><Text style={styles.badgeText}>{card.badge}</Text></View> : null}
+      {card.badge ? <View style={[styles.badge, { backgroundColor: tone.badge }]}><Text style={styles.badgeText}>{card.badge}</Text></View> : null}
       {card.worn ? <View style={styles.check}><Text style={styles.checkText}>✓</Text></View> : null}
-      {card.locked ? <View style={styles.lock}><Text style={styles.lockText}>🔒</Text></View> : null}
-      <Text numberOfLines={1} style={[styles.cardLabel, card.dim && styles.cardLabelDim]}>{card.label}</Text>
+      {card.locked ? <View style={[styles.lock, { backgroundColor: tone.fill }]}><Text style={styles.lockText}>🔒</Text></View> : null}
+      <Text numberOfLines={1} style={[styles.cardLabel, { textShadowColor: tone.shadow }, card.dim && styles.cardLabelDim]}>{card.label}</Text>
       {card.sub ? <Text numberOfLines={1} style={styles.cardSub}>{card.sub}</Text> : null}
     </Pressable>
   </Reanimated.View>;

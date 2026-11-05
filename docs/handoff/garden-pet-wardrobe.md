@@ -75,16 +75,22 @@ Not done yet (next work, in the owner's order):
    originals in `maltese/v2/sheets-before-belly/`); the bottom band keeps the red bow out.
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
    ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
-   RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second. It has
-   no wardrobe of its own (the server's PetId has no `maltese`): it wears the kinds of piece in the
-   puppy's outfit (`malteseLookOfOutfit` in `puppyLooks.ts`, any set): hat, necklace, cape, any of
-   them together (all three: its petal look). Unlike the puppy's capes it can wear a necklace with
-   its cape. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
+   RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second.
+   *Its own menu and wardrobe (2026-11-05, owner's choices):* a tap on Xiaobai opens the same ring
+   menu in the Garden's forest green (`TONES` in `PetRingMenu.tsx`; the Skia ring takes its tone as
+   a prop, context does not reach a Skia canvas). Its closet holds only its own three pieces, each
+   kept under a catalog id and opening with it: flower clip `flower-sprig`, lilac capelet
+   `petal-capelet`, pink bow `crystal-drop` (`PET_OWN_PIECES` in `petRing.ts` and, enforced, in
+   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat show hearts
+   (no painted clips yet). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
+   string); until that is deployed the menu says it is almost ready and Xiaobai keeps following the
+   puppy's outfit. It wears its own outfit (`malteseLookOfOutfit`): hat, necklace, cape, any of them
+   together (all three: its petal look), a necklace with its cape too. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
    walking or sitting. Running (the bluebird chase, a game of chase, the Maltese catching up) is cut
    short: both sit down where they are (`sitDown`), then change. A hug or a tug-of-war is never
    interrupted: a tap does nothing during it, and an outfit waits until it has played out, then
-   both sit and change. Tapping the puppy (its ring menu) sits the Maltese down where it is
-   too, and both get up when the menu closes. A change loads only the new look's
+   both sit and change. Tapping either dog (its ring menu) sits both down where they are,
+   and both get up when the menu closes. A change loads only the new look's
    sheets. Eight looks: bare, hat, necklace, hat-necklace, cape, cape-hat, cape-necklace, petal.
    *Its own pieces (2026-11-05):* the owner chose Xiaobai's own flower clip (its hat) and pink bow
    with two charms on the ribbon from under its ear (its necklace), cut from the Holopix painting

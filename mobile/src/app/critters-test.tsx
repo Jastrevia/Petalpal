@@ -2,10 +2,11 @@ import { Canvas, Group, Rect } from '@shopify/react-native-skia';
 import { Redirect } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { Critter, PairSceneClip, type MalteseLook } from '@/components/garden/critters/GardenCritters';
 import { PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
+import PetRingMenu from '@/components/garden/critters/PetRingMenu';
 import { Otter } from '@/components/garden/spirits/MemoryOtter';
 import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
 import { CRITTER_IDS, CRITTERS, MALTESE_RUN_SPEED, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
@@ -81,6 +82,9 @@ export default function CrittersTestScreen() {
   }, [visit, seconds]);
   // Memory Otter on night water: it swims across, dives, and comes back the other way.
   const [otter, setOtter] = useState(false);
+  // Each pet's ring menu over this page, as if it had been tapped at the middle of the preview.
+  const [ring, setRing] = useState<'puppy' | 'maltese' | null>(null);
+  const viewport = useWindowDimensions();
   const [swimRound, setSwimRound] = useState(0);
   const swim = useMemo<Swim>(() => {
     const left = { x: 60, y: HEIGHT * 0.55 }, right = { x: WIDTH - 60, y: HEIGHT * 0.5 };
@@ -127,7 +131,13 @@ export default function CrittersTestScreen() {
       style={[styles.button, move === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     <View style={styles.row}>
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
+      <Pressable onPress={() => setRing('puppy')} style={styles.button}><Text style={styles.label}>ring: puppy 小金毛菜单</Text></Pressable>
+      <Pressable onPress={() => setRing('maltese')} style={styles.button}><Text style={styles.label}>ring: maltese 小白菜单</Text></Pressable>
     </View>
+    {ring ? <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
+      <PetRingMenu key={ring} petId={ring} pet={{ x: viewport.width / 2 - 60, y: 230, body: ring === 'puppy' ? 110 : 52 }} viewport={viewport}
+        locale="zh-Hans" onClose={() => setRing(null)} />
+    </View> : null}
   </ScrollView>;
 }
 

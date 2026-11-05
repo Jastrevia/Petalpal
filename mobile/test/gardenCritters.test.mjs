@@ -511,3 +511,21 @@ test('tapping the puppy holds its friend too: a running Maltese sits with it, no
   const up = visits.releaseVisit(held, held.start + 10, 20 / 12, 19 / 12);
   assert.equal(up.held, false);
 });
+
+test('Xiaobai\'s closet holds its own three pieces, named as its own; the puppy\'s holds every row', () => {
+  const ring = load('../critters/petRing');
+  const accessories = [
+    { id: 'flower-sprig', row: 'hat', collection: 'light', name: 'Flower Sprig', unlocked: true, unlockedAtLevel: 4 },
+    { id: 'lilac-beret', row: 'hat', collection: 'light', name: 'Lilac Beret', unlocked: true, unlockedAtLevel: 4 },
+    { id: 'petal-capelet', row: 'collar', collection: 'light', name: 'Petal Capelet', unlocked: false, unlockedAtLevel: null },
+    { id: 'lilac-cape', row: 'collar', collection: 'light', name: 'Lilac Cape', unlocked: false, unlockedAtLevel: null },
+    { id: 'crystal-drop', row: 'pendant', collection: 'light', name: 'Crystal Drop', unlocked: true, unlockedAtLevel: 9 },
+  ];
+  assert.deepEqual(ring.petShelf(accessories, 'hat', 'maltese', 'zh-Hans').map(p => [p.id, p.name, p.unlocked]), [['flower-sprig', '小花夹', true]]);
+  assert.deepEqual(ring.petShelf(accessories, 'collar', 'maltese', 'en').map(p => [p.id, p.name, p.unlocked]), [['petal-capelet', 'Lilac Capelet', false]], 'still locked until it opens');
+  assert.deepEqual(ring.petShelf(accessories, 'pendant', 'maltese', 'en').map(p => p.name), ['Pink Bow']);
+  assert.deepEqual(ring.petShelf(accessories, 'hat', 'puppy', 'en').map(p => p.id), ['flower-sprig', 'lilac-beret']);
+  // Its pieces are the ones the server lets it wear (lib/garden-pets.js PET_OWN_PIECES).
+  assert.deepEqual(Object.fromEntries(Object.entries(ring.PET_OWN_PIECES.maltese).map(([slot, piece]) => [slot, piece.id])),
+    { hat: 'flower-sprig', collar: 'petal-capelet', pendant: 'crystal-drop' });
+});

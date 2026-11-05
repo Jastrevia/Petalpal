@@ -33,3 +33,11 @@ export const ACCESSORY_ICONS: Record<string, number> = {
   'straw-sun-hat': require('@/assets/garden/pets/accessories/straw-sun-hat.webp'),
   'voyager-goggles': require('@/assets/garden/pets/accessories/voyager-goggles.webp'),
 };
+// A pet's own pieces (petRing.ts PET_OWN_PIECES), painted from that pet: per pet, per catalog id.
+export const OWN_PIECE_ICONS: Record<string, Record<string, number>> = {
+  maltese: {
+    'flower-sprig': require('@/assets/garden/pets/accessories/maltese-flower-clip.webp'),
+    'petal-capelet': require('@/assets/garden/pets/accessories/maltese-capelet.webp'),
+    'crystal-drop': require('@/assets/garden/pets/accessories/maltese-bow.webp'),
+  },
+};
