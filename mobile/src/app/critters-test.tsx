@@ -22,7 +22,7 @@ const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
 // The puppy beside the Maltese wears the look the Maltese matches (malteseLookOf).
 const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace',
-  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat' };
+  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat', noble: 'cape-hat' };
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');

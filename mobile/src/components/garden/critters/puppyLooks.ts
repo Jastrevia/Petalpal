@@ -116,7 +116,9 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
 // flower clip (hat), a pink bow with two charms (necklace) and a lilac capelet fastened by a gold
 // clasp (cape); all three on is its petal look. It has no wardrobe of its own yet: it wears the
 // kinds of piece its friend the puppy has on (any set), malteseLookOfOutfit.
-export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal';
+// `noble`: its second outfit (the Noble design sheet: lilac flower headpiece with gold beads, deep
+// violet capelet with gold embroidery, violet crystal clasp), whole; not in its closet yet.
+export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal' | 'noble';
 const MALTESE_BY_PIECES: Record<string, MalteseLook> = {
   '': 'bare', h: 'hat', n: 'necklace', hn: 'hat-necklace', c: 'cape', ch: 'cape-hat', cn: 'cape-necklace', chn: 'petal',
 };

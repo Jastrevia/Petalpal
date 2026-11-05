@@ -454,7 +454,7 @@ test('the Maltese walks, sits and runs in every look, about half the puppy\'s si
   const fs = await import('node:fs');
   const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
   const block = source.slice(source.indexOf('const MALTESE_LOOKS'), source.indexOf('const ART:'));
-  for (const look of ['bare', 'hat', 'necklace', 'hat-necklace', 'cape', 'cape-hat', 'cape-necklace', 'petal']) {
+  for (const look of ['bare', 'hat', 'necklace', 'hat-necklace', 'cape', 'cape-hat', 'cape-necklace', 'petal', 'noble']) {
     const at = block.search(new RegExp(`\\n  '?${look}'?: `));
     assert.ok(at >= 0, `${look} is drawn`);
     const sheets = [...block.slice(at).matchAll(/require\('@\/(assets\/garden\/critters\/[^']+)'\)/g)].slice(0, 3).map(m => m[1]);

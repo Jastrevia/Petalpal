@@ -68,6 +68,13 @@ const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
     require('@/assets/garden/critters/maltese-looks/run-cape.webp')),
   'cape-hat': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-hat.webp'),
     require('@/assets/garden/critters/maltese-looks/run-cape-hat.webp')),
+  // Its Noble outfit (2026-11-05): its own clips from today's painting dressed by one gpt-image edit,
+  // only the outfit pasted back so the dog is the same (~/dev/petalpal-motion/maltese/noble); walk one
+  // 43-frame stride, gallop from the bare gallop's key dressed the same way.
+  noble: { source: require('@/assets/garden/critters/maltese-looks/walk-noble.webp'), columns: 8, count: 43, ground: 216, loop: 51.1,
+    rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble.webp'), columns: 8, count: 59, loop: 70,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
   'cape-necklace': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-necklace.webp'),
     require('@/assets/garden/critters/maltese-looks/run-cape-necklace.webp')),
   petal: { source: require('@/assets/garden/critters/maltese-petal-walk.webp'), columns: 8, count: 42, ground: 216, loop: 34.6,
