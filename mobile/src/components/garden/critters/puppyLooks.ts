@@ -112,14 +112,22 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
   return hat ? `hat${n}` as PuppyLook : 'bare';
 }
 
-// The Maltese's looks (its sheets: MALTESE_LOOKS in GardenCritters.tsx). It has no wardrobe of its
-// own yet: it wears the pieces its friend the puppy wears (a hat, a necklace or both, of either
-// set), and its whole petal outfit while the puppy wears a cape.
-export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'petal';
+// The Maltese's looks (its sheets: MALTESE_LOOKS in GardenCritters.tsx), in its own pieces: a
+// flower clip (hat), a pink bow with two charms (necklace) and a lilac capelet fastened by a gold
+// clasp (cape); all three on is its petal look. It has no wardrobe of its own yet: it wears the
+// kinds of piece its friend the puppy has on (any set), malteseLookOfOutfit.
+export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal';
+const MALTESE_BY_PIECES: Record<string, MalteseLook> = {
+  '': 'bare', h: 'hat', n: 'necklace', hn: 'hat-necklace', c: 'cape', ch: 'cape-hat', cn: 'cape-necklace', chn: 'petal',
+};
+const malteseLookWith = (cape: boolean, hat: boolean, necklace: boolean) =>
+  MALTESE_BY_PIECES[`${cape ? 'c' : ''}${hat ? 'h' : ''}${necklace ? 'n' : ''}`];
+export function malteseLookOfOutfit(outfit: PetOutfit | null): MalteseLook {
+  if (!outfit) return 'bare';
+  return malteseLookWith(!!outfit.collar, !!outfit.hat, !!outfit.pendant);
+}
+// From a puppy look alone (the preview's chosen look): what it shows (a cape hides its necklace).
 export function malteseLookOf(look: PuppyLook): MalteseLook {
-  if (look.startsWith('cape')) return 'petal';
-  if (look.startsWith('hat-necklace')) return 'hat-necklace';
-  if (look.startsWith('necklace')) return 'necklace';
-  if (look.startsWith('hat')) return 'hat';
-  return 'bare';
+  const cape = look.startsWith('cape');
+  return malteseLookWith(cape, look.includes('hat'), !cape && look.includes('necklace'));
 }

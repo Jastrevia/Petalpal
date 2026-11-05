@@ -20,7 +20,8 @@ const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2
 const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
 // The puppy beside the Maltese wears the look the Maltese matches (malteseLookOf).
-const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace', petal: 'cape2' };
+const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace',
+  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat' };
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');

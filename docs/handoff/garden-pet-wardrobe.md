@@ -76,10 +76,11 @@ Not done yet (next work, in the owner's order):
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
    ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
    RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second. It has
-   no wardrobe of its own (the server's PetId has no `maltese`): it dresses like the puppy
-   (`malteseLookOf` in `puppyLooks.ts`): a hat, a necklace or both when the puppy wears them (of
-   either set), its whole petal look when the puppy wears a cape; like the puppy it never changes
-   look mid-run, and a change loads only the new look's sheets.
+   no wardrobe of its own (the server's PetId has no `maltese`): it wears the kinds of piece in the
+   puppy's outfit (`malteseLookOfOutfit` in `puppyLooks.ts`, any set): hat, necklace, cape, any of
+   them together (all three: its petal look). Unlike the puppy's capes it can wear a necklace with
+   its cape. Like the puppy it never changes look mid-run, and a change loads only the new look's
+   sheets. Eight looks: bare, hat, necklace, hat-necklace, cape, cape-hat, cape-necklace, petal.
    *Its own pieces (2026-11-05):* the owner chose Xiaobai's own flower clip (its hat) and pink bow
    with two charms on the ribbon from under its ear (its necklace), cut from the Holopix painting
    where it differs from the bare one (`maltese/v2/pieces/cut_pieces.py`). They are laid onto the
@@ -89,6 +90,16 @@ Not done yet (next work, in the owner's order):
    the head puts it, as its fur looks like the legs), then packed with the bare sheets' loops and
    crops and the belly shadow cleared (`pieces/pack_looks.sh` → `maltese-looks/*.webp`), so hat,
    necklace and bare walk in step.
+   *Its cape (2026-11-05):* the capelet alone has its own clips (owner approved: 2 gpt-image-2.5-flare
+   edits, 3 minimax h3 highspeed videos). First frames: the petal painting and its gallop key with
+   only the head top and throat taken from an edit that took off the flower clip and the bow and
+   fastened the capelet with a small gold clasp set with a pink crystal (owner's choice;
+   `maltese/v2/cape/compose_keys.py`). The walk's backdrop turned black after its first frame, so
+   every frame is keyed by its own border (`cape/key_frames.py`, keeping eyes and nose, and fading
+   the dark crease under the curled tail). Flower and bow are laid on as on the bare clips (the bow
+   over the clasp, without its ribbon: the capelet has its own collar) and packed with one loop per
+   move (`cape/pack_cape.sh`: walk 49+40, sit 0+80 → 20, run 61+60); strides scaled from the petal
+   look's (walk 34.6, run 71.2).
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

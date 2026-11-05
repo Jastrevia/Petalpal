@@ -6,7 +6,7 @@ import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
-import { ACTION_FPS, actionSeconds, malteseLookOf, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
+import { ACTION_FPS, actionSeconds, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
 export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
@@ -41,11 +41,20 @@ type Frames = { columns: number; count: number; ground: number; loop: number; fp
 // Its own pieces, the painting's flower clip (its hat) and pink bow with two charms (its necklace),
 // are laid onto the bare clips frame by frame (maltese/v2/pieces/overlay_maltese.py, after Kiro's
 // head tracking for the golden) and cut with the bare sheets' frames, so hat, necklace and both
-// walk in step with the bare look. It dresses like its friend: malteseLookOf.
+// walk in step with the bare look; the cape looks likewise share the cape's clips. It dresses like
+// its friend: malteseLookOfOutfit.
 const malteseBare = (walk: number, sit: number, run: number): Frames & { source: number } => ({
   source: walk, columns: 8, count: 48, ground: 216, loop: 47.9,
   rest: { source: sit, count: 20, rise: 1 },
   run: { source: run, columns: 8, count: 60, loop: 66.3, cell: { w: 395.4, h: 237.2, x: -47.83, y: -16.1 } } });
+// The capelet alone: its own oil-motion clips (2026-11-05, from the petal painting with the flower
+// clip and bow taken off and the capelet fastened by a gold clasp; ~/dev/petalpal-motion/maltese/v2/
+// cape), its walk one 40-frame stride and its gallop starting from the petal gallop's key, so they
+// share the petal look's cells; hat and necklace are laid onto them like the bare clips'.
+const malteseCape = (walk: number, sit: number, run: number): Frames & { source: number } => ({
+  source: walk, columns: 8, count: 40, ground: 216, loop: 34.6,
+  rest: { source: sit, count: 20, rise: 1 },
+  run: { source: run, columns: 8, count: 60, loop: 71.2, cell: { w: 395.4, h: 237.2, x: -47.83, y: -15 } } });
 const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
   bare: malteseBare(require('@/assets/garden/critters/maltese-walk.webp'), require('@/assets/garden/critters/maltese-sit.webp'),
     require('@/assets/garden/critters/maltese-run.webp')),
@@ -55,6 +64,12 @@ const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
     require('@/assets/garden/critters/maltese-looks/run-necklace.webp')),
   'hat-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-hat-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-hat-necklace.webp'),
     require('@/assets/garden/critters/maltese-looks/run-hat-necklace.webp')),
+  cape: malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape.webp')),
+  'cape-hat': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-hat.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape-hat.webp')),
+  'cape-necklace': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape-necklace.webp')),
   petal: { source: require('@/assets/garden/critters/maltese-petal-walk.webp'), columns: 8, count: 42, ground: 216, loop: 34.6,
     rest: { source: require('@/assets/garden/critters/maltese-petal-sit.webp'), count: 20, rise: 1 },
     run: { source: require('@/assets/garden/critters/maltese-petal-run.webp'), columns: 8, count: 59, loop: 64.4,
@@ -123,6 +138,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const outfit = usePetOutfit('puppy', active);
   const [dressed, setDressed] = useState<PuppyLook | undefined>(undefined);
   const look = dressed !== undefined ? dressed : puppyLookOf(outfit);
+  // Its friend the Maltese wears the same kinds of piece (a cape with a necklace too, unlike it).
+  const malteseLook = dressed !== undefined ? malteseLookOf(dressed) : malteseLookOfOutfit(outfit);
   // The look it shows. Walking or sitting, a new outfit goes on at once; running after the
   // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
   const [shownLook, setShownLook] = useState(look);
@@ -374,7 +391,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     };
   }, [clock]);
   return <>
-    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} />)}
+    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} malteseLook={malteseLook} />)}
     {sceneList.map(scene => <PairSceneClip key={scene.key} scene={scene} clock={clock} />)}
     {hearts.map(heart => <PlayHearts key={heart.key} x={heart.x} y={heart.y} start={heart.start} clock={clock} />)}
   </>;

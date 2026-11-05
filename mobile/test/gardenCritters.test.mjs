@@ -454,7 +454,7 @@ test('the Maltese walks, sits and runs in every look, about half the puppy\'s si
   const fs = await import('node:fs');
   const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
   const block = source.slice(source.indexOf('const MALTESE_LOOKS'), source.indexOf('const ART:'));
-  for (const look of ['bare', 'hat', 'necklace', 'hat-necklace', 'petal']) {
+  for (const look of ['bare', 'hat', 'necklace', 'hat-necklace', 'cape', 'cape-hat', 'cape-necklace', 'petal']) {
     const at = block.search(new RegExp(`\\n  '?${look}'?: `));
     assert.ok(at >= 0, `${look} is drawn`);
     const sheets = [...block.slice(at).matchAll(/require\('@\/(assets\/garden\/critters\/[^']+)'\)/g)].slice(0, 3).map(m => m[1]);
@@ -465,10 +465,21 @@ test('the Maltese walks, sits and runs in every look, about half the puppy\'s si
   assert.ok(ratio > 0.4 && ratio < 0.5, `${ratio}`);
 });
 
-test('the Maltese wears what its friend wears: a hat, a necklace or both, and its petal outfit with a cape', () => {
-  const { malteseLookOf, PUPPY_LOOKS } = load('../critters/puppyLooks');
+test('the Maltese wears the kinds of piece its friend wears: hat, necklace, cape, any of them together', () => {
+  const { malteseLookOf, malteseLookOfOutfit, PUPPY_LOOKS } = load('../critters/puppyLooks');
+  const outfit = (hat, collar, pendant) => ({ hat, collar, pendant });
+  assert.equal(malteseLookOfOutfit(null), 'bare');
+  assert.equal(malteseLookOfOutfit(outfit(null, null, null)), 'bare');
+  assert.equal(malteseLookOfOutfit(outfit('flower-sprig', null, null)), 'hat');
+  assert.equal(malteseLookOfOutfit(outfit(null, null, 'crystal-drop')), 'necklace');
+  assert.equal(malteseLookOfOutfit(outfit('a', null, 'b')), 'hat-necklace');
+  assert.equal(malteseLookOfOutfit(outfit(null, 'petal-capelet', null)), 'cape');
+  assert.equal(malteseLookOfOutfit(outfit('a', 'b', null)), 'cape-hat');
+  assert.equal(malteseLookOfOutfit(outfit(null, 'b', 'c')), 'cape-necklace');
+  assert.equal(malteseLookOfOutfit(outfit('a', 'b', 'c')), 'petal');
+  // From a puppy look alone (the preview), what the puppy shows: its cape hides a necklace.
   const expected = { bare: 'bare', hat: 'hat', hat2: 'hat', necklace: 'necklace', necklace2: 'necklace', 'hat-necklace': 'hat-necklace',
-    'hat-necklace2': 'hat-necklace', cape: 'petal', 'cape-hat': 'petal', cape2: 'petal', 'cape2-hat': 'petal' };
+    'hat-necklace2': 'hat-necklace', cape: 'cape', 'cape-hat': 'cape-hat', cape2: 'cape', 'cape2-hat': 'cape-hat' };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(PUPPY_LOOKS).sort());
   for (const [look, maltese] of Object.entries(expected)) assert.equal(malteseLookOf(look), maltese, look);
 });
