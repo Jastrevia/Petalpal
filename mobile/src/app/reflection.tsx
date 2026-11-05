@@ -1,14 +1,21 @@
+import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
+import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
+import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
+import { OPEN_MS, CLOSE_MS, OPEN_STAGES, CLOSE_STAGES, openTiming, closeTiming } from '../components/bookhouse/book3d/motion';
 import { EmotionalSafetyNote } from '../components/features/EmotionalSafetyNote';
 import { AiOutputReport } from '../components/features/AiPrivacySettings';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../services/auth';
 import { useWorldTime } from '../components/garden/world-time';
 import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, monthly2, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
 import { ShortWeeklyReport } from '../components/features/ShortWeeklyReport';
 import { PetalCollection } from '../components/features/PetalCollection';
 import { MonthlyReport2 } from '../components/features/MonthlyReport2';
+import { PavilionBookReader } from '../components/bookhouse/PavilionBookReader';
 import { useAppLocale } from '../services/locale';
 
 // The shelf's books: Weekly, Monthly, the third one, notes about the reflections (safety note, disclaimers), and the
@@ -17,14 +24,14 @@ type Book = ReportType | 'notes' | 'collection';
 const BOOKS: Book[] = ['weekly', 'monthly', 'notes', 'collection'];
 // Every label on this screen follows the app language; saved reflections keep their own words.
 const CHROME = {
-  en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'About', collection: 'Petal collection' }, unit: { weekly: 'week', monthly: 'month' },
-    reportOutput: 'Report final output', pick: 'Choose a book from the shelf', notesTitle: 'About these reflections', notes: [
+  en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'Instruction', collection: 'Flower Language Collection' }, unit: { weekly: 'week', monthly: 'month' },
+    reportOutput: 'Report final output', notesTitle: 'About these reflections', notes: [
       'Your petal card is only a way to look back at yourself. It is not a prediction, and it cannot replace professional help.',
       'Every number and every quote in a reflection is found by the app in your own entries; AI only words them, and any sentence that does not match what you wrote is left out.',
       'Don’t want to see an insight? Tap Hide under it. If something in a reflection seems wrong, report it at the end of that reflection.',
       'Keep an insight or a card and it waits in the cream Petal collection book. Follow an insight and each Weekly reports on that thread (up to three). Write an entry to answer a question and the next Weekly quotes your answer.',
       'In the Petal collection you can write one sentence to a later week, withdraw it before its day, and list names or topics that insights must never use.'],
-    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: Book) => type === 'collection' ? 'Petal collection' : type === 'notes' ? 'About these reflections' : `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
+    title: (type: ReportType) => `Your ${type === 'weekly' ? 'Weekly' : 'Monthly'} Reflection`, shelf: (type: Book) => type === 'collection' ? 'Flower Language Collection' : type === 'notes' ? 'Instruction' : `${type === 'weekly' ? 'Weekly' : 'Monthly'} reflections`,
     inProgress: ' · In progress', writing: (type: ReportType) => `Writing last ${type === 'weekly' ? 'week' : 'month'}’s reflection…`,
     loading: 'Loading reflection', tryLoad: 'Try loading again', tryRead: 'Try reading again', loadFailed: 'Unable to load saved reflections.',
     readFailed: 'Unable to read this reflection.', emptyTitle: 'A place to look back', empty: (type: ReportType) => `No saved ${type} reflections yet.`,
@@ -38,14 +45,14 @@ const CHROME = {
     previous: (type: ReportType) => `Previous ${type === 'weekly' ? 'week' : 'month'}`, next: (type: ReportType) => `Next ${type === 'weekly' ? 'week' : 'month'}`,
     close: 'Close Reflections', putBack: 'Put the book back on the shelf', lantern: 'Lantern — night lighting', lanternHint: 'Turn the lantern on for night, or off for day',
     kept: 'Your reflections, kept here.' },
-  'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '关于', collection: '花语集' }, unit: { weekly: '周', monthly: '月' },
-    reportOutput: '举报最终内容', pick: '从书架上取一本书', notesTitle: '关于这些回看', notes: [
+  'zh-Hans': { book: { weekly: '周报', monthly: '月报', notes: '使用说明', collection: '花语集' }, unit: { weekly: '周', monthly: '月' },
+    reportOutput: '举报最终内容', notesTitle: '关于这些回看', notes: [
       '花语卡只是陪你回看自己，不是预测，也不能代替专业的帮助。',
       '回看里的每个数字、每句原话，都是程序从你自己的记录里找出来的；AI 只负责把它们说通顺，和你写过的话对不上的句子不会出现。',
       '不想看到某一条，可以点它下面的「隐藏」。觉得哪份回看有问题，可以在那份回看的最后举报。',
       '收藏的洞察和花语卡都在书架上奶白色的“花语集”里。跟进一条洞察，之后每份周报都会说说这条线（最多 3 条）。点“写一条来回答”写下的记录，下周的周报会引用它。',
       '在花语集里可以写一句话给之后的某一周，到那天之前都能撤回；也可以写下不想出现在洞察里的人名或主题。'],
-    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: Book) => type === 'collection' ? '花语集' : type === 'notes' ? '关于这些回看' : type === 'weekly' ? '周报' : '月报',
+    title: (type: ReportType) => type === 'weekly' ? '你的周报' : '你的月报', shelf: (type: Book) => type === 'collection' ? '花语集' : type === 'notes' ? '使用说明' : type === 'weekly' ? '周报' : '月报',
     inProgress: ' · 还在写', writing: (type: ReportType) => type === 'weekly' ? '正在写上周的周报…' : '正在写上个月的月报…',
     loading: '正在打开', tryLoad: '重新加载', tryRead: '重新打开', loadFailed: '没能打开保存的回看。', readFailed: '没能打开这份回看。',
     emptyTitle: '回看的地方', empty: (type: ReportType) => type === 'weekly' ? '还没有保存的周报。' : '还没有保存的月报。',
@@ -71,18 +78,21 @@ function heading(report: SavedReport, lang: ShortLocale) {
   const label = weekLabel(report.periodKey, lang);
   return label.range ? `${label.title} · ${label.range}` : label.title;
 }
-const interiorDay = require('../../assets/reflection/interior-day-v2.png');
-const interiorNight = require('../../assets/reflection/interior-night-v2.png');
+const pavilionReference = require('../../assets/reflection/pavilion-reference-v3.png');
+const pavilionEmpty = require('../../assets/reflection/pavilion-empty-v3.png');
+const pavilionNight = require('../../assets/reflection/pavilion-night-v1.webp');
+const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
 
 export default function Reflection() {
   const router = useRouter();
+  const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
   const { width, height } = useWindowDimensions();
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
-  const night = nightOverride ?? worldNight;
+  const night = (__DEV__ ? nightOverride : null) ?? worldNight;
   const lighting = useRef(new Animated.Value(night ? 1 : 0)).current;
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
@@ -92,32 +102,110 @@ export default function Reflection() {
     return () => { mounted = false; subscription.remove(); };
   }, []);
   useEffect(() => {
-    const animation = Animated.timing(lighting, { toValue: night ? 1 : 0, duration: reducedMotion ? 0 : 550, useNativeDriver: true });
+    const animation = Animated.timing(lighting, { toValue: night ? 1 : 0, duration: reducedMotion ? 0 : 1800, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
     animation.start(); return () => animation.stop();
   }, [night, reducedMotion, lighting]);
   const [type, setType] = useState<ReportType>('weekly');
   // The pavilion opens with every book on the shelf. Tapping one pulls it out, carries it to the desk and opens it
   // (the green book is Weekly, the blue Monthly, the purple one the notes about them).
   const [open, setOpen] = useState<Book | null>(null);
+  const spines = usePavilionSpines(lang);
+  const pavilionText = PAVILION_TEXT[lang];
+  const instructionFade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const fade = Animated.timing(instructionFade, { toValue: open ? 0 : 1,
+      duration: reducedMotion ? 0 : open ? 180 : 360, useNativeDriver: true });
+    fade.start(); return () => fade.stop();
+  }, [open, reducedMotion, instructionFade]);
   // `notes`: a book without reports (the notes or the 花语集), shown as one scrolling page.
   const notes = open === 'notes' || open === 'collection';
   const onBook = (book: Book) => open === book;
   const [flying, setFlying] = useState<Book | null>(null);
-  const flight = useRef(new Animated.Value(0)).current, reveal = useRef(new Animated.Value(0)).current;
-  function openBook(book: Book) {
-    if (flying || book === open) return;
+  const timeline = useSharedValue(0), focus = useSharedValue(0);
+  const contentFade = useRef(new Animated.Value(0)).current;
+  const busy = useRef(false), pendingBook = useRef<Book | null>(null);
+  const [bookDrawn, setBookDrawn] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__reflectionDebug = {
+        get open() { return open; },
+        timeline,
+        focus,
+        openBook,
+        closeBook,
+        pauseAt: (t: number) => { cancelAnimation(timeline); timeline.value = t; },
+        setLocale: (loc: 'en' | 'zh-Hans') => auth.updateLocale?.(loc),
+        setOpenBook: (book: Book | null, t = 0) => {
+          cancelAnimation(timeline);
+          busy.current = false;
+          if (book) {
+            if (book === 'weekly' || book === 'monthly') setType(book);
+            setOpen(book);
+            setFlying(book);
+            setBookDrawn(true);
+            timeline.value = t;
+          } else {
+            setOpen(null);
+            setFlying(null);
+            setBookDrawn(false);
+            timeline.value = 0;
+          }
+        },
+      };
+    }
+  }, [open, timeline, focus, auth]);
+  useEffect(() => () => { cancelAnimation(timeline); cancelAnimation(focus); contentFade.stopAnimation(); }, [timeline, focus, contentFade]);
+  function revealContent() {
+    Animated.timing(contentFade, { toValue: 1, duration: reducedMotion ? 0 : 180, useNativeDriver: true }).start();
+  }
+  function finishOpen() { setFlying(null); busy.current = false; revealContent(); }
+  function bookReady() {
+    setBookDrawn(true);
+    timeline.value = withTiming(1, { duration: reducedMotion ? 0 : OPEN_MS, easing: openTiming(OPEN_STAGES) },
+      done => { if (done) runOnJS(finishOpen)(); });
+  }
+  function startBook(book: Book) {
     if (book === 'weekly' || book === 'monthly') setType(book);
-    if (reducedMotion) { reveal.setValue(1); setOpen(book); return; }
-    setOpen(null); setFlying(book); flight.setValue(0); reveal.setValue(0);
-    Animated.timing(flight, { toValue: 1, duration: 760, easing: Easing.inOut(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(() => {
-      setOpen(book); setFlying(null);
-      Animated.timing(reveal, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start();
+    busy.current = true; setBookDrawn(false); setFocused(false);
+    timeline.value = 0; focus.value = 0; contentFade.setValue(0);
+    setOpen(book); setFlying(book);
+    // Start only once the illustrated spine and paper are decoded. Until then,
+    // its shelf copy remains in place, so no book disappears while assets load.
+  }
+  function openBook(book: Book) {
+    if (busy.current || book === open) return;
+    if (open) { pendingBook.current = book; closeBook(); return; }
+    startBook(book);
+  }
+  function finishReturn() {
+    setOpen(null); setFlying(null); setBookDrawn(false); setFocused(false); busy.current = false;
+    const next = pendingBook.current; pendingBook.current = null;
+    if (next) startBook(next);
+  }
+  function returnToShelf() {
+    timeline.value = withTiming(0, { duration: reducedMotion ? 0 : CLOSE_MS, easing: closeTiming(CLOSE_STAGES) },
+      done => { if (done) runOnJS(finishReturn)(); });
+  }
+  function closeBook() {
+    if (busy.current || !open || turning) return;
+    busy.current = true; setFlying(open);
+    Animated.timing(contentFade, { toValue: 0, duration: reducedMotion ? 0 : 100, useNativeDriver: true }).start(({ finished }) => {
+      if (!finished) return;
+      if (focused) {
+        focus.value = withTiming(0, { duration: reducedMotion ? 0 : 300 }, done => { if (done) runOnJS(returnToShelf)(); });
+      } else returnToShelf();
     });
   }
-  // Back to the desk, with every book on the shelf again; the big × leaves the pavilion.
-  function closeBook() {
-    if (reducedMotion) { setOpen(null); return; }
-    Animated.timing(reveal, { toValue: 0, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(({ finished }) => { if (finished) setOpen(null); });
+  function finishFocus(next: boolean) { setFocused(next); busy.current = false; setFlying(null); revealContent(); }
+  function toggleFocus() {
+    if (busy.current || turning || !open) return;
+    busy.current = true; setFlying(open);
+    const next = !focused;
+    Animated.timing(contentFade, { toValue: 0, duration: reducedMotion ? 0 : 90, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) focus.value = withTiming(next ? 1 : 0, { duration: reducedMotion ? 0 : 350 },
+        done => { if (done) runOnJS(finishFocus)(next); });
+    });
   }
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -219,7 +307,7 @@ export default function Reflection() {
   useEffect(() => () => progress.stopAnimation(), [progress]);
   async function turn(direction: number) {
     const to = index + direction, target = pages[to];
-    if (locked.current || !target) return;
+    if (locked.current || busy.current || !target) return;
     locked.current = true;
     if (!details[target.id]) {
       try { const result = await readReflection(target); setDetails(previous => ({ ...previous, [target.id]: result })); } catch {}
@@ -237,82 +325,42 @@ export default function Reflection() {
     onPanResponderRelease: (_event, g) => { if (Math.abs(g.dx) > 50) void turnRef.current(g.dx < 0 ? 1 : -1); },
   })).current;
 
-  // Narrow or short screens (phones in either orientation) use the single-page layout.
-  const compact = width < 700 || height < 600;
-  // A phone on its side reads like an open book: heading on the left, the reflection on the right.
-  const wide = compact && width > height;
-  const sceneWidth = Math.min(width, 1000);
-  const artHeight = sceneWidth * 4 / 3;
-  // Phone: a scenic header, then one page that fills the rest of the screen (content scrolls inside).
-  // Upright phones keep the whole window and the lake outside it in view (the window ends at
-  // about 40% of the art); a phone on its side keeps the short header.
-  const bookTop = compact ? (wide ? Math.min(artHeight * .3, 170, height * .22) : Math.min(artHeight * .4, height * .36)) : artHeight * .365;
-  const bookWidth = compact ? sceneWidth - 20 : sceneWidth * .80;
-  const bookHeight = compact ? Math.max(320, height - bookTop - 12) : artHeight * .48;
-  const bookLeft = compact ? 10 : sceneWidth * .17;
-  const sceneHeight = compact ? bookTop + bookHeight + 12 : artHeight;
-  // An upright phone is taller than the painting: it is scaled up to fill the whole screen, cropped
-  // at the sides so the shelf, the desk and the window's lake all stay in view.
-  const fillHeight = compact && !wide ? Math.max(artHeight, sceneHeight) : artHeight;
-  const fillWidth = fillHeight * 3 / 4, artLeft = fillWidth > sceneWidth ? Math.max(sceneWidth - fillWidth, -fillWidth * .33) : 0;
-  const camera = { position: 'absolute' as const, left: artLeft, top: 0, width: fillWidth, height: fillHeight };
-  const lakeCamera = { ...camera, top: -fillHeight * .14 };
-  // The text area inside the book (same fractions as the resting layout below).
-  // Phone: the page sits inside the open cloth cover of the shelf book it came from.
-  const area = compact
-    ? { left: 20, top: 15, width: bookWidth - 38, height: bookHeight - 31 }
-    : { left: bookWidth * .10, top: bookHeight * .07, width: bookWidth * .85, height: bookHeight * .83 };
-  const pageWidth = compact ? area.width : area.width / 2;
-  const paperColor = night ? '#E6C495' : '#F3E1BA';
+  useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
+  const scene = useMemo(() => pavilionScene(width, height), [width, height]);
+  const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
+  const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
+  const instructionTop = scene.art.y + scene.art.height * .63 - 22;
+  const compact = scene.compact, wide = false;
+  const sceneWidth = width, artHeight = scene.art.height;
+  const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
+  const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
+  const compactBookTop = Math.min(scene.art.height * .36, height * .32);
+  const compactBookWidth = Math.min(440, width - 24);
+  const compactBookLeft = (width - compactBookWidth) / 2;
+  const compactBookHeight = Math.max(380, height - compactBookTop - 20);
+
+  const readingRect = compact ? {
+    x: compactBookLeft,
+    y: compactBookTop,
+    width: compactBookWidth,
+    height: compactBookHeight,
+  } : {
+    x: leaves.left.x, y: Math.min(leaves.left.y, leaves.right.y),
+    width: leaves.right.x + leaves.right.width - leaves.left.x,
+    height: Math.max(leaves.left.height, leaves.right.height),
+  };
+  const area = { left: 0, top: 0, width: readingRect.width, height: readingRect.height };
+  const pageWidth = leaves.right.width;
   const backwards = !!turning && turning.to < turning.from;
   const angle = progress.interpolate({ inputRange: [0, 1], outputRange: backwards ? ['-180deg', '0deg'] : ['0deg', '-180deg'] });
   const faceOpacity = (front: boolean) => progress.interpolate({ inputRange: [0, .499, .501, 1],
     outputRange: front === !backwards ? [1, 1, 0, 0] : [0, 0, 1, 1] });
-
-  // The open book on phones is the shelf book itself: green cloth for Weekly, blue for Monthly.
-  const cloth = type === 'weekly' ? (night ? '#2F4739' : '#3E5A4C') : (night ? '#233F62' : '#2D5279');
+  const bookCloth = PAVILION_CLOTH[open ?? 'weekly'];
   const accent = type === 'weekly' ? '#55704A' : '#3B5F8C', bookInk = type === 'weekly' ? '#34472F' : '#2A4466';
-  // Shelf spines cropped from the same painted art (1000-wide units, rows 138–318): the phone's Weekly/Monthly switch.
-  const shelf = { weekly: { x: 572, w: 70 }, monthly: { x: 661, w: 74 }, notes: { x: 754, w: 72 }, collection: { x: 838, w: 74 } };
-  // A book's place on the painted shelf, in scene points (the art is 1000 units wide; its shelf row runs 138–318).
-  const spineRect = (item: Book) => { const k = fillWidth / 1000;
-    return { left: artLeft + shelf[item].x * k, top: 138 * k, width: shelf[item].w * k, height: 180 * k }; };
-  const shelfSpine = (item: Book, h: number) => {
-    const { x, w } = shelf[item], k = h / 180;
-    return <View style={{ width: w * k, height: h, overflow: 'hidden', borderRadius: 2 }}>
-      <Image source={night ? interiorNight : interiorDay} accessible={false} style={{ position: 'absolute', width: 1000 * k, height: 4000 / 3 * k, left: -x * k, top: -138 * k }} />
-    </View>;
-  };
+  const paper = (_side: 'left' | 'right') => <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#F3E4C7' }]}>
+    <Image source={parchment} style={StyleSheet.absoluteFill} resizeMode="stretch" />
+  </View>;
 
-  // Phone paper: the left page of the painted spread, scaled to cover the page and mirrored so its
-  // gutter shading sits at the spine. Same art (and day/night) as the desktop book.
-  const sheet = { x: 262, y: 545, w: 310, h: 500 }; // in a 1000-wide copy of the interior art
-  const paintedPaper = () => {
-    const k = Math.max(area.width / sheet.w, area.height / sheet.h);
-    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: 6 }]}>
-      <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
-        <Image source={night ? interiorNight : interiorDay} accessible={false} style={{ position: 'absolute', width: 1000 * k, height: 4000 / 3 * k,
-          left: -sheet.x * k - (sheet.w * k - area.width) / 2, top: -sheet.y * k - (sheet.h * k - area.height) / 2 }} />
-      </View>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F6E4BE', opacity: night ? .38 : .2 }]} />
-      {/* Foxing: a few soft age marks. */}
-      <View style={[s.fox, { left: '14%', top: '62%', width: 70, height: 60 }]} />
-      <View style={[s.fox, { right: '16%', top: '26%', width: 46, height: 40 }]} />
-      <View style={[s.fox, { right: '9%', bottom: '12%', width: 84, height: 70 }]} />
-      <View style={s.aged} />
-    </View>;
-  };
-  // Paper under a moving leaf: the book's own art on both layouts.
-  const paper = (side: 'left' | 'right') => compact
-    ? paintedPaper()
-    : <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
-      <Image source={night ? interiorNight : interiorDay} accessible={false}
-        style={{ position: 'absolute', width: sceneWidth, height: artHeight,
-          left: -(bookLeft + area.left + (side === 'right' ? pageWidth : 0)), top: -(bookTop + area.top) }} />
-    </View>;
-
-  // A Weekly 2.0 report (components/features/ShortWeeklyReport.tsx) or a Monthly 2.0 one (MonthlyReport2.tsx) is one
-  // spread of the book, without the three tabs.
   const weekly2Of = (report: SavedReport | null) => {
     const detail = report ? details[report.id] : null;
     if (detail && report?.type === 'monthly') { const month = monthly2(detail); return month ? { detail, short: null, month } : null; }
@@ -421,135 +469,82 @@ export default function Reflection() {
   }
   // Phone: a whole page; desktop: a two-page spread split at the spine.
   const page = (report: SavedReport | null, interactive: boolean) => compact
-    ? <View style={{ flex: 1, paddingTop: 18, paddingRight: 30, paddingBottom: 60, paddingLeft: 30 }}>{leftFace(report, interactive)}</View>
+    ? <View style={{ flex: 1, minHeight: 0, paddingTop: 6, paddingRight: 4, paddingBottom: 4, paddingLeft: 4 }}>{leftFace(report, interactive)}</View>
     : <View style={{ flex: 1, flexDirection: 'row' }}>{leftFace(report, interactive)}{rightFace(report)}</View>;
 
   const from = turning ? pages[turning.from] : null, to = turning ? pages[turning.to] : null;
-  // What rests under the leaf while it moves (Journal mapping).
   const restingLeft = turning ? (backwards ? to : from) : selected;
   const restingRight = turning ? (backwards ? from : to) : selected;
   const leafFront = turning ? (backwards ? to : from) : null, leafBack = turning ? (backwards ? from : to) : null;
   const atStart = index <= 0, atEnd = index >= pages.length - 1;
-  const leafSize = { left: compact ? 0 : pageWidth, width: pageWidth, height: area.height };
+  const contentHeight = Math.max(60, readingRect.height - (!notes && pages.length ? 40 : 0));
+  const leafSize = { left: compact ? 0 : leaves.right.x - readingRect.x, width: pageWidth, height: contentHeight };
 
-  return <View style={{ flex: 1, backgroundColor: '#35271D' }}><ScrollView style={{ flex: 1, backgroundColor: '#35271D' }} contentContainerStyle={{ minHeight: height, alignItems: 'center' }}>
-    <View style={{ width: sceneWidth, height: sceneHeight, overflow: 'hidden' }} testID="reflection-scene">
+
+  return <View style={{ flex: 1, backgroundColor: '#34251A' }}>
+    <View style={{ width, height, overflow: 'hidden' }} testID="reflection-scene">
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Image source={require('../../assets/reflection/lake-day-v2.png')} style={lakeCamera} />
-        <Animated.Image source={require('../../assets/reflection/lake-night-v2.png')} style={[lakeCamera, { opacity: lighting }]} />
-        <Image source={interiorDay} style={camera} />
-        <Animated.Image source={interiorNight} style={[camera, { opacity: lighting }]} />
+        <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height }} />
+        {/* Both paintings share the original pixel geometry. Lighting lives below
+            the book/reader tree, so a fade cannot reset a book or dim its pages. */}
+        <Animated.Image source={pavilionNight} resizeMode="stretch"
+          style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height, opacity: lighting }} />
       </View>
-      {/* Away from the open book is the desk: a tap there puts the book back, and the shelf stays within reach. */}
+      <Animated.View testID="reflection-instruction" pointerEvents="none" accessibilityElementsHidden={!!open}
+        accessible={!open} accessibilityLabel={pavilionText.instruction}
+        importantForAccessibility={open ? 'no-hide-descendants' : 'auto'} style={{ position: 'absolute',
+          left: instructionLeft, width: instructionWidth, top: instructionTop, height: 44, opacity: instructionFade }}>
+        <PavilionEngraving locale={lang} width={instructionWidth} height={44} left={instructionLeft} top={instructionTop}
+          art={scene.art} size={Math.max(17, Math.min(25, scene.art.width * .021))} />
+      </Animated.View>
       {open && <Pressable testID="reflection-desk" accessibilityRole="button" accessibilityLabel={t.putBack} onPress={closeBook} style={StyleSheet.absoluteFill} />}
-      <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night} accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)} hitSlop={6}
-        style={{ position: 'absolute', left: artLeft + fillWidth * .91, top: fillHeight * .10, width: fillWidth * .085, height: fillHeight * .145, zIndex: compact && !wide ? 0 : 3 }} />
-      {/* The painted books on the shelf are the controls; the one that is out leaves a gap. Drawn before the open book,
-          which covers them where the two overlap. */}
       {BOOKS.map(item => {
-        const rect = spineRect(item), out = onBook(item) || flying === item;
-        return <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: onBook(item) }} aria-selected={onBook(item)}
-          accessibilityLabel={t.shelf(item)} disabled={!!turning || !!flying} onPress={() => openBook(item)} hitSlop={{ left: 8, right: 8 }}
-          style={({ pressed }) => [{ position: 'absolute', ...rect }, pressed && { transform: [{ translateY: -3 }] }]}>
-          {out && <View pointerEvents="none" style={s.shelfGap} />}
+        const rect = scene.slot(item), out = onBook(item) && bookDrawn;
+        return <Pressable key={item} testID={`reflection-shelf-${item}`} accessibilityRole="button"
+          accessibilityState={{ selected: onBook(item), disabled: !!turning || !!flying }}
+          accessibilityLabel={pavilionText.titles[item]} accessibilityHint={lang === 'en' ? 'Take this book to the reading desk' : '把这本书取到阅读桌前'}
+          disabled={!!turning || !!flying} onPress={() => openBook(item)}
+          style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden' }}>
+          {!out && (spines ? <Image source={{ uri: spines[item].uri }} accessible={false} resizeMode="stretch" style={StyleSheet.absoluteFill} />
+            : <Image source={pavilionReference} accessible={false} resizeMode="stretch" style={{ position: 'absolute',
+              left: scene.art.x - rect.x, top: scene.art.y - rect.y, width: scene.art.width, height: scene.art.height }} />)}
         </Pressable>;
       })}
-      {flying && (() => {
-        // The book leaves the shelf, crosses to the desk growing larger, and fades as the open book unfolds there.
-        const rect = spineRect(flying), dx = bookLeft + bookWidth / 2 - (rect.left + rect.width / 2), dy = bookTop + bookHeight / 2 - (rect.top + rect.height / 2);
-        const grow = Math.min(2.6, bookHeight / rect.height * .7);
-        return <Animated.View pointerEvents="none" style={{ position: 'absolute', ...rect, zIndex: 5, opacity: flight.interpolate({ inputRange: [0, .85, 1], outputRange: [1, 1, 0] }),
-          transform: [{ translateY: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [0, -rect.height * .25, dy] }) },
-            { translateX: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [0, 0, dx] }) },
-            { scale: flight.interpolate({ inputRange: [0, .2, 1], outputRange: [1, 1.05, grow] }) },
-            { rotate: flight.interpolate({ inputRange: [0, .2, 1], outputRange: ['0deg', '-4deg', '0deg'] }) }] }}>
-          {shelfSpine(flying, rect.height)}
-        </Animated.View>;
-      })()}
-      {/* Before a book is taken: a quiet line on the painted book's open pages. */}
-      {!open && !flying && <View pointerEvents="none" style={{ position: 'absolute', top: fillHeight * .53, left: artLeft ? 0 : sceneWidth * .2, width: artLeft ? sceneWidth : sceneWidth * .74,
-        alignItems: 'center' }}>
-        <Text style={[s.pick, { fontSize: Math.max(13, Math.min(17, sceneWidth * .02)) }]}>{t.pick}</Text>
-      </View>}
-      {open && <Animated.View testID="reflection-book" style={{ position: 'absolute', top: bookTop, left: bookLeft, width: bookWidth, height: bookHeight,
-        opacity: reveal, transform: [{ scaleX: reveal.interpolate({ inputRange: [0, 1], outputRange: [.55, 1] }) }] }}>
-        {/* The cover around the page belongs to "away from the page" too. */}
-        <Pressable accessible={false} onPress={closeBook} style={StyleSheet.absoluteFill} />
-        {!compact && !notes && !weekly2Of(selected) && <View style={{ position: 'absolute', left: '-6%', top: '10%', gap: 6, zIndex: 2 }}>
-          {(['Summary', 'Topics', 'Patterns'] as const).map((item, i) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: section === item, disabled: !selected || !details[selected.id] || !!turning }} aria-selected={section === item} disabled={!selected || !details[selected.id] || !!turning} onPress={() => setSection(item)} style={[s.edgeTab, { backgroundColor: ['#BBC09A', '#E1C49A', '#DCA9A0'][i], opacity: section === item ? 1 : .88 }]}><Text style={s.small}>{t.tabs[item]}</Text></Pressable>)}
-        </View>}
-        {compact && <>
-          <View pointerEvents="none" style={[s.cover, { backgroundColor: cloth }]}>
-            <View style={s.coverRule} />
-            {/* Gold-tooled corners. */}
-            <View style={[s.corner, { left: 8, top: 8, borderTopWidth: 2, borderLeftWidth: 2 }]} />
-            <View style={[s.corner, { right: 8, top: 8, borderTopWidth: 2, borderRightWidth: 2 }]} />
-            <View style={[s.corner, { left: 8, bottom: 8, borderBottomWidth: 2, borderLeftWidth: 2 }]} />
-            <View style={[s.corner, { right: 8, bottom: 8, borderBottomWidth: 2, borderRightWidth: 2 }]} />
-          </View>
-          {/* Gilt page block: two sheets peeking out at the fore-edge and tail. */}
-          <View pointerEvents="none" style={[s.sheetEdge, { left: area.left + 7, top: area.top + 6, width: area.width - 4, height: area.height - 2 }]} />
-          <View pointerEvents="none" style={[s.sheetEdge, { left: area.left + 3, top: area.top + 3, width: area.width - 2, height: area.height - 1 }]} />
-        </>}
-        <View {...swipe.panHandlers} style={[s.pages, { left: area.left, top: area.top, width: area.width, height: area.height, backgroundColor: compact ? paperColor : 'transparent',
-          borderRadius: compact ? 6 : 12, boxShadow: compact ? '0 2px 6px rgba(25,14,5,.45)' : undefined, overflow: compact ? 'hidden' : 'visible' }]}>
-          {compact && <>
-            {paintedPaper()}
-            {/* A sprig pressed between the pages. */}
-            {/* Weekly 2.0 pages carry their own paintings. */}
-            {!wide && !weekly2Of(turning ? (backwards ? from : to) : selected) && <Image source={require('../../assets/garden/environment/flowers/sparse_sprig.png')} accessible={false} resizeMode="contain"
-              style={{ position: 'absolute', right: 22, top: 128, width: 82, height: 76, opacity: .5, transform: [{ rotate: '16deg' }] }} />}
-            <View pointerEvents="none" style={s.ribbon}><View style={s.ribbonBody} />
-              <View style={{ flexDirection: 'row' }}><View style={s.ribbonTailLeft} /><View style={s.ribbonTailRight} /></View></View>
-          </>}
-          {compact
-            ? page(turning ? (backwards ? from : to) : selected, !turning)
-            : <View style={{ flex: 1, flexDirection: 'row' }}>
-              <View testID="reflection-left-page" style={{ flex: 1, minHeight: 0 }}>{leftFace(restingLeft, !turning)}</View>
-              <View testID="reflection-right-page" style={{ flex: 1, minHeight: 0 }}>{rightFace(restingRight, !turning)}</View>
-            </View>}
-          {turning && <>
-            <Animated.View pointerEvents="none" style={{ position: 'absolute', left: compact ? 0 : pageWidth, top: 7, bottom: 7, width: 24, backgroundColor: '#604322',
-              opacity: progress.interpolate({ inputRange: [0, .5, 1], outputRange: [0, .14, 0] }),
-              transform: [{ translateX: progress.interpolate({ inputRange: [0, .5, 1], outputRange: backwards ? [0, 0, pageWidth - 24] : [pageWidth - 24, 0, 0] }) }] }} />
-            <Animated.View testID="reflection-turning-leaf" pointerEvents="none" accessible={false} aria-hidden importantForAccessibility="no-hide-descendants"
-              style={{ position: 'absolute', top: 0, ...leafSize, zIndex: 2, ...(Platform.OS === 'web' ? { transformStyle: 'preserve-3d' as const } : {}),
-                transform: [{ perspective: pageWidth * 8 }, { translateX: -pageWidth / 2 }, { rotateY: angle }, { translateX: pageWidth / 2 }] }}>
-              <Animated.View style={[StyleSheet.absoluteFill, { backfaceVisibility: 'hidden', overflow: 'hidden', borderRadius: compact ? 0 : 6, opacity: faceOpacity(true) }]}>
-                {paper('right')}
-                {compact ? page(leafFront, false) : rightFace(leafFront)}
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: compact ? 0 : 6, opacity: faceOpacity(false) }]}>
-                <View style={[StyleSheet.absoluteFill, { transform: [{ rotateY: '180deg' }] }]}>
-                  {paper('left')}
-                  {compact ? null : leftFace(leafBack, false)}
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: '#765632', opacity: .1 }]} />
-                </View>
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#664728', opacity: progress.interpolate({ inputRange: [0, .5, 1], outputRange: [0, .16, 0] }) }]} />
-              <Animated.View style={{ position: 'absolute', right: 0, top: 7, bottom: 7, width: 2, backgroundColor: '#FFF3D6', opacity: progress.interpolate({ inputRange: [0, .5, 1], outputRange: [0, .8, 0] }) }} />
-            </Animated.View>
-          </>}
-        </View>
-        {pages.length > 0 && !notes && <View style={[s.turns, compact
-          ? { left: area.left + 8, width: area.width - 16, top: area.top + area.height - 52, borderTopWidth: 1, borderColor: '#AA8B5933' }
-          : { left: area.left, width: area.width, top: area.top + area.height + 4 }]}>
-          <Pressable testID="reflection-previous-page" accessibilityRole="button" accessibilityLabel={t.previous(type)}
-            disabled={!!turning || (atStart && !cursor)} onPress={() => atStart ? void load(cursor || undefined) : void turn(-1)}
-            style={[s.turn, { opacity: atStart && !cursor ? .35 : 1 }]}><Text style={s.arrow}>‹</Text></Pressable>
-          <Text accessibilityLiveRegion="polite" style={s.number}>{selected ? `❦   ${period(selected, lang)}  ·  ${t.of(index + 1, pages.length)}   ❦` : ''}</Text>
-          <Pressable testID="reflection-next-page" accessibilityRole="button" accessibilityLabel={t.next(type)}
-            disabled={!!turning || atEnd} onPress={() => void turn(1)} style={[s.turn, { opacity: atEnd ? .35 : 1 }]}><Text style={s.arrow}>›</Text></Pressable>
-        </View>}
-        <Pressable testID="reflection-put-back" accessibilityRole="button" accessibilityLabel={t.putBack} disabled={!!turning} onPress={closeBook} hitSlop={10}
-          style={[s.putBack, { left: area.left + area.width - (compact ? 56 : 36), top: area.top + 6 }]}><Text style={s.putBackText}>✕</Text></Pressable>
+      {open && <PavilionBook key={open} id={open} locale={lang} spine={spines?.[open].image ?? null} geometry={geometry} timeline={timeline} focus={focus} onReady={bookReady} />}
+      {open && <Animated.View testID="reflection-book" pointerEvents={flying ? 'none' : 'box-none'}
+        accessibilityElementsHidden={!!flying} importantForAccessibility={flying ? 'no-hide-descendants' : 'auto'}
+        style={{
+          position: 'absolute',
+          left: readingRect.x,
+          top: readingRect.y,
+          width: readingRect.width,
+          height: readingRect.height,
+          opacity: contentFade,
+        }}>
+        <PavilionBookReader
+          bookId={open}
+          locale={lang}
+          leaves={leaves}
+          readingRect={readingRect}
+          compact={compact}
+          reports={pages}
+          details={details}
+          selectedReport={selected}
+          onSelectReport={show}
+          onClose={closeBook}
+          onWriteEvent={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })}
+        />
       </Animated.View>}
+      {__DEV__ && <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night}
+        accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)}
+        style={{ position: 'absolute', left: scene.lantern.x, top: scene.lantern.y,
+          width: scene.lantern.width, height: scene.lantern.height }} />}
     </View>
-  </ScrollView>
-  {/* Outside the ScrollView: × stays in the corner however far the page is scrolled. */}
-  <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
-    style={[s.back, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable></View>;
+    <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
+      style={[s.back, { top: compact ? undefined : insets.top + 10, bottom: compact ? insets.bottom + 10 : undefined, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
+  </View>;
 }
+
 const s = StyleSheet.create({
   back: { position: 'absolute', zIndex: 20, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#F3E7CCE6', borderWidth: 1, borderColor: '#BFA36D' },
@@ -563,7 +558,7 @@ const s = StyleSheet.create({
   topic: { alignItems: 'center', minWidth: 70, maxWidth: 125, padding: 5 },
   edgeTab: { width: 83, minHeight: 49, justifyContent: 'center', alignItems: 'center', borderRadius: 4, borderWidth: 1, borderColor: '#9F805866', shadowColor: '#372412', shadowOpacity: .18, shadowRadius: 2, shadowOffset: { width: 1, height: 2 } },
   notesText: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: '#4D3B28' },
-  shelfGap: { position: 'absolute', left: 0, top: 6, right: 0, bottom: 0, backgroundColor: '#1E140C', opacity: .82, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  shelfGap: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
   pick: { fontFamily: 'Georgia', fontStyle: 'italic', letterSpacing: .5, textAlign: 'center', color: '#5E4B33' },
   quietLink: { fontFamily: 'Georgia', fontSize: 12, color: '#8C7556', textDecorationLine: 'underline' },
   note: { fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 17, lineHeight: 25, color: '#775633', textAlign: 'center', padding: 9 },

@@ -1,0 +1,841 @@
+{
+  "schemaVersion": 1,
+  "bookId": "instruction",
+  "name": {
+    "en": "Instruction",
+    "zh-Hans": "说明书"
+  },
+  "subtitle": {
+    "en": "A Small Guide to PetalPal",
+    "zh-Hans": "PetalPal 小小使用手册"
+  },
+  "languageSource": "existing app Settings locale; do not translate user-authored content",
+  "layout": {
+    "reader": "physical-pages",
+    "internalScroll": false,
+    "doublePageDesktop": true,
+    "singlePageMobileWhenNeeded": true,
+    "pageCount": 24,
+    "bookmarkPosition": "outer-right-edge",
+    "bookmarkStartsAtSectionFirstPage": true
+  },
+  "editorialNotes": [
+    "Content is proposed publication copy grounded in the described PetalPal product and current design; verify implementation-specific claims before publishing.",
+    "Do not state that AI outputs are always grounded, or that specific sharing/deletion/data rights are implemented, without checking production code and policy.",
+    "Keep UI paths and navigation instructions synchronized with the actual current build.",
+    "Preserve English and Simplified Chinese content; do not machine-translate on every render."
+  ],
+  "sections": [
+    {
+      "id": "welcome",
+      "bookmark": {
+        "en": "Welcome",
+        "zh-Hans": "欢迎"
+      },
+      "title": {
+        "en": "Welcome to PetalPal",
+        "zh-Hans": "欢迎来到 PetalPal"
+      },
+      "pages": [
+        {
+          "id": "welcome-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER I · WELCOME",
+            "zh-Hans": "第一章 · 欢迎"
+          },
+          "title": {
+            "en": "A Garden for Your Days",
+            "zh-Hans": "为日常留一座花园"
+          },
+          "paragraphs": {
+            "en": [
+              "Not every day needs a grand story. A small feeling, an ordinary conversation, or one quiet thought can all become part of your garden.",
+              "PetalPal brings flowers, personal memories, and gentle discovery into one storybook world. You decide what to record, what to revisit, and how your garden grows."
+            ],
+            "zh-Hans": [
+              "不是每一天都需要发生特别的故事。一点心情、一次平常的交谈，或是一闪而过的念头，都值得在花园里留下位置。",
+              "PetalPal 将花朵、个人回忆与温柔的探索放进同一个童话世界。记录什么、回望什么、怎样让花园成长，都由你决定。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Small fairy beside a newly sprouted flower; use existing character art.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "welcome-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "YOUR OWN PACE",
+            "zh-Hans": "按照自己的节奏"
+          },
+          "title": {
+            "en": "There Is No Perfect Garden",
+            "zh-Hans": "花园不必完美"
+          },
+          "paragraphs": {
+            "en": [
+              "Your garden is not a scorecard. Bright days, difficult days, and days that are hard to name may all belong here.",
+              "Explore at your own pace. You can write a little, write a lot, or simply look around. The purpose is to make space for your experiences—not to judge them."
+            ],
+            "zh-Hans": [
+              "你的花园不是一张成绩单。晴朗的日子、艰难的日子，以及说不清感受的日子，都可以在这里被好好安放。",
+              "你可以慢慢探索，写几句、写很多，或者只是在花园里看看。这里的意义是为经历留出空间，而不是评判它们。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Gentle garden path and different blooms.",
+          "verifyBeforePublishing": []
+        }
+      ]
+    },
+    {
+      "id": "guide",
+      "bookmark": {
+        "en": "Guide",
+        "zh-Hans": "指南"
+      },
+      "title": {
+        "en": "How to Explore",
+        "zh-Hans": "如何探索"
+      },
+      "pages": [
+        {
+          "id": "guide-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER II · GUIDE",
+            "zh-Hans": "第二章 · 指南"
+          },
+          "title": {
+            "en": "Find Your Way",
+            "zh-Hans": "从这里出发"
+          },
+          "paragraphs": {
+            "en": [
+              "The Garden is your home base. From it, you can grow flowers, open the Treehouse journal, visit the Central Pavilion, check your mailbox, and explore the other parts of PetalPal.",
+              "Look for objects that belong to the world: books can open, letters can be read, and garden companions can respond to a tap."
+            ],
+            "zh-Hans": [
+              "花园是你的起点。你可以从这里种花，进入树屋写日记，前往中央亭子翻书，查看信箱，也可以探索 PetalPal 的其他角落。",
+              "留意场景里可以互动的物件：书可以打开，信可以阅读，花园里的伙伴也会回应你的轻触。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Simplified hand-drawn garden map with hotspots; no invented navigation names.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "guide-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "GROWING",
+            "zh-Hans": "种植"
+          },
+          "title": {
+            "en": "Plant a Moment",
+            "zh-Hans": "把一段心情种下"
+          },
+          "paragraphs": {
+            "en": [
+              "Daily Grow helps turn a moment from your day into a flower. Choose the feeling that best fits, then follow the on-screen steps to make your entry and grow your bloom.",
+              "A flower is a reminder of something you lived through. Different feelings may bring different flowers; none of them makes your day more or less valuable."
+            ],
+            "zh-Hans": [
+              "Daily Grow 可以把一天中的片刻变成一朵花。选择最接近当下感受的心情，再按照画面指引完成记录，让花朵在花园中生长。",
+              "每朵花都对应一段真实经历。不同心情可能带来不同花朵，但没有哪一种心情会让你的日子更有或更没有价值。"
+            ]
+          },
+          "items": {
+            "en": [
+              "Choose a mood.",
+              "Complete the Daily Grow entry.",
+              "Return to the Garden to see your flower."
+            ],
+            "zh-Hans": [
+              "选择心情。",
+              "完成 Daily Grow 记录。",
+              "回到花园看看你的花。"
+            ]
+          },
+          "illustrationHint": "One flower blooming in three gentle frames.",
+          "verifyBeforePublishing": [
+            "Confirm exact Daily Grow entry flow and whether every completed entry plants a flower."
+          ]
+        },
+        {
+          "id": "guide-03",
+          "type": "content",
+          "eyebrow": {
+            "en": "EVENTS & FLOWERS",
+            "zh-Hans": "事件与花朵"
+          },
+          "title": {
+            "en": "Keep What Matters",
+            "zh-Hans": "留下值得记住的事"
+          },
+          "paragraphs": {
+            "en": [
+              "Events give meaningful moments a place in your story. They can help you return to what happened, beyond a single mood label.",
+              "Some events may be linked to flowers, while others may live only as records. Follow the available options in the app; an event does not need to produce a new flower to matter."
+            ],
+            "zh-Hans": [
+              "Events 让重要的时刻在你的故事里留下位置。除了一个心情标签，你还可以记下事情本身，日后再回来看看。",
+              "有些事件可能与花朵关联，有些则只作为记录保存。按照应用里提供的选项使用即可；一件事不必长出新花，也一样值得被记住。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Open note beside a small bloom.",
+          "verifyBeforePublishing": [
+            "Verify Event creation/display routes and any limitations on flower-linked events."
+          ]
+        },
+        {
+          "id": "guide-04",
+          "type": "content",
+          "eyebrow": {
+            "en": "TREEHOUSE",
+            "zh-Hans": "树屋"
+          },
+          "title": {
+            "en": "Write in the Treehouse",
+            "zh-Hans": "在树屋里写下故事"
+          },
+          "paragraphs": {
+            "en": [
+              "The Treehouse is a quiet place for your journal. Open the books to revisit entries, and use the writing desk to record what you want to remember.",
+              "Take your time with the pages. An honest sentence can be enough; you never need to write something polished or complete."
+            ],
+            "zh-Hans": [
+              "树屋是写日记的安静角落。打开书本回看往日记录，也可以在写字台上写下想留下的故事。",
+              "翻书时不必着急。一句真实的话就已经足够，日记不需要写得完整或漂亮。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Existing Treehouse desk and open journal.",
+          "verifyBeforePublishing": [
+            "Verify journal creation, edit and deletion availability before adding instructions for those actions."
+          ]
+        },
+        {
+          "id": "guide-05",
+          "type": "content",
+          "eyebrow": {
+            "en": "CENTRAL PAVILION",
+            "zh-Hans": "中央亭子"
+          },
+          "title": {
+            "en": "Four Books to Explore",
+            "zh-Hans": "亭子里的四本书"
+          },
+          "paragraphs": {
+            "en": [
+              "On the upper-right shelf you will find four books: Weekly, Monthly, Instruction, and Flower Language Collection. Tap a spine to bring that book down and open it.",
+              "Turn the full paper pages to read. Use chapter bookmarks where available. Close the book to return it to its place on the shelf."
+            ],
+            "zh-Hans": [
+              "右上角的书架摆着四本书：周回顾、月回顾、说明书和花语集。轻点书脊，书本就会来到前方展开。",
+              "阅读时可以翻动整张书页；有章节书签的书也能直接跳转。关闭后，书本会回到书架原来的位置。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Four existing pavilion books in order; preserve source artwork.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "guide-06",
+          "type": "content",
+          "eyebrow": {
+            "en": "COMPANIONS",
+            "zh-Hans": "花园伙伴"
+          },
+          "title": {
+            "en": "Say Hello to Your Companions",
+            "zh-Hans": "和小伙伴打个招呼"
+          },
+          "paragraphs": {
+            "en": [
+              "Some garden animals have small interactions of their own. Tap a companion to see the actions currently available, such as feeding, petting, or dressing up.",
+              "Collected food and outfits may appear in their own menus. If an option is unavailable, it may not yet be unlocked or implemented."
+            ],
+            "zh-Hans": [
+              "花园里的部分小动物有属于自己的互动。轻点伙伴，看看目前开放了哪些动作，例如喂食、摸头或换装。",
+              "收集到的食物与装扮可能会显示在相应菜单中。如果某个选项不可用，可能是还未解锁，或功能尚未开放。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Small generic paw and leaf motifs, avoid depicting one specific pet.",
+          "verifyBeforePublishing": [
+            "Confirm pet interaction menus and inventory behavior in currently deployed build."
+          ]
+        },
+        {
+          "id": "guide-07",
+          "type": "content",
+          "eyebrow": {
+            "en": "FRIENDS & MAIL",
+            "zh-Hans": "好友与信箱"
+          },
+          "title": {
+            "en": "A Garden with Connections",
+            "zh-Hans": "把温柔传递出去"
+          },
+          "paragraphs": {
+            "en": [
+              "The Friends area helps you connect with people in PetalPal. The mailbox is where you can look for letters and other messages shown by the app.",
+              "Before sharing, take a moment to check what is being sent and who can see it. Personal writing and shared messages are not always the same thing."
+            ],
+            "zh-Hans": [
+              "好友页面让你与 PetalPal 里的其他人建立联系；信箱则收纳应用中展示的信件和消息。",
+              "分享之前，记得看看要发送的是什么、谁能够看到。写给自己的记录和发给别人的消息，不一定具有相同的可见范围。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Closed envelope with a delicate flower seal.",
+          "verifyBeforePublishing": [
+            "Verify actual friend permissions, sharing flows and mail delivery types."
+          ]
+        },
+        {
+          "id": "guide-08",
+          "type": "content",
+          "eyebrow": {
+            "en": "CUSTOMIZATION",
+            "zh-Hans": "个性化"
+          },
+          "title": {
+            "en": "Make the Garden Yours",
+            "zh-Hans": "让花园更像你"
+          },
+          "paragraphs": {
+            "en": [
+              "Your fairy, avatar, unlocked decorations, and other available choices help make the space feel personal. Open the relevant menus to see what you can choose or change.",
+              "Settings also lets you choose the app language. Built-in instructions and book text should follow that choice; things you wrote yourself stay in your own words."
+            ],
+            "zh-Hans": [
+              "花仙子、头像、已解锁的装扮和其他个性化选项，可以让这里慢慢有你的模样。打开对应菜单，看看哪些内容可以选择或更换。",
+              "Settings 也可以设置应用语言。系统说明和书本的预设内容会跟随语言变化；你自己写下的文字则应保留原文。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Small fairy wings and a wardrobe key.",
+          "verifyBeforePublishing": [
+            "Verify which avatar/fairy customization options are live and the localization behavior."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reflection",
+      "bookmark": {
+        "en": "Reflection",
+        "zh-Hans": "回顾"
+      },
+      "title": {
+        "en": "Looking Back",
+        "zh-Hans": "回望与发现"
+      },
+      "pages": [
+        {
+          "id": "reflection-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER III · REFLECTION",
+            "zh-Hans": "第三章 · 回顾"
+          },
+          "title": {
+            "en": "Looking Back with Kindness",
+            "zh-Hans": "温柔地回望"
+          },
+          "paragraphs": {
+            "en": [
+              "Reflections help you notice patterns, changes, and questions across the moments you have recorded. They are invitations to look again—not verdicts about who you are.",
+              "Read slowly. Keep what feels useful, question what does not fit, and return to your own entries whenever you want the fuller story."
+            ],
+            "zh-Hans": [
+              "回顾帮助你留意记录中反复出现的感受、变化与疑问。它邀请你再看一眼，而不是替你定义“你是什么样的人”。",
+              "慢慢读，留下有帮助的部分，对不贴切的内容保留疑问。想了解更完整的故事时，随时回到自己的原始记录。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Petal resting between book pages.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "reflection-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "WEEKLY & MONTHLY",
+            "zh-Hans": "每周与每月"
+          },
+          "title": {
+            "en": "Two Ways to Look Back",
+            "zh-Hans": "两种回望的距离"
+          },
+          "paragraphs": {
+            "en": [
+              "Weekly offers a closer look at a week of entries. Monthly steps farther back to consider the month as a whole. The two views can reveal different details.",
+              "The results depend on the information available. A missing or short reflection should not be treated as proof that nothing meaningful happened."
+            ],
+            "zh-Hans": [
+              "周回顾更靠近一周内的具体记录；月回顾则拉远一点，看整个月的变化。距离不同，看到的细节也会不同。",
+              "回顾内容取决于实际可用的记录。如果某次回顾较短或没有生成，也不代表那段时间没有重要的事发生。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Seven petals and a month calendar motif.",
+          "verifyBeforePublishing": [
+            "Verify whether Weekly/Monthly are AI-generated and what input data each actually uses."
+          ]
+        },
+        {
+          "id": "reflection-03",
+          "type": "content",
+          "eyebrow": {
+            "en": "PETAL COLLECTION",
+            "zh-Hans": "花瓣收藏"
+          },
+          "title": {
+            "en": "Keep a Thought Nearby",
+            "zh-Hans": "把一句话留在身边"
+          },
+          "paragraphs": {
+            "en": [
+              "Petal Collection gathers reflection cards and thoughts you have chosen to keep, where supported by the current build. Followed threads help you revisit an insight in later reflections.",
+              "A thought may change as you do. You can revisit it without needing to agree with it forever."
+            ],
+            "zh-Hans": [
+              "花瓣收藏用于收纳你选择留下的回顾卡片与想法（以当前版本提供的功能为准）。关注的线索可以帮助你在之后的回顾中再次看见某个念头。",
+              "想法会随着你一起变化。你可以重新阅读它，而不必永远认同当时的判断。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Petal cards stacked inside an open envelope.",
+          "verifyBeforePublishing": [
+            "Verify Keep, Hide, Follow, unfollow, persistence, and max thread count before publishing detailed controls."
+          ]
+        },
+        {
+          "id": "reflection-04",
+          "type": "content",
+          "eyebrow": {
+            "en": "FUTURE LETTERS",
+            "zh-Hans": "未来信件"
+          },
+          "title": {
+            "en": "A Note to a Later You",
+            "zh-Hans": "写给未来的自己"
+          },
+          "paragraphs": {
+            "en": [
+              "A short note to your future self can preserve what matters today. If future letters are enabled, use the controls shown in Petal Collection to write or review your message.",
+              "Before saving, check the stated delivery timing and whether editing or withdrawing is supported. Keep the words yours."
+            ],
+            "zh-Hans": [
+              "写给未来自己的一句话，可以把今天在意的东西留到以后。如果未来信件功能已开放，可以通过花瓣收藏中提供的入口写下或查看信件。",
+              "保存前，请确认应用标注的送达时间，以及是否允许修改或撤回。让那句话保留你自己的声音。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Folded letter tucked into a book.",
+          "verifyBeforePublishing": [
+            "Verify future letter scheduling, delivery, editing and withdrawal before shipping any definite promise."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai-policy",
+      "bookmark": {
+        "en": "AI Policy",
+        "zh-Hans": "AI 原则"
+      },
+      "title": {
+        "en": "AI and Your Reflections",
+        "zh-Hans": "AI 与你的回顾"
+      },
+      "pages": [
+        {
+          "id": "ai-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER IV · AI POLICY",
+            "zh-Hans": "第四章 · AI 原则"
+          },
+          "title": {
+            "en": "A Helper, Not an Authority",
+            "zh-Hans": "协助理解，不替你定论"
+          },
+          "paragraphs": {
+            "en": [
+              "PetalPal may use AI to help organize or phrase reflections from information made available to the feature. An AI-written reflection is a suggestion for consideration, not an objective description of your mind.",
+              "You are the expert on what you meant and how you feel. If a sentence does not fit, you do not need to accept it."
+            ],
+            "zh-Hans": [
+              "PetalPal 可能使用 AI，根据提供给相关功能的信息，协助整理或表述回顾。AI 生成的文字只是供你参考的理解方式，并不是对你内心的客观定论。",
+              "你最了解自己原本想表达什么、真实感受到什么。遇到不贴切的句子，你完全可以不接受。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Quill and soft golden star over a page.",
+          "verifyBeforePublishing": [
+            "Verify actual AI features and inputs before release."
+          ]
+        },
+        {
+          "id": "ai-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "SOURCES & UNCERTAINTY",
+            "zh-Hans": "来源与不确定性"
+          },
+          "title": {
+            "en": "Words Should Stay Grounded",
+            "zh-Hans": "让文字有所依据"
+          },
+          "paragraphs": {
+            "en": [
+              "Generated summaries can miss context or misunderstand a sentence. Compare any important claim with your original entries, especially dates, quotations, and counts.",
+              "PetalPal aims for grounded, careful language. If something looks invented, exaggerated, or misleading, use the available feedback or reporting route."
+            ],
+            "zh-Hans": [
+              "生成的总结可能遗漏上下文，也可能误解一句话。对于重要的描述，尤其是日期、引文和数量，请以原始记录为准。",
+              "PetalPal 希望用有依据、审慎的语言表达。如果内容看起来被编造、夸大或误读，请通过应用提供的反馈或报告入口告知我们。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Two overlapping journal sheets with magnifying glass.",
+          "verifyBeforePublishing": [
+            "Do not assert that all output is source-verified unless source-validation implementation is confirmed.",
+            "Verify report route and exact UI label."
+          ]
+        },
+        {
+          "id": "ai-03",
+          "type": "content",
+          "eyebrow": {
+            "en": "LIMITS & CHOICE",
+            "zh-Hans": "边界与选择"
+          },
+          "title": {
+            "en": "You Keep the Final Say",
+            "zh-Hans": "最后的解释权属于你"
+          },
+          "paragraphs": {
+            "en": [
+              "AI cannot diagnose mental health conditions, reliably predict the future, or replace a trained professional. It may be wrong even when its writing sounds confident.",
+              "Choose how much weight to give a reflection. Where controls are available, use them to hide, keep, or report content. Your own words remain the primary record."
+            ],
+            "zh-Hans": [
+              "AI 不能进行心理健康诊断，也不能可靠地预测未来，更不能取代专业人员的帮助。即使语气十分肯定，它也可能出错。",
+              "你可以自己决定如何看待一段回顾。如果应用提供隐藏、收藏或报告功能，可以用这些选项管理内容。你亲手写下的记录始终是最重要的原始资料。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Small book beside a compass.",
+          "verifyBeforePublishing": [
+            "Verify content-control actions and avoid promises of deletion or training opt-out not implemented."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "bookmark": {
+        "en": "Privacy",
+        "zh-Hans": "隐私"
+      },
+      "title": {
+        "en": "Privacy and Control",
+        "zh-Hans": "隐私与控制"
+      },
+      "pages": [
+        {
+          "id": "privacy-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER V · PRIVACY",
+            "zh-Hans": "第五章 · 隐私"
+          },
+          "title": {
+            "en": "Your Words Deserve Care",
+            "zh-Hans": "认真对待你的文字"
+          },
+          "paragraphs": {
+            "en": [
+              "A journal can contain things you would not say out loud. Before using sharing or AI-powered features, it is worth knowing what information they receive and who can access the result.",
+              "This chapter explains how to think about those choices. For exact data practices, read the app’s current Privacy Policy and Settings rather than relying on a short in-book summary."
+            ],
+            "zh-Hans": [
+              "日记里可能写着你不愿当面说出的事。使用分享或 AI 功能之前，值得先了解哪些信息会被使用、谁可以看到结果。",
+              "本章帮助你理解这些选择。具体的数据处理方式，请以应用当前的隐私政策和设置说明为准，不要只依靠书中的简要介绍。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Sealed journal with a small brass key.",
+          "verifyBeforePublishing": [
+            "Link the actual privacy policy; verify it is accessible."
+          ]
+        },
+        {
+          "id": "privacy-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "PERSONAL & SHARED",
+            "zh-Hans": "私人记录与分享"
+          },
+          "title": {
+            "en": "Know What Leaves Your Garden",
+            "zh-Hans": "分享之前先看清楚"
+          },
+          "paragraphs": {
+            "en": [
+              "Writing for yourself and sending something to another person are different actions. Check each screen’s audience, recipient, and confirmation steps before sharing.",
+              "Never assume that a page is publicly visible—or completely private—only because of how it looks. Use the app’s current sharing indicators and policy as the reference."
+            ],
+            "zh-Hans": [
+              "写给自己和发送给他人，是两种不同的操作。分享前，请确认页面显示的接收对象、可见范围和确认步骤。",
+              "不要因为界面的样子，就默认某个页面一定公开或绝对私密。请以当前的分享提示和隐私政策为准。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "One closed envelope, one open letter.",
+          "verifyBeforePublishing": [
+            "Verify visibility model for journals, events, friend content and letters."
+          ]
+        },
+        {
+          "id": "privacy-03",
+          "type": "content",
+          "eyebrow": {
+            "en": "SETTINGS & REQUESTS",
+            "zh-Hans": "设置与请求"
+          },
+          "title": {
+            "en": "Choices, Corrections, Questions",
+            "zh-Hans": "设置、更正与疑问"
+          },
+          "paragraphs": {
+            "en": [
+              "Settings is the place to review language and other available preferences. For account or data questions, use the support and privacy routes provided in the current app.",
+              "If you want to correct, export, or delete information, check which options are actually offered and consult the Privacy Policy for the relevant process. Not every action is necessarily available inside the book."
+            ],
+            "zh-Hans": [
+              "你可以在 Settings 查看语言及其他已开放的偏好设置。遇到账户或数据相关问题，请使用应用当前提供的客服或隐私联系渠道。",
+              "如果你希望更正、导出或删除信息，请先确认应用是否提供对应操作，并参考隐私政策中的具体流程；这些操作不一定都能直接在书本里完成。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Small settings gear inside a floral wreath.",
+          "verifyBeforePublishing": [
+            "Verify privacy contact, correction, export and deletion processes; never claim unsupported controls."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wellbeing",
+      "bookmark": {
+        "en": "Wellbeing",
+        "zh-Hans": "身心支持"
+      },
+      "title": {
+        "en": "Wellbeing and Safety",
+        "zh-Hans": "身心支持与安全"
+      },
+      "pages": [
+        {
+          "id": "wellbeing-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER VI · WELLBEING",
+            "zh-Hans": "第六章 · 身心支持"
+          },
+          "title": {
+            "en": "A Place to Reflect, Not Diagnose",
+            "zh-Hans": "记录心情，而非进行诊断"
+          },
+          "paragraphs": {
+            "en": [
+              "PetalPal is designed for personal reflection and gentle self-expression. It is not medical advice, a mental health diagnosis, therapy, or an emergency response service.",
+              "An unexpected or difficult feeling does not need to be solved immediately. If you need support beyond an app, reaching out to a qualified professional or someone you trust may help."
+            ],
+            "zh-Hans": [
+              "PetalPal 用于个人记录和温柔的自我表达。它不提供医疗建议、心理诊断、心理治疗或紧急救援服务。",
+              "遇到复杂或难受的心情，你不必立刻找到答案。如果需要应用之外的支持，可以考虑联系专业人员或信任的人。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "A soft white flower near a lamplight.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "wellbeing-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "WHEN YOU NEED HELP",
+            "zh-Hans": "需要帮助时"
+          },
+          "title": {
+            "en": "People Come First",
+            "zh-Hans": "现实中的人更重要"
+          },
+          "paragraphs": {
+            "en": [
+              "If you or someone else is in immediate danger, contact local emergency services now. If the situation is not immediate but feels overwhelming, consider speaking with a trusted person or a qualified support service.",
+              "You can close the app whenever you need. A pause, a conversation, or practical help matters more than completing a reflection."
+            ],
+            "zh-Hans": [
+              "如果你或他人正处于紧急危险之中，请立即联系当地紧急服务。如果并非即时危险，但情况令你难以承受，可以考虑联系信任的人或专业支持服务。",
+              "任何时候，你都可以合上这本书、暂时离开应用。休息、与人交谈、寻求实际帮助，都比完成一次回顾更重要。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Lantern lighting a path toward a small house.",
+          "verifyBeforePublishing": []
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "bookmark": {
+        "en": "Help",
+        "zh-Hans": "帮助"
+      },
+      "title": {
+        "en": "Help and Feedback",
+        "zh-Hans": "帮助与反馈"
+      },
+      "pages": [
+        {
+          "id": "help-01",
+          "type": "chapter",
+          "eyebrow": {
+            "en": "CHAPTER VII · HELP",
+            "zh-Hans": "第七章 · 帮助"
+          },
+          "title": {
+            "en": "When Something Does Not Work",
+            "zh-Hans": "遇到问题时"
+          },
+          "paragraphs": {
+            "en": [
+              "If a page will not load, an animation looks wrong, or a feature seems missing, first check whether the app is connected and whether an update is available.",
+              "Then note what you were doing, which screen you were on, and what you expected to happen. These details make feedback easier to act on."
+            ],
+            "zh-Hans": [
+              "如果页面无法加载、动画出现异常，或某个功能似乎不见了，可以先检查网络连接与应用版本。",
+              "接着记下当时的操作、所在页面，以及你原本希望发生的结果。这些信息可以帮助我们更快理解问题。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Tiny envelope and paperclip.",
+          "verifyBeforePublishing": []
+        },
+        {
+          "id": "help-02",
+          "type": "content",
+          "eyebrow": {
+            "en": "QUESTIONS & SUPPORT",
+            "zh-Hans": "疑问与支持"
+          },
+          "title": {
+            "en": "Contact & Support",
+            "zh-Hans": "联系与支持"
+          },
+          "paragraphs": {
+            "en": [
+              "Every piece of feedback helps PetalPal grow. If you encounter an issue, have a question, or wish to share thoughts about your garden, you are warmly invited to reach out to our team.",
+              "You can write to us directly at the contact address below:",
+              "Before sending screenshots or attachments, please ensure they do not contain private journal entries, passwords, or sensitive personal information."
+            ],
+            "zh-Hans": [
+              "你的每一条反馈，都能帮助 PetalPal 慢慢成长。如果你在使用中遇到了问题、有任何疑问，或想分享关于花园的想法，都欢迎与我们联系。",
+              "你可以通过下方联系邮箱直接与我们取得联系：",
+              "发送截图或附件前，请确认其中未包含私密日记记录、密码或其他敏感个人信息。"
+            ]
+          },
+          "items": {
+            "en": [],
+            "zh-Hans": []
+          },
+          "illustrationHint": "Sealed feedback letter with flower stamp.",
+          "verifyBeforePublishing": [
+            "Verify Help & Feedback route and whether attachments/screenshots are supported."
+          ],
+          "callToAction": {
+            "en": "Open Feedback",
+            "zh-Hans": "打开反馈页面"
+          },
+          "contactEmail": "contact@jastrevia.com"
+        }
+      ]
+    }
+  ]
+}

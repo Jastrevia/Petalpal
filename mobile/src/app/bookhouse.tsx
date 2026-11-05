@@ -472,7 +472,7 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
         <Text style={s.caption}>{flower.placementOrigin === 'LOCAL' ? 'Planted' : 'Created'} {new Date(flower.plantedDate).toLocaleDateString(undefined, { timeZone: timezone })} · {flower.supportCount} support</Text>
       </Pressable>
       {detailBusy === flower.flowerId && <ActivityIndicator />}
-      {detail?.id === flower.flowerId && <View style={{ gap: 8 }}><Text selectable style={s.body}>{detail.content || 'No written entry attached.'}</Text><Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>
+      {detail?.id === flower.flowerId && <View style={{ gap: 8 }}>{Boolean(detail.content) && <Text selectable style={s.body}>{detail.content}</Text>}<Text style={s.caption}>{detail.secondary.join(' · ') || 'No secondary emotions'} · {detail.supports} support</Text>
         {detail.messages.length ? detail.messages.map((message, i) => <Text key={i} style={s.body}>{message}</Text>) : <Text style={s.caption}>No messages received.</Text>}</View>}
     </View>)}
     {!!detailError && <Text accessibilityRole="alert" style={s.body}>{detailError}</Text>}

@@ -134,7 +134,7 @@ import GardenWaterField from './water/GardenWaterField';
 import GardenSubmergedRocks from './water/GardenSubmergedRocks';
 import WaterfallImpactUnderlay from './water/WaterfallImpactUnderlay';
 import FishLayer, { type FishDensity, type FishMotionPreset } from './water/FishLayer';
-import LotusLayer, { type LotusRenderMode } from './water/LotusLayer';
+import LotusLayer, { type LotusRenderMode, type LotusOccluder, type LotusOccluderListener } from './water/LotusLayer';
 import { useWaterTopFlow, type TopWaterMotionMode } from './water/WaterTopAssembly';
 import WaterTopCalibrationEditor, { type TopWaterDisplayPreset } from './WaterTopCalibrationEditor';
 import { INITIAL_WATER_TOP_PLACEMENT, type WaterTopPlacement } from './waterTopPlacement';
@@ -537,6 +537,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [fishDensity, setFishDensity] = useState<FishDensity>('normal');
   const [fishMotionPreset, setFishMotionPreset] = useState<FishMotionPreset>('normal');
   const [lotusVisible, setLotusVisible] = useState(true);
+  // Register on image arrival/removal only; sway stays on the UI thread and
+  // never updates React state. The mask reads each cluster's live transform.
+  const [lotusOccluders, setLotusOccluders] = useState<LotusOccluder[]>([]);
+  const registerLotusOccluder = useCallback<LotusOccluderListener>((id, occluder) => {
+    setLotusOccluders(current => {
+      const others = current.filter(item => item.id !== id);
+      return occluder ? [...others, occluder] : others;
+    });
+  }, []);
   const [lotusMode, setLotusMode] = useState<LotusRenderMode>('sway');
   const [wakeVisible, setWakeVisible] = useState(false); // Optional DEV toggle, default OFF
   const [foamVisible, setFoamVisible] = useState(true);
@@ -1519,6 +1528,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           <Group transform={cameraTransform}>
             {/* 6. Lotus */}
             <GardenProfile name="Lotus" enabled={perf.Lotus}><LotusLayer
+              onOccluder={registerLotusOccluder}
               flow={surfaceFlow}
               active={worldActive && perf.WaterAnimation}
               visible={lotusVisible}
@@ -1672,7 +1682,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>
           <Group transform={cameraTransform}>
             {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
-            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} />}
+            {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} lotusOccluders={lotusVisible && perf.Lotus ? lotusOccluders : undefined} />}
             {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
             {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
               <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}

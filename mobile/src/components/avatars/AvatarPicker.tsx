@@ -1,18 +1,20 @@
 import { usePanelTheme } from '../features/PanelTheme';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
-import { AVATAR_ART, AVATAR_IDS } from './avatarArt';
+import { AVATAR_ART, LEGACY_AVATAR_IDS } from './avatarArt';
 
-// Choose a portrait from the avatar library. `defaultOption` adds a first tile that
-// clears the choice (onSelect(null)), such as the Fairy's own Moments photo.
-export function AvatarPicker({ visible, title, selected, busy = false, error = '', closeLabel, optionLabel, defaultOption, onSelect, onClose }: {
+// Choose a portrait from the avatar library (by default the original eight, as for the Fairy's
+// Moments avatar; the owner's own avatar uses AvatarCollection). `defaultOption` adds a first tile
+// that clears the choice (onSelect(null)), such as the Fairy's own Moments photo.
+export function AvatarPicker({ visible, title, selected, busy = false, error = '', closeLabel, optionLabel, defaultOption, ids = LEGACY_AVATAR_IDS, onSelect, onClose }: {
   visible: boolean; title: string; selected?: string | null; busy?: boolean; error?: string; closeLabel: string;
   optionLabel: (number: number) => string;
   defaultOption?: { source: ImageSourcePropType; label: string };
+  ids?: string[];
   onSelect: (avatar: string | null) => void; onClose: () => void;
 }) {
   const tiles: { id: string | null; source: ImageSourcePropType; label: string }[] = [
     ...(defaultOption ? [{ id: null, ...defaultOption }] : []),
-    ...AVATAR_IDS.map((id, index) => ({ id, source: AVATAR_ART[id], label: optionLabel(index + 1) })),
+    ...ids.map((id, index) => ({ id, source: AVATAR_ART[id], label: optionLabel(index + 1) })),
   ];
   const current = selected ?? null;
   const { theme } = usePanelTheme();

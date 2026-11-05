@@ -14,6 +14,9 @@ import { useClosenessSummary } from '../../services/fairyCloseness';
 import { useAuth } from '../../services/auth';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
+import { AvatarCollection } from '../avatars/AvatarCollection';
+import { AvatarWelcome } from '../avatars/AvatarWelcome';
+import { BondLevelUp } from '../avatars/BondLevelUp';
 import { momentLocale } from '../moments/momentFormat';
 import { startUserRealtime, stopUserRealtime } from '../../services/userRealtime';
 import { startFriendAlerts, stopFriendAlerts, useFriendAlerts } from '../../services/friendAlerts';
@@ -53,6 +56,8 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const [entryOpens, setEntryOpens] = useState(0);
   const [entryOpen, setEntryOpen] = useState(false);
   const [bondOpen, setBondOpen] = useState(false);
+  // The avatar collection opened from the Fairy Bond level-up celebration.
+  const [avatarsOpen, setAvatarsOpen] = useState(false);
   const closeness = useClosenessSummary(entryOpens);
   const { experience, session } = useAuth();
   const locale = momentLocale(experience?.user.preferredLocale);
@@ -86,6 +91,11 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   if (activeMode !== 'normal' || selectedFlower) return null;
   const navigationItem = (feature: typeof GARDEN_FEATURES[number]) => {
     const selected = openFeature === feature.id || (feature.id === 'profile' && openFeature === 'settings') || (feature.id === 'garden' && !openFeature);
+    const isProfile = feature.id === 'profile';
+    const isHovered = highlightedFeature === feature.id;
+    // For 'profile' (Me), use the brighter hover/selected visual appearance permanently as default
+    const isVisuallyActive = selected || isHovered || isProfile;
+
     return <Pressable key={feature.id} accessibilityRole="button"
       accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
@@ -101,10 +111,10 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
         } else setOpenFeature(feature.id === 'garden' ? undefined : feature.id);
       }}
       style={({ pressed }) => [styles.bottomItem,
-        (selected || highlightedFeature === feature.id) && [styles.selected, { backgroundColor: light ? '#D6E5DCD9' : theme.input, borderColor: theme.gold }],
+        isVisuallyActive && [styles.selected, { backgroundColor: light ? '#D6E5DCD9' : theme.input, borderColor: theme.gold }],
         pressed && styles.pressed]}>
       <View>
-        <SidebarIllustration id={feature.id} size={iconSize} active={selected || highlightedFeature === feature.id} />
+        <SidebarIllustration id={feature.id} size={iconSize} active={isVisuallyActive} />
         {(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? <View testID={`hud-${feature.id}-dot`} style={[styles.unread, feature.id === 'friends' && styles.unreadBeside, { borderColor: theme.background }]} /> : null}
       </View>
       <Text numberOfLines={1} style={[styles.label, styles.bottomLabel, { fontSize: phone ? 13 : 15, color: theme.text }]}>
@@ -135,6 +145,11 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       onOpenBond={() => { setEntryOpen(false); setBondOpen(true); setEntryOpens(count => count + 1); }} />
     <OurBondPanel visible={bondOpen} locale={locale} summary={closeness.summary} loading={closeness.on === null}
       onClose={() => setBondOpen(false)} />
+    {/* A new account's first avatar, then the level-up celebration once no panel is open. */}
+    {ownerId ? <AvatarWelcome locale={locale} enabled /> : null}
+    {ownerId ? <BondLevelUp userId={ownerId} locale={locale} summary={closeness.on ? closeness.summary : null}
+      paused={entryOpen || bondOpen || momentsOpen || avatarsOpen || Boolean(openFeature)} onChoose={() => setAvatarsOpen(true)} /> : null}
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
     <FairyMomentsPanel visible={momentsOpen} highlightNewest={momentsHighlight} onClose={leaveMoments}
       onFindFairy={() => { leaveMoments(); onFocusFairy?.(); }} />
     <FeatureOverlay feature={gardenFeature(openFeature)} onClose={() => setOpenFeature(undefined)} onGardenChanged={refreshGarden} onOpenSettings={() => setOpenFeature('settings')} />

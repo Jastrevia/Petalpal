@@ -6,7 +6,8 @@ export function UserAvatar({ avatar, size, radius = size / 2, fallback = '🦋',
   avatar?: string | null; size: number; radius?: number; fallback?: string; style?: StyleProp<ViewStyle>;
 }) {
   const art = avatarArt(avatar);
-  return <View style={[styles.frame, { width: size, height: size, borderRadius: radius }, style]}>
+  // Medallion portraits carry their own rim and clear corners, so only emoji get the lilac ground.
+  return <View style={[styles.frame, { width: size, height: size, borderRadius: radius }, art ? styles.clear : null, style]}>
     {art ? <Image source={art} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
       : <Text style={{ fontSize: size * 0.5 }}>{avatar || fallback}</Text>}
   </View>;
@@ -14,4 +15,5 @@ export function UserAvatar({ avatar, size, radius = size / 2, fallback = '🦋',
 
 const styles = StyleSheet.create({
   frame: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEE7F6' },
+  clear: { backgroundColor: 'transparent' },
 });

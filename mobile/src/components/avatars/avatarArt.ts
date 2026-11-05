@@ -1,5 +1,7 @@
-// The avatar library bundled in the app, keyed by the server's ids (lib/avatars.js).
-// Compressed from the owner's portraits by scripts/compress-avatars.mjs.
+// The avatar library bundled in the app, keyed by the server's ids (lib/avatars.js), in three
+// tiers: Level 1 from the start (the original portraits fairy-1 … fairy-8 from
+// scripts/compress-avatars.mjs, then l1-*), Level 2 from Fairy Bond Lv 6, Level 3 from Lv 14.
+// The tiered sheets are cut by scripts/crop-avatar-sheets.py. Requires stay literal for Metro.
 export const AVATAR_ART: Record<string, number> = {
   'fairy-1': require('@/assets/avatars/fairy-1.webp'),
   'fairy-2': require('@/assets/avatars/fairy-2.webp'),
@@ -9,8 +11,85 @@ export const AVATAR_ART: Record<string, number> = {
   'fairy-6': require('@/assets/avatars/fairy-6.webp'),
   'fairy-7': require('@/assets/avatars/fairy-7.webp'),
   'fairy-8': require('@/assets/avatars/fairy-8.webp'),
+  'l1-01': require('@/assets/avatars/l1-01.webp'),
+  'l1-02': require('@/assets/avatars/l1-02.webp'),
+  'l1-03': require('@/assets/avatars/l1-03.webp'),
+  'l1-04': require('@/assets/avatars/l1-04.webp'),
+  'l1-05': require('@/assets/avatars/l1-05.webp'),
+  'l1-06': require('@/assets/avatars/l1-06.webp'),
+  'l1-07': require('@/assets/avatars/l1-07.webp'),
+  'l1-08': require('@/assets/avatars/l1-08.webp'),
+  'l1-09': require('@/assets/avatars/l1-09.webp'),
+  'l1-10': require('@/assets/avatars/l1-10.webp'),
+  'l1-11': require('@/assets/avatars/l1-11.webp'),
+  'l1-12': require('@/assets/avatars/l1-12.webp'),
+  'l1-13': require('@/assets/avatars/l1-13.webp'),
+  'l1-14': require('@/assets/avatars/l1-14.webp'),
+  'l1-15': require('@/assets/avatars/l1-15.webp'),
+  'l1-16': require('@/assets/avatars/l1-16.webp'),
+  'l1-17': require('@/assets/avatars/l1-17.webp'),
+  'l1-18': require('@/assets/avatars/l1-18.webp'),
+  'l1-19': require('@/assets/avatars/l1-19.webp'),
+  'l1-20': require('@/assets/avatars/l1-20.webp'),
+  'l1-21': require('@/assets/avatars/l1-21.webp'),
+  'l1-22': require('@/assets/avatars/l1-22.webp'),
+  'l1-23': require('@/assets/avatars/l1-23.webp'),
+  'l1-24': require('@/assets/avatars/l1-24.webp'),
+  'l2-01': require('@/assets/avatars/l2-01.webp'),
+  'l2-02': require('@/assets/avatars/l2-02.webp'),
+  'l2-03': require('@/assets/avatars/l2-03.webp'),
+  'l2-04': require('@/assets/avatars/l2-04.webp'),
+  'l2-05': require('@/assets/avatars/l2-05.webp'),
+  'l2-06': require('@/assets/avatars/l2-06.webp'),
+  'l2-07': require('@/assets/avatars/l2-07.webp'),
+  'l2-08': require('@/assets/avatars/l2-08.webp'),
+  'l2-09': require('@/assets/avatars/l2-09.webp'),
+  'l2-10': require('@/assets/avatars/l2-10.webp'),
+  'l2-11': require('@/assets/avatars/l2-11.webp'),
+  'l2-12': require('@/assets/avatars/l2-12.webp'),
+  'l2-13': require('@/assets/avatars/l2-13.webp'),
+  'l2-14': require('@/assets/avatars/l2-14.webp'),
+  'l2-15': require('@/assets/avatars/l2-15.webp'),
+  'l2-16': require('@/assets/avatars/l2-16.webp'),
+  'l3-01': require('@/assets/avatars/l3-01.webp'),
+  'l3-02': require('@/assets/avatars/l3-02.webp'),
+  'l3-03': require('@/assets/avatars/l3-03.webp'),
+  'l3-04': require('@/assets/avatars/l3-04.webp'),
+  'l3-05': require('@/assets/avatars/l3-05.webp'),
+  'l3-06': require('@/assets/avatars/l3-06.webp'),
+  'l3-07': require('@/assets/avatars/l3-07.webp'),
+  'l3-08': require('@/assets/avatars/l3-08.webp'),
+  'l3-09': require('@/assets/avatars/l3-09.webp'),
+  'l3-10': require('@/assets/avatars/l3-10.webp'),
+  'l3-11': require('@/assets/avatars/l3-11.webp'),
+  'l3-12': require('@/assets/avatars/l3-12.webp'),
+  'l3-13': require('@/assets/avatars/l3-13.webp'),
+  'l3-14': require('@/assets/avatars/l3-14.webp'),
+  'l3-15': require('@/assets/avatars/l3-15.webp'),
+  'l3-16': require('@/assets/avatars/l3-16.webp'),
+  'l3-17': require('@/assets/avatars/l3-17.webp'),
+  'l3-18': require('@/assets/avatars/l3-18.webp'),
+  'l3-19': require('@/assets/avatars/l3-19.webp'),
+  'l3-20': require('@/assets/avatars/l3-20.webp'),
+  'l3-21': require('@/assets/avatars/l3-21.webp'),
+  'l3-22': require('@/assets/avatars/l3-22.webp'),
+  'l3-23': require('@/assets/avatars/l3-23.webp'),
+  'l3-24': require('@/assets/avatars/l3-24.webp'),
+  'l3-25': require('@/assets/avatars/l3-25.webp'),
+  'l3-26': require('@/assets/avatars/l3-26.webp'),
+  'l3-27': require('@/assets/avatars/l3-27.webp'),
 };
 export const AVATAR_IDS = Object.keys(AVATAR_ART);
+export type AvatarTier = 1 | 2 | 3;
+const TIER_IDS = ([1, 2, 3] as const).map(tier => AVATAR_IDS.filter(id => (id.startsWith('fairy-') ? 1 : Number(id[1])) === tier));
+export const AVATAR_TIERS: { tier: AvatarTier; unlockLevel: number; ids: string[] }[] = [
+  { tier: 1, unlockLevel: 1, ids: TIER_IDS[0] },
+  { tier: 2, unlockLevel: 6, ids: TIER_IDS[1] },
+  { tier: 3, unlockLevel: 14, ids: TIER_IDS[2] },
+];
+export const avatarTier = (id?: string | null): AvatarTier | null => AVATAR_TIERS.find(entry => id && entry.ids.includes(id))?.tier ?? null;
+// The original eight: the Fairy's Moments avatar keeps choosing from these.
+export const LEGACY_AVATAR_IDS = AVATAR_TIERS[0].ids.filter(id => id.startsWith('fairy-'));
 export const DEFAULT_AVATAR = 'fairy-1';
 // Accounts made before the library keep their emoji (🦋, 🐝, 🐦) until they choose a portrait.
 export const avatarArt = (avatar?: string | null) => (avatar ? AVATAR_ART[avatar] : undefined);

@@ -7,7 +7,7 @@
 import { createRequire } from "node:module";
 import { mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { AVATAR_IDS } from "../lib/avatars.js";
+import { LEGACY_AVATAR_IDS as AVATAR_IDS } from "../lib/avatars.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 const sharp = createRequire(root + "/package.json")("sharp");

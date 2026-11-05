@@ -1,64 +1,77 @@
-import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadPlantingModules } from './loadPlantingModules.mjs';
 
-const load = loadPlantingModules();
-const otter = load('../spirits/otterSwims');
-const { gardenGroundKind } = load('../fairy/gardenGround');
-const isWater = p => gardenGroundKind(p) === 'water';
-const bounds = { minX: 60, minY: 40, maxX: 2340, maxY: 1620 };
-const seeded = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+const otter=loadPlantingModules()('../spirits/otterSwims');
+const network=otter.getSwimNetwork();
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const close=(a,b)=>assert.ok(distance(a,b)<1e-6);
 
-test('Memory Otter swims only open water, near level, and surfaces near where it dived', () => {
-  const random = seeded(7);
-  let swim = otter.planSwim({ from: null, now: 0, isWater, bounds, random });
-  assert.ok(swim, 'finds open water');
-  for (let i = 0; i < 40; i++) {
-    const { a, b } = swim, length = Math.hypot(b.x - a.x, b.y - a.y);
-    for (let s = 0; s <= length; s += 10) {
-      const p = { x: a.x + (b.x - a.x) * s / length, y: a.y + (b.y - a.y) * s / length };
-      assert.ok(otter.isOpenWater(p, isWater), `swim ${i} keeps clear of the shore at ${Math.round(p.x)}, ${Math.round(p.y)}`);
-    }
-    assert.ok(Math.abs(Math.atan2(b.y - a.y, Math.abs(b.x - a.x))) <= 0.41, `swim ${i} stays near level`);
-    for (const p of [a, b]) assert.ok(p.x >= bounds.minX && p.x <= bounds.maxX && p.y >= bounds.minY && p.y <= bounds.maxY, `swim ${i} stays where it can be seen`);
-    const next = otter.planSwim({ from: b, now: otter.swimEnd(swim), isWater, bounds, random });
-    if (!next) break;
-    assert.ok(Math.hypot(next.a.x - b.x, next.a.y - b.y) <= 400 + 1e-6, `swim ${i + 1} surfaces near where it dived`);
-    swim = next;
-  }
-});
-
-test('it rises, swims and dives smoothly, then stays hidden until the next swim', () => {
-  const swim = { a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, start: 10, swim: 300 / otter.OTTER_SPEED, under: 2 };
-  assert.equal(otter.swimPose(swim, 10).opacity, 0);
-  const mid = otter.swimPose(swim, 10 + otter.OTTER_FADE + swim.swim / 2);
-  assert.equal(mid.opacity, 1); assert.ok(Math.abs(mid.x - 150) < 1e-6);
-  assert.equal(otter.swimPose(swim, 10 + otter.OTTER_FADE * 2 + swim.swim).opacity, 0, 'under after diving');
-  let previous = 0;
-  for (let t = 10; t <= 10 + otter.OTTER_FADE; t += 0.05) {
-    const o = otter.swimPose(swim, t).opacity; assert.ok(o >= previous - 1e-9, 'fades in, never pops'); previous = o;
-  }
-  assert.equal(otter.swimPose({ ...swim, b: { x: -300, y: 0 } }, 12).facing, -1, 'faces the way it swims');
-});
-
-test('she glows above the night grade, so her swims stay clear of the bridges and the waterfall', () => {
-  const { planSwim, swimmableWater, OVER_WATER } = load('../spirits/otterSwims');
-  const water = point => swimmableWater(point, () => true);
-  const bounds = { minX: 60, minY: 40, maxX: 2340, maxY: 1620 };
-  let planned = 0;
-  for (let i = 0; i < 400; i++) {
-    let seed = i * 7 + 1;
-    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const swim = planSwim({ from: null, now: 0, isWater: water, bounds, random });
-    if (!swim) continue;
-    planned++;
-    for (let t = 0; t <= 1; t += .02) {
-      const point = { x: swim.a.x + (swim.b.x - swim.a.x) * t, y: swim.a.y + (swim.b.y - swim.a.y) * t };
-      for (const o of OVER_WATER) assert.ok(((point.x - o.x) / o.rx) ** 2 + ((point.y - o.y) / o.ry) ** 2 > 1, 'swims never cross what stands over the water');
+test('largest safe component spans the lake, branches, and never joins land-separated bays',()=>{
+  assert.ok(network.nodes.length>50);
+  assert.ok(network.bounds.maxX-network.bounds.minX>1000);
+  assert.ok(network.nodes.some(p=>p.links.length>2));
+  const seen=new Set([0]),pending=[0];
+  for(const id of pending) for(const next of network.nodes[id].links) if(!seen.has(next)){seen.add(next);pending.push(next);}
+  assert.equal(seen.size,network.nodes.length);
+  for(const p of network.nodes) {
+    assert.ok(otter.isOpenWater(p,otter.OTTER_BODY_RADIUS+16));
+    for(const id of p.links) {
+      const q=network.nodes[id],heading=Math.atan2(q.y-p.y,q.x-p.x);
+      for(let t=0;t<=1;t+=.025) {
+        const point={x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t};
+        assert.ok(otter.isOpenWater(point)||otter.bodyFits(point,heading),'entire body fits, not only its center');
+      }
     }
   }
-  assert.ok(planned > 300);
-  const scene = fs.readFileSync(new URL('../src/components/garden/GardenScene.tsx', import.meta.url), 'utf8');
-  assert.ok(scene.indexOf('<MemoryOtter') > scene.indexOf('</Group>\n          </Group>\n          <Group transform={cameraTransform}>'), 'drawn after the night grade');
+  assert.equal(otter.swimmableWater({x:100,y:600}),false,'western terrain stays solid');
+  assert.equal(otter.swimmableWater({x:1800,y:0}),false,'decorative scenic collision exclusion is not water');
+});
+
+test('every possible junction and both dead-end turns keep the full rotating body clear',()=>{
+  for(let to=0;to<network.nodes.length;to++) for(const from of network.nodes[to].links)
+    for(const next of network.nodes[to].links) for(const side of next===from?[-1,1]:[1]) {
+      const entering=otter.straightLeg(network,from,to),turn=otter.turningLeg(network,from,to,next,side);
+      const exiting=otter.straightLeg(network,to,next);
+      close(entering.samples.at(-1),turn.samples[0]);
+      close(turn.samples.at(-1),exiting.samples[0]);
+      for(const point of turn.samples) assert.ok(otter.isOpenWater(point),'turn clearance includes artwork and glow at every heading');
+      assert.ok(turn.speed>0 && turn.speed<=otter.OTTER_SPEED);
+    }
+});
+
+test('four simulated hours explore the whole network without resets, pauses, or heading snaps',()=>{
+  let state=otter.createSwim(network,7),maxStep=0,maxYaw=0,turns=0;
+  const visited=new Set();
+  for(let i=0;i<144000;i++) {
+    const before=state;state=otter.advanceSwim(network,state,.1);
+    const step=distance(before,state);
+    maxStep=Math.max(maxStep,step);maxYaw=Math.max(maxYaw,Math.abs(state.heading-before.heading));
+    assert.ok(step>0,'route ends never freeze or despawn the swimmer');
+    assert.ok(Number.isFinite(state.x)&&Number.isFinite(state.y));
+    if(state.turning&&!before.turning) turns++;
+    visited.add(state.to);
+    if(i%10===0) assert.ok(otter.isOpenWater(state)||otter.bodyFits(state,state.heading),'rendered whole-body pose stays in water');
+  }
+  assert.equal(visited.size,network.nodes.length,'visitation weighting explores every branch');
+  assert.ok(turns>100);
+  assert.ok(maxStep<=otter.OTTER_SPEED*.1+1e-6,'no teleport');
+  assert.ok(maxYaw<=.095+1e-6,'heading crosses +/-pi continuously');
+});
+
+test('dead ends use a moving curved U-turn, slow down, and resume at the same world-space join',()=>{
+  const from=0,to=network.nodes[from].links[0];
+  const turn=otter.turningLeg(network,from,to,from);
+  close(turn.samples[0],turn.samples.at(-1));
+  assert.ok(turn.samples.some(p=>distance(p,turn.samples[0])>10),'swims a real curve instead of flipping in place');
+  const first=turn.samples[0].heading,last=turn.samples.at(-1).heading;
+  assert.ok(Math.abs(Math.abs(Math.atan2(Math.sin(last-first),Math.cos(last-first)))-Math.PI)<.1);
+  assert.ok(turn.speed<otter.OTTER_SPEED*.6);
+});
+
+test('only actual bridge decks can override dry collision; terrain and causeways cannot',()=>{
+  for(const p of [{x:1660,y:560},{x:1710,y:1380},{x:1650,y:950}])
+    assert.equal(otter.swimmableWater(p),true);
+  for(const p of [{x:100,y:600},{x:1200,y:700},{x:1600,y:1700}])
+    assert.equal(otter.swimmableWater(p),false);
 });

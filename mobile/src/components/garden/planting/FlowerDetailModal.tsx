@@ -192,7 +192,7 @@ export default function FlowerDetailModal() {
               <Text style={styles.detailLabel}>{sourceEvent?.id === eventId ? copy.hideEvent : copy.viewEvent}</Text>
             </Pressable>
             {sourceEvent?.id === eventId && sourceEvent.state === 'loading' ? <Text style={styles.notesText}>{copy.opening}</Text> : null}
-            {sourceEvent?.id === eventId && sourceEvent.state === 'ready' ? <Text selectable style={styles.notesText}>{sourceEvent.text}</Text> : null}
+            {sourceEvent?.id === eventId && sourceEvent.state === 'ready' && Boolean(sourceEvent.text?.trim()) ? <Text selectable style={styles.notesText}>{sourceEvent.text}</Text> : null}
             {sourceEvent?.id === eventId && sourceEvent.state === 'error' ? <Text accessibilityRole="alert" style={styles.notesText}>{copy.eventError}</Text> : null}
           </View> : null}
           {selectedFlowerIsOwner && selectedFlower?.sourceEventId ? <AiOutputReport kind="event" outputId={selectedFlower.sourceEventId} /> : null}
