@@ -29,10 +29,10 @@ export type CritterSpec = {
 // it covers, so its stride stays the painted one and its little legs simply step quicker, about 1.7
 // times the video's own pace.)
 export const MALTESE_SIZE = 49.6, MALTESE_SPEED = 38;
-// Its gallop: two strides of about 33 units each loop. A small dog's strides are short and quick:
-// it takes two to each of the puppy's (the puppy's gallop: 178 units a stride at RUN_SPEED, 1.23 s),
-// so it runs a loop in about 1.23 s.
-export const MALTESE_RUN_SPEED = 53;
+// Its gallop: two strides of about 33 units each loop. It runs as fast as the puppy (the owner's
+// choice, 2026-11-05) on its own short strides, so its legs go much quicker: about 4.4 strides a
+// second to the puppy's one stride of 178 units each 1.23 s.
+export const MALTESE_RUN_SPEED = 145;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
@@ -520,9 +520,9 @@ export function planPlay({ maltese, puppy, now, dash, chase, runner = 'maltese' 
   // It sets off once the runner is a body length ahead along the trail.
   const delay = Math.max(0.6, (APART - pathLength(chase)) / speed + 0.2);
   if (trail.length < 2 || pathLength(trail) < 40) return null;
-  // The chaser runs at its own pace too: the puppy, much faster, sets off late enough to pull up
-  // behind the Maltese just as it stops; the Maltese, slower, simply runs after the puppy and gets
-  // there after it.
+  // The chaser runs at its own run's pace too (the two now run equally fast): the puppy sets off
+  // late enough to pull up behind the Maltese as it stops, or as soon after as its start allows;
+  // the Maltese simply runs after the puppy and gets there after it.
   const pace = runner === 'maltese' ? RUN_SPEED : MALTESE_RUN_SPEED;
   const startAt = runner === 'maltese' ? Math.max(now + delay, arrives - pathLength(trail) / pace - 0.15) : now + delay;
   const rising = Boolean(after.sits) && startAt < after.start + after.lead;

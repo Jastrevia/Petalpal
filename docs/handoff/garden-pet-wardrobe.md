@@ -74,7 +74,8 @@ Not done yet (next work, in the owner's order):
    patches of 25 px or more in the bottom 22% of each cell fade to transparent (`maltese/v2/belly_clear.py`;
    originals in `maltese/v2/sheets-before-belly/`); the bottom band keeps the red bow out.
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
-   ground covered, so the painted stride stays and its steps come quicker. It has
+   ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
+   RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second. It has
    no wardrobe of its own (the server's PetId has no `maltese`): it wears its petal look while the
    puppy has any outfit on, and like the puppy never changes look mid-run.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
