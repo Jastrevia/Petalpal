@@ -1,4 +1,4 @@
-import type { PetOutfit, PetsSummary } from '@/services/gardenPets';
+import type { PetId, PetOutfit, PetsSummary } from '@/services/gardenPets';
 import { PUPPY_SET_2 } from './puppyLooks';
 
 // The pet's ring menu (PetRingMenu.tsx, the owner's mock-up): a one-third ring (120°) standing
@@ -84,6 +84,24 @@ export const NO_OUTFIT: PetOutfit = { hat: null, collar: null, pendant: null };
 
 // One shelf of the closet: every piece of that row, in catalog order, opened or not.
 export const shelfOf = (accessories: readonly Piece[], shelf: Shelf) => accessories.filter(piece => piece.row === shelf);
+
+// A pet with its own pieces (the server's PET_OWN_PIECES): its closet holds only those, each under
+// the catalog id it is kept as (it opens with that piece), shown with its own name and painting.
+// The Maltese (Xiaobai): its flower clip, its lilac capelet with a gold clasp, its pink bow.
+export type OwnPiece = { id: string; name: { en: string; 'zh-Hans': string } };
+export const PET_OWN_PIECES: Partial<Record<PetId, Record<Shelf, OwnPiece>>> = {
+  maltese: {
+    hat: { id: 'flower-sprig', name: { en: 'Flower Clip', 'zh-Hans': '小花夹' } },
+    collar: { id: 'petal-capelet', name: { en: 'Lilac Capelet', 'zh-Hans': '紫色小披肩' } },
+    pendant: { id: 'crystal-drop', name: { en: 'Pink Bow', 'zh-Hans': '粉色蝴蝶结' } },
+  },
+};
+// The shelf as `petId` sees it: its own piece (renamed) when it has its own, else the whole row.
+export function petShelf(accessories: readonly Piece[], shelf: Shelf, petId: PetId, locale: 'en' | 'zh-Hans'): Piece[] {
+  const own = PET_OWN_PIECES[petId]?.[shelf];
+  if (!own) return shelfOf(accessories, shelf);
+  return accessories.filter(piece => piece.id === own.id).map(piece => ({ ...piece, name: own.name[locale] }));
+}
 
 // The whole outfit after choosing `piece` (the PUT sends all three slots): it goes on in its own
 // slot, or comes off when it is already on. A piece not yet opened cannot be chosen (null).

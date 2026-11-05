@@ -336,6 +336,12 @@ test("outfits: only opened pieces of the right row, and a list that shows the lo
   assert.ok(after.accessories.every(item => item.unlocked));
   await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: null }, now });
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "taking it off");
+  // The Maltese wears only its own three pieces.
+  assert.deepEqual(plain(after.outfits.maltese), { hat: null, collar: null, pendant: null });
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { hat: "lilac-beret" }, now })), { error: "UNKNOWN_ACCESSORY" }, "not its piece");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { hat: "flower-sprig", collar: "petal-capelet", pendant: "crystal-drop" }, now })),
+    { outfit: { hat: "flower-sprig", collar: "petal-capelet", pendant: "crystal-drop" } });
+  assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "the puppy's outfit is its own");
 });
 
 test("Fairy Moments open at Lv 3; feeds that already have posts stay open; owners outside the switch keep the old rule", async () => {

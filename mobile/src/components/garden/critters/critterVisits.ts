@@ -22,13 +22,17 @@ export type CritterSpec = {
   altitude: [number, number];
 };
 // The Maltese's drawn size and walking pace (world units), from its painted walk.
-// (Its sheet's cells are 293 px wide; 62 units makes it stand about 42 units tall, some six tenths of
-// the puppy. Its painted walk covers 45 units a stride cycle in 1.8 s: 27 units a second is its own pace.)
-export const MALTESE_SIZE = 62, MALTESE_SPEED = 27;
-// Its gallop: two strides of about 38.5 units each loop. A small dog's strides are short and quick:
-// it takes two to each of the puppy's (the puppy's gallop: 178 units a stride at RUN_SPEED, 1.23 s),
-// so it runs a loop in 1.23 s, a little under half the puppy's speed.
-export const MALTESE_RUN_SPEED = 63;
+// (Its sheet's cells are 293 px wide. Its painting since 2026-11-05 has a bigger head than the
+// first one, so it is drawn at 0.8 of the first one's 62 units, keeping it about half the puppy's
+// size. Its painted walk covers 47.9 units a 48-frame stride, 34.6 a 42-frame one in its petal
+// look. It walks as fast as the puppy (the owner's choice, 2026-11-05): its frames follow the ground
+// it covers, so its stride stays the painted one and its little legs simply step quicker, about 1.7
+// times the video's own pace.)
+export const MALTESE_SIZE = 49.6, MALTESE_SPEED = 38;
+// Its gallop: two strides of about 33 units each loop. It runs as fast as the puppy (the owner's
+// choice, 2026-11-05) on its own short strides, so its legs go much quicker: about 4.4 strides a
+// second to the puppy's one stride of 178 units each 1.23 s.
+export const MALTESE_RUN_SPEED = 145;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
   butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
@@ -124,10 +128,15 @@ export function stopChase(visit: Visit, now: number): Visit {
 export const HOLD_SECONDS = 3600;
 export function holdVisit(visit: Visit, now: number): Visit {
   if (visit.held) return visit;
+  return sitDown(visit, now, HOLD_SECONDS, true);
+}
+// Sitting down where it is for `seconds` (a run, a game or a walk given up), then on along the
+// rest of its path at its own pace; `held` keeps it sitting until let go.
+export function sitDown(visit: Visit, now: number, seconds: number, held = false): Visit {
   const elapsed = now - visit.start;
   if (visit.sits && !visit.rising && elapsed >= 0 && elapsed < visit.lead) {
-    const lead = elapsed + HOLD_SECONDS;
-    return { ...visit, held: true, lead, duration: visit.duration + lead - visit.lead };
+    const lead = Math.max(visit.lead, elapsed + seconds);
+    return { ...visit, held: held || !!visit.held, lead, duration: visit.duration + lead - visit.lead };
   }
   const spec = CRITTERS[visit.id], gone = visitDistance(visit, now);
   const pose = visitPose(visit, now), here = { x: pose.x, y: pose.y };
@@ -138,10 +147,13 @@ export function holdVisit(visit: Visit, now: number): Visit {
   }
   const rest = visit.path.slice(ahead);
   const path = rest.length ? [here, ...rest] : [{ x: here.x - (pose.dx < 0 ? -1 : 1) * 1e-3, y: here.y }, here];
-  return { ...visit, path, start: now, lead: HOLD_SECONDS, fadeIn: false, walked: visit.walked + gone,
-    chase: false, rising: false, sits: true, held: true, speed: spec.speed, rhythm: RHYTHMS[visit.id],
-    duration: HOLD_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
+  // (No longer running or playing: a sitting Maltese is drawn with its sit, not its gallop.)
+  return { ...visit, path, start: now, lead: seconds, fadeIn: false, walked: visit.walked + gone,
+    chase: false, play: false, running: false, rising: false, sits: true, held: held || !!visit.held, speed: spec.speed, rhythm: RHYTHMS[visit.id],
+    duration: seconds + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[visit.id]) };
 }
+// Running (after the bluebird or in a game with its friend): such a leg is not yet over.
+export const isRunning = (visit: Visit, now: number) => !!(visit.chase || visit.running || visit.play) && now < visit.start + visit.duration;
 
 // Let go (the ring menu closed): it finishes sitting down if it had only just begun (`settle`
 // seconds), gets up (`rise` seconds) and walks on along the rest of its path.
@@ -516,9 +528,9 @@ export function planPlay({ maltese, puppy, now, dash, chase, runner = 'maltese' 
   // It sets off once the runner is a body length ahead along the trail.
   const delay = Math.max(0.6, (APART - pathLength(chase)) / speed + 0.2);
   if (trail.length < 2 || pathLength(trail) < 40) return null;
-  // The chaser runs at its own pace too: the puppy, much faster, sets off late enough to pull up
-  // behind the Maltese just as it stops; the Maltese, slower, simply runs after the puppy and gets
-  // there after it.
+  // The chaser runs at its own run's pace too (the two now run equally fast): the puppy sets off
+  // late enough to pull up behind the Maltese as it stops, or as soon after as its start allows;
+  // the Maltese simply runs after the puppy and gets there after it.
   const pace = runner === 'maltese' ? RUN_SPEED : MALTESE_RUN_SPEED;
   const startAt = runner === 'maltese' ? Math.max(now + delay, arrives - pathLength(trail) / pace - 0.15) : now + delay;
   const rising = Boolean(after.sits) && startAt < after.start + after.lead;
@@ -593,8 +605,8 @@ export function clearOf(candidates: readonly (Visit | null)[], other: Point): Vi
 // puppy (`apart` units from it, on its side) and the scene plays there, both held for it.
 export type SceneKind = 'tug' | 'hug';
 export const SCENE_SPECS: Readonly<Record<SceneKind, { seconds: number; apart: number; sits: boolean }>> = {
-  tug: { seconds: 71 / 12, apart: 106.6, sits: false },
-  hug: { seconds: 71 / 12, apart: 65.3, sits: true },
+  tug: { seconds: 71 / 12, apart: 102.5, sits: false },
+  hug: { seconds: 71 / 12, apart: 63.9, sits: true },
 };
 export type Scene = { key: number; kind: SceneKind; start: number; end: number; x: number; y: number; dir: 1 | -1 };
 export function planScene({ key, kind, maltese, puppy, now, mAt, pAt, approach }: {

@@ -777,8 +777,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [lawnNote, setLawnNote] = useState<{ key: number; month: number } | null>(null);
   // A tapped pet's ring menu (critters/PetRingMenu.tsx): it sits where it was until it closes.
   const gardenPets = useRef<GardenPetsHandle | null>(null);
-  const [petRing, setPetRing] = useState<PetSpot | null>(null);
-  const closePetRing = useCallback(() => { gardenPets.current?.release('puppy'); setPetRing(null); }, []);
+  const [petRing, setPetRing] = useState<(PetSpot & { id: 'puppy' | 'maltese' }) | null>(null);
+  const petRingRef = useRef(petRing); petRingRef.current = petRing;
+  const closePetRing = useCallback(() => { if (petRingRef.current) gardenPets.current?.release(petRingRef.current.id); setPetRing(null); }, []);
   useEffect(() => { if (petRing && (!worldActive || activeMode !== 'normal' || selectedFlower)) closePetRing(); }, [petRing, worldActive, activeMode, selectedFlower, closePetRing]);
   const lawnNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showLawnNote = useCallback((month: number) => {
@@ -1086,7 +1087,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (pet) {
         gardenPets.current?.hold(pet.id);
         const scale = fit * currentZoom;
-        setPetRing({ x: baseX + currentCamX + pet.x * scale, y: baseY + currentCamY + pet.y * scale, body: pet.size * scale });
+        setPetRing({ id: pet.id === 'maltese' ? 'maltese' : 'puppy', x: baseX + currentCamX + pet.x * scale, y: baseY + currentCamY + pet.y * scale, body: pet.size * scale });
         return;
       }
       const currentPlacements = placementsRef.current;
@@ -1708,8 +1709,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           cameraY.value += viewport.height * 0.25;
         }} />}
       {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
-        <PetRingMenu petId="puppy" pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
-          onAction={kind => gardenPets.current?.act('puppy', kind) ?? 0} />
+        <PetRingMenu key={petRing.id} petId={petRing.id} pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
+          onAction={kind => gardenPets.current?.act(petRing.id, kind) ?? 0} />
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />

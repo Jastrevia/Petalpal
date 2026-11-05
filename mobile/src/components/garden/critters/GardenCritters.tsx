@@ -1,16 +1,17 @@
 import { BlurMask, Group, Image, Oval, Path, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
-import { usePetOutfit } from '@/services/gardenPets';
+import { usePetOutfits } from '@/services/gardenPets';
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/gardenGround';
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
-import { ACTION_FPS, actionSeconds, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type PuppyAction, type PuppyLook } from './puppyLooks';
+import { ACTION_FPS, actionSeconds, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
+export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, stopChase, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -29,6 +30,58 @@ type Frames = { columns: number; count: number; ground: number; loop: number; fp
     // A run in bigger cells than the walk's (a gallop stretches past them): their size, and where
     // their top left lies in the walk's cell, in walk-cell pixels.
     cell?: { w: number; h: number; x: number; y: number } }; trail?: number };
+// The Maltese (Xiaobai), from the owner's Holopix painting of it in its petal outfit (2026-11-05;
+// ~/dev/petalpal-motion/maltese/v2): that painting on green is the dressed look, the same painting
+// with every piece taken off the bare one. Each look: an oil-motion walk (a four-beat walk, one
+// stride), a walk-to-sit (20 frames) and a gallop (two strides, painted from a mid-stride key
+// frame), all cut with the walk's scale (crop 190,30,920,690 into 293 × 220 cells; the gallop is
+// longer, so it is cut wider, 40,0,1240,744 into 395 × 237 cells, and drawn offset onto them, its
+// landing paws on the walk's ground). `loop` is the ground the planted paws cover (measured by
+// video-frames.py) at MALTESE_SIZE.
+// Its own pieces, the painting's flower clip (its hat) and pink bow with two charms (its necklace),
+// are laid onto the bare clips frame by frame (maltese/v2/pieces/overlay_maltese.py, after Kiro's
+// head tracking for the golden) and cut with the bare sheets' frames, so hat, necklace and both
+// walk in step with the bare look; the cape looks likewise share the cape's clips. It dresses like
+// its friend: malteseLookOfOutfit.
+const malteseBare = (walk: number, sit: number, run: number): Frames & { source: number } => ({
+  source: walk, columns: 8, count: 48, ground: 216, loop: 47.9,
+  rest: { source: sit, count: 20, rise: 1 },
+  run: { source: run, columns: 8, count: 60, loop: 66.3, cell: { w: 395.4, h: 237.2, x: -47.83, y: -16.1 } } });
+// The capelet alone: its own oil-motion clips (2026-11-05, from the petal painting with the flower
+// clip and bow taken off and the capelet fastened by a gold clasp; ~/dev/petalpal-motion/maltese/v2/
+// cape), its walk one 40-frame stride and its gallop starting from the petal gallop's key, so they
+// share the petal look's cells; hat and necklace are laid onto them like the bare clips'.
+const malteseCape = (walk: number, sit: number, run: number): Frames & { source: number } => ({
+  source: walk, columns: 8, count: 40, ground: 216, loop: 34.6,
+  rest: { source: sit, count: 20, rise: 1 },
+  run: { source: run, columns: 8, count: 60, loop: 71.2, cell: { w: 395.4, h: 237.2, x: -47.83, y: -15 } } });
+const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
+  bare: malteseBare(require('@/assets/garden/critters/maltese-walk.webp'), require('@/assets/garden/critters/maltese-sit.webp'),
+    require('@/assets/garden/critters/maltese-run.webp')),
+  hat: malteseBare(require('@/assets/garden/critters/maltese-looks/walk-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-hat.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-hat.webp')),
+  necklace: malteseBare(require('@/assets/garden/critters/maltese-looks/walk-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-necklace.webp')),
+  'hat-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-hat-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-hat-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-hat-necklace.webp')),
+  cape: malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape.webp')),
+  'cape-hat': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-hat.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape-hat.webp')),
+  // Its Noble outfit (2026-11-05): its own clips from today's painting dressed by one gpt-image edit,
+  // only the outfit pasted back so the dog is the same (~/dev/petalpal-motion/maltese/noble); walk one
+  // 43-frame stride, gallop from the bare gallop's key dressed the same way.
+  noble: { source: require('@/assets/garden/critters/maltese-looks/walk-noble.webp'), columns: 8, count: 43, ground: 216, loop: 51.1,
+    rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble.webp'), columns: 8, count: 59, loop: 70,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
+  'cape-necklace': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-cape-necklace.webp')),
+  petal: { source: require('@/assets/garden/critters/maltese-petal-walk.webp'), columns: 8, count: 42, ground: 216, loop: 34.6,
+    rest: { source: require('@/assets/garden/critters/maltese-petal-sit.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-petal-run.webp'), columns: 8, count: 59, loop: 64.4,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -22.2 } } },
+};
 const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: number }> = {
   butterfly: { source: require('@/assets/garden/critters/butterfly.webp'), w: 448, h: 367 },
   // The bluebird flies in painted frames: a few wingbeats of a generated flying clip.
@@ -43,17 +96,8 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   // The puppy walks, gallops after the bluebird and sits down where it caught up in its outfit's
   // paintings (puppyLooks.ts; bare when it has nothing on), all sharing one crop, ground and scale.
   puppy: { source: PUPPY_LOOKS.bare.source, w: 418, h: 300, frames: PUPPY_LOOKS.bare },
-  // The Maltese, the puppy's tiny friend: an oil-motion walk (a four-beat walk, one stride cycle of
-  // 43 frames, 45 units of ground) and a walk-to-sit (20 frames), cut with one crop (190,30,920,690)
-  // so they lie on the same cells. Only frames where its legs are moving are kept: a still stretch
-  // in a loop made it slide.
-  maltese: { source: require('@/assets/garden/critters/maltese-walk.webp'), w: 293, h: 220,
-    frames: { columns: 8, count: 43, ground: 216, loop: 45, rest: { source: require('@/assets/garden/critters/maltese-sit.webp'), count: 20, rise: 1 },
-      // Its run: a gallop (painted from a mid-stride key frame; 59 frames, 77 units), chasing the
-      // puppy or dashing off in a game. Stretched out it is longer than the walk's cells, so it is cut
-      // wider (crop 100,10,1120,710 into 374 × 237 cells) and drawn offset onto them.
-      run: { source: require('@/assets/garden/critters/maltese-run.webp'), columns: 8, count: 59, loop: 77,
-        cell: { w: 374 * 0.9986, h: 237 * 0.9986, x: -30, y: -6.67 } } } },
+  // The Maltese, the puppy's tiny friend (bare, or in its own look: MALTESE_LOOKS).
+  maltese: { source: MALTESE_LOOKS.bare.source, w: 293, h: 220, frames: MALTESE_LOOKS.bare },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
   // from that same running pose), and gets up again (back to its standing frame, 24).
@@ -65,6 +109,8 @@ const REST_FPS = 12;
 // From the end of a run to sitting still: the longest settling-down sheet (16 frames at REST_FPS)
 // plus the check that starts the next leg.
 const SIT_DOWN_MS = 1600;
+// How long the pair sit after a run is given up for an outfit, before they walk on.
+const SIT_SECONDS = 3.5;
 const EDGES = walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const POINTS = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
 // Where the puppy waits for a bird landing on `perch`: the path point nearest below it.
@@ -97,14 +143,24 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const awaySince = useRef<number | null>(null);
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
-  // What the puppy has on (its wardrobe, lib/garden-pets.js); `dressed` overrides it in development.
-  const outfit = usePetOutfit('puppy', active);
+  // What the puppy and the Maltese have on (their wardrobes, lib/garden-pets.js); `dressed`
+  // overrides the puppy's in development.
+  const outfits = usePetOutfits(active);
+  const outfit = outfits?.puppy ?? null;
   const [dressed, setDressed] = useState<PuppyLook | undefined>(undefined);
   const look = dressed !== undefined ? dressed : puppyLookOf(outfit);
-  // The look it shows. Walking or sitting, a new outfit goes on at once; running after the
-  // bluebird, it stops, sits down (about SIT_DOWN_MS) and changes sitting.
+  // The Maltese wears its own outfit; on a server from before it had one (no `maltese` entry), and
+  // in the development override, the same kinds of piece as its friend.
+  const malteseLook = dressed !== undefined ? malteseLookOf(dressed)
+    : malteseLookOfOutfit(outfits && 'maltese' in outfits ? outfits.maltese ?? null : outfit);
+  // The looks they show, changed together. Walking or sitting, a new outfit goes on at once.
+  // Running (after the bluebird, or a game of chase) they both stop and sit down where they are
+  // (about SIT_DOWN_MS), then change sitting; a hug or a tug-of-war plays out first, then they sit
+  // and change. Meanwhile no game sets them running.
   const [shownLook, setShownLook] = useState(look);
   const shownLookRef = useRef(shownLook); shownLookRef.current = shownLook;
+  const [shownMaltese, setShownMaltese] = useState(malteseLook);
+  const shownMalteseRef = useRef(shownMaltese); shownMalteseRef.current = shownMaltese;
   // Who leads the pair's walks (critterVisits.ts pickLeader), and hearts rising after a game.
   const pair = useRef<{ leader: PairLeader; until: number }>({ leader: 'maltese', until: 0 });
   const [hearts, setHearts] = useState<{ key: number; x: number; y: number; start: number }[]>([]);
@@ -117,18 +173,26 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
   const scenes = useRef(sceneList); scenes.current = sceneList;
   const reducedRef = useRef(false); reducedRef.current = !!useReducedMotion();
   useEffect(() => {
-    const now = clock.value;
-    const running = () => visitsRef.current.some(v => v.id === 'puppy' && v.chase && !v.leaving && clock.value < v.start + v.duration);
-    if (!running()) { setShownLook(look); return; }
-    // Never mid-run: it stops, sits down, and only then changes; meanwhile no game sets it running.
+    const pairNow = (v: Visit) => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving;
+    const running = () => visitsRef.current.some(v => pairNow(v) && isRunning(v, clock.value));
+    const playingScene = () => scenes.current.some(scene => clock.value < scene.end);
+    const wear = () => { lookPending.current = false; setShownLook(look); setShownMaltese(malteseLook); };
+    if (!running() && !playingScene()) { wear(); return; }
     lookPending.current = true;
-    setVisits(current => current.map(v => (v.id === 'puppy' ? stopChase(v, now) : v)));
-    let timer = setTimeout(function wear() {
-      if (running()) { timer = setTimeout(wear, 300); return; }
-      lookPending.current = false; setShownLook(look);
-    }, SIT_DOWN_MS);
+    let timer: ReturnType<typeof setTimeout>;
+    const settle = () => {
+      if (playingScene()) { timer = setTimeout(settle, 300); return; }
+      const now = clock.value;
+      visitsRef.current = visitsRef.current.map(v => (pairNow(v) && !v.held ? sitDown(v, now, SIT_SECONDS) : v));
+      setVisits(visitsRef.current);
+      timer = setTimeout(function wearSitting() {
+        if (running()) { timer = setTimeout(wearSitting, 300); return; }
+        wear();
+      }, SIT_DOWN_MS);
+    };
+    settle();
     return () => { clearTimeout(timer); lookPending.current = false; };
-  }, [look, clock]);
+  }, [look, malteseLook, clock]);
   const unplanted = useMemo(() => {
     const planted = new Set(placements.filter(p => !awaitsPlanting(p)).map(p => p.month));
     return Array.from({ length: 12 }, (_, i) => i + 1).filter(month => !planted.has(month));
@@ -280,8 +344,10 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     const unwatch = onBirdFlight(flight => { if (Math.random() < CHASE_CHANCE) chase.current(flight.to); });
     return () => { clearTimeout(timer); clearInterval(legs); unwatch(); };
   }, [active, clock]);
-  // Only the puppy answers a tap so far (the other pets have no wardrobe yet). Its body is drawn
-  // about 0.9 of its size wide and 0.7 tall, standing on its paws.
+  // The puppy and the Maltese answer a tap (the other pets have no wardrobe yet). A body is drawn
+  // about 0.9 of its size wide and 0.7 tall, standing on its paws. The pair go together: a tap on
+  // either sits both down where they are until its menu closes; a hug or a tug-of-war plays out
+  // first (no tap during it).
   useEffect(() => {
     if (!pets) return;
     const update = (id: CritterId, change: (visit: Visit, now: number) => Visit) => {
@@ -293,25 +359,36 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       petAt: (point, slop) => {
         const now = clock.value;
         for (const visit of visitsRef.current) {
-          if (visit.id !== 'puppy' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead || visit.inScene && now < visit.inScene.end) continue;
+          if (visit.id !== 'puppy' && visit.id !== 'maltese' || visit.leaving || visit.fadeIn && now < visit.start + visit.lead || visit.inScene && now < visit.inScene.end) continue;
           const pose = visitPose(visit, now), size = CRITTERS[visit.id].size;
           if (Math.abs(point.x - pose.x) <= size * 0.45 + slop && point.y >= pose.y - size * 0.7 - slop && point.y <= pose.y + size * 0.08 + slop)
             return { id: visit.id, x: pose.x, y: pose.y, size };
         }
         return null;
       },
-      hold: id => update(id, holdVisit),
+      hold: () => {
+        const sittable = (v: Visit, now: number) => !(v.leaving || v.fadeIn && now < v.start + v.lead || v.inScene && now < v.inScene.end);
+        update('puppy', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
+        update('maltese', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
+      },
       act: (id, kind) => {
-        const frames = PUPPY_ACTIONS[shownLookRef.current]?.[kind];
+        // (The Maltese has no painted eating or patting yet: its menu shows hearts.)
+        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind] : undefined;
         const visit = visitsRef.current.find(v => v.id === id && v.held);
         if (!frames || !visit || reducedRef.current) return 0;
         update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
         return actionSeconds(frames);
       },
-      release: id => update(id, (visit, now) => {
-        const rest = PUPPY_LOOKS[shownLookRef.current].rest;
-        return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
-      }),
+      release: () => {
+        update('puppy', (visit, now) => {
+          const rest = PUPPY_LOOKS[shownLookRef.current].rest;
+          return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
+        });
+        update('maltese', (visit, now) => {
+          const rest = MALTESE_LOOKS[shownMalteseRef.current].rest!;
+          return releaseVisit(visit, now, rest.count / REST_FPS, (rest.count - rest.rise) / REST_FPS);
+        });
+      },
     };
     return () => { pets.current = null; };
   }, [pets, clock]);
@@ -352,21 +429,68 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     };
   }, [clock]);
   return <>
-    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} />)}
+    {visits.map(visit => <Critter key={visit.key} visit={visit} clock={clock} look={shownLook} malteseLook={shownMaltese} />)}
     {sceneList.map(scene => <PairSceneClip key={scene.key} scene={scene} clock={clock} />)}
     {hearts.map(heart => <PlayHearts key={heart.key} x={heart.x} y={heart.y} start={heart.start} clock={clock} />)}
   </>;
 });
 
-export function Critter({ visit, clock, zoom = 1, look = 'bare' }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook }) {
+export function Critter({ visit, clock, zoom = 1, look = 'bare', malteseLook }: { visit: Visit; clock: SharedValue<number>; zoom?: number; look?: PuppyLook; malteseLook?: MalteseLook }) {
   const art = ART[visit.id];
-  const image = useImage(visit.id === 'puppy' ? null : art.source);
+  const image = useImage(visit.id === 'puppy' || visit.id === 'maltese' ? null : art.source);
   if (visit.id === 'puppy') return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}><Puppy visit={visit} clock={clock} look={look} /></Group>;
+  // The Maltese dresses like its friend (malteseLookOf).
+  if (visit.id === 'maltese') return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
+    <Maltese visit={visit} clock={clock} look={malteseLook ?? malteseLookOf(look)} /></Group>;
   if (!image) return null;
   return <Group transform={zoom === 1 ? undefined : [{ scale: zoom }]}>
     {art.frames && CRITTERS[visit.id].kind === 'walker' ? <FrameWalker visit={visit} clock={clock} sheet={image} frames={art.frames} w={art.w} h={art.h} />
       : <Flyer visit={visit} clock={clock} image={image} />}
   </Group>;
+}
+
+// The Maltese in its look, changed like the puppy's: the old look stays whole until the new one's
+// sheets are in, then fades off it (only those two looks' sheets are loaded); never mid-run: a new
+// look waits until its run has ended. Hat and necklace looks share the bare clip's frames, so they
+// are in step; the petal look is its own clip and simply crossfades.
+type MalteseShown = { look: MalteseLook; from?: MalteseLook; ready: boolean; at: number };
+function Maltese({ visit, clock, look }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook }) {
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState<MalteseShown>({ look, ready: false, at: 0 });
+  const visitRef = useRef(visit); visitRef.current = visit;
+  useEffect(() => {
+    if (look === shown.look) return;
+    const running = () => { const v = visitRef.current; return !!(v.chase || v.running) && clock.value < v.start + v.duration; };
+    let timer = setTimeout(function wear() {
+      if (running()) { timer = setTimeout(wear, 300); return; }
+      setShown(current => {
+        if (current.look === look) return current;
+        // Back to the look still showing before the new one was in: it simply stays.
+        if (look === current.from && !current.ready) return { look, ready: true, at: 0 };
+        return { look, from: current.ready ? current.look : current.from, ready: false, at: Infinity };
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [look, shown.look, clock]);
+  const ready = useCallback(() => setShown(current => (current.ready ? current : { ...current, ready: true, at: clock.value })), [clock]);
+  useEffect(() => {
+    if (shown.from === undefined || !shown.ready) return;
+    const timer = setTimeout(() => setShown(current => ({ ...current, from: undefined })), (reduced ? 0 : SWITCH_SECONDS * 1000) + 100);
+    return () => clearTimeout(timer);
+  }, [shown, reduced]);
+  const fading = shown.from !== undefined;
+  const span = reduced ? 1e-3 : SWITCH_SECONDS;
+  const fadeOut = useDerivedValue(() => (fading ? Math.min(1, Math.max(0, 1 - (clock.value - shown.at) / span)) : 0), [fading, shown.at, span]);
+  return <>
+    <MalteseLookWalker key={shown.look} visit={visit} clock={clock} look={shown.look} onReady={ready} />
+    {fading ? <MalteseLookWalker key={shown.from} visit={visit} clock={clock} look={shown.from!} fade={fadeOut} /> : null}
+  </>;
+}
+
+function MalteseLookWalker({ visit, clock, look, fade, onReady }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook; fade?: DerivedValue<number>; onReady?: () => void }) {
+  const sheet = useImage(MALTESE_LOOKS[look].source);
+  if (!sheet) return null;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} onReady={onReady} />;
 }
 
 // The puppy in its outfit. A new outfit simply goes on: the old look fades off the new one in a

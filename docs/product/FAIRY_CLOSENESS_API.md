@@ -205,7 +205,8 @@
 - `GET /api/fairy/pets`：`accessories`（32 件，`row` 是 `hat` / `collar` / `pendant`，`unlocked` 决定要不要小锁）、`outfits`（每只宠物穿什么）、`foods`（库存）。
 - `PUT /api/fairy/pets/:petId/outfit`，请求体 `{ hat, collar, pendant }`，传 `null` 是脱下。没解锁返回 409 `ACCESSORY_LOCKED`，不是这一行的件返回 400。
 - `POST /api/fairy/pets/:petId/feed`，请求体 `{ foodId }`，返回 `{ foodId, count }`。没有库存返回 409 `NO_FOOD`。
-- `petId`：`puppy` `hedgehog` `butterfly` `rabbit` `bluebird`。喂食和摸头不加亲密度。
+- `petId`：`puppy` `hedgehog` `butterfly` `rabbit` `bluebird` `maltese`。喂食和摸头不加亲密度。
+- 小白（`maltese`）只能穿自己的三件：头饰 `flower-sprig`（花夹）、披风 `petal-capelet`（披肩）、挂饰 `crystal-drop`（蝴蝶结），别的件返回 400 `UNKNOWN_ACCESSORY`。解锁规则和其他件一样。
 
 **花园里怎么显示（App，[puppyLooks.ts](../../mobile/src/components/garden/critters/puppyLooks.ts)）**
 

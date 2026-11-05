@@ -59,6 +59,71 @@ Not done yet (next work, in the owner's order):
    and the belly gap filled in every frame from Kiro's repaint (`belly_paste.py`). The puppy never
    changes outfit while running: it stops, sits, then changes, and no game or chase starts
    meanwhile. Dressed, it only plays chase with the Maltese (the tug and hug clips paint it bare).
+   *New Maltese painting and its outfit (2026-11-05, branch `feat/maltese-holopix`):* the owner
+   dressed the Maltese on Holopix (Outfit Transfer template, `creativeTemplateId=139`) after its
+   design sheet (flower clip, lilac capelet, bow and charms) and chose that painting for the dog
+   itself, so it replaces M0: on green it is the petal look (`dressed.png`, the capelet refitted
+   over the back by one gpt-image edit), and the same painting with every piece taken off is the bare
+   look (`bare.png`), both in `~/dev/petalpal-motion/maltese/v2/`. Each look has its own walk, walk-to-
+   sit and gallop (`MALTESE_LOOKS` in GardenCritters.tsx; `maltese-*.webp`, `maltese-petal-*.webp`);
+   tug and hug were regenerated with the new bare Maltese. Its head is bigger than M0's, so it is
+   drawn at 0.8 of the old size (`MALTESE_SIZE` 49.6, about 0.44 of the puppy), and the pair first
+   frames use that scale (the tug frame is itself at 0.79 of the puppy's video scale: k 0.342).
+   The bare sit clip's backdrop turned pink half way: it is keyed per frame (`sit-masks/`). The
+   videos paint a dark shadow between its legs and belly (dark on the lawn): in all six sheets, dark
+   patches of 25 px or more in the bottom 22% of each cell fade to transparent (`maltese/v2/belly_clear.py`;
+   originals in `maltese/v2/sheets-before-belly/`); the bottom band keeps the red bow out.
+   It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
+   ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
+   RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second.
+   *Its own menu and wardrobe (2026-11-05, owner's choices):* a tap on Xiaobai opens the same ring
+   menu in the Garden's forest green (`TONES` in `PetRingMenu.tsx`; the Skia ring takes its tone as
+   a prop, context does not reach a Skia canvas). Its closet holds only its own three pieces, each
+   kept under a catalog id and opening with it: flower clip `flower-sprig`, lilac capelet
+   `petal-capelet`, pink bow `crystal-drop` (`PET_OWN_PIECES` in `petRing.ts` and, enforced, in
+   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat show hearts
+   (no painted clips yet). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
+   string); until that is deployed the menu says it is almost ready and Xiaobai keeps following the
+   puppy's outfit. It wears its own outfit (`malteseLookOfOutfit`): hat, necklace, cape, any of them
+   together (all three: its petal look), a necklace with its cape too. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
+   walking or sitting. Running (the bluebird chase, a game of chase, the Maltese catching up) is cut
+   short: both sit down where they are (`sitDown`), then change. A hug or a tug-of-war is never
+   interrupted: a tap does nothing during it, and an outfit waits until it has played out, then
+   both sit and change. Tapping either dog (its ring menu) sits both down where they are,
+   and both get up when the menu closes. A change loads only the new look's
+   sheets. Eight looks: bare, hat, necklace, hat-necklace, cape, cape-hat, cape-necklace, petal.
+   *Its own pieces (2026-11-05):* the owner chose Xiaobai's own flower clip (its hat) and pink bow
+   with two charms on the ribbon from under its ear (its necklace), cut from the Holopix painting
+   where it differs from the bare one (`maltese/v2/pieces/cut_pieces.py`). They are laid onto the
+   bare walk, sit and run clips frame by frame (`pieces/overlay_maltese.py`, after Kiro's head
+   tracking: the flower rides the head, the bow the throat, the ribbon skinned between them and
+   tucked under the ear, the charms swing; in the gallop the throat is searched only near where
+   the head puts it, as its fur looks like the legs), then packed with the bare sheets' loops and
+   crops and the belly shadow cleared (`pieces/pack_looks.sh` → `maltese-looks/*.webp`), so hat,
+   necklace and bare walk in step.
+   *Its cape (2026-11-05):* the capelet alone has its own clips (owner approved: 2 gpt-image-2.5-flare
+   edits, 3 minimax h3 highspeed videos). First frames: the petal painting and its gallop key with
+   only the head top and throat taken from an edit that took off the flower clip and the bow and
+   fastened the capelet with a small gold clasp set with a pink crystal (owner's choice;
+   `maltese/v2/cape/compose_keys.py`). The walk's backdrop turned black after its first frame, so
+   every frame is keyed by its own border (`cape/key_frames.py`, keeping eyes and nose, and fading
+   the dark crease under the curled tail). Flower and bow are laid on as on the bare clips (the bow
+   over the clasp, without its ribbon: the capelet has its own collar) and packed with one loop per
+   move (`cape/pack_cape.sh`: walk 49+40, sit 0+80 → 20, run 61+60); strides scaled from the petal
+   look's (walk 34.6, run 71.2).
+   *Its Noble outfit (2026-11-05, commit `f01364e0`):* the owner's second reference for Xiaobai (the
+   Noble sheet: lilac flower headpiece with gold bead strands, deep violet capelet with gold
+   embroidery, violet crystal clasp). Holopix redrew the dog and left fur over the cape, so the owner
+   chose oil-motion: one gpt-image edit of `v2/bare.png` with the Noble reference, only the outfit
+   pasted back (`maltese/noble/noble.png`); the gallop key `v2/run-key-fit.png` dressed the same way;
+   then three minimax h3 highspeed videos (walk, walk-to-sit, run), no retries. The sit video's
+   backdrop went near-black halfway: keyed per frame keeping the eyes and the cape's dark purple;
+   the belly-shadow clear was changed to leave purple fabric alone (it had cut the hem). Loops: walk
+   43 frames, run 59. Look `noble` in `MALTESE_LOOKS` (GardenCritters.tsx), drawn whole (no Noble
+   hat-only or cape-only clips). **Not in its closet yet:** only the preview shows it
+   (`/critters-test` → maltese → noble). Choosing it needs the owner's call on how the closet
+   offers it and which catalog ids it uses (`PET_OWN_PIECES.maltese` in `lib/garden-pets.js`
+   allows only the three light pieces), and that is a backend change to deploy.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.
