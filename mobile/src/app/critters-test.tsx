@@ -19,6 +19,9 @@ const zoomFor = (id: CritterId) => (id === 'puppy' ? 1.5 : id === 'rabbit' ? 1.2
 // The visitors plus the Silktail Fox spirit (not a random visitor; shown resting first, then walking).
 const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
+// The puppy beside the Maltese wears the look the Maltese matches (malteseLookOf).
+const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace', petal: 'cape2' };
+
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
   const [slow, setSlow] = useState(false);
@@ -103,7 +106,7 @@ export default function CrittersTestScreen() {
       <Rect x={0} y={HEIGHT * 0.62} width={WIDTH} height={HEIGHT * 0.3} color="#B9AA8C" />
       {scene ? <Group transform={[{ scale: 1.5 }]}><PairSceneClip key={scene.key} scene={scene} clock={seconds} /></Group>
         : mate ? <>
-          <Critter key={`mate-${move}`} visit={mate} clock={seconds} zoom={zoomFor('puppy')} look={malteseLook === 'petal' ? 'cape2' : 'bare'} />
+          <Critter key={`mate-${move}`} visit={mate} clock={seconds} zoom={zoomFor('puppy')} look={MATE_LOOK[malteseLook]} />
           <Critter key={`${id}-${move}-t`} visit={visit} clock={seconds} zoom={zoomFor('puppy')} malteseLook={malteseLook} /></>
         : <Critter key={`${id}-${move}`} visit={visit} clock={seconds} zoom={zoomFor(id)} look={look} malteseLook={malteseLook} />}
     </Canvas>}
@@ -115,8 +118,8 @@ export default function CrittersTestScreen() {
       style={[styles.button, pair === item && styles.selected]}><Text style={styles.label}>{item === 'hug' ? 'pair: hug 抱抱' : 'pair: tug 抢玩具'}</Text></Pressable>)}</View>
     {!otter && !pair && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
       style={[styles.button, look === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
-    {!otter && !pair && id === 'maltese' ? <View style={styles.row}>{(['bare', 'petal'] as const).map(item => <Pressable key={item} onPress={() => setMalteseLook(item)}
-      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{item === 'petal' ? 'petal 花仙装' : 'bare'}</Text></Pressable>)}
+    {!otter && !pair && id === 'maltese' ? <View style={styles.row}>{(Object.keys(MATE_LOOK) as MalteseLook[]).map(item => <Pressable key={item} onPress={() => setMalteseLook(item)}
+      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{item === 'petal' ? 'petal 花仙装' : item}</Text></Pressable>)}
       <Pressable onPress={() => { setTogether(value => !value); setRound(value => value + 1); }} style={[styles.button, together && styles.selected]}><Text style={styles.label}>with puppy 和小金毛一起</Text></Pressable></View> : null}
     {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
       onPress={() => { setMove(item); setRound(value => value + 1); }}

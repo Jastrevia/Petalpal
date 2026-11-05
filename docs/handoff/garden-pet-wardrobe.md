@@ -76,8 +76,19 @@ Not done yet (next work, in the owner's order):
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
    ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
    RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second. It has
-   no wardrobe of its own (the server's PetId has no `maltese`): it wears its petal look while the
-   puppy has any outfit on, and like the puppy never changes look mid-run.
+   no wardrobe of its own (the server's PetId has no `maltese`): it dresses like the puppy
+   (`malteseLookOf` in `puppyLooks.ts`): a hat, a necklace or both when the puppy wears them (of
+   either set), its whole petal look when the puppy wears a cape; like the puppy it never changes
+   look mid-run, and a change loads only the new look's sheets.
+   *Its own pieces (2026-11-05):* the owner chose Xiaobai's own flower clip (its hat) and pink bow
+   with two charms on the ribbon from under its ear (its necklace), cut from the Holopix painting
+   where it differs from the bare one (`maltese/v2/pieces/cut_pieces.py`). They are laid onto the
+   bare walk, sit and run clips frame by frame (`pieces/overlay_maltese.py`, after Kiro's head
+   tracking: the flower rides the head, the bow the throat, the ribbon skinned between them and
+   tucked under the ear, the charms swing; in the gallop the throat is searched only near where
+   the head puts it, as its fur looks like the legs), then packed with the bare sheets' loops and
+   crops and the belly shadow cleared (`pieces/pack_looks.sh` → `maltese-looks/*.webp`), so hat,
+   necklace and bare walk in step.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

@@ -450,16 +450,25 @@ test('the puppy eats and is patted in every look: each has both painted sheets, 
   }
 });
 
-test('the Maltese walks, sits and runs in both its looks, about half the puppy\'s size', async () => {
+test('the Maltese walks, sits and runs in every look, about half the puppy\'s size', async () => {
   const fs = await import('node:fs');
   const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
   const block = source.slice(source.indexOf('const MALTESE_LOOKS'), source.indexOf('const ART:'));
-  for (const look of ['bare', 'petal']) {
-    const part = block.slice(block.indexOf(`  ${look}: {`));
-    const sheets = [...part.matchAll(/require\('@\/(assets\/garden\/critters\/[^']+)'\)/g)].slice(0, 3).map(m => m[1]);
+  for (const look of ['bare', 'hat', 'necklace', 'hat-necklace', 'petal']) {
+    const at = block.search(new RegExp(`\\n  '?${look}'?: `));
+    assert.ok(at >= 0, `${look} is drawn`);
+    const sheets = [...block.slice(at).matchAll(/require\('@\/(assets\/garden\/critters\/[^']+)'\)/g)].slice(0, 3).map(m => m[1]);
     assert.equal(sheets.length, 3, `${look}: walk, sit and run`);
     for (const sheet of sheets) assert.ok(fs.existsSync(new URL(`../${sheet}`, import.meta.url)), sheet);
   }
   const ratio = visits.CRITTERS.maltese.size / visits.CRITTERS.puppy.size;
   assert.ok(ratio > 0.4 && ratio < 0.5, `${ratio}`);
+});
+
+test('the Maltese wears what its friend wears: a hat, a necklace or both, and its petal outfit with a cape', () => {
+  const { malteseLookOf, PUPPY_LOOKS } = load('../critters/puppyLooks');
+  const expected = { bare: 'bare', hat: 'hat', hat2: 'hat', necklace: 'necklace', necklace2: 'necklace', 'hat-necklace': 'hat-necklace',
+    'hat-necklace2': 'hat-necklace', cape: 'petal', 'cape-hat': 'petal', cape2: 'petal', 'cape2-hat': 'petal' };
+  assert.deepEqual(Object.keys(expected).sort(), Object.keys(PUPPY_LOOKS).sort());
+  for (const [look, maltese] of Object.entries(expected)) assert.equal(malteseLookOf(look), maltese, look);
 });

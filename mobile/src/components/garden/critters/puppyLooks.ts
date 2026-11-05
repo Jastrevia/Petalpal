@@ -111,3 +111,15 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
   if (pendant) return `${hat ? 'hat-' : ''}necklace${n}` as PuppyLook;
   return hat ? `hat${n}` as PuppyLook : 'bare';
 }
+
+// The Maltese's looks (its sheets: MALTESE_LOOKS in GardenCritters.tsx). It has no wardrobe of its
+// own yet: it wears the pieces its friend the puppy wears (a hat, a necklace or both, of either
+// set), and its whole petal outfit while the puppy wears a cape.
+export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'petal';
+export function malteseLookOf(look: PuppyLook): MalteseLook {
+  if (look.startsWith('cape')) return 'petal';
+  if (look.startsWith('hat-necklace')) return 'hat-necklace';
+  if (look.startsWith('necklace')) return 'necklace';
+  if (look.startsWith('hat')) return 'hat';
+  return 'bare';
+}
