@@ -111,6 +111,19 @@ Not done yet (next work, in the owner's order):
    over the clasp, without its ribbon: the capelet has its own collar) and packed with one loop per
    move (`cape/pack_cape.sh`: walk 49+40, sit 0+80 → 20, run 61+60); strides scaled from the petal
    look's (walk 34.6, run 71.2).
+   *Its Noble outfit (2026-11-05, commit `f01364e0`):* the owner's second reference for Xiaobai (the
+   Noble sheet: lilac flower headpiece with gold bead strands, deep violet capelet with gold
+   embroidery, violet crystal clasp). Holopix redrew the dog and left fur over the cape, so the owner
+   chose oil-motion: one gpt-image edit of `v2/bare.png` with the Noble reference, only the outfit
+   pasted back (`maltese/noble/noble.png`); the gallop key `v2/run-key-fit.png` dressed the same way;
+   then three minimax h3 highspeed videos (walk, walk-to-sit, run), no retries. The sit video's
+   backdrop went near-black halfway: keyed per frame keeping the eyes and the cape's dark purple;
+   the belly-shadow clear was changed to leave purple fabric alone (it had cut the hem). Loops: walk
+   43 frames, run 59. Look `noble` in `MALTESE_LOOKS` (GardenCritters.tsx), drawn whole (no Noble
+   hat-only or cape-only clips). **Not in its closet yet:** only the preview shows it
+   (`/critters-test` → maltese → noble). Choosing it needs the owner's call on how the closet
+   offers it and which catalog ids it uses (`PET_OWN_PIECES.maltese` in `lib/garden-pets.js`
+   allows only the three light pieces), and that is a backend change to deploy.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.
