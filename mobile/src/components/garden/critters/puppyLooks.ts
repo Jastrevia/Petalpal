@@ -64,20 +64,35 @@ export const PUPPY_LOOKS: Record<PuppyLook, LookFrames> = {
     ...cape2Moves(require('@/assets/garden/critters/puppy-looks/run-cape2-hat.webp'), require('@/assets/garden/critters/puppy-looks/sit-cape2-hat.webp')) },
 };
 
-// Eating and being patted (the ring menu's Feed and Pat), painted so far for set 2's petal cape
-// alone: oil-motion clips (minimax h3) that start and end on that look's sitting frame (sit sheet's
-// last cell), cut from the same video canvas at the same scale (300 / 660), so the clip lies exactly
-// over the sitting puppy. Eating brings its own bowl (it fades in and out with the clip); the pat
+// Eating and being patted (the ring menu's Feed and Pat), for every look: oil-motion clips
+// (minimax h3) of the bare puppy, the velvet cape and the petal cape that start and end on that
+// look's sitting frame (sit sheet's last cell), cut from the same video canvas at the same scale
+// (300 / 660), so the clip lies exactly over the sitting puppy. Hats and necklaces are laid onto
+// those clips frame by frame like the walks (~/dev/petalpal-motion/dressed/actions/build_looks.sh:
+// the head followed frame to frame as it dips into the bowl; on the pat clips the hand stays over
+// the pieces). Eating brings its own bowl (it fades in and out with the clip); the pat
 // clip's cell is wider and taller, for the hand coming in from the top right (its edges fade).
 // `anchorX`, `ground`: where the puppy's centre and paws are in a cell (the sit sheets: 209, 277).
 export type PuppyAction = 'eat' | 'pat';
 export type ActionFrames = { source: number; columns: number; count: number; w: number; h: number; anchorX: number; ground: number };
 export const ACTION_FPS = 12;
-export const PUPPY_ACTIONS: Partial<Record<PuppyLook, Record<PuppyAction, ActionFrames>>> = {
-  cape2: {
-    eat: { source: require('@/assets/garden/critters/puppy-looks/eat-cape2.webp'), columns: 9, count: 71, w: 418, h: 300, anchorX: 209, ground: 277 },
-    pat: { source: require('@/assets/garden/critters/puppy-looks/pat-cape2.webp'), columns: 7, count: 71, w: 520, h: 314, anchorX: 209, ground: 291 },
-  },
+// (Same cells for every look.)
+const actions = (eat: number, pat: number): Record<PuppyAction, ActionFrames> => ({
+  eat: { source: eat, columns: 9, count: 71, w: 418, h: 300, anchorX: 209, ground: 277 },
+  pat: { source: pat, columns: 7, count: 71, w: 520, h: 314, anchorX: 209, ground: 291 },
+});
+export const PUPPY_ACTIONS: Record<PuppyLook, Record<PuppyAction, ActionFrames>> = {
+  bare: actions(require('@/assets/garden/critters/puppy-looks/eat-bare.webp'), require('@/assets/garden/critters/puppy-looks/pat-bare.webp')),
+  hat: actions(require('@/assets/garden/critters/puppy-looks/eat-hat.webp'), require('@/assets/garden/critters/puppy-looks/pat-hat.webp')),
+  necklace: actions(require('@/assets/garden/critters/puppy-looks/eat-necklace.webp'), require('@/assets/garden/critters/puppy-looks/pat-necklace.webp')),
+  'hat-necklace': actions(require('@/assets/garden/critters/puppy-looks/eat-hat-necklace.webp'), require('@/assets/garden/critters/puppy-looks/pat-hat-necklace.webp')),
+  cape: actions(require('@/assets/garden/critters/puppy-looks/eat-cape.webp'), require('@/assets/garden/critters/puppy-looks/pat-cape.webp')),
+  'cape-hat': actions(require('@/assets/garden/critters/puppy-looks/eat-cape-hat.webp'), require('@/assets/garden/critters/puppy-looks/pat-cape-hat.webp')),
+  hat2: actions(require('@/assets/garden/critters/puppy-looks/eat-hat2.webp'), require('@/assets/garden/critters/puppy-looks/pat-hat2.webp')),
+  necklace2: actions(require('@/assets/garden/critters/puppy-looks/eat-necklace2.webp'), require('@/assets/garden/critters/puppy-looks/pat-necklace2.webp')),
+  'hat-necklace2': actions(require('@/assets/garden/critters/puppy-looks/eat-hat-necklace2.webp'), require('@/assets/garden/critters/puppy-looks/pat-hat-necklace2.webp')),
+  cape2: actions(require('@/assets/garden/critters/puppy-looks/eat-cape2.webp'), require('@/assets/garden/critters/puppy-looks/pat-cape2.webp')),
+  'cape2-hat': actions(require('@/assets/garden/critters/puppy-looks/eat-cape2-hat.webp'), require('@/assets/garden/critters/puppy-looks/pat-cape2-hat.webp')),
 };
 export const actionSeconds = (frames: ActionFrames) => frames.count / ACTION_FPS;
 

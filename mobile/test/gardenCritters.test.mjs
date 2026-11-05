@@ -434,3 +434,18 @@ test('pair scenes: the Maltese walks up beside the puppy, both stay for the clip
   assert.equal(g.puppy.chase, true);
   assert.equal(g.maltese.running, true);
 });
+
+test('the puppy eats and is patted in every look: each has both painted sheets, on the sit cells', async () => {
+  const fs = await import('node:fs');
+  const looks = load('../critters/puppyLooks');
+  for (const look of Object.keys(looks.PUPPY_LOOKS)) {
+    const actions = looks.PUPPY_ACTIONS[look];
+    assert.ok(actions, `${look} has eat and pat`);
+    for (const kind of ['eat', 'pat']) {
+      const frames = actions[kind];
+      assert.ok(fs.existsSync(new URL(`../${frames.source.replace('@/', '')}`, import.meta.url)), `${look} ${kind}: ${frames.source}`);
+      assert.equal(frames.anchorX, 209, 'the clip lies over the sitting puppy');
+      assert.ok(looks.actionSeconds(frames) > 5 && looks.actionSeconds(frames) < 7);
+    }
+  }
+});

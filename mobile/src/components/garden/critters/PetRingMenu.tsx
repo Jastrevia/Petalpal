@@ -16,7 +16,8 @@ import {
 // whole closet: every piece, a small lock on those not opened yet, a gold check on those worn).
 // Choosing a piece saves the whole outfit and goes back to the ring. A tap anywhere outside it
 // closes it. While it is open the pet sits where it is (GardenCritters `hold`).
-// There is no painted patting or eating clip yet: the pet sits and small hearts float up.
+// The puppy plays its painted eating or patting clip in whatever it wears (puppyLooks.ts
+// PUPPY_ACTIONS), then small hearts float up; with reduced motion only the hearts show.
 
 const COPY = {
   en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', closeShort: 'Close', loading: 'Opening…',
@@ -334,7 +335,7 @@ function ArcCard({ card, index, scrollY, busy, geometry }: { card: CardSpec; ind
   </Reanimated.View>;
 }
 
-// Small pink hearts floating up from the pet's head (no painted patting or eating clip yet).
+// Small pink hearts floating up from the pet's head (after its eating or patting clip).
 function Hearts({ x, y }: { x: number; y: number }) {
   const reduced = useReducedMotion();
   const rise = useRef(new Animated.Value(0)).current;

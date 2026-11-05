@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { Critter, PairSceneClip } from '@/components/garden/critters/GardenCritters';
-import { PUPPY_ACTIONS, PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
+import { PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
 import { Otter } from '@/components/garden/spirits/MemoryOtter';
 import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
 import { CRITTER_IDS, CRITTERS, MALTESE_RUN_SPEED, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
@@ -102,7 +102,7 @@ export default function CrittersTestScreen() {
     {!otter && !pair && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
       style={[styles.button, look === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
-      onPress={() => { setMove(item); if ((item === 'eat' || item === 'pat') && !PUPPY_ACTIONS[look]) setLook('cape2'); setRound(value => value + 1); }}
+      onPress={() => { setMove(item); setRound(value => value + 1); }}
       style={[styles.button, move === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     <View style={styles.row}>
       <Pressable onPress={() => setSlow(value => !value)} style={[styles.button, slow && styles.selected]}><Text style={styles.label}>slow ¼×</Text></Pressable>
