@@ -1,584 +1,1522 @@
 import { router } from 'expo-router';
+
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import {
+
+  Animated,
+
+  Easing,
+
+  Image,
+
   ImageBackground,
+
   Platform,
+
   Pressable,
+
   SafeAreaView,
+
   StyleSheet,
+
   Text,
+
   View,
+
   useWindowDimensions,
+
 } from 'react-native';
+
 import { FloatingLetterStack } from './FloatingLetterStack';
+
 import { FloatingPetalsOverlay } from './FloatingPetalsOverlay';
+
 import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
+
 import { MagicLevitationAura } from './MagicLevitationAura';
+
 import { isLetterRead, MAILBOX_LETTERS as LETTERS, markLetterRead } from './mailboxReadState';
+
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
+
 import { localizedLetter } from './mockLetters';
+
 import { useAppLocale } from '../../services/locale';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { MailboxFirefliesOverlay } from './MailboxFirefliesOverlay';
+
+import { useWorldTime } from '../garden/world-time';
+
+
 
 const BACKGROUND_IMAGE = require('../../../assets/mailbox/mailbox_bg_clean.jpg');
+const BACKGROUND_DAY = BACKGROUND_IMAGE;
+
+const BACKGROUND_NIGHT = require('../../../assets/mailbox/mailbox_bg_night.jpg');
+
+const BACKGROUND_NIGHT_PORTRAIT = require('../../../assets/mailbox/mailbox_bg_night_portrait.jpg');
+
+const LANTERN_NIGHT_ASSET = require('../../../assets/mailbox/lantern_night.png');
+
+
+
+function useSafeInsets() {
+  try {
+    return useSafeAreaInsets();
+  } catch {
+    return { top: 0, bottom: 0, left: 0, right: 0 };
+  }
+}
+
+function useSafeWorldTimeNight(): boolean {
+
+  try {
+
+    const wt = useWorldTime();
+
+    return Boolean(wt?.isTreehouseLightingTime);
+
+  } catch {
+
+    return false;
+
+  }
+
+}
+
+
 
 export const MailboxPage = memo(function MailboxPage() {
+
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  // 1. Core Mailbox State Machine: 3 Distinct Visual States with 4-Stage Physical Choreography
-  // Stage A ('lifting'): 260ms — Envelope rises up & forward with elevated shadow
-  // Stage B ('opening'): 320ms — Flap visibly hinges backward around fold line (-180deg)
-  // Stage C ('extracting'): 380ms — Folded paper sheet visibly slides upward out of pocket
-  // Stage D ('unfolding'): 460ms — Paper expands along creases into reading letter & settles
-  const locale = useAppLocale();
-  const [letters, setLetters] = useState<Letter[]>(() =>
-    LETTERS.map((letter) => ({
-      ...localizedLetter(letter, locale),
-      read: isLetterRead(letter.id),
-    }))
-  );
-  const [selectedLetterId, setSelectedLetterId] = useState<string>(LETTERS[Math.min(1, LETTERS.length - 1)].id);
-  const [visualState, setVisualState] = useState<MailboxVisualState>('reading');
-  const [phase, setPhase] = useState<MailboxPhase>('reading');
-  const [pendingLetterId, setPendingLetterId] = useState<string | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  const [transitionStage, setTransitionStage] = useState<
-    'idle' | 'folding' | 'sliding' | 'unfolding'
-  >('idle');
+  const isPortrait = windowWidth < windowHeight;
+  const insets = useSafeInsets();
 
-  // Help & Feedback panel state
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const toggleHelp = useCallback(() => setIsHelpOpen((prev) => !prev), []);
-  const closeHelp = useCallback(() => setIsHelpOpen(false), []);
 
-  // Mark letter as read deterministically upon successful physical opening
-  const markLetterAsRead = useCallback((id: string) => {
-    markLetterRead(id);
-    setLetters((prev) =>
-      prev.map((letter) => (letter.id === id ? { ...letter, read: true } : letter))
-    );
-  }, []);
 
-  // Timer ref management for reliable cancellation without state race conditions
-  const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Day/Night world-time coordination & smooth 1.8s crossfade
 
-  const clearTimers = useCallback(() => {
-    timerRefs.current.forEach((t) => clearTimeout(t));
-    timerRefs.current = [];
-  }, []);
+  const worldNight = useSafeWorldTimeNight();
 
-  const addTimer = useCallback((fn: () => void, ms: number) => {
-    const t = setTimeout(fn, ms);
-    timerRefs.current.push(t);
-    return t;
-  }, []);
+  const [nightOverride, setNightOverride] = useState<boolean | null>(null);
+
+  const isNight = (__DEV__ ? nightOverride : null) ?? worldNight;
+
+  const nightLighting = useRef(new Animated.Value(isNight ? 1 : 0)).current;
+
+
 
   useEffect(() => {
+
+    Animated.timing(nightLighting, {
+
+      toValue: isNight ? 1 : 0,
+
+      duration: 1800,
+
+      easing: Easing.inOut(Easing.cubic),
+
+      useNativeDriver: true,
+
+    }).start();
+
+  }, [isNight, nightLighting]);
+
+
+
+  // 1. Core Mailbox State Machine: 3 Distinct Visual States with 4-Stage Physical Choreography
+
+  // Stage A ('lifting'): 260ms — Envelope rises up & forward with elevated shadow
+
+  // Stage B ('opening'): 320ms — Flap visibly hinges backward around fold line (-180deg)
+
+  // Stage C ('extracting'): 380ms — Folded paper sheet visibly slides upward out of pocket
+
+  // Stage D ('unfolding'): 460ms — Paper expands along creases into reading letter & settles
+
+  const locale = useAppLocale();
+
+  const [letters, setLetters] = useState<Letter[]>(() =>
+
+    LETTERS.map((letter) => ({
+
+      ...localizedLetter(letter, locale),
+
+      read: isLetterRead(letter.id),
+
+    }))
+
+  );
+
+  const [selectedLetterId, setSelectedLetterId] = useState<string>(LETTERS[Math.min(1, LETTERS.length - 1)].id);
+
+  const [visualState, setVisualState] = useState<MailboxVisualState>('reading');
+
+  const [phase, setPhase] = useState<MailboxPhase>('reading');
+
+  const [pendingLetterId, setPendingLetterId] = useState<string | null>(null);
+
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+
+  const [transitionStage, setTransitionStage] = useState<
+
+    'idle' | 'folding' | 'sliding' | 'unfolding'
+
+  >('idle');
+
+
+
+  // Help & Feedback panel state
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  const toggleHelp = useCallback(() => setIsHelpOpen((prev) => !prev), []);
+
+  const closeHelp = useCallback(() => setIsHelpOpen(false), []);
+
+
+
+  // Mark letter as read deterministically upon successful physical opening
+
+  const markLetterAsRead = useCallback((id: string) => {
+
+    markLetterRead(id);
+
+    setLetters((prev) =>
+
+      prev.map((letter) => (letter.id === id ? { ...letter, read: true } : letter))
+
+    );
+
+  }, []);
+
+
+
+  // Timer ref management for reliable cancellation without state race conditions
+
+  const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+
+
+  const clearTimers = useCallback(() => {
+
+    timerRefs.current.forEach((t) => clearTimeout(t));
+
+    timerRefs.current = [];
+
+  }, []);
+
+
+
+  const addTimer = useCallback((fn: () => void, ms: number) => {
+
+    const t = setTimeout(fn, ms);
+
+    timerRefs.current.push(t);
+
+    return t;
+
+  }, []);
+
+
+
+  useEffect(() => {
+
     return () => clearTimers();
+
   }, [clearTimers]);
+
+
 
   const isReading = visualState === 'reading' || phase === 'reading';
 
+
+
   // Currently active letter
+
   const activeLetter = useMemo(
+
     () => letters.find((l) => l.id === selectedLetterId) || letters[0],
+
     [letters, selectedLetterId]
+
   );
+
+
 
   const activeIndex = useMemo(
+
     () => letters.findIndex((l) => l.id === selectedLetterId),
+
     [letters, selectedLetterId]
+
   );
 
+
+
   // 2. Physical Switch Interaction Model:
+
   // Continuous, visibly physical choreography:
+
   // Envelope rises -> Flap opens -> Paper slides out -> Paper unfolds
+
   const handleSelectLetter = useCallback(
+
     (nextLetterId: string) => {
+
       if (isTransitioning) return;
+
       if (nextLetterId === selectedLetterId && isReading) return;
+
+
 
       clearTimers();
 
+
+
       if (!isReading && phase === 'stack') {
+
         // STATE 1 -> STATE 3: Opening from resting stack
+
         setSelectedLetterId(nextLetterId);
+
         setIsTransitioning(true);
+
         setVisualState('opening');
+
         setTransitionStage('sliding');
 
+
+
         // Stage A: Envelope lifts up & forward (260ms)
+
         setPhase('lifting');
 
+
+
         addTimer(() => {
+
           // Stage B: Flap hinges backward -180deg (320ms)
+
           setPhase('opening');
 
+
+
           addTimer(() => {
+
             // Stage C: Folded paper visibly slides upward out of pocket (380ms)
+
             // Deterministically mark as read upon confirmed physical extraction!
+
             markLetterAsRead(nextLetterId);
+
             setPhase('extracting');
+
             setTransitionStage('unfolding');
 
+
+
             addTimer(() => {
+
               // Stage D: Paper unfolds along fold creases into full reading letter (460ms)
+
               setPhase('unfolding');
 
+
+
               addTimer(() => {
+
                 setPhase('reading');
+
                 setVisualState('reading');
+
                 setTransitionStage('idle');
+
                 setIsTransitioning(false);
+
               }, 460);
+
             }, 380);
+
           }, 320);
+
         }, 260);
+
         return;
+
       }
 
+
+
       // STATE 3 -> STATE 3: Switching while in reading mode
+
       // Letter A closes -> Letter B opens (Zero hard swaps!)
+
       setIsTransitioning(true);
+
       setPendingLetterId(nextLetterId);
+
       setVisualState('opening');
+
       setTransitionStage('folding');
+
+
 
       // Step 1: Letter A collapses in height (320ms)
+
       setPhase('closing_fold');
 
+
+
       addTimer(() => {
+
         // Step 2: Paper A slides down into pocket (280ms)
+
         setPhase('closing_insert');
 
+
+
         addTimer(() => {
+
           // Step 3: Flap A hinges shut (240ms)
+
           setPhase('closing_flap');
 
+
+
           addTimer(() => {
+
             // Step 4: Switch identity to Letter B and lift envelope B!
+
             setSelectedLetterId(nextLetterId);
+
             setPendingLetterId(null);
+
             setPhase('lifting');
+
             setTransitionStage('sliding');
 
+
+
             addTimer(() => {
+
               // Flap B hinges backward (320ms)
+
               setPhase('opening');
 
+
+
               addTimer(() => {
+
                 // Paper B visibly slides out of pocket (380ms)
+
                 // Deterministically mark as read upon confirmed physical extraction!
+
                 markLetterAsRead(nextLetterId);
+
                 setPhase('extracting');
+
                 setTransitionStage('unfolding');
 
+
+
                 addTimer(() => {
+
                   // Paper B unfolds into full reading letter (460ms)
+
                   setPhase('unfolding');
 
+
+
                   addTimer(() => {
+
                     setPhase('reading');
+
                     setVisualState('reading');
+
                     setTransitionStage('idle');
+
                     setIsTransitioning(false);
+
                   }, 460);
+
                 }, 380);
+
               }, 320);
+
             }, 260);
+
           }, 240);
+
         }, 280);
+
       }, 320);
+
     },
+
     [selectedLetterId, isReading, isTransitioning, phase, clearTimers, addTimer]
+
   );
 
+
+
   // Flip Next / Previous
+
   const handleNext = useCallback(() => {
+
     const nextIdx = (activeIndex + 1) % letters.length;
+
     handleSelectLetter(letters[nextIdx].id);
+
   }, [activeIndex, letters, handleSelectLetter]);
+
+
 
   const handlePrev = useCallback(() => {
+
     const prevIdx = (activeIndex - 1 + letters.length) % letters.length;
+
     handleSelectLetter(letters[prevIdx].id);
+
   }, [activeIndex, letters, handleSelectLetter]);
 
+
+
   // Toggle between State 1 (holding stack) and State 3 (reading letter)
+
   const handleToggleState = useCallback(() => {
+
     if (isTransitioning) return;
+
     clearTimers();
 
+
+
     if (isReading) {
+
       // Reverse process: Paper folds -> Paper slides in -> Flap closes -> Envelope settles
+
       setIsTransitioning(true);
+
       setVisualState('opening');
+
       setTransitionStage('folding');
 
+
+
       // Step 1: Paper folds into trifold dimensions (340ms)
+
       setPhase('closing_fold');
 
+
+
       addTimer(() => {
+
         // Step 2: Paper slides down into envelope pocket (300ms)
+
         setPhase('closing_insert');
 
+
+
         addTimer(() => {
+
           // Step 3: Flap hinges forward to closed position (280ms)
+
           setPhase('closing_flap');
 
+
+
           addTimer(() => {
+
             // Step 4: Envelope descends and settles into stack (240ms)
+
             setPhase('closing');
 
+
+
             addTimer(() => {
+
               setPhase('stack');
+
               setVisualState('holding');
+
               setTransitionStage('idle');
+
               setIsTransitioning(false);
+
             }, 240);
+
           }, 280);
+
         }, 300);
+
       }, 340);
+
     } else {
+
       // Forward process: Envelope lifts -> Flap opens -> Paper slides out -> Paper unfolds
+
       setIsTransitioning(true);
+
       setVisualState('opening');
+
       setTransitionStage('sliding');
 
+
+
       // Stage A: Envelope lifts up (260ms)
+
       setPhase('lifting');
 
+
+
       addTimer(() => {
+
         // Stage B: Flap hinges backward -180deg (320ms)
+
         setPhase('opening');
 
+
+
         addTimer(() => {
+
           // Stage C: Paper slides upward out of pocket (380ms)
+
           // Deterministically mark as read upon confirmed physical extraction!
+
           markLetterAsRead(selectedLetterId);
+
           setPhase('extracting');
+
           setTransitionStage('unfolding');
 
+
+
           addTimer(() => {
+
             // Stage D: Paper unfolds along creases into reading letter (460ms)
+
             setPhase('unfolding');
 
+
+
             addTimer(() => {
+
               setPhase('reading');
+
               setVisualState('reading');
+
               setTransitionStage('idle');
+
               setIsTransitioning(false);
+
             }, 460);
+
           }, 380);
+
         }, 320);
+
       }, 260);
+
     }
+
   }, [isReading, isTransitioning, clearTimers, addTimer]);
 
+
+
   const handleBackToGarden = useCallback(() => {
+
     if (router.canGoBack()) {
+
       router.back();
+
     } else {
+
       router.replace(__DEV__ ? '/garden-test' : '/');
+
     }
+
   }, []);
 
-  const contentWidth = Math.min(windowWidth, 560);
+
+
+  const isWide = windowWidth >= 720;
+
+  const contentWidth = isWide
+    ? Math.min(windowWidth - 32, 840)
+    : Math.min(windowWidth - 24, 420);
+
+  const usableHeight = Math.max(480, windowHeight - insets.top - insets.bottom);
+  const maxContentHeight = Math.min(540, Math.round(usableHeight * 0.72));
+
+
+
+  const activeNightAsset = isPortrait ? BACKGROUND_NIGHT_PORTRAIT : BACKGROUND_NIGHT;
+
+
 
   return (
-    <ImageBackground
-      source={BACKGROUND_IMAGE}
-      style={styles.backgroundImage}
-      resizeMode="cover"
-    >
-      {/* ── Soft Atmospheric Background Focus Wash ── */}
-      {/* Softens background clutter in reading mode so the letter takes center stage */}
-      <View
-        style={[
-          styles.backgroundAtmosphereWash,
-          isReading && styles.backgroundReadingFocusWash,
-        ]}
-        pointerEvents="none"
+
+    <View style={styles.rootContainer}>
+
+      {/* ── DAYTIME BACKGROUND LAYER ── */}
+
+      <Image
+
+        source={BACKGROUND_DAY}
+
+        style={styles.backgroundCover}
+
+        resizeMode="cover"
+
       />
 
+
+
+      {/* ── ALIGNED NIGHTTIME BACKGROUND LAYER (1.8s smooth crossfade) ── */}
+
+      <Animated.Image
+
+        source={activeNightAsset}
+
+        style={[styles.backgroundCover, { opacity: nightLighting }]}
+
+        resizeMode="cover"
+
+      />
+
+
+
+      {/* ── Soft Atmospheric Background Focus Wash ── */}
+
+      <View
+
+        style={[
+
+          styles.backgroundAtmosphereWash,
+
+          isReading && styles.backgroundReadingFocusWash,
+
+        ]}
+
+        pointerEvents="none"
+
+      />
+
+
+
       {/* ── Delicate Ambient Drifting Petals ── */}
+
       <FloatingPetalsOverlay />
 
+
+
+      {/* ── Floating Glowing Golden Fireflies at Night ── */}
+
+      <Animated.View
+
+        style={[StyleSheet.absoluteFill, { opacity: nightLighting }]}
+
+        pointerEvents="none"
+
+      >
+
+        <MailboxFirefliesOverlay />
+
+      </Animated.View>
+
+
+
+      {/* ── Warm Lantern Glow Radiating Upward from Center Table ── */}
+
+      <Animated.View
+
+        style={[styles.lanternWarmthOverlay, { opacity: nightLighting }]}
+
+        pointerEvents="none"
+
+      />
+
+
+
+      {/* ── Cozy Hexagonal Wooden Lantern Resting on the Wooden Table ── */}
+
+      <Animated.View
+
+        style={[
+
+          styles.tableLanternContainer,
+
+          {
+
+            bottom: Math.max(34, insets.bottom + 14),
+
+            opacity: nightLighting.interpolate({
+
+              inputRange: [0, 0.4, 1],
+
+              outputRange: [0.35, 0.75, 1],
+
+            }),
+
+          },
+
+        ]}
+
+        pointerEvents="none"
+
+      >
+
+        <Image
+
+          source={LANTERN_NIGHT_ASSET}
+
+          style={styles.tableLanternImage}
+
+          resizeMode="contain"
+
+        />
+
+      </Animated.View>
+
+
+
       {/* NOTE: Single coherent pair of fairy hands is rendered directly from
-          the cohesive painted background scene (BACKGROUND_IMAGE), eliminating
-          any duplicated/overlapping hand layers. */}
+
+          the cohesive painted background scene (BACKGROUND_DAY / activeNightAsset),
+
+          eliminating any duplicated/overlapping hand layers. */}
+
+
 
       <SafeAreaView style={styles.safeArea}>
+
         {/* ── SIMPLIFIED TOP HEADER: Light, Airy, Minimal Presence ── */}
-        <View style={styles.topHeader}>
+
+        <View style={[styles.topHeader, { paddingTop: Math.max(10, insets.top) }]}>
+
           <Pressable
+
             accessibilityRole="button"
+
             accessibilityLabel="Close Mailbox"
+
             onPress={handleBackToGarden}
+
             style={({ pressed }) => [
+
               styles.backButton,
+
               pressed && styles.buttonPressed,
+
             ]}
+
           >
+
             <Text style={styles.backButtonText}>✕</Text>
+
           </Pressable>
 
-          <View style={styles.brandTitleContainer}>
+
+
+          <View style={[styles.brandTitleContainer, { top: Math.max(12, insets.top + 2) }]}>
+
             <Text style={styles.brandLogo}>✿ PetalPal</Text>
+
           </View>
 
+
+
           <View style={styles.topRightActions}>
+
+            {__DEV__ && (
+
+              <Pressable
+
+                accessibilityRole="button"
+
+                accessibilityLabel="Toggle Night/Day scene"
+
+                onPress={() => setNightOverride((prev) => !(prev ?? worldNight))}
+
+                style={({ pressed }) => [
+
+                  styles.devNightToggle,
+
+                  pressed && styles.buttonPressed,
+
+                ]}
+
+              >
+
+                <Text style={styles.devNightToggleText}>
+
+                  {isNight ? '🌙' : '☀️'}
+
+                </Text>
+
+              </Pressable>
+
+            )}
+
+
+
             <Pressable
+
               accessibilityRole="button"
+
               accessibilityLabel={
+
                 isReading ? 'Fold mail into envelopes stack' : 'Open selected letter'
+
               }
+
               onPress={handleToggleState}
+
               style={({ pressed }) => [
+
                 styles.modeToggleButton,
+
                 pressed && styles.buttonPressed,
+
               ]}
+
             >
+
               <Text style={styles.modeToggleText}>
+
                 {locale === 'zh-Hans' ? (isReading ? '收起 ✉️' : '阅读 📜') : (isReading ? 'Stack ✉️' : 'Read 📜')}
+
               </Text>
+
             </Pressable>
+
           </View>
+
         </View>
+
+
 
         {/* Note: HelpFeedbackTrigger and HelpFeedbackPanel are now globally mounted in the root application shell */}
 
+
+
         {/* ── MAIN FLOATING MAILBOX CANVAS (Center Above Palms) ── */}
+
         <View style={[styles.mainArea, { width: contentWidth }]}>
+
           <View style={styles.floatingCenterCluster}>
+
             {/* Gentle fairy magic radiance beneath the envelopes */}
+
             <MagicLevitationAura />
 
+
+
             {/* Dominant Unfolded Letter (State 3) or Floating Envelopes Stack (State 1) */}
+
             <FloatingLetterStack
+
               letters={letters}
+
               selectedLetterId={selectedLetterId}
+
               visualState={visualState}
+
               phase={phase}
+
               transitionStage={transitionStage}
+
               onSelectLetter={handleSelectLetter}
+
               onToggleUnfold={handleToggleState}
+
               maxContentWidth={contentWidth}
+
               maxContentHeight={Math.min(540, windowHeight * 0.68)}
+
             />
+
           </View>
+
         </View>
+
+
 
         {/* ── BOTTOM HUD: Botanical Pagination & Flipping ── */}
-        <View style={styles.bottomHud}>
+
+        <View style={[styles.bottomHud, { paddingBottom: Math.max(16, insets.bottom + 6) }]}>
+
           <View style={styles.paginationPill}>
+
             <Pressable
+
               accessibilityRole="button"
+
               accessibilityLabel="Previous letter"
+
               onPress={handlePrev}
+
               style={({ pressed }) => [
+
                 styles.arrowBtn,
+
                 pressed && styles.arrowBtnPressed,
+
               ]}
+
             >
+
               <Text style={styles.arrowBtnText}>‹</Text>
+
             </Pressable>
+
+
 
             <Text style={styles.paginationText}>
+
               — ❧ {activeIndex + 1} / {letters.length} ☙ —
+
             </Text>
 
+
+
             <Pressable
+
               accessibilityRole="button"
+
               accessibilityLabel="Next letter"
+
               onPress={handleNext}
+
               style={({ pressed }) => [
+
                 styles.arrowBtn,
+
                 pressed && styles.arrowBtnPressed,
+
               ]}
+
             >
+
               <Text style={styles.arrowBtnText}>›</Text>
+
             </Pressable>
+
           </View>
+
         </View>
+
       </SafeAreaView>
-    </ImageBackground>
+
+    </View>
+
   );
+
 });
+
+
 
 const styles = StyleSheet.create({
-  backgroundImage: {
-    flex: 1,
+
+  backgroundCover: {
+
+    position: 'absolute',
+
+    top: 0,
+
+    left: 0,
+
+    right: 0,
+
+    bottom: 0,
+
     width: '100%',
+
     height: '100%',
+
+  },
+
+  rootContainer: {
+
+    flex: 1,
+
+    width: '100%',
+
+    height: '100%',
+
+    backgroundColor: '#16221E',
+
+    overflow: 'hidden',
+
+  },
+
+  backgroundImage: {
+
+    flex: 1,
+
+    width: '100%',
+
+    height: '100%',
+
     backgroundColor: '#2D3D32',
+
   },
-  backgroundAtmosphereWash: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(16, 24, 18, 0.16)',
-    zIndex: 0,
+
+  lanternWarmthOverlay: {
+
+    position: 'absolute',
+
+    bottom: 0,
+
+    left: '15%',
+
+    right: '15%',
+
+    height: 280,
+
+    zIndex: 1,
+
     ...Platform.select({
+
       web: {
-        transition: 'background-color 0.45s ease',
+
+        backgroundImage:
+
+          'radial-gradient(ellipse at bottom center, rgba(255, 175, 45, 0.32) 0%, rgba(255, 160, 40, 0.12) 50%, transparent 80%)',
+
+        filter: 'blur(10px)',
+
       },
-    }),
-  },
-  backgroundReadingFocusWash: {
-    backgroundColor: 'rgba(12, 18, 14, 0.40)',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(3px)',
+
+      default: {
+
+        backgroundColor: 'rgba(255, 175, 45, 0.14)',
+
       },
+
     }),
+
   },
-  safeArea: {
-    flex: 1,
-    justifyContent: 'space-between',
+
+  tableLanternContainer: {
+
+    position: 'absolute',
+
+    bottom: 44,
+
+    left: 0,
+
+    right: 0,
+
     alignItems: 'center',
-    zIndex: 3,
-  },
-  topHeader: {
-    width: '100%',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  backButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(8px)',
-        transition: 'background-color 0.2s ease',
-      },
-    }),
-  },
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  brandTitleContainer: {
-    alignItems: 'center',
-  },
-  brandLogo: {
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    fontFamily:
-      Platform.OS === 'web'
-        ? '"Playfair Display", "Cormorant Garamond", Georgia, serif'
-        : Platform.OS === 'ios'
-          ? 'Georgia'
-          : 'serif',
-    textShadowColor: 'rgba(0, 0, 0, 0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  topRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginRight: Platform.OS === 'web' ? 140 : 68,
-  },
-  modeToggleButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(8px)',
-        transition: 'background-color 0.2s ease',
-      },
-    }),
-  },
-  buttonPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.30)',
-  },
-  modeToggleText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  mainArea: {
-    flex: 1,
+
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  floatingCenterCluster: {
-    position: 'relative',
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomHud: {
-    paddingBottom: 16,
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  paginationPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: 'rgba(20, 28, 22, 0.80)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+
+    zIndex: 2,
+
     ...Platform.select({
+
       web: {
-        backdropFilter: 'blur(8px)',
+
+        filter: 'drop-shadow(0 0 24px rgba(255, 185, 60, 0.55))',
+
       },
+
     }),
+
   },
-  arrowBtn: {
-    width: 28,
-    height: 28,
+
+  tableLanternImage: {
+
+    width: 140,
+
+    height: 105,
+
+  },
+
+  devNightToggle: {
+
+    paddingHorizontal: 10,
+
+    paddingVertical: 5,
+
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+
+    borderWidth: 0.8,
+
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+
+    marginRight: 8,
+
     alignItems: 'center',
+
     justifyContent: 'center',
+
+  },
+
+  devNightToggleText: {
+
+    fontSize: 13,
+
+  },
+
+  backgroundAtmosphereWash: {
+
+    ...StyleSheet.absoluteFill,
+
+    backgroundColor: 'rgba(16, 24, 18, 0.16)',
+
+    zIndex: 0,
+
     ...Platform.select({
+
       web: {
-        transition: 'background-color 0.18s ease',
+
+        transition: 'background-color 0.45s ease',
+
       },
+
     }),
+
   },
-  arrowBtnPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+
+  backgroundReadingFocusWash: {
+
+    backgroundColor: 'rgba(12, 18, 14, 0.40)',
+
+    ...Platform.select({
+
+      web: {
+
+        backdropFilter: 'blur(3px)',
+
+      },
+
+    }),
+
   },
-  arrowBtnText: {
+
+  safeArea: {
+
+    flex: 1,
+
+    justifyContent: 'space-between',
+
+    alignItems: 'center',
+
+    zIndex: 3,
+
+  },
+
+  topHeader: {
+
+    width: '100%',
+
+    paddingHorizontal: 16,
+
+    paddingVertical: 10,
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+
+    alignItems: 'center',
+
+    zIndex: 20,
+
+  },
+
+  backButton: {
+
+    paddingHorizontal: 12,
+
+    paddingVertical: 6,
+
+    borderRadius: 16,
+
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+
+    borderWidth: 0.8,
+
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+
+    ...Platform.select({
+
+      web: {
+
+        backdropFilter: 'blur(8px)',
+
+        transition: 'background-color 0.2s ease',
+
+      },
+
+    }),
+
+  },
+
+  backButtonText: {
+
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  paginationText: {
-    color: '#E8F2EC',
+
     fontSize: 12,
+
     fontWeight: '600',
-    letterSpacing: 1.1,
-    fontFamily:
-      Platform.OS === 'web'
-        ? '"Cormorant Garamond", Georgia, serif'
-        : Platform.OS === 'ios'
-          ? 'Georgia'
-          : 'serif',
+
+    letterSpacing: 0.3,
+
   },
+
+  brandTitleContainer: {
+
+    position: 'absolute',
+
+    left: 0,
+
+    right: 0,
+
+    top: 12,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    pointerEvents: 'none',
+
+  },
+
+  brandLogo: {
+
+    color: 'rgba(255, 255, 255, 0.95)',
+
+    fontSize: 15,
+
+    fontWeight: '600',
+
+    letterSpacing: 0.8,
+
+    fontFamily:
+
+      Platform.OS === 'web'
+
+        ? '"Playfair Display", "Cormorant Garamond", Georgia, serif'
+
+        : Platform.OS === 'ios'
+
+          ? 'Georgia'
+
+          : 'serif',
+
+    textShadowColor: 'rgba(0, 0, 0, 0.35)',
+
+    textShadowOffset: { width: 0, height: 1 },
+
+    textShadowRadius: 3,
+
+  },
+
+  topRightActions: {
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 8,
+
+    marginRight: Platform.OS === 'web' ? 140 : 68,
+
+    zIndex: 25,
+
+  },
+
+  modeToggleButton: {
+
+    paddingHorizontal: 12,
+
+    paddingVertical: 6,
+
+    borderRadius: 16,
+
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+
+    borderWidth: 0.8,
+
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+
+    ...Platform.select({
+
+      web: {
+
+        backdropFilter: 'blur(8px)',
+
+        transition: 'background-color 0.2s ease',
+
+      },
+
+    }),
+
+  },
+
+  buttonPressed: {
+
+    backgroundColor: 'rgba(255, 255, 255, 0.30)',
+
+  },
+
+  modeToggleText: {
+
+    color: '#FFFFFF',
+
+    fontSize: 11,
+
+    fontWeight: '600',
+
+    letterSpacing: 0.3,
+
+  },
+
+  mainArea: {
+
+    flex: 1,
+
+    justifyContent: 'center',
+
+    alignItems: 'center',
+
+    paddingVertical: 4,
+
+  },
+
+  floatingCenterCluster: {
+
+    position: 'relative',
+
+    width: '100%',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+  },
+
+  bottomHud: {
+
+    paddingBottom: 16,
+
+    alignItems: 'center',
+
+    zIndex: 20,
+
+  },
+
+  paginationPill: {
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 14,
+
+    backgroundColor: 'rgba(20, 28, 22, 0.80)',
+
+    paddingHorizontal: 16,
+
+    paddingVertical: 6,
+
+    borderRadius: 20,
+
+    borderWidth: 1,
+
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+
+    ...Platform.select({
+
+      web: {
+
+        backdropFilter: 'blur(8px)',
+
+      },
+
+    }),
+
+  },
+
+  arrowBtn: {
+
+    width: 28,
+
+    height: 28,
+
+    borderRadius: 14,
+
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    ...Platform.select({
+
+      web: {
+
+        transition: 'background-color 0.18s ease',
+
+      },
+
+    }),
+
+  },
+
+  arrowBtnPressed: {
+
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+
+  },
+
+  arrowBtnText: {
+
+    color: '#FFFFFF',
+
+    fontSize: 18,
+
+    fontWeight: '700',
+
+    lineHeight: 20,
+
+  },
+
+  paginationText: {
+
+    color: '#E8F2EC',
+
+    fontSize: 12,
+
+    fontWeight: '600',
+
+    letterSpacing: 1.1,
+
+    fontFamily:
+
+      Platform.OS === 'web'
+
+        ? '"Cormorant Garamond", Georgia, serif'
+
+        : Platform.OS === 'ios'
+
+          ? 'Georgia'
+
+          : 'serif',
+
+  },
+
 });
 
+
+
 export default MailboxPage;
+
