@@ -53,6 +53,12 @@ Not done yet (next work, in the owner's order):
    `~/dev/petalpal-motion/maltese/`. The golden's sitting frames had a dark patch under the belly:
    Kiro repainted it (one oil-motion edit, `~/dev/petalpal-motion/dressed/belly/NOTES.md`) in all
    seven bare-body sit sheets; the hug clip was regenerated with a clean belly.
+   *Every outfit eats and is patted (2026-11-05):* eat/pat clips for bare, velvet cape and petal
+   cape (minimax h3 highspeed; h3-max is not on the ZenMux key's allowed models), hats and
+   necklaces laid on by Kiro's head tracking (`~/dev/petalpal-motion/dressed/actions/build_looks.sh`),
+   and the belly gap filled in every frame from Kiro's repaint (`belly_paste.py`). The puppy never
+   changes outfit while running: it stops, sits, then changes, and no game or chase starts
+   meanwhile. Dressed, it only plays chase with the Maltese (the tug and hug clips paint it bare).
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.
