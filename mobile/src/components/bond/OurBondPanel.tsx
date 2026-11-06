@@ -3,14 +3,11 @@ import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, Style
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import type { ClosenessSource, ClosenessSummary } from '../../services/fairyCloseness';
 import { useAvatarCollection } from '../../services/avatars';
-import { AvatarCollection } from '../avatars/AvatarCollection';
-import { AVATAR_ART } from '../avatars/avatarArt';
 import { avatarCopy } from '../avatars/avatarCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { pickTapLine, RECENT_TAP_LINES } from '../garden/fairy/tapLines';
 import { bondCopy, BOND_TIERS, type BondLocale } from './bondCopy';
 import { useFairyName } from '../../services/fairyName';
-import { KeepsakeBook } from './KeepsakeBook';
 import { keepsakeArt } from './keepsakeArt';
 
 // The owner's PPL illustration, cut out with soft contact shadows baked in, lying on a
@@ -30,14 +27,13 @@ const TASK_ART: Record<ClosenessSource, ImageSourcePropType> = {
   FAIRY_TAP: require('@/assets/bond/task-garden-time.webp'),
   WEEKLY_READ: require('@/assets/bond/task-weekly-report.webp'),
 };
-const BOOK_THUMBS = ['crocus-brooch', 'acorn-teacup', 'dewdrop'];
 // Medallions keep a light ground in both themes, like the Friends panel's avatar circles.
 const MEDALLION = '#EAE8D7';
 
 // Our Bond (亲密度): PPL resting on the garden ledge, then level and progress, today's progress,
-// check-in rewards, levels and unlocks, the avatar collection and the keepsake book, quiet serif
-// type on the panel theme. The check-in itself lives in the Garden calendar. Avatars and keepsakes
-// are separate collections with their own counts.
+// check-in rewards, levels and unlocks, quiet serif type on the panel theme. The check-in itself
+// lives in the Garden calendar; the keepsake book and the avatar collection live in Collection
+// (the Garden dock, components/collection/CollectionPanel.tsx).
 export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   visible: boolean; locale: BondLocale; summary: ClosenessSummary | null; loading: boolean; onClose: () => void;
 }) {
@@ -46,8 +42,6 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const reducedMotion = useReducedMotion();
-  const [bookOpen, setBookOpen] = useState(false);
-  const [avatarsOpen, setAvatarsOpen] = useState(false);
   const avatarWords = avatarCopy(locale);
   const { collection: avatars } = useAvatarCollection(visible, summary?.level);
   const [said, setSaid] = useState<{ key: number; text: string } | null>(null);
@@ -103,12 +97,12 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               <View style={styles.track}><View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} /></View>
               <Text style={styles.next}>{summary.maxed ? copy.maxed : copy.toNext(summary.pointsForNextLevel! - summary.pointsIntoLevel, summary.level + 1)}</Text>
               {/* The avatar reward for the next level, or the ones waiting now (server data). */}
-              {avatars?.bondOn ? <Pressable accessibilityRole="button" onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.avatarHint, avatars.ready > 0 && styles.avatarHintReady, pressed && styles.pressed, styles.focus]}>
+              {avatars?.bondOn ? <View style={[styles.avatarHint, avatars.ready > 0 && styles.avatarHintReady]}>
                 <Text style={[styles.avatarHintText, avatars.ready > 0 && styles.avatarHintTextReady]}>
                   ✦ {avatars.ready > 1 ? avatarWords.rewardsReady(avatars.ready) : avatars.ready === 1 ? avatarWords.rewardReady
                     : avatars.nextRewardLevel ? avatarWords.nextUnlock(avatars.nextRewardLevel) : avatarWords.allCollected}
                 </Text>
-              </Pressable> : null}
+              </View> : null}
 
 
               <Text style={[styles.checkInLine, summary.checkIn.checkedInToday && styles.checkInDone]}>
@@ -164,26 +158,6 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                 })}
               </Section>
 
-              <Pressable accessibilityRole="button" accessibilityLabel={`${avatarWords.entry}, ${avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''}${avatars?.ready ? `, ${avatarWords.entryPending(avatars.ready)}` : ''}`}
-                onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.bookButton, styles.focus, pressed && styles.pressed]}>
-                <View style={styles.thumbs}>
-                  {(avatars?.owned.length ? avatars.owned.slice(-3) : ['fairy-1', 'l1-02', 'l1-05']).map((id, index) => AVATAR_ART[id]
-                    ? <Image key={id} source={AVATAR_ART[id]} style={[styles.thumb, index > 0 && styles.thumbOverlap]} resizeMode="cover" accessible={false} /> : null)}
-                </View>
-                <Text style={styles.bookText}>{avatarWords.entry}</Text>
-                <View style={styles.entrySide}>
-                  {avatars?.ready ? <Text style={styles.entryBadge}>{avatarWords.entryPending(avatars.ready)}</Text> : null}
-                  <Text style={styles.small}>{avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''} ›</Text>
-                </View>
-              </Pressable>
-
-              <Pressable accessibilityRole="button" onPress={() => setBookOpen(true)} style={({ pressed }) => [styles.bookButton, styles.bookButtonNext, styles.focus, pressed && styles.pressed]}>
-                <View style={styles.thumbs}>
-                  {BOOK_THUMBS.map((id, index) => <Image key={id} source={keepsakeArt(id)!} style={[styles.thumb, index > 0 && styles.thumbOverlap]} resizeMode="cover" accessible={false} />)}
-                </View>
-                <Text style={styles.bookText}>{copy.openBook}</Text>
-                <Text style={styles.small}>{copy.collected(summary.collection.owned, summary.collection.total)} ›</Text>
-              </Pressable>
             </>}
           </View>
         </ScrollView>
@@ -193,8 +167,6 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
         </Pressable>
       </View>
     </View>
-    <KeepsakeBook visible={bookOpen} locale={locale} onClose={() => setBookOpen(false)} />
-    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
 

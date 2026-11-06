@@ -10,7 +10,8 @@ type Entry = Book['keepsakes'][number];
 
 // The keepsake book (design screens 9 and 10): every keepsake, collected ones in colour,
 // the rest as faded silhouettes; tap a collected one for her note and the day it came.
-export function KeepsakeBook({ visible, locale, onClose }: { visible: boolean; locale: BondLocale; onClose: () => void }) {
+// `newIds`: keepsakes today's check-in gave that the owner has not looked at yet (Collection marks them seen on close).
+export function KeepsakeBook({ visible, locale, onClose, newIds = [] }: { visible: boolean; locale: BondLocale; onClose: () => void; newIds?: string[] }) {
   const fairyName = useFairyName();
   const copy = bondCopy(locale, fairyName);
   const [book, setBook] = useState<Book | null>(null);
@@ -22,7 +23,9 @@ export function KeepsakeBook({ visible, locale, onClose }: { visible: boolean; l
     loadKeepsakeBook().then(setBook).catch(() => setError(true));
   };
   useEffect(() => { if (visible) load(); else { setOpen(null); setFilter('ALL'); } }, [visible]);
-  const shown = book?.keepsakes.filter(keepsake => filter === 'ALL' || keepsake.rarity === filter) ?? [];
+  // Today's new keepsakes come first, so they are the first thing seen.
+  const shown = (book?.keepsakes.filter(keepsake => filter === 'ALL' || keepsake.rarity === filter) ?? [])
+    .sort((a, b) => Number(newIds.includes(b.id) && b.owned) - Number(newIds.includes(a.id) && a.owned));
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={() => (open ? setOpen(null) : onClose())} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.sheet}>
@@ -45,11 +48,12 @@ export function KeepsakeBook({ visible, locale, onClose }: { visible: boolean; l
           {shown.map(keepsake => {
             const art = keepsakeArt(keepsake.id);
             return <Pressable key={keepsake.id} accessibilityRole="button" disabled={!keepsake.owned}
-              accessibilityLabel={keepsake.owned ? keepsake.name : `${keepsake.name}, ${copy.locked}`}
+              accessibilityLabel={keepsake.owned ? `${keepsake.name}${newIds.includes(keepsake.id) ? `, ${copy.isNew}` : ''}` : `${keepsake.name}, ${copy.locked}`}
               onPress={() => setOpen(keepsake)} style={({ pressed }) => [styles.cell, pressed && styles.pressed]}>
               {art ? <Image source={art} resizeMode="contain" accessibilityIgnoresInvertColors
                 style={[styles.cellArt, !keepsake.owned && styles.silhouette]} /> : null}
               {keepsake.count > 1 ? <Text style={styles.count}>{copy.times(keepsake.count)}</Text> : null}
+              {keepsake.owned && newIds.includes(keepsake.id) ? <Text testID={`keepsake-new-${keepsake.id}`} style={styles.isNew}>{copy.isNew}</Text> : null}
             </Pressable>;
           })}
         </ScrollView>
@@ -91,6 +95,7 @@ const styles = StyleSheet.create({
   cellArt: { width: '88%', height: '88%' },
   silhouette: { opacity: 0.22 }, // faded, so the shape still hints at what is waiting
   count: { position: 'absolute', right: 6, bottom: 4, fontSize: 10, color: BOND.muted },
+  isNew: { position: 'absolute', top: 4, left: 4, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, fontSize: 10, fontWeight: '600', color: '#FFFFFF', backgroundColor: BOND.purple },
   footer: { marginTop: 8, textAlign: 'center', fontFamily: 'serif', fontSize: 13, color: BOND.ink },
   detailBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#0B1F1B88' },
   detail: { width: '100%', maxWidth: 340, alignItems: 'center', gap: 8, padding: 20, borderRadius: 20, backgroundColor: BOND.paper, borderWidth: 1.5, borderColor: BOND.edge },
