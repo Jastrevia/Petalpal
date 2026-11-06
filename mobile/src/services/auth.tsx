@@ -31,6 +31,8 @@ interface AuthState extends AuthSnapshot {
   completeProfile: (profile: ProfileInput | string) => Promise<void>;
   /** Saves a library avatar (components/avatars) for the signed-in owner. */
   updateAvatar: (avatar: string) => Promise<void>;
+  /** Shows an avatar the server has already saved (the welcome gift) without another request. */
+  rememberAvatar: (avatar: string) => void;
   /** Saves the app language (also the Weekly reflection language) and switches the app to it. */
   updateLocale: (locale: 'en' | 'zh-Hans') => Promise<void>;
   logout: () => Promise<void>;
@@ -247,6 +249,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...current,
         session: { ...current.session, user: { ...current.session.user, avatar: saved.avatar } },
         experience: current.experience && { ...current.experience, user: { ...current.experience.user, avatar: saved.avatar } },
+      });
+    },
+    rememberAvatar: (avatar) => {
+      const owner = state.session?.user.id;
+      setState(current => !owner || current.session?.user.id !== owner ? current : {
+        ...current,
+        session: { ...current.session, user: { ...current.session.user, avatar } },
+        experience: current.experience && { ...current.experience, user: { ...current.experience.user, avatar } },
       });
     },
     updateLocale: async (locale) => {

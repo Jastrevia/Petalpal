@@ -16,7 +16,7 @@ import { EventIllustration } from './EventIllustration';
 import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
 import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
-import { AvatarPicker } from '../avatars/AvatarPicker';
+import { AvatarCollection } from '../avatars/AvatarCollection';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
@@ -186,25 +186,17 @@ const PROFILE_COPY = {
 // Your avatar (tap to choose from the avatar library), name and time zone.
 function ProfileHero({ theme }: { theme: PanelTheme }) {
   const styles = createStyles(theme);
-  const { session, experience, updateAvatar } = useAuth();
+  const { session, experience } = useAuth();
   const profile = experience?.user || session?.user;
   const locale = momentLocale(experience?.user.preferredLocale);
   const copy = PROFILE_COPY[locale];
-  const [choosing, setChoosing] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
+  const [choosing, setChoosing] = useState(false);
   // Online is what friends see: this device's live connection to the owner's user room.
   const [online, setOnline] = useState(userRealtimeConnected());
   useEffect(() => subscribeUserRealtime({ connection: setOnline }), []);
-  async function choose(avatar: string | null) {
-    if (!avatar || saving) return;
-    if (avatar === profile?.avatar) { setChoosing(false); return; }
-    setSaving(true); setError('');
-    try { await updateAvatar(avatar); setChoosing(false); }
-    catch { setError(copy.failed); }
-    finally { setSaving(false); }
-  }
   return <View style={styles.profileHero}>
     <Pressable accessibilityRole="button" accessibilityLabel={copy.change} disabled={!profile}
-      onPress={() => { setError(''); setChoosing(true); }} style={({ pressed }) => [pressed && ui.pressed]}>
+      onPress={() => setChoosing(true)} style={({ pressed }) => [pressed && ui.pressed]}>
       <UserAvatar avatar={profile?.avatar} size={76} style={styles.avatar} fallback="○" />
       <View style={styles.avatarEdit}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor={colors.ink} /></View>
       <View testID="profile-presence-dot" style={[styles.presenceDot, { backgroundColor: online ? '#7FB77E' : '#9AA79F' }]} />
@@ -217,8 +209,8 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
       <RedeemCodeChip />
     </View>
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
-    <AvatarPicker visible={choosing} title={copy.title} selected={profile?.avatar} busy={saving} error={error}
-      closeLabel={copy.close} optionLabel={copy.option} onSelect={avatar => void choose(avatar)} onClose={() => setChoosing(false)} />
+    {/* The avatar collection: wear an owned avatar, or unlock one with a Fairy Bond reward. */}
+    <AvatarCollection visible={choosing} locale={locale} onClose={() => setChoosing(false)} />
   </View>;
 }
 

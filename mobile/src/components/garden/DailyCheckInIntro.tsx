@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkInWithFairy, loadClosenessSummary, type CheckInResult } from '../../services/fairyCloseness';
+import { isWelcomeActive, loadAvatarCollection, useWelcomeActive } from '../../services/avatars';
 import { KeepsakeReveal } from '../bond/KeepsakeReveal';
 import { PetalRing } from '../petalCards/PetalRing';
 import { loadPetalToday, type PetalToday } from '../../services/petalCardDraw';
@@ -37,6 +38,9 @@ export function DailyCheckInIntro() {
   const progress = useRef(new Animated.Value(0)).current;
   const [card, setCard] = useState<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const [reveal, setReveal] = useState<CheckInResult | null>(null);
+  const [deferredReveal, setDeferredReveal] = useState<CheckInResult | null>(null);
+  const [deferredToday, setDeferredToday] = useState<{ today: PetalToday | null } | null>(null);
+  const welcomeActive = useWelcomeActive();
   const [petal, setPetal] = useState<PetalToday | null>(null), [ringOpen, setRingOpen] = useState(false);
   const pendingCard = useRef<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const showCard = (next: { time: string | null; streak: number; keepsake?: string }) => {
@@ -49,6 +53,19 @@ export function DailyCheckInIntro() {
     if (pendingCard.current) showCard(pendingCard.current);
     pendingCard.current = null;
   };
+
+  // When the welcome flow finishes, any deferred keepsake reveal or tarot check-in runs.
+  useEffect(() => {
+    if (welcomeActive) return;
+    if (deferredReveal) {
+      setReveal(deferredReveal);
+      setDeferredReveal(null);
+    } else if (deferredToday) {
+      afterKeepsake(deferredToday.today);
+      setDeferredToday(null);
+    }
+  }, [welcomeActive, deferredReveal, deferredToday]);
+
   // Waits for the Garden to appear, so the card lands on her Garden, not on an empty screen.
   const { isGardenLoading } = usePlanting();
 
@@ -79,9 +96,18 @@ export function DailyCheckInIntro() {
       const time = at ? new Date(at).toLocaleTimeString(locale === 'zh-Hans' ? 'zh-CN' : 'en', { hour: 'numeric', minute: '2-digit' }) : null;
       const today = await loadPetalToday().catch(() => null);
       if (!active) return;
+      const avatars = await loadAvatarCollection().catch(() => null);
+      if (!active) return;
+      const welcomeWaiting = isWelcomeActive() || Boolean(avatars?.welcome.needed);
       setPetal(today);
       pendingCard.current = { time, streak, keepsake: earned?.keepsakes[0].id };
-      if (earned) setReveal(earned); else afterKeepsake(today);
+      if (earned) {
+        if (welcomeWaiting) setDeferredReveal(earned);
+        else setReveal(earned);
+      } else {
+        if (welcomeWaiting) setDeferredToday({ today });
+        else afterKeepsake(today);
+      }
     })();
     return () => { active = false; };
   }, [locale, progress, isGardenLoading]);

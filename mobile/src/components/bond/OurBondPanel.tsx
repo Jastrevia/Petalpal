@@ -2,6 +2,10 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import type { ClosenessSource, ClosenessSummary } from '../../services/fairyCloseness';
+import { useAvatarCollection } from '../../services/avatars';
+import { AvatarCollection } from '../avatars/AvatarCollection';
+import { AVATAR_ART } from '../avatars/avatarArt';
+import { avatarCopy } from '../avatars/avatarCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { pickTapLine, RECENT_TAP_LINES } from '../garden/fairy/tapLines';
 import { BOND_COPY, BOND_TIERS, type BondLocale } from './bondCopy';
@@ -30,8 +34,9 @@ const BOOK_THUMBS = ['crocus-brooch', 'acorn-teacup', 'dewdrop'];
 const MEDALLION = '#EAE8D7';
 
 // Our Bond (亲密度): PPL resting on the garden ledge, then level and progress, today's progress,
-// check-in rewards, levels and unlocks, and the keepsake book, quiet serif type on the panel theme.
-// The check-in itself lives in the Garden calendar.
+// check-in rewards, levels and unlocks, the avatar collection and the keepsake book, quiet serif
+// type on the panel theme. The check-in itself lives in the Garden calendar. Avatars and keepsakes
+// are separate collections with their own counts.
 export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   visible: boolean; locale: BondLocale; summary: ClosenessSummary | null; loading: boolean; onClose: () => void;
 }) {
@@ -40,6 +45,9 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const reducedMotion = useReducedMotion();
   const [bookOpen, setBookOpen] = useState(false);
+  const [avatarsOpen, setAvatarsOpen] = useState(false);
+  const avatarWords = avatarCopy(locale);
+  const { collection: avatars } = useAvatarCollection(visible, summary?.level);
   const [said, setSaid] = useState<{ key: number; text: string } | null>(null);
   const [heroWidth, setHeroWidth] = useState(0);
   const recentLines = useRef<string[]>([]);
@@ -92,6 +100,13 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               {zh ? <Text style={styles.small}>{tier.zh}</Text> : null}
               <View style={styles.track}><View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} /></View>
               <Text style={styles.next}>{summary.maxed ? copy.maxed : copy.toNext(summary.pointsForNextLevel! - summary.pointsIntoLevel, summary.level + 1)}</Text>
+              {/* The avatar reward for the next level, or the ones waiting now (server data). */}
+              {avatars?.bondOn ? <Pressable accessibilityRole="button" onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.avatarHint, avatars.ready > 0 && styles.avatarHintReady, pressed && styles.pressed, styles.focus]}>
+                <Text style={[styles.avatarHintText, avatars.ready > 0 && styles.avatarHintTextReady]}>
+                  ✦ {avatars.ready > 1 ? avatarWords.rewardsReady(avatars.ready) : avatars.ready === 1 ? avatarWords.rewardReady
+                    : avatars.nextRewardLevel ? avatarWords.nextUnlock(avatars.nextRewardLevel) : avatarWords.allCollected}
+                </Text>
+              </Pressable> : null}
 
 
               <Text style={[styles.checkInLine, summary.checkIn.checkedInToday && styles.checkInDone]}>
@@ -130,6 +145,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               </Section>
 
               <Section styles={styles} title={copy.levels}>
+                <Text style={styles.avatarNote}>✦ {avatarWords.milestoneNote}</Text>
                 {BOND_TIERS.map((item, index) => {
                   const unlock = summary.unlocks.find(entry => entry.level === item.level);
                   const reached = summary.level >= item.level;
@@ -139,13 +155,27 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                       <Text style={styles.rowTitle}>{item.en}</Text>
                       {zh ? <Text style={styles.small}>{item.zh}</Text> : null}
                       {unlock ? <Text style={styles.tiny}>{copy.unlocks[unlock.key] ?? unlock.key}{unlock.status === 'coming_soon' ? ` · ${copy.comingSoon}` : ''}</Text> : null}
+                      <Text style={[styles.tiny, styles.avatarMark]}>✦ {avatarWords.milestoneAvatar(item.level)}{reached && avatars?.pending.some(reward => reward.level === item.level && reward.eligible > 0) ? ` · ${avatarWords.milestoneWaiting}` : ''}</Text>
                     </View>
                     <Text style={[styles.levelState, reached && styles.goldText]}>{reached ? copy.reached : copy.levelLocked}</Text>
                   </View>;
                 })}
               </Section>
 
-              <Pressable accessibilityRole="button" onPress={() => setBookOpen(true)} style={({ pressed }) => [styles.bookButton, styles.focus, pressed && styles.pressed]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${avatarWords.entry}, ${avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''}${avatars?.ready ? `, ${avatarWords.entryPending(avatars.ready)}` : ''}`}
+                onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.bookButton, styles.focus, pressed && styles.pressed]}>
+                <View style={styles.thumbs}>
+                  {(avatars?.owned.length ? avatars.owned.slice(-3) : ['fairy-1', 'l1-02', 'l1-05']).map((id, index) => AVATAR_ART[id]
+                    ? <Image key={id} source={AVATAR_ART[id]} style={[styles.thumb, index > 0 && styles.thumbOverlap]} resizeMode="cover" accessible={false} /> : null)}
+                </View>
+                <Text style={styles.bookText}>{avatarWords.entry}</Text>
+                <View style={styles.entrySide}>
+                  {avatars?.ready ? <Text style={styles.entryBadge}>{avatarWords.entryPending(avatars.ready)}</Text> : null}
+                  <Text style={styles.small}>{avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''} ›</Text>
+                </View>
+              </Pressable>
+
+              <Pressable accessibilityRole="button" onPress={() => setBookOpen(true)} style={({ pressed }) => [styles.bookButton, styles.bookButtonNext, styles.focus, pressed && styles.pressed]}>
                 <View style={styles.thumbs}>
                   {BOOK_THUMBS.map((id, index) => <Image key={id} source={keepsakeArt(id)!} style={[styles.thumb, index > 0 && styles.thumbOverlap]} resizeMode="cover" accessible={false} />)}
                 </View>
@@ -162,6 +192,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
       </View>
     </View>
     <KeepsakeBook visible={bookOpen} locale={locale} onClose={() => setBookOpen(false)} />
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
 
@@ -266,6 +297,15 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     thumb: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: theme.gold, backgroundColor: MEDALLION },
     thumbOverlap: { marginLeft: -9 },
     bookText: { flex: 1, fontFamily: 'serif', fontSize: 17, color: theme.text },
+    bookButtonNext: { marginTop: 10 },
+    entrySide: { alignItems: 'flex-end', gap: 3 },
+    entryBadge: { fontSize: 10, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', color: goldText },
+    avatarHint: { alignSelf: 'flex-end', marginTop: 6, paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999 },
+    avatarHintReady: { borderWidth: 1, borderColor: theme.gold, backgroundColor: `${theme.gold}1F` },
+    avatarHintText: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 13, color: theme.muted },
+    avatarHintTextReady: { fontStyle: 'normal', color: theme.text },
+    avatarNote: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 13, lineHeight: 18, color: theme.muted, textAlign: 'center', marginBottom: 4 },
+    avatarMark: { color: goldText, opacity: 0.9, marginTop: 1 },
     pressed: { opacity: 0.8 },
     // Keyboard focus keeps a ring, in the panel's colours rather than the browser's blue (as in the calendar).
     focus: Platform.OS === 'web' ? { outlineColor: light ? '#416651' : '#D6C58B' } : {},

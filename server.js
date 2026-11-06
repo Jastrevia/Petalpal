@@ -55,6 +55,7 @@ import {
 } from "./lib/fairy-moments.js";
 import { isMomentCover } from "./lib/moment-covers.js";
 import { isLibraryAvatar } from "./lib/avatars.js";
+import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar } from "./lib/avatar-collection.js";
 import {
   awardCloseness,
   awardFairyTap,
@@ -1486,6 +1487,13 @@ app.post("/legacy-register-disabled", async (req, res) => {
   
       await requireCommunityAcceptance(prisma, userId);
       assertSocialContent(avatar);
+      // Library avatars are worn only once owned (lib/avatar-collection.js); the one already worn
+      // stays wearable. Legacy emoji avatars keep the old rule.
+      const trimmed = avatar.trim();
+      if (isLibraryAvatar(trimmed) && !await ownsAvatar(prisma, { userId, avatar: trimmed })) {
+        const current = await prisma.user.findUnique({ where: { id: userId }, select: { avatar: true } });
+        if (current?.avatar !== trimmed) return res.status(403).json({ error: "Unlock this avatar first", code: "AVATAR_NOT_OWNED" });
+      }
       const user = await prisma.user.update({
         where: {
           id: userId
@@ -2053,6 +2061,28 @@ app.get("/api/fairy/keepsakes", closenessRoute("GET /api/fairy/keepsakes",
 app.post("/api/fairy/closeness/tap", allowBodyFields([]), closenessRoute("POST /api/fairy/closeness/tap",
   req => awardFairyTap(prisma, { userId: req.auth.userId, now: new Date() })));
 
+// The avatar collection (lib/avatar-collection.js): owned avatars, the one-time welcome gift and
+// one chosen avatar per Fairy Bond level reached. The server works out the level and eligibility.
+const avatarRoute = (label, handler) => async (req, res) => {
+  try {
+    res.json(await handler(req));
+  } catch (error) {
+    if (error instanceof AvatarError) return res.status(error.status).json({ error: error.message, code: error.code });
+    if (error?.code === "P2002") return res.status(409).json({ error: "Avatar reward already granted", code: "CONFLICT" });
+    logServerError(`${label} error`, error);
+    res.status(500).json({ error: "Unable to update avatars" });
+  }
+};
+
+app.get("/api/avatars", avatarRoute("GET /api/avatars",
+  req => avatarCollection(prisma, { userId: req.auth.userId })));
+
+app.post("/api/avatars/welcome", allowBodyFields(["avatar"]), avatarRoute("POST /api/avatars/welcome",
+  req => grantWelcomeAvatars(prisma, { userId: req.auth.userId, avatar: req.body.avatar, now: new Date() })));
+
+app.post("/api/avatars/claim", allowBodyFields(["level", "avatar"]), avatarRoute("POST /api/avatars/claim",
+  req => claimLevelAvatar(prisma, { userId: req.auth.userId, level: req.body.level, avatar: req.body.avatar, now: new Date() })));
+
 // The Garden pets' wardrobe and food (lib/garden-pets.js), behind the same switch as closeness.
 const validPet = (req, res, next) => (fairyClosenessEnabledFor(req.auth.userId) && GARDEN_PETS.includes(req.params.petId)
   ? next() : res.status(404).json({ error: "Not found" }));
@@ -2291,6 +2321,16 @@ function withEmotionLabDiagnostics(result, includeDiagnostics, details = result.
 }
 
 async function eventEmotionResult({ userId, eventId, text, primaryGardenMood, aiProcessingAllowed, createdConsentUpdatedAt, includeDiagnostics = false }) {
+  if (aiProcessingAllowed !== true) return withEmotionLabDiagnostics(
+    { status: "SKIPPED", labels: [], latencyMs: 0, fallbackReason: "CONSENT_DISABLED" }, includeDiagnostics,
+    { attempted: false, status: "SKIPPED", fallbackReason: "AI_CONSENT_DISABLED" });
+  if (!text || !text.trim()) {
+    return withEmotionLabDiagnostics(
+      { status: "SUCCESS", labels: [], latencyMs: 0, fallbackReason: null, consentUpdatedAt: createdConsentUpdatedAt },
+      includeDiagnostics,
+      { attempted: false, status: "SUCCESS", fallbackReason: null, validatedLabels: [] }
+    );
+  }
   if (eventEmotionProvider() !== "workers-ai") {
     const result = await classifyHaikuEventSecondaryEmotions({ prisma, identity: { userId }, eventId,
       text, primaryGardenMood, aiProcessingAllowed, createdConsentUpdatedAt });

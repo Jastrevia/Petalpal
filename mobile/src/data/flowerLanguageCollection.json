@@ -1,0 +1,799 @@
+{
+  "schemaVersion": 1,
+  "collectionId": "flower-language-collection",
+  "title": {
+    "en": "Flower Language Collection",
+    "zh": "花语集"
+  },
+  "localeSource": "useAppLocale",
+  "contentPolicy": {
+    "meaningType": "PetalPal editorial interpretations; not universally fixed traditional floriography",
+    "note": "The uploaded source document supplies mood-to-flower groups and group-level tooltip copy. Per-flower meanings and bilingual descriptions are authored editorial text, not asserted as verbatim source facts.",
+    "uncertainName": "Tumi.png: Chinese botanical identification is unverified; leave the asset filename unchanged."
+  },
+  "reading": {
+    "categoryCount": 8,
+    "sectionOpeningPage": true,
+    "flowersPerPage": 1,
+    "pageTurn": "full-physical-page",
+    "noInternalScrolling": true,
+    "bookmarkLabelField": "tab",
+    "bookmarks": "one per category",
+    "pageNumbering": "global sequential pages",
+    "imagePolicy": "use existing PNG files; preserve transparency and aspect ratio"
+  },
+  "categories": [
+    {
+      "id": "happy",
+      "tab": "Happy",
+      "folderHint": "happy",
+      "title": {
+        "en": "Sunny Bloom",
+        "zh": "明朗花开"
+      },
+      "moods": {
+        "en": [
+          "Happy",
+          "Joy",
+          "Amusement"
+        ],
+        "zh": [
+          "快乐",
+          "喜悦",
+          "愉悦"
+        ]
+      },
+      "intro": {
+        "en": "A bright chapter for joyful moments, lighthearted laughter, and little sparks of delight.",
+        "zh": "献给快乐、喜悦，以及那些让心里突然亮起来的瞬间。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Sunny Bloom",
+            "zh": "明朗花开"
+          },
+          "moods": {
+            "en": "Happy · Joy · Amusement",
+            "zh": "快乐 · 喜悦 · 愉悦"
+          },
+          "intro": {
+            "en": "A bright chapter for joyful moments, lighthearted laughter, and little sparks of delight.",
+            "zh": "献给快乐、喜悦，以及那些让心里突然亮起来的瞬间。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "coreopsis",
+          "imageFile": "Coreopsis.png",
+          "name": {
+            "en": "Coreopsis",
+            "zh": "金鸡菊"
+          },
+          "meaning": {
+            "en": "Joy, brightness, hope",
+            "zh": "快乐、明朗、希望"
+          },
+          "description": {
+            "en": "Like a small sun swaying in the breeze, it celebrates the moments that make your heart feel lighter.",
+            "zh": "像一束轻轻摇晃的阳光，纪念让心情明亮起来的时刻。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "daisy",
+          "imageFile": "Daisy.png",
+          "name": {
+            "en": "Daisy",
+            "zh": "雏菊"
+          },
+          "meaning": {
+            "en": "Innocence, simplicity, cheerful joy",
+            "zh": "纯真、简单、轻快的快乐"
+          },
+          "description": {
+            "en": "A daisy holds the easy happiness of an unguarded smile.",
+            "zh": "雏菊像不带负担的笑容，收藏那些简单而真切的快乐。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "gerbera-daisy",
+          "imageFile": "Gerbera Daisy.png",
+          "name": {
+            "en": "Gerbera Daisy",
+            "zh": "非洲菊"
+          },
+          "meaning": {
+            "en": "Cheerfulness, vitality, bright delight",
+            "zh": "开朗、活力、鲜明的喜悦"
+          },
+          "description": {
+            "en": "Its vivid petals suit the days when everything suddenly feels alive.",
+            "zh": "鲜明的花瓣，适合记录让世界突然鲜活起来的瞬间。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "sunflower",
+          "imageFile": "Sunflower.png",
+          "name": {
+            "en": "Sunflower",
+            "zh": "向日葵"
+          },
+          "meaning": {
+            "en": "Warmth, optimism, devotion to light",
+            "zh": "温暖、乐观、向光而行"
+          },
+          "description": {
+            "en": "The sunflower turns toward light, like a heart returning to what gives it energy.",
+            "zh": "向日葵追逐光亮，像一颗重新找回力量的心。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "anger",
+      "tab": "Anger",
+      "folderHint": "anger&frustration",
+      "title": {
+        "en": "Fire Bloom",
+        "zh": "炽烈花开"
+      },
+      "moods": {
+        "en": [
+          "Anger",
+          "Frustration"
+        ],
+        "zh": [
+          "愤怒",
+          "挫败"
+        ]
+      },
+      "intro": {
+        "en": "A vivid chapter for feelings that burn brightly and deserve to be acknowledged.",
+        "zh": "献给愤怒与挫败，也献给那些值得被认真看见的强烈感受。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Fire Bloom",
+            "zh": "炽烈花开"
+          },
+          "moods": {
+            "en": "Anger · Frustration",
+            "zh": "愤怒 · 挫败"
+          },
+          "intro": {
+            "en": "A vivid chapter for feelings that burn brightly and deserve to be acknowledged.",
+            "zh": "献给愤怒与挫败，也献给那些值得被认真看见的强烈感受。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "gentian",
+          "imageFile": "Gentian.png",
+          "name": {
+            "en": "Gentian",
+            "zh": "龙胆"
+          },
+          "meaning": {
+            "en": "Resolve, honesty, fierce sincerity",
+            "zh": "坚定、坦诚、强烈的真心"
+          },
+          "description": {
+            "en": "Its deep blue color evokes a feeling that refuses to be ignored.",
+            "zh": "深蓝色的花朵，像一份不愿再被忽略的真实情绪。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "petunia",
+          "imageFile": "Petunia.png",
+          "name": {
+            "en": "Petunia",
+            "zh": "矮牵牛"
+          },
+          "meaning": {
+            "en": "Emotional intensity, expression, resistance",
+            "zh": "浓烈情绪、表达、不甘"
+          },
+          "description": {
+            "en": "The bold bloom offers room for frustration to be named rather than hidden.",
+            "zh": "饱满的花色，让难以言说的不甘也有了形状。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "poppy",
+          "imageFile": "Poppy.png",
+          "name": {
+            "en": "Poppy",
+            "zh": "虞美人／罂粟属花"
+          },
+          "meaning": {
+            "en": "Release, powerful feeling, emotional waves",
+            "zh": "释放、强烈感受、情绪的波澜"
+          },
+          "description": {
+            "en": "Its striking petals evoke an emotion that arrives all at once.",
+            "zh": "鲜明的花瓣，像忽然涌上心头、无法忽视的波澜。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "anxiety",
+      "tab": "Anxiety",
+      "folderHint": "anxiety&stress&fear",
+      "title": {
+        "en": "Healing Bloom",
+        "zh": "疗愈花开"
+      },
+      "moods": {
+        "en": [
+          "Anxiety",
+          "Stress",
+          "Fear"
+        ],
+        "zh": [
+          "焦虑",
+          "压力",
+          "恐惧"
+        ]
+      },
+      "intro": {
+        "en": "A gentle chapter for uneasy days and the effort of finding steadiness again.",
+        "zh": "献给不安的日子，以及一点一点找回安稳的努力。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Healing Bloom",
+            "zh": "疗愈花开"
+          },
+          "moods": {
+            "en": "Anxiety · Stress · Fear",
+            "zh": "焦虑 · 压力 · 恐惧"
+          },
+          "intro": {
+            "en": "A gentle chapter for uneasy days and the effort of finding steadiness again.",
+            "zh": "献给不安的日子，以及一点一点找回安稳的努力。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "chamomile",
+          "imageFile": "Chamomile.png",
+          "name": {
+            "en": "Chamomile",
+            "zh": "洋甘菊"
+          },
+          "meaning": {
+            "en": "Comfort, soothing, rest",
+            "zh": "安抚、舒缓、休息"
+          },
+          "description": {
+            "en": "A small reminder to offer yourself a softer moment.",
+            "zh": "像一次放慢的呼吸，提醒自己也值得温柔对待。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "snowdrop",
+          "imageFile": "Snowdrop.png",
+          "name": {
+            "en": "Snowdrop",
+            "zh": "雪滴花"
+          },
+          "meaning": {
+            "en": "Hope, resilience, new beginnings",
+            "zh": "希望、复原、重新开始"
+          },
+          "description": {
+            "en": "It blooms through cold days, suggesting that gentle courage can persist.",
+            "zh": "雪滴花穿过寒意开放，像害怕时仍愿意向前的一点勇气。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "calm",
+      "tab": "Calm",
+      "folderHint": "calm &peace",
+      "title": {
+        "en": "Peaceful Bloom",
+        "zh": "宁静花开"
+      },
+      "moods": {
+        "en": [
+          "Calm",
+          "Peace"
+        ],
+        "zh": [
+          "平静",
+          "平和"
+        ]
+      },
+      "intro": {
+        "en": "A quiet chapter for balance, stillness, and the space after the noise fades.",
+        "zh": "献给安静、平衡，以及喧闹褪去后留下的从容。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Peaceful Bloom",
+            "zh": "宁静花开"
+          },
+          "moods": {
+            "en": "Calm · Peace",
+            "zh": "平静 · 平和"
+          },
+          "intro": {
+            "en": "A quiet chapter for balance, stillness, and the space after the noise fades.",
+            "zh": "献给安静、平衡，以及喧闹褪去后留下的从容。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "chinese-violet-cress",
+          "imageFile": "Chinese-Violet-Cress.png",
+          "name": {
+            "en": "Chinese Violet Cress",
+            "zh": "诸葛菜（二月兰）"
+          },
+          "meaning": {
+            "en": "Gentleness, steadiness, quiet balance",
+            "zh": "柔和、安定、细小而稳定的平衡"
+          },
+          "description": {
+            "en": "The delicate blossoms honor peaceful moments that are anything but empty.",
+            "zh": "纤细的花朵，纪念平静却并不空白的日常。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "lavender",
+          "imageFile": "Lavender.png",
+          "name": {
+            "en": "Lavender",
+            "zh": "薰衣草"
+          },
+          "meaning": {
+            "en": "Calm, ease, rest",
+            "zh": "平静、舒缓、休息"
+          },
+          "description": {
+            "en": "Lavender belongs to slow evenings and a mind allowed to settle.",
+            "zh": "薰衣草适合慢下来的夜晚，陪心绪渐渐安静。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "olive",
+          "imageFile": "Olive.png",
+          "name": {
+            "en": "Olive",
+            "zh": "橄榄枝"
+          },
+          "meaning": {
+            "en": "Peace, reconciliation, harmony",
+            "zh": "和平、和解、调和"
+          },
+          "description": {
+            "en": "An olive branch carries the hope of meeting the world with a gentler heart.",
+            "zh": "橄榄枝象征和解与调和，也珍惜重新恢复的平衡。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "white-magnolia",
+          "imageFile": "white-Magnolia.png",
+          "name": {
+            "en": "White Magnolia",
+            "zh": "白玉兰"
+          },
+          "meaning": {
+            "en": "Quiet dignity, serenity, clarity",
+            "zh": "宁静、从容、清澈"
+          },
+          "description": {
+            "en": "Its white petals suggest a calm that does not need to speak loudly.",
+            "zh": "洁白的花瓣，如同无需喧哗也能感受到的平和。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "love",
+      "tab": "Love",
+      "folderHint": "love&caring&gratitude",
+      "title": {
+        "en": "Gentle Bloom",
+        "zh": "温柔花开"
+      },
+      "moods": {
+        "en": [
+          "Love",
+          "Caring",
+          "Gratitude"
+        ],
+        "zh": [
+          "爱",
+          "关怀",
+          "感激"
+        ]
+      },
+      "intro": {
+        "en": "A warm chapter for affection, tenderness, and the gratitude we carry for others.",
+        "zh": "献给爱与关怀，以及那些想认真说出口的感谢。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Gentle Bloom",
+            "zh": "温柔花开"
+          },
+          "moods": {
+            "en": "Love · Caring · Gratitude",
+            "zh": "爱 · 关怀 · 感激"
+          },
+          "intro": {
+            "en": "A warm chapter for affection, tenderness, and the gratitude we carry for others.",
+            "zh": "献给爱与关怀，以及那些想认真说出口的感谢。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "hydrangea",
+          "imageFile": "Hydrangea.png",
+          "name": {
+            "en": "Hydrangea",
+            "zh": "绣球花"
+          },
+          "meaning": {
+            "en": "Gratitude, understanding, heartfelt connection",
+            "zh": "感谢、理解、真挚联结"
+          },
+          "description": {
+            "en": "Its clustered petals resemble many small acts of care coming together.",
+            "zh": "繁密的花瓣，像许多细小的关心汇成的温柔。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "rose",
+          "imageFile": "Rose.png",
+          "name": {
+            "en": "Rose",
+            "zh": "玫瑰"
+          },
+          "meaning": {
+            "en": "Love, appreciation, sincere affection",
+            "zh": "爱、珍惜、真挚心意"
+          },
+          "description": {
+            "en": "A rose gives shape to feelings we want someone else to know.",
+            "zh": "玫瑰让那些想要传达的珍惜与爱意有了形状。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sad",
+      "tab": "Sad",
+      "folderHint": "sad&loneliness",
+      "title": {
+        "en": "Quiet Bloom",
+        "zh": "静默花开"
+      },
+      "moods": {
+        "en": [
+          "Sadness",
+          "Loneliness"
+        ],
+        "zh": [
+          "悲伤",
+          "孤独"
+        ]
+      },
+      "intro": {
+        "en": "A soft chapter for heavy days, loneliness, and feelings that linger quietly.",
+        "zh": "献给难过与孤独，也献给那些沉默却真切的心情。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Quiet Bloom",
+            "zh": "静默花开"
+          },
+          "moods": {
+            "en": "Sadness · Loneliness",
+            "zh": "悲伤 · 孤独"
+          },
+          "intro": {
+            "en": "A soft chapter for heavy days, loneliness, and feelings that linger quietly.",
+            "zh": "献给难过与孤独，也献给那些沉默却真切的心情。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "anemone",
+          "imageFile": "Anemone.png",
+          "name": {
+            "en": "Anemone",
+            "zh": "银莲花"
+          },
+          "meaning": {
+            "en": "Longing, fragile hope, remembrance",
+            "zh": "思念、脆弱的希望、怀念"
+          },
+          "description": {
+            "en": "Its fragile beauty holds room for both loss and a little hope.",
+            "zh": "细薄的花瓣，盛放失落，也留下微弱而温柔的希望。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "bluebell",
+          "imageFile": "Bluebell.png",
+          "name": {
+            "en": "Bluebell",
+            "zh": "蓝铃花"
+          },
+          "meaning": {
+            "en": "Quiet companionship, humility, remembrance",
+            "zh": "静默陪伴、谦逊、怀念"
+          },
+          "description": {
+            "en": "Its hanging bells speak of a presence that stays without disturbing.",
+            "zh": "低垂的小花铃，如同不打扰却始终在身边的陪伴。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "heather",
+          "imageFile": "Heather.png",
+          "name": {
+            "en": "Heather",
+            "zh": "石楠花"
+          },
+          "meaning": {
+            "en": "Protection, understanding, quiet care",
+            "zh": "守护、理解、温柔陪伴"
+          },
+          "description": {
+            "en": "Heather makes space for feelings that are difficult to put into words.",
+            "zh": "细密的花穗，陪伴那些暂时说不出口的低落。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "tumi",
+          "imageFile": "Tumi.png",
+          "name": {
+            "en": "Tumi",
+            "zh": "荼蘼（暂定）"
+          },
+          "meaning": {
+            "en": "Tenderness, vulnerability, quiet sorrow",
+            "zh": "柔软、脆弱、静静的哀伤"
+          },
+          "description": {
+            "en": "A gentle image for sadness that asks only to be seen.",
+            "zh": "一朵柔软的花，安放那些只希望被看见的悲伤。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "surprise",
+      "tab": "Surprise",
+      "folderHint": "surprise&excitement&curiosity",
+      "title": {
+        "en": "Wonder Bloom",
+        "zh": "奇遇花开"
+      },
+      "moods": {
+        "en": [
+          "Surprise",
+          "Excitement",
+          "Curiosity"
+        ],
+        "zh": [
+          "惊喜",
+          "兴奋",
+          "好奇"
+        ]
+      },
+      "intro": {
+        "en": "A lively chapter for unexpected discoveries and the thrill of something new.",
+        "zh": "献给意外的惊喜、跃动的兴奋，以及对未知的好奇。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Wonder Bloom",
+            "zh": "奇遇花开"
+          },
+          "moods": {
+            "en": "Surprise · Excitement · Curiosity",
+            "zh": "惊喜 · 兴奋 · 好奇"
+          },
+          "intro": {
+            "en": "A lively chapter for unexpected discoveries and the thrill of something new.",
+            "zh": "献给意外的惊喜、跃动的兴奋，以及对未知的好奇。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "bird-of-paradise",
+          "imageFile": "Bird of Paradise.png",
+          "name": {
+            "en": "Bird of Paradise",
+            "zh": "鹤望兰（天堂鸟）"
+          },
+          "meaning": {
+            "en": "Wonder, freedom, extraordinary possibility",
+            "zh": "奇遇、自由、突破"
+          },
+          "description": {
+            "en": "Its bold shape feels like a door opening to something unexpected.",
+            "zh": "特别的花形，像一扇突然打开、通往新世界的门。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "tulip",
+          "imageFile": "Tulip.png",
+          "name": {
+            "en": "Tulip",
+            "zh": "郁金香"
+          },
+          "meaning": {
+            "en": "Fresh delight, anticipation, bright beginnings",
+            "zh": "欣喜、期待、新鲜的开始"
+          },
+          "description": {
+            "en": "A tulip celebrates the small thrill of seeing something anew.",
+            "zh": "郁金香收藏那些令人眼前一亮的小小惊喜。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "white-rose",
+          "imageFile": "White-Rose.png",
+          "name": {
+            "en": "White Rose",
+            "zh": "白玫瑰"
+          },
+          "meaning": {
+            "en": "Sincerity, fresh beginnings, gentle surprise",
+            "zh": "真诚、纯净、温柔的惊喜"
+          },
+          "description": {
+            "en": "Its pale petals feel like an unexpected kindness offered quietly.",
+            "zh": "洁白的花瓣，像不经意间收到的一份真挚心意。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "yellow-daffodil",
+          "imageFile": "Yellow-Daffodil.png",
+          "name": {
+            "en": "Yellow Daffodil",
+            "zh": "黄水仙"
+          },
+          "meaning": {
+            "en": "Renewal, hope, joyful anticipation",
+            "zh": "新生、希望、明亮的期待"
+          },
+          "description": {
+            "en": "A burst of yellow brings the promise of another beginning.",
+            "zh": "明亮的黄色，像新的开始刚刚探出头来。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tiredness",
+      "tab": "Tiredness",
+      "folderHint": "tiredness&numbness&confusion",
+      "title": {
+        "en": "Drifting Bloom",
+        "zh": "漂游花开"
+      },
+      "moods": {
+        "en": [
+          "Tiredness",
+          "Numbness",
+          "Confusion"
+        ],
+        "zh": [
+          "疲惫",
+          "麻木",
+          "困惑"
+        ]
+      },
+      "intro": {
+        "en": "A light chapter for foggy days, emotional distance, and the need to rest without explanation.",
+        "zh": "献给疲惫、麻木与困惑，也允许自己暂时不必弄清一切。"
+      },
+      "pages": [
+        {
+          "type": "category",
+          "title": {
+            "en": "Drifting Bloom",
+            "zh": "漂游花开"
+          },
+          "moods": {
+            "en": "Tiredness · Numbness · Confusion",
+            "zh": "疲惫 · 麻木 · 困惑"
+          },
+          "intro": {
+            "en": "A light chapter for foggy days, emotional distance, and the need to rest without explanation.",
+            "zh": "献给疲惫、麻木与困惑，也允许自己暂时不必弄清一切。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "aster",
+          "imageFile": "Aster.png",
+          "name": {
+            "en": "Aster",
+            "zh": "紫菀"
+          },
+          "meaning": {
+            "en": "Patience, small hope, perseverance",
+            "zh": "耐心、微光、坚持"
+          },
+          "description": {
+            "en": "Even in a hazy moment, a quiet hope can remain.",
+            "zh": "即使心绪模糊，也仍可能留着一点没有熄灭的微光。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "dandelion",
+          "imageFile": "Dandelion.png",
+          "name": {
+            "en": "Dandelion",
+            "zh": "蒲公英"
+          },
+          "meaning": {
+            "en": "Letting go, drifting, lightness",
+            "zh": "放下、漂游、顺其自然"
+          },
+          "description": {
+            "en": "A dandelion allows thoughts to float without demanding answers.",
+            "zh": "蒲公英让思绪轻轻飘散，不必急着得到答案。"
+          }
+        },
+        {
+          "type": "flower",
+          "flowerId": "yellow-rapeseed-flower",
+          "imageFile": "Yellow-Rapeseed-Flower.png",
+          "name": {
+            "en": "Yellow Rapeseed Flower",
+            "zh": "油菜花"
+          },
+          "meaning": {
+            "en": "Everyday vitality, gradual recovery, warmth",
+            "zh": "朴素生机、缓慢恢复、温暖"
+          },
+          "description": {
+            "en": "Its ordinary brightness reminds us that energy can return a little at a time.",
+            "zh": "朴素的花朵提醒我们，力气也可以一点一点回来。"
+          }
+        }
+      ]
+    }
+  ]
+}

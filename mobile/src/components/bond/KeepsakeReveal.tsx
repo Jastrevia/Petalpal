@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CheckInResult } from '../../services/fairyCloseness';
+import { holdBondCelebration } from '../../services/avatars';
 import { BOND, BOND_COPY, type BondLocale } from './bondCopy';
 import { keepsakeArt } from './keepsakeArt';
 
@@ -13,6 +14,9 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const [index, setIndex] = useState(0);
   const grow = useRef(new Animated.Value(0)).current;
   useEffect(() => { setIndex(0); }, [result]);
+  // A Fairy Bond level-up celebration waits until the keepsakes have been looked at.
+  const showing = Boolean(result?.keepsakes.length);
+  useEffect(() => (showing ? holdBondCelebration() : undefined), [showing]);
   useEffect(() => {
     grow.setValue(0);
     Animated.spring(grow, { toValue: 1, friction: 6, tension: 60, useNativeDriver: true }).start();
