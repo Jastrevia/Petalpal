@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAvatarCollection } from '../../services/avatars';
-import { markAvatarsSeen, markKeepsakesSeen, type CollectionAlerts } from '../../services/collectionAlerts';
+import { markKeepsakesSeen, type CollectionAlerts } from '../../services/collectionAlerts';
 import { useClosenessSummary } from '../../services/fairyCloseness';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { AVATAR_ART } from '../avatars/avatarArt';
@@ -13,16 +13,17 @@ import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 // Collection (收藏), opened from the Garden dock under Letters: the keepsakes her check-ins give
 // and the avatar collection, moved here from Our Bond (owner, 2026-11-06). Today's new keepsakes
 // read "New" until the owner has opened the keepsake book; an avatar reward that can be chosen
-// shows "!" until the owner has looked at the avatars (choosing is not required).
+// shows "!", and the three avatars given at sign-up read "New", until the owner has looked at the
+// avatars (choosing is not required).
 const CASKET = require('@/assets/garden-dock/collection-casket.webp');
 const KEEPSAKE_THUMBS = ['crocus-brooch', 'acorn-teacup', 'dewdrop'];
 const AVATAR_THUMBS = ['fairy-1', 'l1-02', 'l1-05'];
 const MEDALLION = '#EAE8D7';
 export const COLLECTION_COPY = {
   en: { title: 'Collection', close: 'Close', keepsakes: 'Keepsakes', avatars: 'Avatars', isNew: 'New', newToday: (n: number) => `${n} new today`,
-    ready: 'An avatar is ready to choose', count: (owned: number, total: number) => `${owned} / ${total}`, dock: 'Collection', waiting: ', something new' },
+    ready: 'An avatar is ready to choose', gifted: (n: number) => `${n} new, a welcome gift`, count: (owned: number, total: number) => `${owned} / ${total}`, dock: 'Collection', waiting: ', something new' },
   'zh-Hans': { title: '收藏', close: '关闭', keepsakes: '信物', avatars: '头像', isNew: '新', newToday: (n: number) => `今天新得 ${n} 个`,
-    ready: '有一个头像可以选了', count: (owned: number, total: number) => `${owned} / ${total}`, dock: '收藏', waiting: '，有新东西' },
+    ready: '有一个头像可以选了', gifted: (n: number) => `新得 ${n} 个，见面礼`, count: (owned: number, total: number) => `${owned} / ${total}`, dock: '收藏', waiting: '，有新东西' },
 };
 
 export function CollectionPanel({ visible, locale, alerts, onClose }: { visible: boolean; locale: BondLocale; alerts: CollectionAlerts; onClose: () => void }) {
@@ -34,7 +35,8 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
   const { summary } = useClosenessSummary(visible);
   const { collection: avatars } = useAvatarCollection(visible);
   const keepsakesOn = Boolean(summary);
-  const ownedAvatars = avatars?.owned.length ? avatars.owned.slice(-3) : AVATAR_THUMBS;
+  const ownedAvatars = alerts.newAvatars.length ? alerts.newAvatars.slice(0, 3) : avatars?.owned.length ? avatars.owned.slice(-3) : AVATAR_THUMBS;
+  const avatarNote = alerts.reward ? copy.ready : alerts.newAvatars.length ? copy.gifted(alerts.newAvatars.length) : null;
 
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
@@ -57,7 +59,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
         </Pressable> : null}
 
         <Pressable testID="collection-avatars" accessibilityRole="button"
-          accessibilityLabel={`${copy.avatars}${avatars ? `, ${copy.count(avatars.owned.length, avatars.total)}` : ''}${alerts.avatars ? `, ${copy.ready}` : ''}`}
+          accessibilityLabel={`${copy.avatars}${avatars ? `, ${copy.count(avatars.owned.length, avatars.total)}` : ''}${avatarNote ? `, ${avatarNote}` : ''}`}
           onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
           <View style={styles.thumbs}>
             {ownedAvatars.map((id, index) => AVATAR_ART[id]
@@ -65,9 +67,11 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
           </View>
           <View style={styles.tileText}>
             <Text style={styles.tileTitle}>{copy.avatars}</Text>
-            <Text style={styles.small}>{alerts.avatars ? copy.ready : avatars ? copy.count(avatars.owned.length, avatars.total) : ''}</Text>
+            <Text style={styles.small}>{avatarNote ?? (avatars ? copy.count(avatars.owned.length, avatars.total) : '')}</Text>
           </View>
-          {alerts.avatars ? <Text testID="collection-avatars-alert" style={styles.alertBadge}>!</Text> : <Text style={styles.chevron}>›</Text>}
+          {alerts.reward ? <Text testID="collection-avatars-alert" style={styles.alertBadge}>!</Text>
+            : alerts.newAvatars.length ? <Text testID="collection-avatars-new" style={styles.newBadge}>{copy.isNew}</Text>
+            : <Text style={styles.chevron}>›</Text>}
         </Pressable>
 
         <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
@@ -77,7 +81,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
     </View>
     <KeepsakeBook visible={bookOpen} locale={locale} newIds={alerts.keepsakes ? alerts.newKeepsakes : []}
       onClose={() => { setBookOpen(false); markKeepsakesSeen(); }} />
-    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => { setAvatarsOpen(false); markAvatarsSeen(); }} />
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
 

@@ -6,7 +6,7 @@ import {
   View,
 } from 'react-native';
 
-const FAIRY_PALMS_ASSET = require('../../../assets/mailbox/fairy_palms_foreground.png');
+const FAIRY_PALMS_ASSET = require('../../../assets/mailbox/fairy_palms_foreground.webp');
 
 interface FairyPalmsSupportProps {
   isReadingMode?: boolean;

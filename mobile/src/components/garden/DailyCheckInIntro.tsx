@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkInWithFairy, loadClosenessSummary, type CheckInResult } from '../../services/fairyCloseness';
-import { isWelcomeActive, loadAvatarCollection, useWelcomeActive } from '../../services/avatars';
+import { holdBondCelebration, isWelcomeActive, loadAvatarCollection, signUpGiftPending, useWelcomeActive } from '../../services/avatars';
 import { KeepsakeReveal } from '../bond/KeepsakeReveal';
 import { PetalRing } from '../petalCards/PetalRing';
 import { loadPetalToday, type PetalToday } from '../../services/petalCardDraw';
@@ -73,20 +73,29 @@ export function DailyCheckInIntro() {
   // Waits for the Garden to appear, so the card lands on her Garden, not on an empty screen.
   const { isGardenLoading } = usePlanting();
 
+  // From the Garden's first look until today's card has gone (or there is nothing to show), the
+  // check-in holds the Garden's other moments: the AI question and the Fairy Bond level-up wait, so
+  // no two of them ever cover each other (Avatar System V1.0, popup order).
+  const hold = useRef<(() => void) | null>(null);
+  const settle = () => { hold.current?.(); hold.current = null; };
+  useEffect(() => settle, []);
   useEffect(() => {
     if (isGardenLoading) return;
     let active = true;
+    hold.current ??= holdBondCelebration();
     (async () => {
       await new Promise(resolve => setTimeout(resolve, 700));
       if (!active) return;
       const dayKey = calendarDateKey(new Date());
-      if ((await AsyncStorage.getItem(SHOWN_KEY).catch(() => null)) === dayKey) return;
+      if ((await AsyncStorage.getItem(SHOWN_KEY).catch(() => null)) === dayKey) { settle(); return; }
       const summary = await loadClosenessSummary().catch(() => null);
-      if (!summary || !active) return;
+      if (!summary) { settle(); return; }
+      if (!active) return;
       let streak = summary.checkIn.streak, at: string | null = null, earned: CheckInResult | null = null;
       if (!summary.checkIn.checkedInToday) {
         const result = await checkInWithFairy().catch(() => null);
-        if (!result || !active) return;
+        if (!result) { settle(); return; }
+        if (!active) return;
         streak = result.checkIn?.streak ?? streak + 1;
         if (result.created && result.keepsakes?.length) earned = result;
         at = new Date().toISOString();
@@ -102,7 +111,7 @@ export function DailyCheckInIntro() {
       if (!active) return;
       const avatars = await loadAvatarCollection().catch(() => null);
       if (!active) return;
-      const welcomeWaiting = isWelcomeActive() || Boolean(avatars?.welcome.needed);
+      const welcomeWaiting = isWelcomeActive() || signUpGiftPending() || Boolean(avatars?.welcome.needed);
       setPetal(today);
       pendingCard.current = { time, streak, keepsake: earned?.keepsakes[0].id };
       if (earned) {
@@ -121,7 +130,7 @@ export function DailyCheckInIntro() {
     leaving.current = true;
     AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then(reduced => {
       Animated.timing(progress, { toValue: 2, duration: reduced ? 0 : SHRINK_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: Platform.OS !== 'web' })
-        .start(() => setCard(null));
+        .start(() => { setCard(null); settle(); });
     });
   };
   useEffect(() => {

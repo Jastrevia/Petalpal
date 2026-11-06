@@ -67,7 +67,7 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
   const cells = Array.from({ length: month.getDay() + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate() }, (_, i) => i - month.getDay() + 1);
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={`${copy.open}, ${today.toLocaleDateString(copy.dateLocale)}`} onPress={() => { setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(dateKey(today)); setOpen(true); }} style={{ position: 'absolute', zIndex: 41, top: insets.top + 10, right: insets.right + 12, width: size, height: 64, justifyContent: 'center' }}>
-      <Image accessible={false} source={light ? require('../../../assets/calendar/light.png') : require('../../../assets/calendar/dark.png')} resizeMode="contain" style={{ position: 'absolute', width: size, height: 64 }} />
+      <Image accessible={false} source={light ? require('../../../assets/calendar/light.webp') : require('../../../assets/calendar/dark.webp')} resizeMode="contain" style={{ position: 'absolute', width: size, height: 64 }} />
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={.7} style={[label, { marginLeft: size * (locale === 'zh-Hans' ? .36 : .39), width: size * (locale === 'zh-Hans' ? .56 : .47), textAlign: 'center', fontSize: size * (locale === 'zh-Hans' ? .105 : .14) }]}>{today.toLocaleDateString(copy.dateLocale, { month: 'short', day: 'numeric' })}</Text>
       {__DEV__ && simulated && <Text style={{ position: 'absolute', top: 59, right: 8, fontSize: 10, color: ink }}>DEV date</Text>}
     </Pressable>

@@ -358,12 +358,12 @@ export default function SwingEntity({
     return lanternGlowOpacity.value * breath;
   });
 
-  const frame = useProductionImage(require('@/assets/garden/landmarks/swing/frame-static.png'));
-  const decor = useProductionImage(require('@/assets/garden/landmarks/swing/hanging-decor.png'));
+  const frame = useProductionImage(require('@/assets/garden/landmarks/swing/frame-static.webp'));
+  const decor = useProductionImage(require('@/assets/garden/landmarks/swing/hanging-decor.webp'));
   const lanterns = useProductionImage(require('@/assets/garden/landmarks/swing/lanterns.png'));
-  const movingBack = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-back.png'));
+  const movingBack = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-back.webp'));
   const movingFront = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-front.png'));
-  const foreground = useProductionImage(require('@/assets/garden/landmarks/swing/foreground-overlay.png'));
+  const foreground = useProductionImage(require('@/assets/garden/landmarks/swing/foreground-overlay.webp'));
   const layers = [frame, decor, lanterns, movingBack, movingFront, foreground];
   const names = SWING_LAYER_NAMES.filter((name) =>
     name !== 'fairy-slot' && name !== 'lantern-glow');

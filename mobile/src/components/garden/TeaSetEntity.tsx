@@ -83,13 +83,13 @@ export default function TeaSetEntity({
   x = 0, y = 0, scale = 1, debugMode = 'all',
   registration = TEA_SET_LAYER_REGISTRATION, onDebugStatus, fairy,
 }: TeaSetEntityProps) {
-  const leftBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-chair-base.png'));
-  const rightBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-chair-base.png'));
-  const table = useProductionImage(require('@/assets/garden/landmarks/tea-set/tea-table.png'));
+  const leftBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-chair-base.webp'));
+  const rightBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-chair-base.webp'));
+  const table = useProductionImage(require('@/assets/garden/landmarks/tea-set/tea-table.webp'));
   const leftOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-occluder.png'));
   const rightOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-occluder.png'));
   const leftOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-overlay.png'));
-  const rightOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-overlay.png'));
+  const rightOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-overlay.webp'));
   const layers = [leftBase, rightBase, table, leftOccluder, rightOccluder, leftOverlay, rightOverlay];
   const mode = __DEV__ ? debugMode : 'all';
   const status = __DEV__ ? layers.map(({ image, error }, index) =>

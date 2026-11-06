@@ -96,7 +96,7 @@ function sceneGeometry(width, height) {
         useWindowDimensions: () => ({width, height}),
       };
       if (name === './entranceTimeline') return timeline.exports;
-      if (name.endsWith('.png') || name.endsWith('.jpg')) return name;
+      if (/\.(png|jpg|webp)$/.test(name)) return name;
       assert.fail(`Unexpected entrance scene dependency: ${name}`);
     },
   };

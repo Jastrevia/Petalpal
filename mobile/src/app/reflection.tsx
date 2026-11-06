@@ -1,4 +1,4 @@
-import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, pavilionReadingCamera, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
 import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
 import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
 import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -22,6 +22,7 @@ import { useAppLocale } from '../services/locale';
 // cream fourth one, the 花语集 (petal cards, kept insights, threads, letters, muted words).
 type Book = ReportType | 'notes' | 'collection';
 const BOOKS: Book[] = ['weekly', 'monthly', 'notes', 'collection'];
+const rectStyle = (r: { x: number; y: number; width: number; height: number }) => ({ left: r.x, top: r.y, width: r.width, height: r.height });
 // Every label on this screen follows the app language; saved reflections keep their own words.
 const CHROME = {
   en: { book: { weekly: 'Weekly', monthly: 'Monthly', notes: 'Instruction', collection: 'Flower Language Collection' }, unit: { weekly: 'week', monthly: 'month' },
@@ -78,8 +79,8 @@ function heading(report: SavedReport, lang: ShortLocale) {
   const label = weekLabel(report.periodKey, lang);
   return label.range ? `${label.title} · ${label.range}` : label.title;
 }
-const pavilionReference = require('../../assets/reflection/pavilion-reference-v3.png');
-const pavilionEmpty = require('../../assets/reflection/pavilion-empty-v3.png');
+const pavilionReference = require('../../assets/reflection/pavilion-reference-v3.webp');
+const pavilionEmpty = require('../../assets/reflection/pavilion-empty-v3.webp');
 const pavilionNight = require('../../assets/reflection/pavilion-night-v1.webp');
 const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
@@ -336,8 +337,11 @@ export default function Reflection() {
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
   const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
   const compactBookTop = Math.min(scene.art.height * .36, height * .32);
-  const compactBookWidth = Math.min(440, width - 24);
-  const compactBookLeft = (width - compactBookWidth) / 2;
+  // Phones keep the chapter bookmarks outside the page's right edge, as on wide screens.
+  const compactTabs = open === 'collection' || open === 'notes' ? 40 : 0;
+  const compactBookWidth = Math.min(440, width - 24 - compactTabs);
+  const compactBookLeft = (width - compactBookWidth - compactTabs) / 2;
+  const readingCamera = useMemo(() => pavilionReadingCamera(width), [width]);
   const compactBookHeight = Math.max(380, height - compactBookTop - 20);
 
   const readingRect = compact ? {
@@ -464,7 +468,7 @@ export default function Reflection() {
       {weekly2Page(report, 'right', interactive)}
     </View>;
     return <View style={{ flex: compact ? undefined : 1, minHeight: 0, alignItems: 'center', paddingLeft: compact ? 0 : 18, paddingTop: compact ? 15 : 0, paddingBottom: compact ? 0 : artHeight * .045 }}>
-      <Image source={require('../../assets/reflection/botanical.png')} resizeMode="contain" accessible={false} style={{ width: '100%', height: compact ? 120 : undefined, flex: compact ? undefined : 1, opacity: .88 }} />
+      <Image source={require('../../assets/reflection/botanical.webp')} resizeMode="contain" accessible={false} style={{ width: '100%', height: compact ? 120 : undefined, flex: compact ? undefined : 1, opacity: .88 }} />
       {spread ? null : detail?.narrativeSections?.length ? <ScrollView scrollEnabled={!compact} style={{ maxHeight: compact ? undefined : 120, alignSelf: 'stretch' }}><Text style={s.note}>{detail.narrativeSections[detail.narrativeSections.length - 1].claim}</Text></ScrollView> : <Text style={s.caption}>❧  {report ? period(report, lang) : t.kept}</Text>}
     </View>;
   }
@@ -504,14 +508,33 @@ export default function Reflection() {
         return <Pressable key={item} testID={`reflection-shelf-${item}`} accessibilityRole="button"
           accessibilityState={{ selected: onBook(item), disabled: !!turning || !!flying }}
           accessibilityLabel={pavilionText.titles[item]} accessibilityHint={lang === 'en' ? 'Take this book to the reading desk' : '把这本书取到阅读桌前'}
-          disabled={!!turning || !!flying} onPress={() => openBook(item)}
+          disabled={!!turning || !!flying} onPress={() => openBook(item)} pointerEvents={compact && open ? 'none' : 'auto'}
           style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden' }}>
           {!out && (spines ? <Image source={{ uri: spines[item].uri }} accessible={false} resizeMode="stretch" style={StyleSheet.absoluteFill} />
             : <Image source={pavilionReference} accessible={false} resizeMode="stretch" style={{ position: 'absolute',
               left: scene.art.x - rect.x, top: scene.art.y - rect.y, width: scene.art.width, height: scene.art.height }} />)}
         </Pressable>;
       })}
-      {open && <PavilionBook key={open} id={open} locale={lang} spine={spines?.[open].image ?? null} geometry={geometry} timeline={timeline} focus={focus} onReady={bookReady} />}
+      {/* A phone reading a book: the whole painting fades in above the page (window, lake and the
+          shelf with this book's gap), the same view a wide screen keeps; it fades with the page. */}
+      {compact && open && <Animated.View testID="reflection-reading-scene" pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: contentFade }]}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#34251A' }]} />
+        <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', ...rectStyle(readingCamera.art) }} />
+        <Animated.Image source={pavilionNight} resizeMode="stretch" style={{ position: 'absolute', ...rectStyle(readingCamera.art), opacity: lighting }} />
+        {BOOKS.filter(item => item !== open).map(item => {
+          const rect = readingCamera.slot(item);
+          return <View key={item} style={{ position: 'absolute', ...rectStyle(rect), overflow: 'hidden' }}>
+            {spines ? <Image source={{ uri: spines[item].uri }} accessible={false} resizeMode="stretch" style={StyleSheet.absoluteFill} />
+              : <Image source={pavilionReference} accessible={false} resizeMode="stretch" style={{ position: 'absolute',
+                left: -rect.x, top: -rect.y, width: readingCamera.art.width, height: readingCamera.art.height }} />}
+          </View>;
+        })}
+      </Animated.View>}
+      {/* On a phone the page covers the book; its edges would peek out past the narrower page, so the
+          3D book fades out while the page is up and back in before it flies to the shelf. */}
+      {open && <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, compact && { opacity: contentFade.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
+        <PavilionBook key={open} id={open} locale={lang} spine={spines?.[open].image ?? null} geometry={geometry} timeline={timeline} focus={focus} onReady={bookReady} />
+      </Animated.View>}
       {open && <Animated.View testID="reflection-book" pointerEvents={flying ? 'none' : 'box-none'}
         accessibilityElementsHidden={!!flying} importantForAccessibility={flying ? 'no-hide-descendants' : 'auto'}
         style={{
@@ -543,8 +566,9 @@ export default function Reflection() {
         style={{ position: 'absolute', left: scene.lantern.x, top: scene.lantern.y,
           width: scene.lantern.width, height: scene.lantern.height }} />}
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
-      style={[s.back, { top: compact ? undefined : insets.top + 10, bottom: compact ? insets.bottom + 10 : undefined, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
+    {/* While a phone reads a book, the book's own ✕ is the only close button. */}
+    {!(compact && open) && <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
+      style={[s.back, { top: compact ? undefined : insets.top + 10, bottom: compact ? insets.bottom + 10 : undefined, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>}
   </View>;
 }
 

@@ -68,9 +68,9 @@ export default function ExistingWindowLights({ light, treehouse, swing }: {
   light: SharedValue<number>; treehouse: { x: number; y: number; scale: number };
   swing: { x: number; y: number; scale: number; rotation: number };
 }) {
-  const tree = useImage(require('@/assets/garden/landmarks/treehouse/tree-base.png'));
+  const tree = useImage(require('@/assets/garden/landmarks/treehouse/tree-base.webp'));
   const lamps = useImage(require('@/assets/garden/landmarks/swing/lanterns.png'));
-  const frame = useImage(require('@/assets/garden/landmarks/swing/frame-static.png'));
+  const frame = useImage(require('@/assets/garden/landmarks/swing/frame-static.webp'));
   const registration = SWING_LAYER_REGISTRATION.lanterns;
   const frameRegistration = SWING_LAYER_REGISTRATION['frame-static'];
   const treeRect = { x: 0, y: 0, width: TREEHOUSE_WIDTH, height: TREEHOUSE_HEIGHT };

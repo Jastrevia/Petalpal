@@ -4,7 +4,10 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
   type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
-import { LEGACY_AVATAR_IDS } from '../avatars/avatarArt';
+import { AVATAR_TIERS } from '../avatars/avatarArt';
+
+// Sign-up offers every Level 1 avatar (Avatar System V1.0): the one chosen is worn, three others are her gift.
+const LEVEL_1 = AVATAR_TIERS[0].ids;
 import { UserAvatar } from '../avatars/UserAvatar';
 
 // The sign-up pages (the owner's mock-ups, 2026-11-06): one garden scene (wisteria, a misty
@@ -142,11 +145,13 @@ export function AvatarChoice({ label, value, onChange, disabled }: { label: stri
   return <View style={styles.field}>
     <View style={styles.labelRow}><Icon name="flower" size={20} color={GOLD} strokeWidth={1.4} /><Text style={styles.label}>{label}</Text></View>
     <View style={styles.avatars} accessibilityRole="radiogroup">
-      {LEGACY_AVATAR_IDS.map((avatar, index) => <Pressable key={avatar} accessibilityRole="radio" accessibilityLabel={`Avatar ${index + 1}`}
+      {LEVEL_1.map((avatar, index) => <Pressable key={avatar} accessibilityRole="radio" accessibilityLabel={`Avatar ${index + 1}`}
         accessibilityState={{ selected: value === avatar }} disabled={disabled} onPress={() => onChange(avatar)} testID={`avatar-${avatar}`}
         style={[styles.avatar, value === avatar && styles.avatarOn]}>
-        <UserAvatar avatar={avatar} size={58} />
+        <UserAvatar avatar={avatar} size={50} />
       </Pressable>)}
+      {/* Five to a row: spacers keep the last row's avatars under the columns above. */}
+      {Array.from({ length: (5 - LEVEL_1.length % 5) % 5 }, (_, i) => <View key={`spacer-${i}`} style={styles.avatarSpacer} />)}
     </View>
   </View>;
 }
@@ -192,8 +197,9 @@ const styles = StyleSheet.create({
   input: { flex: 1, minWidth: 0, width: '100%', fontFamily: FONT_BODY, fontSize: 16, color: INK, paddingVertical: Platform.OS === 'web' ? 12 : 8,
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : {}) },
   note: { fontFamily: FONT_BODY, fontStyle: 'italic', fontSize: 13.5, lineHeight: 19, color: HINT, marginTop: 6, marginLeft: 4 },
-  avatars: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  avatar: { width: '23%', aspectRatio: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(201, 163, 94, 0.55)' },
+  avatars: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  avatarSpacer: { width: '18.5%' },
+  avatar: { width: '18.5%', aspectRatio: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(201, 163, 94, 0.55)' },
   avatarOn: { borderWidth: 3, borderColor: '#E7C26B', shadowColor: '#F2C766', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 4 },
   checkRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 5, marginTop: 2, marginBottom: 6 },
   checkHit: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },

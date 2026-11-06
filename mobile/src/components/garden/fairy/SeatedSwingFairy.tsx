@@ -4,7 +4,7 @@ import { Group, Image, useImage } from '@shopify/react-native-skia';
 // existing moving-front backrest painted AFTER the fairy, hiding her lap.
 // The whole sprite inherits the seat's pendulum transform, never floating alone.
 export default function SeatedSwingFairy() {
-  const image = useImage(require('@/assets/garden/fairy/swing-seated-v3/seated-back.png'));
+  const image = useImage(require('@/assets/garden/fairy/swing-seated-v3/seated-back.webp'));
   if (!image) return null;
   const height = 470;
   const width = height * image.width() / image.height();

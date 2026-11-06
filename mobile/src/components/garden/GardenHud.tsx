@@ -12,7 +12,6 @@ import { FairyMomentsPanel } from '../moments/FairyMomentsPanel';
 import { markFairyMomentsRead, refreshFairyRuntime, useFairyRuntime } from '../../services/fairyRuntime';
 import { useClosenessSummary } from '../../services/fairyCloseness';
 import { useAuth } from '../../services/auth';
-import { markAvatarsSeen } from '../../services/collectionAlerts';
 import { FairyEntryCard } from '../fairy/FairyEntryCard';
 import { OurBondPanel } from '../bond/OurBondPanel';
 import { AvatarCollection } from '../avatars/AvatarCollection';
@@ -152,7 +151,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     {ownerId ? <AvatarWelcome locale={locale} enabled /> : null}
     {ownerId ? <BondLevelUp userId={ownerId} locale={locale} summary={closeness.on ? closeness.summary : null}
       paused={entryOpen || bondOpen || momentsOpen || avatarsOpen || aiPromptOpen || Boolean(openFeature)} onChoose={() => setAvatarsOpen(true)} /> : null}
-    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => { setAvatarsOpen(false); markAvatarsSeen(); }} />
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
     <FairyMomentsPanel visible={momentsOpen} highlightNewest={momentsHighlight} onClose={leaveMoments}
       onFindFairy={() => { leaveMoments(); onFocusFairy?.(); }} />
     <FeatureOverlay feature={gardenFeature(openFeature)} onClose={() => setOpenFeature(undefined)} onGardenChanged={refreshGarden} onOpenSettings={() => setOpenFeature('settings')} />

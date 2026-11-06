@@ -23,7 +23,7 @@ import { useLoginEntrance } from './useLoginEntrance';
 import { ENTRANCE_STILLS } from './entranceTimeline';
 import { FairyLoadingExperience } from './FairyLoadingExperience';
 import { Link } from 'expo-router';
-const INVITATION_MATERIALS = require('../../../assets/auth/invitation_materials_repaired.png');
+const INVITATION_MATERIALS = require('../../../assets/auth/invitation_materials_repaired.webp');
 
 // Top Botanical Sprout Fleuron above PetalPal brand title
 function TopBotanicalFleuron({ size = 22, color = '#9E804D' }: { size?: number; color?: string }) {

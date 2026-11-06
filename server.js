@@ -54,8 +54,8 @@ import {
   setFairyMomentsCover
 } from "./lib/fairy-moments.js";
 import { isMomentCover } from "./lib/moment-covers.js";
-import { isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
-import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar } from "./lib/avatar-collection.js";
+import { avatarTier, isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
+import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar, welcomeGiftRows } from "./lib/avatar-collection.js";
 import {
   awardCloseness,
   awardFairyTap,
@@ -1092,8 +1092,10 @@ async function createProfile({ firebaseUid, name, body, email = null, signUp = n
             accountPassword: { create: { hash: signUp.passwordHash } },
             fairies: { create: { fairyType: STARTER_FAIRY.type, name: signUp.fairyName || STARTER_FAIRY.name, unlockSource: STARTER_FAIRY.unlockSource,
               isActive: true, runtime: { create: {} } } },
+            // The one portrait chosen on the sign-up page, and three more Level 1 avatars as her
+            // welcome gift (shown as New in Collection until seen); the welcome screen is then done.
             avatarWelcomeAt: new Date(),
-            avatarOwnerships: { create: LEGACY_AVATAR_IDS.map(avatarId => ({ avatarId, source: "SIGNUP" })) }
+            avatarOwnerships: { create: welcomeGiftRows(body.avatar) }
           } : {})
         }
       });
@@ -1190,7 +1192,8 @@ app.post("/auth/register", newAccountRateLimit,
     if (shape) return res.status(422).json({ error: shape, code: "USERNAME_INVALID" });
     if (!validNewPassword(req.body?.password)) return res.status(400).json({ error: PASSWORD_RULE, code: "PASSWORD_INVALID" });
     const avatar = req.body?.avatar ?? LEGACY_AVATAR_IDS[0];
-    if (!LEGACY_AVATAR_IDS.includes(avatar)) return res.status(400).json({ error: "Choose one of the avatars shown.", code: "AVATAR_INVALID" });
+    // Any Level 1 avatar (the sign-up page shows all 32); higher levels open with Fairy Bond.
+    if (avatarTier(avatar) !== 1) return res.status(400).json({ error: "Choose one of the avatars shown.", code: "AVATAR_INVALID" });
     const fairyName = typeof req.body?.fairyName === "string" ? req.body.fairyName.normalize("NFKC").replace(/\s+/g, " ").trim() : "";
     if (req.body?.fairyName !== undefined && typeof req.body.fairyName !== "string" || fairyName.length > MAX_FAIRY_NAME_LENGTH) {
       return res.status(400).json({ error: `Give your fairy a name of ${MAX_FAIRY_NAME_LENGTH} characters or fewer.`, code: "FAIRY_NAME_INVALID" });

@@ -4,14 +4,14 @@ import type { AppLocale } from '../../services/locale';
 import { FLOWER_ASSETS } from '../../data/flowerAssets';
 
 const instructionManualJson = require('../../data/instructionManual.json');
-const botanical = require('../../../assets/reflection/botanical.png');
+const botanical = require('../../../assets/reflection/botanical.webp');
 
 // Book cover miniatures for Guide-05
 const bookCovers = {
-  collection: require('../../../assets/reflection/pavilion-cover-collection-hd.png'),
-  weekly: require('../../../assets/reflection/pavilion-cover-weekly-hd.png'),
-  notes: require('../../../assets/reflection/pavilion-cover-notes-hd.png'),
-  monthly: require('../../../assets/reflection/pavilion-cover-monthly-hd.png'),
+  collection: require('../../../assets/reflection/pavilion-cover-collection-hd.webp'),
+  weekly: require('../../../assets/reflection/pavilion-cover-weekly-hd.webp'),
+  notes: require('../../../assets/reflection/pavilion-cover-notes-hd.webp'),
+  monthly: require('../../../assets/reflection/pavilion-cover-monthly-hd.webp'),
 };
 
 // Mailbox stamp for Guide-07

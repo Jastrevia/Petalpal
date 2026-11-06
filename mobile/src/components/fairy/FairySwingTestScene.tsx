@@ -21,7 +21,7 @@ export default function FairySwingTestScene() {
   const [foreground,setForeground]=useState(AppState.currentState==='active');
   const [ready,setReady]=useState(false);
   const phaseRef=useRef('');
-  const image=useImage(require('@/assets/garden/fairy/swing-pose-v2/poses.png'));
+  const image=useImage(require('@/assets/garden/fairy/swing-pose-v2/poses.webp'));
   const poseIndex=useSharedValue(0),poseNext=useSharedValue(0),poseMix=useSharedValue(0);
 
   const worldX=useSharedValue(start.x),worldY=useSharedValue(start.y);

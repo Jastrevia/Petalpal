@@ -159,7 +159,9 @@ test('Name and avatar make the account: no email, no password, and the session o
   const body = JSON.parse(made.options.body);
   assert.equal(body.name, 'New Petal'); assert.equal(body.avatar, '🐝'); assert.equal(body.communityTermsVersion, 'v1');
   assert.equal(body.email, undefined); assert.equal(body.password, undefined);
-  assert.equal(s.auth.currentUser.uid, 'pass-new'); assert.deepEqual(s.emails, []); assert.deepEqual(s.writes, []);
+  assert.equal(s.auth.currentUser.uid, 'pass-new'); assert.deepEqual(s.emails, []);
+  // The only thing kept on the device: a flag that the sign-up gift is still to be revealed (no account data).
+  assert.deepEqual(s.writes, [{ key: 'petalpal.avatarGiftReveal.v1', value: '1' }]);
 });
 test('A taken name comes back as its message, with nobody signed in and the name page still there', async () => {
   const s = setup(); let state = await s.ready();

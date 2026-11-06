@@ -20,7 +20,7 @@ function load(file, overrides = {}) {
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react') return { memo: fn => fn, useMemo: fn => fn() };
     if (name === '@shopify/react-native-skia') return new Proxy({}, { get: (_, key) => key === 'useImage' ? () => 'image' : key });
-    if (name.endsWith('.png')) return name;
+    if (/\.(png|webp)$/.test(name)) return name;
     return new Proxy({ __esModule: true, default: name }, { get: (object, key) => {
       if (key in object) return object[key];
       if (key === 'STATIC_LANDMARK_MAP_PLACEMENTS') return { gardenArch: placement, pavilion: placement };

@@ -43,7 +43,7 @@ export default function MoonBedTestScreen() {
   const [showExport, setShowExport] = useState(false);
   const [status, setStatus] = useState('Waiting for Canvas');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const master = useImage(require('@/assets/garden/landmarks/moon-bed/moon-bed-master.png'));
+  const master = useImage(require('@/assets/garden/landmarks/moon-bed/moon-bed-master.webp'));
   const fitScale = Math.min(viewport.width / MOON_BED_WIDTH, viewport.height / MOON_BED_HEIGHT) * TEST_SCALE;
   const scale = fitScale * previewZoom;
 

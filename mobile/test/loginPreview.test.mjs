@@ -114,7 +114,7 @@ function harness({ width = 390, phase = 'idle', platform = 'web', props = {} } =
       if (name === './entranceTimeline') return { ENTRANCE_STILLS: [] };
       if (name === './FairyLoadingExperience') return { FairyLoadingExperience: 'FairyLoadingExperience' };
       if (name === 'expo-router') return { Link: 'Link' };
-      if (/\.(png|jpg)$/.test(name)) return name;
+      if (/\.(png|jpg|webp)$/.test(name)) return name;
       assert.fail(`Unexpected preview dependency: ${name}`);
     },
   };

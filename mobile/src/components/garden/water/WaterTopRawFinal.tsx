@@ -3,7 +3,7 @@ import { type WaterTopPlacement } from '../waterTopPlacement';
 
 // Byte-identical to the approved FIRST complete image, not a rebuilt composite.
 // SHA-256: D76A9BB8FFA42402F04397481D828B86EDE72BF6099F4723C5CDC1A9BBE47B92
-export const WATER_TOP_RAW_FINAL = require('@/assets/garden/water/water-top/water-top-raw-final.png');
+export const WATER_TOP_RAW_FINAL = require('@/assets/garden/water/water-top/water-top-raw-final.webp');
 export const WATER_TOP_RAW_WIDTH = 1536;
 export const WATER_TOP_RAW_HEIGHT = 1024;
 

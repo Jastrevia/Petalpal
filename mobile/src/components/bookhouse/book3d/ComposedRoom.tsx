@@ -4,7 +4,7 @@ import { BlendMode, BlurStyle, Canvas, ClipOp, Picture, Skia, TileMode, createPi
 import { composedAt, composedDesk, composedPoint, deskShelfFade, CS, DESK_CUT, DESK_CUT_V1, PAINTING, ROOM_ROWS, WALLS, type ComposedGeometry, type ComposedState } from './composed';
 import { SHELF } from './desk';
 
-const INTERIOR = require('../../../../assets/bookhouse/interior.png');
+const INTERIOR = require('../../../../assets/bookhouse/interior.webp');
 const DESK = require('../../../../assets/bookhouse/composed/desk-cutout.webp');
 const DESK_V1 = require('../../../../assets/bookhouse/composed/desk-cutout-v1.webp');
 const WOOD = require('../../../../assets/bookhouse/composed/wood-wall.webp');

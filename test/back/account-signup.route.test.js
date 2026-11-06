@@ -10,6 +10,7 @@ import { AI_COST_ACTIONS } from "../../lib/ai-cost-gate.js";
 import { createRateLimiter } from "../../lib/rate-limit.js";
 import { app } from "../../server.js";
 import { COMMUNITY_VERSION } from "../../lib/community-policy.js";
+import { avatarTier } from "../../lib/avatars.js";
 
 const MIGRATION = "prisma/migrations/202611060001_unique_names_account_passwords/migration.sql";
 
@@ -102,9 +103,15 @@ test("an account name and a password make an account, with its fairy, avatar, no
   assert.equal(await verifyPassword("garden123", created.accountPassword.create.hash), true);
   assert.equal(created.fairies.create.name, "Mimi");
   assert.equal(created.avatar, "fairy-2");
-  // It owns the original portraits like any older account, and skips the Garden's avatar welcome.
+  // It owns the one portrait chosen on the page plus three other random Level 1 avatars (its welcome
+  // gift, New in Collection), and skips the Garden's avatar welcome.
   assert.ok(created.avatarWelcomeAt instanceof Date);
-  assert.deepEqual(created.avatarOwnerships.create.map(row => row.avatarId), ["fairy-1", "fairy-2", "fairy-3", "fairy-4", "fairy-5", "fairy-6", "fairy-7", "fairy-8"]);
+  const rows = created.avatarOwnerships.create;
+  assert.deepEqual(rows[0], { avatarId: "fairy-2", source: "WELCOME_CHOICE" });
+  assert.equal(rows.length, 4);
+  const gifts = rows.slice(1);
+  assert.ok(gifts.every(row => row.source === "WELCOME_GIFT" && avatarTier(row.avatarId) === 1 && row.avatarId !== "fairy-2"));
+  assert.equal(new Set(gifts.map(row => row.avatarId)).size, 3);
   // No fairy name: the fairy keeps its own.
   await send(url, "/auth/register", "POST", profile({ name: "Bloom_2", fairyName: undefined }));
   assert.equal(created.fairies.create.name, "PPL");
@@ -137,7 +144,8 @@ test("registration refuses a bad profile and needs the Community Guidelines", as
   mock(t, prisma.user, "create", async () => assert.fail("nothing is created"));
   // (A few by HTTP: refused sign-ups count against the network's sign-in budget. The full rules are below.)
   assert.equal((await send(url, "/auth/register", "POST", profile({ password: undefined }))).status, 400);
-  assert.equal((await send(url, "/auth/register", "POST", profile({ avatar: "🦋" }))).status, 400, "an original portrait only");
+  assert.equal((await send(url, "/auth/register", "POST", profile({ avatar: "🦋" }))).status, 400, "a library avatar only");
+  assert.equal((await send(url, "/auth/register", "POST", profile({ name: "Bloom_9", avatar: "l2-01" }))).status, 400, "Level 1 only: higher levels open with Fairy Bond");
   assert.equal((await send(url, "/auth/register", "POST", profile({ fairyName: "x".repeat(21) }))).status, 400);
   assert.equal((await send(url, "/auth/register", "POST", profile({ communityTermsVersion: undefined }))).status, 428);
   assert.equal((await send(url, "/auth/register", "POST", profile({ email: "a@b.co" }))).status, 400);

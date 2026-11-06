@@ -3,7 +3,7 @@ import { useDerivedValue } from 'react-native-reanimated';
 import { type WaterTopPlacement } from '../waterTopPlacement';
 import { useWaterTopFlow } from './WaterTopAssembly';
 
-export const WATER_TOP_SOURCE = require('@/assets/garden/water/water-top/water-top-cliff-source-v2.png');
+export const WATER_TOP_SOURCE = require('@/assets/garden/water/water-top/water-top-cliff-source-v2.webp');
 // The complete corrected painting remains one layer. Only safe open-water RGB
 // samples move; original alpha, rocks, submerged stones and lip stay fixed.
 const SOURCE_FLOW = Skia.RuntimeEffect.Make(`

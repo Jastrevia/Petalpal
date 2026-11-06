@@ -3,6 +3,7 @@ import { EmailAuthProvider, linkWithCredential, onAuthStateChanged, sendEmailVer
   signInWithCustomToken, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { apiBaseUrl, apiRequest, configureApi, publicApiRequest } from './api';
 import { forgetFairyName } from './fairyName';
+import { noteSignUpGift } from './avatars';
 import { firebaseAuth } from './firebase';
 import { loadSessionExperience, type SessionExperience, type SessionUser } from './sessionExperience';
 import { authErrorMessage, connectEmailError, PASSWORD_RESET_SENT, profileError, type ProfileInput } from './auth/registrationValidation';
@@ -235,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const generation = version.current;
     try {
       const { signInToken } = await publicApiRequest<{ signInToken: string }>('/auth/register', profileBody(profile));
+      noteSignUpGift();
       connectAfterSignIn(connect);
       await signInWithCustomToken(firebaseAuth(), signInToken);
       if (generation === version.current) await sync();

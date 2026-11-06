@@ -46,7 +46,7 @@ export default function VisitGardenScreen() {
       accessibilityHint="Leave this friend's Garden and return to your own"
       testID="visitor-return-home" onPress={() => router.dismissTo('/')}
       style={({ pressed }) => [styles.home, { bottom: insets.bottom + 16, left: insets.left + 16 }, pressed && styles.homePressed]}>
-      <Image source={require('../../../assets/friends/visitor-home-transparent.png')} style={styles.homeArtwork}
+      <Image source={require('../../../assets/friends/visitor-home-transparent.webp')} style={styles.homeArtwork}
         resizeMode="contain" accessible={false} />
     </Pressable> : <View style={[gardenLoadingStyles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
       {error ? <View style={styles.status}><Text accessibilityRole="alert" style={ui.text}>{error}</Text>

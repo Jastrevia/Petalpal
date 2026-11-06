@@ -179,11 +179,11 @@ export default function MoonBedEntity({
     windEnabled, RIGHT_PENDANT_WIND.duration, RIGHT_PENDANT_WIND.delay,
     RIGHT_PENDANT_WIND.rotation, 0, 0,
   );
-  const frame = useProductionImage(require('@/assets/garden/landmarks/moon-bed/frame-static.png'));
+  const frame = useProductionImage(require('@/assets/garden/landmarks/moon-bed/frame-static.webp'));
   const bedSurface = useProductionImage(require('@/assets/garden/landmarks/moon-bed/bed-surface.png'));
-  const pillow = useProductionImage(require('@/assets/garden/landmarks/moon-bed/pillow.png'));
+  const pillow = useProductionImage(require('@/assets/garden/landmarks/moon-bed/pillow.webp'));
   const blanketTail = useProductionImage(require('@/assets/garden/landmarks/moon-bed/blanket-tail.png'));
-  const ribbons = useProductionImage(require('@/assets/garden/landmarks/moon-bed/ribbons.png'));
+  const ribbons = useProductionImage(require('@/assets/garden/landmarks/moon-bed/ribbons.webp'));
   const hangingDecor = useProductionImage(require('@/assets/garden/landmarks/moon-bed/hanging-decor.png'));
   const layers = [ribbons, frame, bedSurface, pillow, hangingDecor, blanketTail];
   const mode = __DEV__ ? debugMode : 'all';

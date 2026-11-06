@@ -38,7 +38,7 @@ function withWebAssetVersion(asset: any, version: string) {
   return asset;
 }
 
-const FAIRY_SPRITE_01 = require('../../../assets/auth/fairy-loading/fairy_pose01_peeking.png');
+const FAIRY_SPRITE_01 = require('../../../assets/auth/fairy-loading/fairy_pose01_peeking.webp');
 const FAIRY_SPRITE_01_BODY = withWebAssetVersion(
   require('../../../assets/auth/fairy-loading/fairy_pose01_body.png'),
   POSE01_LAYER_CACHE_VERSION

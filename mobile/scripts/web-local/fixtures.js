@@ -241,7 +241,12 @@
         // The sign-up page sets the password and picks an original portrait (so no avatar welcome after).
         hasPassword = typeof request.password === 'string'; if (hasPassword) password = request.password;
         fairyName = request.fairyName || 'PPL';
-        if (avatars) { Object.assign(avatars, { welcomed: true, selected: request.avatar }); saveAvatars(); }
+        // Like the server: the chosen portrait plus three random Level 1 avatars as the welcome gift.
+        if (avatars) {
+          const pool = avatarTiers[0].filter(id => id !== request.avatar);
+          const gifts = [0, 1, 2].map(() => pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+          Object.assign(avatars, { welcomed: true, selected: request.avatar, gifted: gifts, owned: [request.avatar, ...gifts], claims: {} }); saveAvatars();
+        }
         return json({ signInToken: 'local-preview-pass' }, 201);
       }
       if (p === '/auth/password-login') {

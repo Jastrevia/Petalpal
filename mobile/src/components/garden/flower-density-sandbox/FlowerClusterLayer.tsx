@@ -180,9 +180,9 @@ export interface FlowerClusterLayerProps {
 export function FlowerClusterLayer({ flowers, tuning, showFootprints, showAnchors, variantsEnabled = true, onArtworkStatus }: FlowerClusterLayerProps) {
   const [loadError, setLoadError] = useState<string>();
   const onLoadError = useCallback((error: Error) => setLoadError(error.message), []);
-  const chamomileSource = useImage(require('../../../../assets/garden/flower-density-sandbox/chamomile.png'), onLoadError);
-  const tulipSource = useImage(require('../../../../assets/garden/flower-density-sandbox/tulip.png'), onLoadError);
-  const hydrangeaSource = useImage(require('../../../../assets/garden/flower-density-sandbox/hydrangea.png'), onLoadError);
+  const chamomileSource = useImage(require('../../../../assets/garden/flower-density-sandbox/chamomile.webp'), onLoadError);
+  const tulipSource = useImage(require('../../../../assets/garden/flower-density-sandbox/tulip.webp'), onLoadError);
+  const hydrangeaSource = useImage(require('../../../../assets/garden/flower-density-sandbox/hydrangea.webp'), onLoadError);
   const chamomile = useMemo(() => transparentArtwork(chamomileSource, 'Chamomile'), [chamomileSource]);
   const tulip = useMemo(() => transparentArtwork(tulipSource, 'Tulip'), [tulipSource]);
   const hydrangea = useMemo(() => transparentArtwork(hydrangeaSource, 'Hydrangea'), [hydrangeaSource]);

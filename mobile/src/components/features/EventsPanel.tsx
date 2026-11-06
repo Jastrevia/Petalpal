@@ -105,7 +105,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         onPress={() => void voice.start()}
         style={({ pressed }) => [styles.microphone, pressed && ui.pressed, (journal.busy || voice.active) && ui.disabled]}>
         <AttentionGlow radius={22} spread={12} />
-        <Image accessible={false} source={require('../../../assets/events/microphone.png')} style={styles.microphoneIcon} resizeMode="contain" />
+        <Image accessible={false} source={require('../../../assets/events/microphone.webp')} style={styles.microphoneIcon} resizeMode="contain" />
       </Pressable> : null}
     </View>
     {!saved ? <Text style={styles.counter}>{journal.content.length} / 4000</Text> : null}

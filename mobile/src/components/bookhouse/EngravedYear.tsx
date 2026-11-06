@@ -40,13 +40,13 @@ export function ShelfMotif({ index, sceneWidth }: { index: number; sceneWidth: n
     {Array.from({ length: 8 }, (_, inset) => <View key={inset} style={{ position: 'absolute',
       left: inset * scale, right: inset * scale, top: inset * scale, bottom: inset * scale,
       overflow: 'hidden', opacity: inset === 7 ? 1 : .18 }}>
-      <Image source={require('../../../assets/bookhouse/interior.png')} contentFit="fill"
+      <Image source={require('../../../assets/bookhouse/interior.webp')} contentFit="fill"
         style={{ position: 'absolute', width: 1024 * scale * 13, height: 1536 * scale,
           left: (-102 * 13 - inset) * scale, top: (-y - inset) * scale }} />
     </View>)}
     <View style={{ position: 'absolute', left: 17 * scale, top: h * .18 * scale,
       width: 65 * .64 * scale, height: h * .64 * scale, overflow: 'hidden', opacity: .72 }}>
-      <Image source={require('../../../assets/bookhouse/interior.png')} contentFit="fill"
+      <Image source={require('../../../assets/bookhouse/interior.webp')} contentFit="fill"
         style={{ position: 'absolute', width: 1024 * scale * .64, height: 1536 * scale * .64,
           left: -36 * scale * .64, top: -y * scale * .64 }} />
     </View>

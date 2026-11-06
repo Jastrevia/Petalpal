@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { apiRequest } from './api';
 import { onClosenessChanged } from './fairyCloseness';
@@ -80,8 +81,29 @@ export function holdBondCelebration() {
 export const bondCelebrationHeld = () => holds > 0;
 export function useBondCelebrationHeld() {
   const [held, setHeld] = useState(bondCelebrationHeld);
-  useEffect(() => { holdListeners.add(setHeld); return () => { holdListeners.delete(setHeld); }; }, []);
+  useEffect(() => { holdListeners.add(setHeld); setHeld(bondCelebrationHeld()); return () => { holdListeners.delete(setHeld); }; }, []);
   return held;
+}
+
+// Sign-up gives the chosen avatar and three gifts in one go (Avatar System V1.0); the Garden then
+// reveals the three once, right after the account is made. Remembered on the device too, so a reload
+// before the Garden opens still shows it; another sign-in never does.
+const GIFT_REVEAL_KEY = 'petalpal.avatarGiftReveal.v1';
+let giftRevealPending = false;
+const giftListeners = new Set<(pending: boolean) => void>();
+const setGiftPending = (pending: boolean) => { giftRevealPending = pending; giftListeners.forEach(listener => listener(pending)); };
+export function noteSignUpGift() { setGiftPending(true); AsyncStorage.setItem(GIFT_REVEAL_KEY, '1').catch(() => undefined); }
+export const signUpGiftPending = () => giftRevealPending;
+export async function loadSignUpGift() {
+  if (!giftRevealPending && (await AsyncStorage.getItem(GIFT_REVEAL_KEY).catch(() => null)) === '1') setGiftPending(true);
+  return giftRevealPending;
+}
+export function finishSignUpGift() { setGiftPending(false); AsyncStorage.removeItem(GIFT_REVEAL_KEY).catch(() => undefined); }
+// Follows the pending gift, so a screen already open when the account is made still learns of it at once.
+export function useSignUpGiftPending() {
+  const [pending, setPending] = useState(giftRevealPending);
+  useEffect(() => { giftListeners.add(setPending); setPending(giftRevealPending); return () => { giftListeners.delete(setPending); }; }, []);
+  return pending;
 }
 
 // The welcome flow (choosing a first avatar, then revealing the three gifts) goes before
@@ -96,6 +118,7 @@ export function setWelcomeActive(active: boolean) {
 export const isWelcomeActive = () => welcomeActive;
 export function useWelcomeActive() {
   const [active, setActive] = useState(welcomeActive);
-  useEffect(() => { welcomeListeners.add(setActive); return () => { welcomeListeners.delete(setActive); }; }, []);
+  // Read again once subscribed: a change between the first render and this effect is not missed.
+  useEffect(() => { welcomeListeners.add(setActive); setActive(welcomeActive); return () => { welcomeListeners.delete(setActive); }; }, []);
   return active;
 }

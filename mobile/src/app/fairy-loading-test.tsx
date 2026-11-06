@@ -30,7 +30,7 @@ import {
   getActionHoldTime,
 } from '../components/auth/fairyLoadingTimeline';
 
-const INVITATION_MATERIALS = require('../../assets/auth/invitation_materials_repaired.png');
+const INVITATION_MATERIALS = require('../../assets/auth/invitation_materials_repaired.webp');
 
 // Botanical fleuron for card title
 function CardFleuron({ size = 18, color = '#9E804D' }: { size?: number; color?: string }) {

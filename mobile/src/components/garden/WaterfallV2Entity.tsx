@@ -6,7 +6,7 @@ import WaterfallV2Impact from './water/WaterfallV2Impact';
 import { WATERFALL_V2_SHORT_BANDS, WATERFALL_V2_ORIGINAL_BANDS } from './waterfallV2Proportions';
 import { INITIAL_WATERFALL_V2_PLACEMENT, WATERFALL_V2_CONTENT_OFFSET_Y, WATERFALL_V2_HEIGHT as HEIGHT, WATERFALL_V2_WIDTH as WIDTH } from './waterfallV2Placement';
 
-export const WATERFALL_V2_ASSET = require('@/assets/garden/landmarks/waterfall-v2/waterfall-v2-compact-r3.png');
+export const WATERFALL_V2_ASSET = require('@/assets/garden/landmarks/waterfall-v2/waterfall-v2-compact-r3.webp');
 
 // One painted landform avoids a compositing seam at the lip. A spatial flow
 // field transports painted water detail; neither the banks nor alpha move.

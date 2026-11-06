@@ -63,7 +63,7 @@ export default function SwingTestScreen() {
   const [previewZoom, setPreviewZoom] = useState(1);
   const [referenceOpacity, setReferenceOpacity] = useState(0);
   const [status, setStatus] = useState('Waiting for Canvas');
-  const masterReference = useImage(require('@/assets/garden/landmarks/swing/swing-master.png'));
+  const masterReference = useImage(require('@/assets/garden/landmarks/swing/swing-master.webp'));
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const fitScale = Math.min(
     viewport.width / SWING_WIDTH,

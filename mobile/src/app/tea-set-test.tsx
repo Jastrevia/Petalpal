@@ -29,7 +29,7 @@ export default function TeaSetTestScreen() {
   const [showExport, setShowExport] = useState(false);
   const [status, setStatus] = useState('Waiting for Canvas');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const master = useImage(require('@/assets/garden/landmarks/tea-set/tea-set-master.png'));
+  const master = useImage(require('@/assets/garden/landmarks/tea-set/tea-set-master.webp'));
   const fit = Math.min(viewport.width / TEA_SET_WIDTH, viewport.height / TEA_SET_HEIGHT) * 0.94;
   const scale = fit * previewZoom;
 

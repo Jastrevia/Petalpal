@@ -13,10 +13,10 @@ import { BotanicalFlowerImage } from '../flower-visuals/BotanicalFlowerImage';
 import { botanicalPresentationPose } from '../flower-visuals/botanicalPresentationPose';
 
 const FLOWER_ASSETS: Record<string, any> = {
-  pink: require('../../../../assets/garden/flowers/pink.png'),
-  purple: require('../../../../assets/garden/flowers/purple.png'),
-  blue: require('../../../../assets/garden/flowers/blue.png'),
-  sunflower: require('../../../../assets/garden/flowers/sunflower.png'),
+  pink: require('../../../../assets/garden/flowers/pink.webp'),
+  purple: require('../../../../assets/garden/flowers/purple.webp'),
+  blue: require('../../../../assets/garden/flowers/blue.webp'),
+  sunflower: require('../../../../assets/garden/flowers/sunflower.webp'),
   tulip: require('../../../../assets/garden/flowers/tulip.png'),
 };
 

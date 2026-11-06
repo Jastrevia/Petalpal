@@ -3,7 +3,7 @@ import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { BlendMode, Canvas, Picture, Skia, TileMode, createPicture, useImage } from '@shopify/react-native-skia';
 import { DESK_ART, deskParallax, pullAt, type PullGeometry } from './desk';
 
-const DESK_PAINTING = require('../../../../assets/bookhouse/continuous-structure.png');
+const DESK_PAINTING = require('../../../../assets/bookhouse/continuous-structure.webp');
 
 /** The writing desk in the foreground: continuous-structure.png from just under its lowest plank (the backboard strip
  *  with the lantern, books and teacup, then the desk top), across the full window width. It rises into the frame as the
