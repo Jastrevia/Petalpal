@@ -144,7 +144,8 @@ test("registration refuses a bad profile and needs the Community Guidelines", as
   mock(t, prisma.user, "create", async () => assert.fail("nothing is created"));
   // (A few by HTTP: refused sign-ups count against the network's sign-in budget. The full rules are below.)
   assert.equal((await send(url, "/auth/register", "POST", profile({ password: undefined }))).status, 400);
-  assert.equal((await send(url, "/auth/register", "POST", profile({ avatar: "🦋" }))).status, 400, "an original portrait only");
+  assert.equal((await send(url, "/auth/register", "POST", profile({ avatar: "🦋" }))).status, 400, "a library avatar only");
+  assert.equal((await send(url, "/auth/register", "POST", profile({ name: "Bloom_9", avatar: "l2-01" }))).status, 400, "Level 1 only: higher levels open with Fairy Bond");
   assert.equal((await send(url, "/auth/register", "POST", profile({ fairyName: "x".repeat(21) }))).status, 400);
   assert.equal((await send(url, "/auth/register", "POST", profile({ communityTermsVersion: undefined }))).status, 428);
   assert.equal((await send(url, "/auth/register", "POST", profile({ email: "a@b.co" }))).status, 400);

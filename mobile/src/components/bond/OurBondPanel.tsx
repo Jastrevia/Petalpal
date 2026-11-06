@@ -3,6 +3,8 @@ import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, Style
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import type { ClosenessSource, ClosenessSummary } from '../../services/fairyCloseness';
 import { useAvatarCollection } from '../../services/avatars';
+import { AvatarCollection } from '../avatars/AvatarCollection';
+import { AVATAR_ART } from '../avatars/avatarArt';
 import { avatarCopy } from '../avatars/avatarCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { pickTapLine, RECENT_TAP_LINES } from '../garden/fairy/tapLines';
@@ -31,9 +33,9 @@ const TASK_ART: Record<ClosenessSource, ImageSourcePropType> = {
 const MEDALLION = '#EAE8D7';
 
 // Our Bond (亲密度): PPL resting on the garden ledge, then level and progress, today's progress,
-// check-in rewards, levels and unlocks, quiet serif type on the panel theme. The check-in itself
-// lives in the Garden calendar; the keepsake book and the avatar collection live in Collection
-// (the Garden dock, components/collection/CollectionPanel.tsx).
+// check-in rewards, levels and unlocks, the avatar collection, quiet serif type on the panel theme.
+// The check-in itself lives in the Garden calendar; the keepsake book lives in Collection (the Garden
+// dock), which also opens the avatars, as Me does.
 export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   visible: boolean; locale: BondLocale; summary: ClosenessSummary | null; loading: boolean; onClose: () => void;
 }) {
@@ -42,6 +44,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const reducedMotion = useReducedMotion();
+  const [avatarsOpen, setAvatarsOpen] = useState(false);
   const avatarWords = avatarCopy(locale);
   const { collection: avatars } = useAvatarCollection(visible, summary?.level);
   const [said, setSaid] = useState<{ key: number; text: string } | null>(null);
@@ -97,12 +100,12 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               <View style={styles.track}><View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} /></View>
               <Text style={styles.next}>{summary.maxed ? copy.maxed : copy.toNext(summary.pointsForNextLevel! - summary.pointsIntoLevel, summary.level + 1)}</Text>
               {/* The avatar reward for the next level, or the ones waiting now (server data). */}
-              {avatars?.bondOn ? <View style={[styles.avatarHint, avatars.ready > 0 && styles.avatarHintReady]}>
+              {avatars?.bondOn ? <Pressable accessibilityRole="button" onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.avatarHint, avatars.ready > 0 && styles.avatarHintReady, pressed && styles.pressed, styles.focus]}>
                 <Text style={[styles.avatarHintText, avatars.ready > 0 && styles.avatarHintTextReady]}>
                   ✦ {avatars.ready > 1 ? avatarWords.rewardsReady(avatars.ready) : avatars.ready === 1 ? avatarWords.rewardReady
                     : avatars.nextRewardLevel ? avatarWords.nextUnlock(avatars.nextRewardLevel) : avatarWords.allCollected}
                 </Text>
-              </View> : null}
+              </Pressable> : null}
 
 
               <Text style={[styles.checkInLine, summary.checkIn.checkedInToday && styles.checkInDone]}>
@@ -158,6 +161,21 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
                 })}
               </Section>
 
+              {/* The avatar collection (Avatar System V1.0): the same screen and data as Me and Collection. */}
+              <Pressable accessibilityRole="button" accessibilityLabel={`${avatarWords.entry}, ${avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''}${avatars?.ready ? `, ${avatarWords.entryPending(avatars.ready)}` : ''}`}
+                onPress={() => setAvatarsOpen(true)} style={({ pressed }) => [styles.bookButton, styles.focus, pressed && styles.pressed]}>
+                <View style={styles.thumbs}>
+                  {(avatars?.owned.length ? avatars.owned.slice(-3) : ['fairy-1', 'l1-02', 'l1-05']).map((id, index) => AVATAR_ART[id]
+                    ? <Image key={id} source={AVATAR_ART[id]} style={[styles.thumb, index > 0 && styles.thumbOverlap]} resizeMode="cover" accessible={false} /> : null)}
+                </View>
+                <Text style={styles.bookText}>{avatarWords.entry}</Text>
+                <View style={styles.entrySide}>
+                  {avatars?.ready ? <Text style={styles.entryBadge}>{avatarWords.entryPending(avatars.ready)}</Text> : null}
+                  <Text style={styles.small}>{avatars ? avatarWords.entryCount(avatars.owned.length, avatars.total) : ''} ›</Text>
+                </View>
+              </Pressable>
+
+
             </>}
           </View>
         </ScrollView>
@@ -167,6 +185,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
         </Pressable>
       </View>
     </View>
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
 

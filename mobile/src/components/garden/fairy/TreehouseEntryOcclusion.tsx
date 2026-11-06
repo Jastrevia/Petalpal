@@ -10,7 +10,7 @@ const frontTrunk = 'M 620 535 L 792 535 C 795 566 802 593 813 617 C 800 634 790 
 
 export default function TreehouseEntryOcclusion({depth}:{depth:SharedValue<number>}) {
   const insideDoorway=useDerivedValue(()=>depth.value>0?1:0);
-  const base=useImage(require('@/assets/garden/landmarks/treehouse/tree-base.png'));
+  const base=useImage(require('@/assets/garden/landmarks/treehouse/tree-base.webp'));
   return base?<Group opacity={insideDoorway} transform={[{translateX:x},{translateY:y},{scale}]}>
     <Group clip={frontTrunk}>
       <Image image={base} x={0} y={0} width={1448} height={1086} fit="contain" />

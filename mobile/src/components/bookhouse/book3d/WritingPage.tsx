@@ -194,7 +194,7 @@ export const WritingPage = forwardRef<WritingPageHandle, {
         {editable && <View style={styles.footer}>
           <Pressable accessibilityRole="button" accessibilityLabel={tt('Dictate private journal')} accessibilityHint={tt('Record up to three minutes, then review before saving')}
             disabled={busy || voice.active} onPress={() => void voice.start()} style={{ width: 44, height: 44, opacity: busy || voice.active ? .45 : 1 }}>
-            <Image accessible={false} source={require('../../../../assets/events/microphone.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
+            <Image accessible={false} source={require('../../../../assets/events/microphone.webp')} style={{ width: 44, height: 44 }} resizeMode="contain" />
           </Pressable>
           <Text style={[regular, styles.small, { flex: 1 }]}>{joinJournal(text).length} / {MAX}</Text>
           {/* Editing a saved journal with nothing changed: "Done" goes back to reading; any change makes it "Save". */}

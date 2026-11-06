@@ -16,7 +16,7 @@ import type { ScheduleRest } from './fairySchedule';
 // Standing: her original painting. Walking: one stride baked from that same painting
 // (scripts/critters/fairy-walk-rig.py), 25 frames of 280 × 420 in a 5-wide sheet, on the same
 // canvas (so the same foot pivot).
-const STANDING=require('@/assets/garden/fairy/walk-v2/walk_04.png');
+const STANDING=require('@/assets/garden/fairy/walk-v2/walk_04.webp');
 const WALKING=require('@/assets/garden/fairy/walk-rig-v1/walk.webp');
 const CELL={w:280,h:420,columns:5};
 export type FairyHandle = { getPosition:()=>Point; getState:()=>FairyState; place:(rest:ScheduleRest,at?:Point)=>boolean; move:(p:Point)=>boolean; visitSwing:()=>boolean; visitMoonBed:()=>boolean; visitTea:()=>boolean; visitTreehouse:()=>boolean; visitMailbox:()=>boolean; isMailboxBusy:()=>boolean; returnFromMailbox:()=>boolean; returnFromTreehouse:()=>boolean; pointer:(p:Point)=>void; stop:()=>void };

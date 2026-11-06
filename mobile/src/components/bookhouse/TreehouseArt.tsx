@@ -4,7 +4,7 @@ import { Image, Platform, Pressable, StyleSheet, Text, View, type StyleProp, typ
 
 // Reusable windows into the original Treehouse painting (1024 × 1536). Every crop keeps the
 // source aspect ratio ("cover"), so pieces can be rearranged without stretching the artwork.
-const interior = require('../../../assets/bookhouse/interior.png');
+const interior = require('../../../assets/bookhouse/interior.webp');
 const SOURCE = { width: 1024, height: 1536 };
 export type Rect = readonly [x: number, y: number, width: number, height: number];
 

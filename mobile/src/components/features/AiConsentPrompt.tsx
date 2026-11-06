@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { apiRequest } from '../../services/api';
 import { useAuth } from '../../services/auth';
+import { useBondCelebrationHeld } from '../../services/avatars';
 import { useAppLocale } from '../../services/locale';
 import { FeatureActionButton } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
@@ -33,9 +34,11 @@ export function AiConsentPrompt({ onOpenChange }: { onOpenChange?: (open: boolea
     }).catch(() => undefined);
     return () => { active = false; };
   }, [owner]);
-  const open = Boolean(version && owner);
+  // It waits its turn behind the welcome gift and today's check-in, never over them.
+  const held = useBondCelebrationHeld();
+  const open = Boolean(version && owner && !held);
   useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
-  if (!version || !owner) return null;
+  if (!open) return null;
   const save = async (on: boolean) => {
     setBusy(true); setError('');
     try {

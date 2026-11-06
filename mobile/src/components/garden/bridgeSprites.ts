@@ -9,7 +9,7 @@ export type BridgeSprite = {
 // Camera-only view of the locked approved master. No bitmap rotation.
 export const BRIDGE_VIEW_SPRITE: BridgeSprite = {
   ...current, filename: 'bridge_entrance_to_right.png',
-  source: require('@/assets/garden/decorations/bridge/rendered/bridge_entrance_to_right.png'),
+  source: require('@/assets/garden/decorations/bridge/rendered/bridge_entrance_to_right.webp'),
 };
 
 export function projectBridgePoint(point: BridgeLocalPoint, sprite: BridgeSprite): PixelPoint {

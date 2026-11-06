@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
-const structure = require('../../../assets/bookhouse/continuous-structure.png');
-const outdoor = require('../../../assets/bookhouse/interior.png');
+const structure = require('../../../assets/bookhouse/continuous-structure.webp');
+const outdoor = require('../../../assets/bookhouse/interior.webp');
 // All positions use the original artwork's width, including the extended tabletop.
 export const SCENE_ASPECT = 2.25;
 // Back edge of the tabletop in the shared artwork; the book sits just in front.

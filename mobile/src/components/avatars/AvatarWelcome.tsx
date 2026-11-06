@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
-import { holdBondCelebration, receiveWelcomeAvatars, setWelcomeActive, useAvatarCollection } from '../../services/avatars';
+import { finishSignUpGift, holdBondCelebration, loadSignUpGift, receiveWelcomeAvatars, setWelcomeActive, useAvatarCollection, useSignUpGiftPending } from '../../services/avatars';
 import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { AVATAR_ART, AVATAR_TIERS } from './avatarArt';
@@ -10,16 +10,37 @@ import { useFairyName, withFairyName } from '../../services/fairyName';
 
 // A new account's first avatar: the whole Level 1 collection to choose from, then PPL's gift of
 // three more at random. The server gives the gift once per account; accounts from before the
-// collection were marked as done, so they never see this.
+// collection were marked as done, so they never see this. An account made on the sign-up page has
+// already chosen there and received the gift with it: only the gift's reveal plays, once.
 export function AvatarWelcome({ locale, enabled }: { locale: BondLocale; enabled: boolean }) {
   const copy = withFairyName(avatarCopy(locale), useFairyName());
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const { rememberAvatar } = useAuth();
-  const { collection } = useAvatarCollection(enabled);
+
   const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [gift, setGift] = useState<string[] | null>(null);
+  // Sign-up's gift waiting to be revealed: known at once in the same session, so the welcome holds the
+  // check-in keepsake and level-up from the start; after a reload, once the device has answered.
+  const revealing = useSignUpGiftPending();
+  // Read again once the gift is pending: a collection read before the account existed has none yet.
+  const { collection, failed } = useAvatarCollection(enabled, revealing);
+  useEffect(() => {
+    if (!revealing) return;
+    // Never keep the Garden waiting on a reveal that cannot happen.
+    const timer = setTimeout(finishSignUpGift, 10_000);
+    return () => clearTimeout(timer);
+  }, [revealing]);
+  useEffect(() => { if (enabled) void loadSignUpGift(); }, [enabled]);
+  useEffect(() => {
+    // Nothing to show if the collection cannot be read: never hold the Garden's other moments for it.
+    if (revealing && failed && !collection) { finishSignUpGift(); return; }
+    // Only a collection that already holds the gift (one read before the account existed has none yet).
+    if (!revealing || !collection?.welcome.gifted.length) return;
+    setGift(collection.welcome.gifted);
+    finishSignUpGift();
+  }, [revealing, collection, failed]);
   const grow = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
   useEffect(() => {
     if (!gift) return;
@@ -28,7 +49,7 @@ export function AvatarWelcome({ locale, enabled }: { locale: BondLocale; enabled
   }, [gift, grow]);
 
   // The welcome flow (choosing avatar + 3 gifts reveal) goes first and holds celebrations.
-  const active = Boolean(collection?.welcome.needed || gift);
+  const active = Boolean(collection?.welcome.needed || gift || revealing);
   useEffect(() => {
     setWelcomeActive(active);
     if (!active) return;

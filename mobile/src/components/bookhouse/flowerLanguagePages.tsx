@@ -4,7 +4,7 @@ import type { AppLocale } from '../../services/locale';
 import { FLOWER_ASSETS } from '../../data/flowerAssets';
 const flowerCollectionJson = require('../../data/flowerLanguageCollection.json');
 
-const botanical = require('../../../assets/reflection/botanical.png');
+const botanical = require('../../../assets/reflection/botanical.webp');
 
 export interface CollectionPageData {
   pageNumber: number;

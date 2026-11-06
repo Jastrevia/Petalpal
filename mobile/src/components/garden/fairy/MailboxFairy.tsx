@@ -29,7 +29,7 @@ half4 main(float2 p) {
 const ease=(v:number)=>{'worklet';const t=Math.max(0,Math.min(1,v));return t*t*(3-2*t);};
 type Props={x:SharedValue<number>;y:SharedValue<number>;phase:SharedValue<number>;elapsedMs:SharedValue<number>;opacity:SharedValue<number>};
 export default function MailboxFairy({x,y,phase,elapsedMs,opacity}:Props){
-  const atlas=useImage(require('@/assets/garden/fairy/mailbox-v1/poses.png'));
+  const atlas=useImage(require('@/assets/garden/fairy/mailbox-v1/poses.webp'));
   const transform=useDerivedValue(()=>[{translateX:x.value},{translateY:y.value}]);
   const uniforms=useDerivedValue(()=>{
     const ms=elapsedMs.value;

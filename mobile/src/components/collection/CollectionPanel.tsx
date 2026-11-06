@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAvatarCollection } from '../../services/avatars';
-import { markAvatarsSeen, markKeepsakesSeen, type CollectionAlerts } from '../../services/collectionAlerts';
+import { markKeepsakesSeen, type CollectionAlerts } from '../../services/collectionAlerts';
 import { useClosenessSummary } from '../../services/fairyCloseness';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { AVATAR_ART } from '../avatars/avatarArt';
@@ -81,7 +81,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
     </View>
     <KeepsakeBook visible={bookOpen} locale={locale} newIds={alerts.keepsakes ? alerts.newKeepsakes : []}
       onClose={() => { setBookOpen(false); markKeepsakesSeen(); }} />
-    <AvatarCollection visible={avatarsOpen} locale={locale} newIds={alerts.newAvatars} onClose={() => { setAvatarsOpen(false); markAvatarsSeen(); }} />
+    <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
 

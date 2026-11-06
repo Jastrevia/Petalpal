@@ -54,7 +54,7 @@ import {
   setFairyMomentsCover
 } from "./lib/fairy-moments.js";
 import { isMomentCover } from "./lib/moment-covers.js";
-import { isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
+import { avatarTier, isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
 import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar, welcomeGiftRows } from "./lib/avatar-collection.js";
 import {
   awardCloseness,
@@ -1192,7 +1192,8 @@ app.post("/auth/register", newAccountRateLimit,
     if (shape) return res.status(422).json({ error: shape, code: "USERNAME_INVALID" });
     if (!validNewPassword(req.body?.password)) return res.status(400).json({ error: PASSWORD_RULE, code: "PASSWORD_INVALID" });
     const avatar = req.body?.avatar ?? LEGACY_AVATAR_IDS[0];
-    if (!LEGACY_AVATAR_IDS.includes(avatar)) return res.status(400).json({ error: "Choose one of the avatars shown.", code: "AVATAR_INVALID" });
+    // Any Level 1 avatar (the sign-up page shows all 32); higher levels open with Fairy Bond.
+    if (avatarTier(avatar) !== 1) return res.status(400).json({ error: "Choose one of the avatars shown.", code: "AVATAR_INVALID" });
     const fairyName = typeof req.body?.fairyName === "string" ? req.body.fairyName.normalize("NFKC").replace(/\s+/g, " ").trim() : "";
     if (req.body?.fairyName !== undefined && typeof req.body.fairyName !== "string" || fairyName.length > MAX_FAIRY_NAME_LENGTH) {
       return res.status(400).json({ error: `Give your fairy a name of ${MAX_FAIRY_NAME_LENGTH} characters or fewer.`, code: "FAIRY_NAME_INVALID" });

@@ -119,9 +119,9 @@ export default function TreehouseEntity({
   const lightsEnabled = motionEnabled && (lightingEnabled || occupied) && debugMode === 'all';
   const windowOpacity = useLightBreathing(lightsEnabled, occupied ? 0.74 : 0.52, occupied ? 0.86 : 0.58, 7000, 0);
   const libraryOpacity = useLightBreathing(lightsEnabled, occupied ? 0.78 : 0.61, occupied ? 0.9 : 0.69, 8500, 1300);
-  const treeBase = useProductionImage(require('@/assets/garden/landmarks/treehouse/tree-base.png'));
-  const canopy = useProductionImage(require('@/assets/garden/landmarks/treehouse/canopy-overlay.png'));
-  const wisteria = useProductionImage(require('@/assets/garden/landmarks/treehouse/wisteria-overlay.png'));
+  const treeBase = useProductionImage(require('@/assets/garden/landmarks/treehouse/tree-base.webp'));
+  const canopy = useProductionImage(require('@/assets/garden/landmarks/treehouse/canopy-overlay.webp'));
+  const wisteria = useProductionImage(require('@/assets/garden/landmarks/treehouse/wisteria-overlay.webp'));
   const mailbox = useProductionImage(require('@/assets/garden/landmarks/treehouse/mailbox.png'));
   const warmLight = useProductionImage(require('@/assets/garden/landmarks/treehouse/warmlight.png'));
   const foreground = useProductionImage(require('@/assets/garden/landmarks/treehouse/foreground-overlay.png'));

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { claimAvatarReward, rewardFor, useAvatarCollection, type AvatarCollection as Collection } from '../../services/avatars';
+import { markAvatarsSeen, useCollectionAlertsSnapshot } from '../../services/collectionAlerts';
 import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { AVATAR_ART, AVATAR_TIERS, avatarTier, type AvatarTier } from './avatarArt';
@@ -37,8 +38,12 @@ export function sortTierAvatars(ids: string[], collection: Collection | null, eq
 // Level 3 from Lv 14), each avatar marked wearing / yours / to unlock / locked by level. Owned
 // avatars are worn with a tap; a waiting Fairy Bond reward lets the owner pick one avatar to unlock.
 // Higher tiers can be looked at before their level. Claiming never changes the avatar worn.
-// `newIds`: avatars given at sign-up the owner has not seen yet (Collection marks them seen on close).
-export function AvatarCollection({ visible, locale, onClose, newIds = [] }: { visible: boolean; locale: BondLocale; onClose: () => void; newIds?: string[] }) {
+// Opened from Collection, Me or Our Bond alike: the avatars given at sign-up read New, and closing it
+// counts as having seen them and any reward waiting (Collection's red dot goes out).
+export function AvatarCollection({ visible, locale, onClose }: { visible: boolean; locale: BondLocale; onClose: () => void }) {
+  const newIds = useCollectionAlertsSnapshot().newAvatars;
+  const wasVisible = useRef(false);
+  useEffect(() => { if (wasVisible.current && !visible) markAvatarsSeen(); wasVisible.current = visible; }, [visible]);
   const copy = avatarCopy(locale);
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);

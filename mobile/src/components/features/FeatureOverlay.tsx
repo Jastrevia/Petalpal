@@ -18,6 +18,9 @@ import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
 import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
 import { AvatarCollection } from '../avatars/AvatarCollection';
+import { avatarCopy } from '../avatars/avatarCopy';
+import { useAvatarCollection } from '../../services/avatars';
+import { useCollectionAlertsSnapshot } from '../../services/collectionAlerts';
 import { UserAvatar } from '../avatars/UserAvatar';
 import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
@@ -193,6 +196,9 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
   const locale = momentLocale(experience?.user.preferredLocale);
   const copy = PROFILE_COPY[locale];
   const [choosing, setChoosing] = useState(false);
+  const words = avatarCopy(locale);
+  const { collection: avatars } = useAvatarCollection(Boolean(profile));
+  const alerts = useCollectionAlertsSnapshot();
   // Online is what friends see: this device's live connection to the owner's user room.
   const [online, setOnline] = useState(userRealtimeConnected());
   useEffect(() => subscribeUserRealtime({ connection: setOnline }), []);
@@ -211,6 +217,15 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
       <RedeemCodeChip />
     </View>
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
+    {/* Me → My avatars (Avatar System V1.0): how many are owned and what waits, the same screen as Collection. */}
+    <Pressable testID="me-my-avatars" accessibilityRole="button" disabled={!profile} onPress={() => setChoosing(true)}
+      accessibilityLabel={`${words.entry}${avatars ? `, ${words.entryCount(avatars.owned.length, avatars.total)}` : ''}${avatars?.ready ? `, ${words.entryPending(avatars.ready)}` : alerts.newAvatars.length ? `, ${words.isNew}` : ''}`}
+      style={({ pressed }) => [styles.myAvatars, pressed && ui.pressed]}>
+      <Text style={[styles.myAvatarsText, { color: theme.text }]}>✦ {words.entry}</Text>
+      {avatars?.ready ? <Text style={styles.myAvatarsBadge}>{words.entryPending(avatars.ready)}</Text>
+        : alerts.newAvatars.length ? <Text style={[styles.myAvatarsBadge, styles.myAvatarsNew]}>{words.isNew}</Text> : null}
+      <Text style={[ui.caption, { color: theme.muted }]}>{avatars ? words.entryCount(avatars.owned.length, avatars.total) : ''} ›</Text>
+    </Pressable>
     {/* The avatar collection: wear an owned avatar, or unlock one with a Fairy Bond reward. */}
     <AvatarCollection visible={choosing} locale={locale} onClose={() => setChoosing(false)} />
   </View>;
@@ -251,6 +266,10 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   fold: { minHeight: 32 },
   profileHero: { alignItems: 'center', gap: 10 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  myAvatars: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: theme.gold },
+  myAvatarsText: { fontFamily: 'serif', fontSize: 15 },
+  myAvatarsBadge: { overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, fontSize: 10, fontWeight: '600', color: '#FFFFFF', backgroundColor: '#E2554B' },
+  myAvatarsNew: { backgroundColor: '#7E62AE' },
   betaBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#C9A95C', backgroundColor: '#F6EBCB' },
   betaText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, color: '#7A5A1E' },
   avatar: { backgroundColor: colors.purpleWash, borderWidth: 2, borderColor: colors.secondary },

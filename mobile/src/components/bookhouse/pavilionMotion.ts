@@ -53,6 +53,17 @@ export function pavilionScene(width: number, height: number) {
 }
 export type PavilionScene = ReturnType<typeof pavilionScene>;
 
+// A phone while a book is open (owner, 2026-11-06): the whole painting across the screen's width,
+// window and lake on the left and the shelf on the right, as the wide view shows it above the book.
+export function pavilionReadingCamera(width: number) {
+  const k = width / PAVILION.width;
+  const slot = (id: PavilionBookId): Rect => {
+    const r = PAVILION_SLOTS[id];
+    return { x: r.x * k, y: r.y * k, width: r.width * k, height: r.height * k };
+  };
+  return { art: { x: 0, y: 0, width: PAVILION.width * k, height: PAVILION.height * k }, slot };
+}
+
 export function pavilionGeometry(scene: PavilionScene, id: PavilionBookId) {
   const { W, H } = SPEC, rect = scene.table;
   const L = bookLayout(scene.width, scene.height, { top: 0, bottom: 0 });

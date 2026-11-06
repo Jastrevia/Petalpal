@@ -51,16 +51,16 @@ test('real Cloudflare runtime serves the actual Expo export, routes, artwork and
   // recovered bridge/paving/entrance and other product images. Compare bytes,
   // not new deployment manifests or application integrity infrastructure.
   for (const area of ['garden', 'bookhouse', 'reflection']) {
-    const art = files.filter(f => f.startsWith(`assets/assets/${area}/`) && f.endsWith('.png'));
+    const art = files.filter(f => f.startsWith(`assets/assets/${area}/`) && /\.(png|webp)$/.test(f));
     assert.ok(art.length, `${area} artwork exported`);
     for (const file of art) {
-      const source = file.replace(/^assets\/assets\//, '').replace(/\.[a-f0-9]{32}(\.png)$/, '$1');
+      const source = file.replace(/^assets\/assets\//, '').replace(/\.[a-f0-9]{32}(\.(png|webp))$/, '$1');
       const [input, output] = await Promise.all([
         readFile(new URL(`../mobile/assets/${source}`, import.meta.url)), readFile(new URL(file, root))
       ]);
       assert.ok(input.equals(output), `Artwork preserved: ${source}`);
     }
-    const r = await get('/' + art[0]); assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /image\/png/);
+    const r = await get('/' + art[0]); assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /image\/(png|webp)/);
   }
   const authorized = await get('/canvaskit.wasm', { headers: { Authorization: 'Bearer synthetic' } });
   assert.equal(authorized.headers.get('cache-control'), 'no-store');

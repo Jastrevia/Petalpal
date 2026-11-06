@@ -25,7 +25,7 @@ import {
 } from './instructionPages';
 
 const parchment = require('../../../assets/bookhouse/journal/parchment.webp');
-const botanical = require('../../../assets/reflection/botanical.png');
+const botanical = require('../../../assets/reflection/botanical.webp');
 
 export interface BookReaderProps {
   bookId: PavilionBookId;
@@ -1736,9 +1736,10 @@ const styles = StyleSheet.create({
     left: '100%',
     width: 76,
   },
+  // Phones too: the bookmarks stand out past the page's right edge (the screen keeps room for them).
   bookmarksCompact: {
-    right: 2,
-    width: 46,
+    left: '100%',
+    width: 40,
   },
   bookmarkTab: {
     width: '100%',
@@ -1760,12 +1761,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 6,
   },
   bookmarkTabCompact: {
-    height: 30,
+    height: 32,
     marginVertical: 2,
-    paddingLeft: 6,
-    paddingRight: 3,
-    borderRadius: 4,
-    borderLeftWidth: 1,
+    paddingLeft: 7,
+    paddingRight: 2,
+    borderLeftWidth: 0,
+    borderTopRightRadius: 5,
+    borderBottomRightRadius: 5,
   },
   bookmarkTabActiveDesktop: {
     backgroundColor: '#F7E8C6',
@@ -1805,7 +1807,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.15,
   },
   bookmarkTabTextCompact: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     letterSpacing: 0,
   },
   bookmarkTabTextActive: {

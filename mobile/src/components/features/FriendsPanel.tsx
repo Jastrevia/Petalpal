@@ -299,7 +299,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
             accessibilityState={{ disabled: !allowed || !!busy }} disabled={!allowed || !!busy} testID={`visit-${friend.id}`}
             onPress={allowed && !busy ? () => visit(friend) : undefined}
             style={({ pressed }) => [styles.home, !allowed && styles.homeDisabled, allowed && pressed && styles.homeActive]}>
-            <Image source={light ? require('../../../assets/friends/visitor-home-transparent.png') : require('../../../assets/friends/garden-house.png')} style={styles.houseImage} resizeMode="contain" accessible={false} />
+            <Image source={light ? require('../../../assets/friends/visitor-home-transparent.webp') : require('../../../assets/friends/garden-house.png')} style={styles.houseImage} resizeMode="contain" accessible={false} />
             <Text style={styles.chevron}>›</Text>
           </Pressable>}
         </View>

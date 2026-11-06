@@ -14,7 +14,7 @@ function load(name){if(cache.has(name))return cache.get(name);const exports={};c
       if(ref==='react/jsx-runtime')return{jsx,jsxs:jsx};
       if(ref==='react')return{memo:f=>f,useMemo:f=>f(),useCallback:f=>f,useEffect:f=>f(),useState:init=>[init,()=>{}]};
       if(ref==='@shopify/react-native-skia')return skia;
-      if(ref.endsWith('.png'))return'reference.png';
+      if(/\.(png|webp)$/.test(ref))return'reference.png';
       if(ref.startsWith('.'))return load(ref.slice(2)+'.ts');
       throw Error(ref);
     }});return exports;

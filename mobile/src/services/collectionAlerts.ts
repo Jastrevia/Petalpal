@@ -66,6 +66,11 @@ export function markAvatarsSeen() {
   if ((mark && mark !== seen.avatars) || (gifts && gifts !== seen.gifts)) { seen = { ...seen, avatars: mark || seen.avatars, gifts: gifts || seen.gifts }; remember(); }
 }
 
+// The current alerts without asking the server (screens that only show them; the Garden dock keeps them fresh).
+export function useCollectionAlertsSnapshot(): CollectionAlerts {
+  return useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => current, () => current);
+}
+
 // The alerts for the signed-in owner; reloads on a check-in, an avatar change or a return to the app.
 export function useCollectionAlerts(ownerId: string | undefined): CollectionAlerts {
   useEffect(() => {

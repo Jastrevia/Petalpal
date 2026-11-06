@@ -46,7 +46,7 @@ export default function WaterfallTestScreen() {
   const [showExport, setShowExport] = useState(false);
   const [status, setStatus] = useState('Waiting for Canvas');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const master = useImage(require('@/assets/garden/landmarks/waterfall/waterfall-master.png'));
+  const master = useImage(require('@/assets/garden/landmarks/waterfall/waterfall-master.webp'));
 
   useEffect(() => { void SplashScreen.hideAsync(); }, []);
   if (!__DEV__) return <Redirect href="/" />;

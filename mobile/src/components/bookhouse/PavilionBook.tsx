@@ -10,20 +10,20 @@ import { SPEC } from './book3d/math';
 import { PAVILION_SLOTS, PAVILION_CLOTH, pavilionFrame, type PavilionBookId, type PavilionGeometry } from './pavilionMotion';
 import { PAVILION_TEXT, pavilionTitleLines } from './pavilionText';
 
-const BLANK = require('../../../assets/reflection/pavilion-leather-v4.png');
+const BLANK = require('../../../assets/reflection/pavilion-leather-v4.webp');
 // Original approved English letterforms, isolated as alpha-only glyphs.
 const APPROVED_TITLE_GLYPHS = require('../../../assets/reflection/pavilion-approved-title-glyphs.png');
 // The existing Noto Serif SC subset is Song-style; covers keep their original font.
 const SPINE_FONT_ZH = require('../../../assets/fonts/PavilionLabels-Serif.ttf');
-const WOOD = require('../../../assets/reflection/pavilion-empty-v3.png');
+const WOOD = require('../../../assets/reflection/pavilion-empty-v3.webp');
 const GRAIN = require('../../../assets/bookhouse/journal/leather-grain.webp');
 const EDGES = require('../../../assets/bookhouse/journal/page-edges.webp');
 const PAPER = require('../../../assets/bookhouse/journal/parchment.webp');
 const COVERS = {
-  weekly: require('../../../assets/reflection/pavilion-cover-weekly-hd.png'),
-  monthly: require('../../../assets/reflection/pavilion-cover-monthly-hd.png'),
-  notes: require('../../../assets/reflection/pavilion-cover-notes-hd.png'),
-  collection: require('../../../assets/reflection/pavilion-cover-collection-hd.png'),
+  weekly: require('../../../assets/reflection/pavilion-cover-weekly-hd.webp'),
+  monthly: require('../../../assets/reflection/pavilion-cover-monthly-hd.webp'),
+  notes: require('../../../assets/reflection/pavilion-cover-notes-hd.webp'),
+  collection: require('../../../assets/reflection/pavilion-cover-collection-hd.webp'),
 };
 export const PAVILION_LABEL_FONT = require('../../../assets/fonts/PavilionLabels-Serif.ttf');
 export const PAVILION_LABEL_FONT_ZH = require('../../../assets/fonts/PavilionLabels-ZH.ttf');

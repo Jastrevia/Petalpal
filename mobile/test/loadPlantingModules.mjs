@@ -23,7 +23,7 @@ export function loadPlantingModules(storage, react, nativeStorage, web = true, d
       if (request === 'react' && react) return react;
       if (request === 'expo-router' && react) return { useFocusEffect: (fn) => react.useEffect(fn, [fn]) };
       if (request === '@react-native-async-storage/async-storage') return nativeStorage ?? {};
-      if (request.startsWith('@/assets/') || request.endsWith('.png')) return request;
+      if (request.startsWith('@/assets/') || /\.(png|webp)$/.test(request)) return request;
       if (request.startsWith('.')) {
         let target = path.resolve(path.dirname(file), request);
         if (!path.extname(target)) target += fs.existsSync(target + '.ts') ? '.ts' : '.tsx';

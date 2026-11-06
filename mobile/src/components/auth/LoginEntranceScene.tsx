@@ -5,15 +5,15 @@ import { entranceFrame, ENTRANCE_DURATION } from './entranceTimeline';
 export const ENTRANCE_ASSETS = {
   outside: require('../../../assets/auth/cinematic_v3/stage1_outside_arch_hd.jpg'),
   inside: require('../../../assets/auth/cinematic_v3/stage2_just_inside_hd.jpg'),
-  arch: require('../../../assets/auth/cinematic_v3/floral_arch_hd.png'),
-  archLeft: require('../../../assets/auth/cinematic_v3/floral_arch_left_hd.png'),
-  archRight: require('../../../assets/auth/cinematic_v3/floral_arch_right_hd.png'),
+  arch: require('../../../assets/auth/cinematic_v3/floral_arch_hd.webp'),
+  archLeft: require('../../../assets/auth/cinematic_v3/floral_arch_left_hd.webp'),
+  archRight: require('../../../assets/auth/cinematic_v3/floral_arch_right_hd.webp'),
   // Backward compatibility aliases
   distance: require('../../../assets/auth/cinematic_v3/stage2_just_inside_hd.jpg'),
-  gateLeft: require('../../../assets/auth/cinematic_v3/floral_arch_left_hd.png'),
-  gateRight: require('../../../assets/auth/cinematic_v3/floral_arch_right_hd.png'),
-  gate: require('../../../assets/auth/cinematic_v3/floral_arch_hd.png'),
-  pillar: require('../../../assets/auth/cinematic_v3/floral_arch_hd.png'),
+  gateLeft: require('../../../assets/auth/cinematic_v3/floral_arch_left_hd.webp'),
+  gateRight: require('../../../assets/auth/cinematic_v3/floral_arch_right_hd.webp'),
+  gate: require('../../../assets/auth/cinematic_v3/floral_arch_hd.webp'),
+  pillar: require('../../../assets/auth/cinematic_v3/floral_arch_hd.webp'),
 };
 
 export function entranceTrack(progress: Animated.Value, key: keyof ReturnType<typeof entranceFrame>, reduced = false) {

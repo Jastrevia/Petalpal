@@ -7,7 +7,7 @@ type GardenReferenceLayerProps = {
 
 /** DEV calibration only: 1448x1086 and 2400x1800 are both exactly 4:3. */
 export default function GardenReferenceLayer({ opacity }: GardenReferenceLayerProps) {
-  const reference = useImage(require('@/assets/garden/reference/structure-final-version.png'));
+  const reference = useImage(require('@/assets/garden/reference/structure-final-version.webp'));
   if (!__DEV__ || !reference || opacity <= 0) return null;
 
   return (

@@ -27,7 +27,7 @@ half4 main(float2 p){
  return mix(rest,drink,sip*upper);
 }`);
 export default function TeaFairy({state,seconds:sharedSeconds}:{state:'seatedAtTea'|'drinkingTea'|null;seconds?:SharedValue<number>}){
- const sprite=useImage(require('@/assets/garden/fairy/tea-v1/poses.png'));
+ const sprite=useImage(require('@/assets/garden/fairy/tea-v1/poses.webp'));
  const stationarySeconds=useSharedValue(0),seconds=sharedSeconds??stationarySeconds;
  const reduced=useReducedMotion();
  // The existing Fairy scheduler owns this clock; no second RAF loop.

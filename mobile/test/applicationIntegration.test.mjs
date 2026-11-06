@@ -491,7 +491,7 @@ test('confirmed Friends retain visible Home icons and use persisted privacy meta
   assert.match(panel.text(), /@alex/); assert.match(panel.text(), /@jenny/);
   for (const id of ['alex', 'jenny', 'offline']) {
     const home = panel.nodes().find(node => node.props?.testID === `visit-${id}`);
-    assert.ok(home); assert.ok(featureNodes(home).some(node => node.type === 'Image' && node.props.source.endsWith('garden-house.png')));
+    assert.ok(home); assert.ok(featureNodes(home).some(node => node.type === 'Image' && /garden-house\.(png|webp)$/.test(node.props.source)));
     assert.equal(home.props.disabled, id !== 'alex');
     if (id !== 'alex') assert.equal(home.props.onPress, undefined, 'Disabled homes have no click handler');
   }
@@ -561,7 +561,7 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
   assert.deepEqual(calls[1].body, { hostUserId: 'alex' });
   const home = featureNodes(tree).find(node => node.props?.testID === 'visitor-return-home');
   assert.equal(home.props.accessibilityLabel, 'Return to My Garden');
-  assert.ok(featureNodes(home).some(node => node.type === 'Image' && node.props.source.endsWith('visitor-home-transparent.png')));
+  assert.ok(featureNodes(home).some(node => node.type === 'Image' && /visitor-home-transparent\.(png|webp)$/.test(node.props.source)));
   assert.doesNotMatch(featureText(tree), /Visiting a friend|Read only/);
   home.props.onPress();
   assert.deepEqual(navigation, ['/']);
