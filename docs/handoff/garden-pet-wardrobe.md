@@ -76,6 +76,12 @@ Not done yet (next work, in the owner's order):
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
    ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
    RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second.
+   *Ring icons (2026-11-06):* Feed, Pat and Dress up show the owner's friend's painted icons (a
+   kibble bowl, the golden being patted, a capelet on a hanger; cut out in
+   `~/dev/petalpal-motion/icons-ring/cut_icons.py`, the screenshot's cursor painted out of the
+   hanger). Xiaobai's Pat icon is the same scene painted with it (FLUX.2 klein from the golden's icon
+   and its head, then one oil-motion edit onto chroma green to drop klein's white sticker rim,
+   `key_green_icon.py`). `RING_ICONS` / `PAT_ICONS` in `PetRingMenu.tsx`.
    *Its own menu and wardrobe (2026-11-05, owner's choices):* a tap on Xiaobai opens the same ring
    menu in the Garden's forest green (`TONES` in `PetRingMenu.tsx`; the Skia ring takes its tone as
    a prop, context does not reach a Skia canvas). Its closet holds only its own three pieces, each

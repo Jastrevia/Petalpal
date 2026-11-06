@@ -40,7 +40,18 @@ type Copy = typeof COPY.en;
 
 // No painted food yet: each food shows as a small picture in a round card.
 const FOOD_ICONS: Record<string, string> = { 'berry-tart': '🥧', 'flower-cookies': '🍪', 'fish-biscuit': '🐟', 'honey-seeds': '🍯' };
-const ACTION_ICONS: Record<RingAction, string | number> = { feed: '🥣', pat: '✋', dress: ACCESSORY_ICONS['lilac-cape'] };
+// The ring's painted icons (the owner's friend's designs, 2026-11-06; cut out in
+// ~/dev/petalpal-motion/icons-ring): a bowl of kibble for Feed, a capelet on a hanger for Dress up,
+// and for Pat the pet itself being patted (the golden's from the design; Xiaobai's painted to match).
+const RING_ICONS = {
+  feed: require('@/assets/garden/pets/ring/feed.webp') as number,
+  dress: require('@/assets/garden/pets/ring/dress.webp') as number,
+};
+const PAT_ICONS: Partial<Record<PetId, number>> = {
+  puppy: require('@/assets/garden/pets/ring/pat-puppy.webp'),
+  maltese: require('@/assets/garden/pets/ring/pat-xiaobai.webp'),
+};
+const iconOf = (petId: PetId, action: RingAction): string | number => (action === 'pat' ? PAT_ICONS[petId] ?? '✋' : RING_ICONS[action]);
 
 const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
 // Each pet's plate: the puppy's translucent mauve, Xiaobai's the Garden's forest green (the theme's
@@ -54,7 +65,6 @@ const TONES: Record<'mauve' | 'forest', Tone> = {
 };
 const ToneContext = createContext<Tone>(TONES.mauve);
 const toneOf = (petId: PetId) => (petId === 'maltese' ? TONES.forest : TONES.mauve);
-const dressIconOf = (petId: PetId) => OWN_PIECE_ICONS[petId]?.['petal-capelet'] ?? (ACTION_ICONS.dress as number);
 const ITEM_H = 50, CARD = 32;
 type Mode = 'ring' | 'feed' | 'dress';
 
@@ -153,7 +163,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
       </Canvas>
       {mode === 'ring' ? <CloseButton layout={layout} viewport={viewport} label={copy.closeShort} a11y={copy.close} onPress={onClose} /> : null}
       {mode === 'ring'
-        ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={action === 'dress' ? dressIconOf(petId) : ACTION_ICONS[action]} onPress={() => act(action)} />)
+        ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={iconOf(petId, action)} onPress={() => act(action)} />)
         : <Panel layout={layout} viewport={viewport} copy={copy} locale={locale} mode={mode} pets={pets} petId={petId} busy={busy} note={note} onBack={back} onFeed={feed} onDress={dress} />}
       {note && !panel ? <View pointerEvents="none" style={[styles.note, { top: Math.min(viewport.height - 130, layout.cy + layout.outer * 0.87 + 8),
         left: Math.max(8, Math.min(viewport.width - 248, layout.cx + layout.side * layout.outer * 0.5 - 120)) }]}>
@@ -237,7 +247,7 @@ function RingButton({ layout, index, label, icon, onPress }: { layout: RingLayou
   const tone = useContext(ToneContext);
   return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} testID={`pet-ring-${RING_ACTIONS[index]}`}
     style={[styles.ringButton, { left: p.x - 28, top: p.y - 25 }]}>
-    {typeof icon === 'string' ? <Text style={styles.ringIcon}>{icon}</Text> : <Image source={icon} style={styles.ringImage} />}
+    {typeof icon === 'string' ? <Text style={styles.ringIcon}>{icon}</Text> : <Image source={icon} style={styles.ringImage} resizeMode="contain" />}
     <Text style={[styles.ringLabel, { textShadowColor: tone.shadow }]}>{label}</Text>
   </Pressable>;
 }
@@ -278,7 +288,7 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
           <Text style={styles.backText}>‹ {copy.back}</Text>
         </Pressable>
         <View style={[styles.titleRow, { backgroundColor: tone.fill }]}>
-          {mode === 'feed' ? <Text style={styles.titleIcon}>🥣</Text> : <Image source={dressIconOf(petId)} style={styles.titleImage} />}
+          <Image source={mode === 'feed' ? RING_ICONS.feed : RING_ICONS.dress} style={styles.titleImage} resizeMode="contain" />
           <Text style={styles.title}>{mode === 'feed' ? copy.feed : copy.dress}</Text>
         </View>
       </View>
@@ -380,7 +390,7 @@ const text = { color: CREAM, fontFamily: 'serif' } as const;
 const styles = StyleSheet.create({
   ringButton: { position: 'absolute', width: 56, height: 50, alignItems: 'center', justifyContent: 'center' },
   ringIcon: { fontSize: 18, lineHeight: 22 },
-  ringImage: { width: 22, height: 22 },
+  ringImage: { width: 32, height: 30 },
   ringLabel: { ...text, fontSize: 11.5, marginTop: 1, textShadowColor: '#2A1638', textShadowRadius: 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pressed: { opacity: 0.7 },
@@ -393,8 +403,7 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', alignItems: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 4, borderRadius: 16,
     backgroundColor: MAUVE, borderWidth: 1, borderColor: GOLD },
-  titleIcon: { fontSize: 14 },
-  titleImage: { width: 18, height: 18 },
+  titleImage: { width: 24, height: 22 },
   title: { ...text, fontSize: 14, letterSpacing: 1 },
   tabs: { flexDirection: 'row', gap: 6, marginTop: 6 },
   tab: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(60, 38, 78, 0.72)', borderWidth: 1, borderColor: 'rgba(233, 201, 121, 0.45)' },
