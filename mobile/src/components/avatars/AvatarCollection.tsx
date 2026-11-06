@@ -117,11 +117,14 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
               const active = entry.tier === tab;
               const info = collection.tiers.find(item => item.tier === entry.tier);
               const ownedHere = entry.ids.filter(id => collection.owned.includes(id)).length;
-              return <Pressable key={entry.tier} accessibilityRole="tab" accessibilityState={{ selected: active }}
-                accessibilityLabel={`${copy.tiers[entry.tier].name}, ${copy.tiers[entry.tier].note}`}
+              // "!" marks a tab holding an avatar that a waiting Fairy Bond reward can choose now.
+              const choosable = ownedHere < entry.ids.length && Boolean(rewardFor(collection.pending, entry.tier));
+              return <Pressable key={entry.tier} testID={`avatar-tab-${entry.tier}`} accessibilityRole="tab" accessibilityState={{ selected: active }}
+                accessibilityLabel={`${copy.tiers[entry.tier].name}, ${copy.tiers[entry.tier].note}${choosable ? `, ${copy.entryPending(1)}` : ''}`}
                 onPress={() => { setTab(entry.tier); setNote(''); }} style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && styles.pressed, styles.focus]}>
                 <Text style={[styles.tabName, active && styles.tabNameActive]}>{copy.tiers[entry.tier].name}</Text>
                 <Text style={styles.tabCount}>{info && !info.unlocked && entry.tier > 1 ? `Lv ${entry.unlockLevel}` : `${ownedHere} / ${entry.ids.length}`}</Text>
+                {choosable ? <Text testID={`avatar-tab-${entry.tier}-alert`} style={styles.tabAlert}>!</Text> : null}
               </Pressable>;
             })}
           </View>
@@ -210,6 +213,8 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     tabActive: { backgroundColor: theme.surface, borderColor: theme.gold },
     tabName: { fontFamily: 'serif', fontSize: 15, color: theme.muted },
     tabNameActive: { color: theme.text },
+    tabAlert: { position: 'absolute', top: -6, right: -2, overflow: 'hidden', width: 18, height: 18, borderRadius: 9, textAlign: 'center', lineHeight: 18,
+      fontSize: 12, fontWeight: '700', color: '#FFFFFF', backgroundColor: '#E2554B' },
     tabCount: { fontSize: 10, letterSpacing: 1, color: theme.muted, marginTop: 1 },
     tierNote: { fontFamily: 'serif', fontStyle: 'italic', fontSize: 13, color: theme.muted, textAlign: 'center', marginTop: 8, marginHorizontal: 18 },
     scroll: { flexShrink: 1, marginTop: 8 },

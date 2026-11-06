@@ -431,6 +431,20 @@
       if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'BLOOM', name: fairyName, avatar: null, cover: null }, locale: 'en', nextBefore: null,
         posts: [{ id: 'mo2', postedAt: ago(0), state: 'TEA_TIME', location: 'TEA_TIME', mood: null, photoKey: 'TEA_TIME/3', caption: 'Tea in the sun this morning.', liked: false },
           { id: 'mo1', postedAt: ago(2), state: 'IN_TREEHOUSE', location: 'IN_TREEHOUSE', mood: null, photoKey: null, caption: 'I found a tiny blue feather.', liked: false }] }); }
+      // Calendar marks and the keepsake book: today's keepsake appears once the check-in has run.
+      if (p === '/api/fairy/check-ins') {
+        const teacup = { id: 'acorn-teacup', rarity: 'COMMON', name: 'Acorn Teacup', reason: 'DAILY' };
+        const days = [3, 2, 1].map(n => ({ localDate: day(n), streak: 4 - n, graceUsed: false, points: 2, keepsakes: [{ id: n === 2 ? 'dewdrop' : 'crocus-brooch', rarity: 'COMMON', name: 'Keepsake', reason: 'DAILY' }] }));
+        if (checkedInToday) days.push({ localDate: day(0), streak: 4, graceUsed: false, points: 2, keepsakes: [teacup] });
+        return json({ locale: 'en', month: day(0).slice(0, 7), today: day(0), days, petalCards: [] });
+      }
+      if (p === '/api/fairy/keepsakes') {
+        const ids = ['acorn-teacup', 'crocus-brooch', 'dewdrop', 'blossom-bell', 'crystal-lantern', 'firefly-bottle', 'flower-key', 'four-leaf-clover', 'garden-coin', 'moonlight-shell', 'star-candy-jar', 'wisteria-music-box'];
+        const owned = new Set(['crocus-brooch', 'dewdrop', ...(checkedInToday ? ['acorn-teacup'] : [])]);
+        const keepsakes = ids.map(id => ({ id, rarity: id === 'star-candy-jar' ? 'RARE' : 'COMMON', name: id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+          note: 'I saved this one for you.', owned: owned.has(id), count: owned.has(id) ? 1 : 0, firstLocalDate: owned.has(id) ? day(0) : null }));
+        return json({ locale: 'en', owned: owned.size, received: owned.size, total: ids.length, keepsakes });
+      }
       if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: bondLevel, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,

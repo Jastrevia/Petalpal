@@ -8,26 +8,29 @@ import { KeepsakeReveal } from '../bond/KeepsakeReveal';
 import { PetalRing } from '../petalCards/PetalRing';
 import { loadPetalToday, type PetalToday } from '../../services/petalCardDraw';
 import { keepsakeArt } from '../bond/keepsakeArt';
+import { keepsakeLanded, measureCollectionIcon } from '../collection/collectionTarget';
 import { useFairyName } from '../../services/fairyName';
 import { useAppLocale } from '../../services/locale';
 import { calendarDateKey } from './calendarDates';
 import { usePlanting } from './planting/PlantingContext';
 
 // The first time the Garden opens each day: today's check-in with PPL happens and her keepsake is
-// revealed. Closing it leads straight to today's petal tarot (when petal cards are on and today's is
+// revealed; "Keep it" flies the keepsake into the Collection icon in the Garden dock, so the owner sees
+// where keepsakes go (owner, 2026-11-06). Then it leads straight to today's petal tarot (when petal cards are on and today's is
 // not drawn), and after that the keepsake on a small card shrinks into the calendar in the top-right
 // corner, so the owner learns that is where check-ins live. Checked in elsewhere earlier today:
 // just the card. Off with the closeness switch (summary null).
 const SHOWN_KEY = 'petalpal.checkInIntro.shownOn';
 const TIME_KEY = 'petalpal.checkInIntro.checkedInAt';
 const HOLD_MS = 2600, SHRINK_MS = 900;
+const FLY_MS = 900, FLY_STAGGER = 140, FLY_START = 120;
 // Her own photo, the same one Fairy Moments uses as her avatar.
 const PPL = require('@/assets/moments/TEA_TIME-3.jpg');
 const COPY = {
   en: { title: 'Checked in for today', at: (time: string) => `Today at ${time}`, earlier: 'Earlier today', streak: (n: number, fairy: string) => `${n}-day streak with ${fairy}`,
-    hint: 'Your check-ins and keepsakes live in the calendar, top right.', dismiss: 'Go to the calendar' },
+    hint: 'Your check-ins live in the calendar, top right; keepsakes go to Collection.', dismiss: 'Go to the calendar' },
   'zh-Hans': { title: '今天已签到', at: (time: string) => `今天 ${time}`, earlier: '今天早些时候', streak: (n: number, _fairy: string) => `和小花仙连续签到 ${n} 天`,
-    hint: '签到记录和信物都在右上角的日历里，点开就能看。', dismiss: '去日历看看' },
+    hint: '签到记录在右上角的日历里，信物都收进了「收藏」。', dismiss: '去日历看看' },
 };
 
 export function DailyCheckInIntro() {
@@ -133,8 +136,44 @@ export function DailyCheckInIntro() {
     if (pendingCard.current) showCard(pendingCard.current);
     pendingCard.current = null;
   };
-  const closeReveal = () => { setReveal(null); afterKeepsake(petal); };
-  if (reveal) return <KeepsakeReveal result={reveal} locale={locale} onDone={closeReveal} />;
+  // "Keep it": each keepsake of the reveal flies from the middle of the screen into the Collection
+  // icon, shrinking along a gentle arc, a few frames apart; the icon answers as the first one lands.
+  const [flight, setFlight] = useState<{ ids: string[]; to: { x: number; y: number; size: number } } | null>(null);
+  const flown = useRef(new Animated.Value(0)).current;
+  const closeReveal = async () => {
+    const ids = (reveal?.keepsakes ?? []).map(keepsake => keepsake.id).filter(id => keepsakeArt(id)).slice(0, 3);
+    setReveal(null);
+    const [target, reduced] = await Promise.all([measureCollectionIcon(), AccessibilityInfo.isReduceMotionEnabled().catch(() => false)]);
+    if (!ids.length || !target || reduced) { if (target) keepsakeLanded(); afterKeepsake(petal); return; }
+    flown.setValue(0);
+    setFlight({ ids, to: { x: target.x + target.width / 2, y: target.y + target.height / 2, size: target.width } });
+    Animated.timing(flown, { toValue: 1, duration: FLY_MS + (ids.length - 1) * FLY_STAGGER, easing: Easing.linear, useNativeDriver: Platform.OS !== 'web' })
+      .start(() => { setFlight(null); afterKeepsake(petal); });
+    setTimeout(keepsakeLanded, FLY_MS - 60);
+  };
+  if (reveal) return <KeepsakeReveal result={reveal} locale={locale} onDone={() => void closeReveal()} />;
+  if (flight) {
+    const total = FLY_MS + (flight.ids.length - 1) * FLY_STAGGER, start = FLY_START;
+    const fromX = width / 2, fromY = height * .42;
+    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.layer]}>
+      {flight.ids.map((id, index) => {
+        const a = (index * FLY_STAGGER) / total, b = (index * FLY_STAGGER + FLY_MS) / total;
+        // Progress of this keepsake alone, eased: quick to leave, soft to arrive.
+        const t = flown.interpolate({ inputRange: [0, a, b, 1], outputRange: [0, 0, 1, 1], easing: Easing.inOut(Easing.cubic) });
+        const lift = flown.interpolate({ inputRange: [0, a, (a + b) / 2, b, 1], outputRange: [0, 0, -46, 0, 0] });
+        return <Animated.View key={id} style={[styles.flyer, {
+          left: fromX - start / 2, top: fromY - start / 2, width: start, height: start,
+          opacity: flown.interpolate({ inputRange: [0, a, b - (b - a) * .12, b, 1], outputRange: [1, 1, 1, 0, 0] }),
+          transform: [
+            { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, flight.to.x - fromX] }) },
+            { translateY: Animated.add(t.interpolate({ inputRange: [0, 1], outputRange: [0, flight.to.y - fromY] }), lift) },
+            { scale: t.interpolate({ inputRange: [0, .15, 1], outputRange: [1, 1.06, Math.max(.18, flight.to.size / start * .8)] }) },
+          ] }]}>
+          <Image source={keepsakeArt(id)!} resizeMode="contain" style={styles.flyerArt} accessible={false} />
+        </Animated.View>;
+      })}
+    </View>;
+  }
   if (ringOpen) return <PetalRing visible today={petal} onClose={toCalendar} />;
   if (!card) return null;
   const art = card.keepsake ? keepsakeArt(card.keepsake) : null;
@@ -174,6 +213,8 @@ const styles = StyleSheet.create({
   portrait: { width: 74, height: 74, borderRadius: 37, overflow: 'hidden', borderWidth: 2, borderColor: '#C9A95C', backgroundColor: '#E9DFC4' },
   pplImage: { width: '100%', height: '100%' },
   keepsake: { width: 96, height: 96 },
+  flyer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  flyerArt: { width: '100%', height: '100%', filter: 'drop-shadow(0 6px 10px rgba(11, 31, 26, .35))' },
   check: { marginTop: 4, fontSize: 22, color: '#3F7A5E' },
   title: { fontFamily: 'Georgia', fontSize: 22, color: '#254E43' },
   time: { fontFamily: 'Georgia', fontSize: 17, color: '#3D5F52' },
