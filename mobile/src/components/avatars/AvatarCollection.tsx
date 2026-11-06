@@ -37,7 +37,8 @@ export function sortTierAvatars(ids: string[], collection: Collection | null, eq
 // Level 3 from Lv 14), each avatar marked wearing / yours / to unlock / locked by level. Owned
 // avatars are worn with a tap; a waiting Fairy Bond reward lets the owner pick one avatar to unlock.
 // Higher tiers can be looked at before their level. Claiming never changes the avatar worn.
-export function AvatarCollection({ visible, locale, onClose }: { visible: boolean; locale: BondLocale; onClose: () => void }) {
+// `newIds`: avatars given at sign-up the owner has not seen yet (Collection marks them seen on close).
+export function AvatarCollection({ visible, locale, onClose, newIds = [] }: { visible: boolean; locale: BondLocale; onClose: () => void; newIds?: string[] }) {
   const copy = avatarCopy(locale);
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
@@ -138,7 +139,9 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
               const canPick = state === 'available' && Boolean(rewardFor(collection.pending, tab));
               const label = state === 'locked' ? copy.stateLabel.locked(tier.unlockLevel) : copy.stateLabel[state];
               const disabled = busy || state === 'locked';
-              return <Pressable key={id} accessibilityRole="button" accessibilityLabel={`${copy.avatar(index + 1, tab)}, ${label}`}
+              const isNew = !isUnowned && newIds.includes(id);
+              return <Pressable key={id} testID={isNew ? `avatar-new-${id}` : undefined} accessibilityRole="button"
+                accessibilityLabel={`${copy.avatar(index + 1, tab)}, ${label}${isNew ? `, ${copy.isNew}` : ''}`}
                 accessibilityState={{ selected: chosen || state === 'equipped', disabled }} disabled={disabled} onPress={() => press(id, state)}
                 style={({ pressed }) => [styles.cell, pressed && !disabled && styles.pressed, styles.focus]}>
                 <View style={[styles.ring, state === 'equipped' && styles.ringEquipped, state === 'owned' && styles.ringOwned,
@@ -146,6 +149,7 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
                   <Image source={AVATAR_ART[id]} style={[styles.art, isUnowned && styles.artUnowned, chosen && styles.artChosen]} accessibilityIgnoresInvertColors />
                   {isUnowned && !chosen ? <View style={styles.veil} /> : null}
                 </View>
+                {isNew ? <Text style={styles.newTag}>{copy.isNew}</Text> : null}
                 <Text numberOfLines={1} style={[styles.state, state === 'equipped' && styles.stateEquipped, state === 'owned' && styles.stateOwned, canPick && styles.stateAvailable]}>
                   {state === 'locked' ? copy.states.locked(tier.unlockLevel) : copy.states[state]}
                 </Text>
@@ -213,6 +217,8 @@ function makeStyles(theme: PanelTheme, light: boolean) {
     tabActive: { backgroundColor: theme.surface, borderColor: theme.gold },
     tabName: { fontFamily: 'serif', fontSize: 15, color: theme.muted },
     tabNameActive: { color: theme.text },
+    newTag: { position: 'absolute', top: 0, left: 2, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999,
+      fontSize: 10, fontWeight: '600', color: '#FFFFFF', backgroundColor: '#7E62AE' },
     tabAlert: { position: 'absolute', top: -6, right: -2, overflow: 'hidden', width: 18, height: 18, borderRadius: 9, textAlign: 'center', lineHeight: 18,
       fontSize: 12, fontWeight: '700', color: '#FFFFFF', backgroundColor: '#E2554B' },
     tabCount: { fontSize: 10, letterSpacing: 1, color: theme.muted, marginTop: 1 },

@@ -55,7 +55,7 @@ import {
 } from "./lib/fairy-moments.js";
 import { isMomentCover } from "./lib/moment-covers.js";
 import { isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
-import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar } from "./lib/avatar-collection.js";
+import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar, welcomeGiftRows } from "./lib/avatar-collection.js";
 import {
   awardCloseness,
   awardFairyTap,
@@ -1092,8 +1092,10 @@ async function createProfile({ firebaseUid, name, body, email = null, signUp = n
             accountPassword: { create: { hash: signUp.passwordHash } },
             fairies: { create: { fairyType: STARTER_FAIRY.type, name: signUp.fairyName || STARTER_FAIRY.name, unlockSource: STARTER_FAIRY.unlockSource,
               isActive: true, runtime: { create: {} } } },
+            // The one portrait chosen on the sign-up page, and three more Level 1 avatars as her
+            // welcome gift (shown as New in Collection until seen); the welcome screen is then done.
             avatarWelcomeAt: new Date(),
-            avatarOwnerships: { create: LEGACY_AVATAR_IDS.map(avatarId => ({ avatarId, source: "SIGNUP" })) }
+            avatarOwnerships: { create: welcomeGiftRows(body.avatar) }
           } : {})
         }
       });

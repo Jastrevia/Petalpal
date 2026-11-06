@@ -19,7 +19,7 @@
   代码在 [CalendarCheckIn.tsx](../../mobile/src/components/bond/CalendarCheckIn.tsx) 和 [KeepsakeReveal.tsx](../../mobile/src/components/bond/KeepsakeReveal.tsx)，日历是 [GardenCalendar.tsx](../../mobile/src/components/garden/GardenCalendar.tsx)。
 - 画面 5–8 亲密度页面：等级、进度条、PPL 的话、陪伴天数、信物数量、今日进度、签到奖励、等级与解锁，都在 [OurBondPanel.tsx](../../mobile/src/components/bond/OurBondPanel.tsx)。
 - 画面 9、10 信物收藏册和详情：[KeepsakeBook.tsx](../../mobile/src/components/bond/KeepsakeBook.tsx)。
-  从 2026-11-06 起，信物收藏册和头像收藏不在亲密度页面里，改从花园右侧日历下方的「收藏 Collection」图标打开：[CollectionPanel.tsx](../../mobile/src/components/collection/CollectionPanel.tsx)。今天签到得到、还没在收藏册里看过的信物，以及可以兑换的头像奖励，会让这个图标亮小红点（[collectionAlerts.ts](../../mobile/src/services/collectionAlerts.ts)）；签到弹窗点「收下」后，信物会飞进这个图标。
+  从 2026-11-06 起，信物收藏册和头像收藏不在亲密度页面里，改从花园右侧日历下方的「收藏 Collection」图标打开：[CollectionPanel.tsx](../../mobile/src/components/collection/CollectionPanel.tsx)。今天签到得到、还没在收藏册里看过的信物，以及可以兑换的头像奖励，会让这个图标亮小红点（[collectionAlerts.ts](../../mobile/src/services/collectionAlerts.ts)）；签到弹窗点「收下」后，信物会飞进这个图标。注册时只能在 8 张原版头像里选 1 张（Level 1），同时随机再送 3 张 Level 1 头像；这 3 张在头像收藏里标「New」，看过一次头像收藏后 New 和小红点都会消失。
 - 文案在 [bondCopy.ts](../../mobile/src/components/bond/bondCopy.ts)，默认英文，用户设了简体中文才显示中文。
 - 信物图在 `mobile/assets/keepsakes/<id>.webp`，是从 Keepsake Icons 图里切出来的，按同样文件名换成原图就会更清楚。
 - 在花园里指挥 PPL 去喝茶、荡秋千等，会自动调用 `POST /api/fairy/closeness/tap`。前端最多每分钟调一次，服务器每天最多算 5 次。

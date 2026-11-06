@@ -27,7 +27,7 @@ export const AVATAR_COPY = {
     // Welcome
     welcomeTitle: 'Choose your first avatar', welcomeBody: 'Pick the one that feels like you. {fairy} has a little gift waiting after.',
     welcomeConfirm: 'Begin with this one', welcomeSaving: 'Opening your gift…', welcomeFailed: "That didn't go through. Try again.",
-    giftTitle: 'A gift from {fairy}', giftBody: 'Three more avatars to keep, for whenever you feel like a change.', giftDone: 'Into the garden',
+    isNew: 'New', giftTitle: 'A gift from {fairy}', giftBody: 'Three more avatars to keep, for whenever you feel like a change.', giftDone: 'Into the garden',
     // Fairy Bond
     levelUpEyebrow: 'Fairy Bond', levelUpTitle: (level: number) => `Lv ${level}`,
     levelUpBody: (n: number) => (n === 1 ? 'You can unlock one new avatar.' : `You can unlock ${n} new avatars, one for each level.`),
@@ -63,7 +63,7 @@ export const AVATAR_COPY = {
     wearNow: '现在换上', keepBrowsing: '继续看看', wearFailed: '头像没有保存成功，请再试一次。', claimFailed: '头像没有解锁成功，请再试一次。',
     welcomeTitle: '选择你的第一个头像', welcomeBody: '选一个最像你的。选好后，{fairy} 还准备了一份小礼物。',
     welcomeConfirm: '就用这个', welcomeSaving: '正在打开礼物…', welcomeFailed: '没有成功，再试一次。',
-    giftTitle: '{fairy} 送你的礼物', giftBody: '再送你三个头像，想换的时候随时换。', giftDone: '去花园',
+    isNew: '新', giftTitle: '{fairy} 送你的礼物', giftBody: '再送你三个头像，想换的时候随时换。', giftDone: '去花园',
     levelUpEyebrow: '亲密度', levelUpTitle: (level: number) => `Lv ${level}`,
     levelUpBody: (n: number) => (n === 1 ? '可以解锁一个新头像。' : `可以解锁 ${n} 个新头像，每升一级一个。`),
     levelUpChoose: '去选头像', later: '稍后再说',
