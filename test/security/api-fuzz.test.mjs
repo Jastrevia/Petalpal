@@ -62,7 +62,10 @@ let verifications = 0;
 setFirebaseTokenVerifierForTests(async token => {
   verifications++;
   if (token === 'invalid') throw Object.assign(new Error('Synthetic verification failure'), { code: 'auth/invalid-id-token' });
-  return { uid: token, email: 'fixture@example.test', email_verified: token !== 'unverified', auth_time: 1 };
+  // 'unverified' signed in with an email and password whose address was never verified: refused.
+  // (A name or PP sign-in has no verified email and is let in; that is covered by the account route tests.)
+  return { uid: token, email: 'fixture@example.test', email_verified: token !== 'unverified', auth_time: 1,
+    ...(token === 'unverified' ? { firebase: { sign_in_provider: 'password' } } : {}) };
 });
 
 async function send(path, { method = 'GET', token = 'owner', body, raw, ip, expected, contentType = 'application/json', headers = {} } = {}) {

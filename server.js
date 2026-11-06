@@ -188,7 +188,7 @@ if (process.env.NATIVE_SECURITY_TEST === '1') {
 }
 const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
-const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit } = rateLimiters();
+const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit, passwordChange: passwordChangeRateLimit } = rateLimiters();
 
 app.use((req, res, next) => {
   req.requestId = requestId();
@@ -1248,7 +1248,7 @@ app.get("/auth/recovery", async (req, res) => {
 });
 
 // Replacing a password takes the old one, or a sign-in with the connected email just now (how a forgotten one is reset).
-app.put("/auth/password", authRateLimit, allowBodyFields(["password", "currentPassword"]), async (req, res) => {
+app.put("/auth/password", authRateLimit, passwordChangeRateLimit, allowBodyFields(["password", "currentPassword"]), async (req, res) => {
   res.set("Cache-Control", "no-store");
   try {
     const { password, currentPassword } = req.body || {};
