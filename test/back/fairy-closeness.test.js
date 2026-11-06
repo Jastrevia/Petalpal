@@ -336,11 +336,14 @@ test("outfits: only opened pieces of the right row, and a list that shows the lo
   assert.ok(after.accessories.every(item => item.unlocked));
   await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: null }, now });
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "taking it off");
-  // The Maltese wears only its own three pieces.
+  // The Maltese wears only its own pieces: its light set's three and its Noble set's three.
   assert.deepEqual(plain(after.outfits.maltese), { hat: null, collar: null, pendant: null });
   assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { hat: "lilac-beret" }, now })), { error: "UNKNOWN_ACCESSORY" }, "not its piece");
   assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { hat: "flower-sprig", collar: "petal-capelet", pendant: "crystal-drop" }, now })),
     { outfit: { hat: "flower-sprig", collar: "petal-capelet", pendant: "crystal-drop" } });
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { hat: "golden-circlet", collar: "midnight-cape", pendant: "crystal-spire" }, now })),
+    { outfit: { hat: "golden-circlet", collar: "midnight-cape", pendant: "crystal-spire" } }, "its Noble set");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { collar: "star-mantle" }, now })), { error: "UNKNOWN_ACCESSORY" }, "a Noble piece that is not its own");
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "the puppy's outfit is its own");
 });
 

@@ -76,13 +76,19 @@ Not done yet (next work, in the owner's order):
    It walks at the puppy's pace (`MALTESE_SPEED` 38, the owner's choice): its frames follow the
    ground covered, so the painted stride stays and its steps come quicker; it gallops at the puppy's
    RUN_SPEED too (`MALTESE_RUN_SPEED` 145), its short strides about 4.4 a second.
+   *Ring icons (2026-11-06):* Feed, Pat and Dress up show the owner's friend's painted icons (a
+   kibble bowl, the golden being patted, a capelet on a hanger; cut out in
+   `~/dev/petalpal-motion/icons-ring/cut_icons.py`, the screenshot's cursor painted out of the
+   hanger). Xiaobai's Pat icon is the same scene painted with it (FLUX.2 klein from the golden's icon
+   and its head, then one oil-motion edit onto chroma green to drop klein's white sticker rim,
+   `key_green_icon.py`). `RING_ICONS` / `PAT_ICONS` in `PetRingMenu.tsx`.
    *Its own menu and wardrobe (2026-11-05, owner's choices):* a tap on Xiaobai opens the same ring
    menu in the Garden's forest green (`TONES` in `PetRingMenu.tsx`; the Skia ring takes its tone as
    a prop, context does not reach a Skia canvas). Its closet holds only its own three pieces, each
    kept under a catalog id and opening with it: flower clip `flower-sprig`, lilac capelet
    `petal-capelet`, pink bow `crystal-drop` (`PET_OWN_PIECES` in `petRing.ts` and, enforced, in
-   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat show hearts
-   (no painted clips yet). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
+   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat play its
+   painted clips, then hearts (see "eats and is patted in every look" below). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
    string); until that is deployed the menu says it is almost ready and Xiaobai keeps following the
    puppy's outfit. It wears its own outfit (`malteseLookOfOutfit`): hat, necklace, cape, any of them
    together (all three: its petal look), a necklace with its cape too. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
@@ -120,10 +126,57 @@ Not done yet (next work, in the owner's order):
    backdrop went near-black halfway: keyed per frame keeping the eyes and the cape's dark purple;
    the belly-shadow clear was changed to leave purple fabric alone (it had cut the hem). Loops: walk
    43 frames, run 59. Look `noble` in `MALTESE_LOOKS` (GardenCritters.tsx), drawn whole (no Noble
-   hat-only or cape-only clips). **Not in its closet yet:** only the preview shows it
-   (`/critters-test` → maltese → noble). Choosing it needs the owner's call on how the closet
-   offers it and which catalog ids it uses (`PET_OWN_PIECES.maltese` in `lib/garden-pets.js`
-   allows only the three light pieces), and that is a backend change to deploy.
+   hat-only or cape-only clips of its own).
+   *Its Noble pieces one by one (2026-11-05, Kiro, owner's request):* Xiaobai's closet now holds two
+   pieces per shelf, light then Noble: headpiece `golden-circlet`, capelet `midnight-cape`, clasp
+   `crystal-spire` (Kiro's pick of catalog ids by likeness; `PET_OWN_PIECES` in `lib/garden-pets.js`,
+   now a list per slot, and in `petRing.ts`; **backend change, needs a deploy**). It wears one set at a
+   time like the puppy (`malteseLookOfOutfit`: the cape's set wins, else the hat's, else the
+   pendant's; `malteseHiddenPieces` marks the other set's pieces "not shown"), and the Noble capelet
+   carries its clasp, so a pendant under it adds nothing. Looks `noble-hat`, `noble-necklace`,
+   `noble-hat-necklace` (the headpiece cut from `noble.png`, `pieces/cut_noble.py`; the clasp on a
+   fine gold chain from one gpt-image edit of `v2/bare.png`, `pieces/cut_necklace.py`; laid onto the
+   bare walk, sit and run by `pieces/overlay_noble.py`, packed by `pieces/build.sh` with the bare
+   loops), `noble-cape` (its own clips: the Noble painting and gallop key with the headpiece taken
+   off, `cape/compose_cape.py`, no paid edit; 3 minimax videos plus one walk retry because the first
+   walk's backdrop turned grey and keyed into the fur; walk 41+46, sit 0+80 → 20, run 24+59; strides
+   from the measured paw slide, 30.6 and 66.9), and `noble` (capelet and headpiece; since 2026-11-06
+   the capelet's clips with the headpiece laid on, `pieces/rebuild_noble.sh`, so its sit matches its
+   eat and pat: its own Noble clips from `f01364e0` sat differently and patting jumped at both ends;
+   the capelet's loops and strides). All
+   in `~/dev/petalpal-motion/maltese/noble/`. Closet icons from its own art (`pieces/make_icons.py`
+   → `maltese-noble-*.webp`). Paid this round: 1 gpt-image edit, 4 videos.
+   *Xiaobai eats and is patted in every look (2026-11-05, Kiro, owner's request: the patting hand
+   must be the golden's hand):* `MALTESE_ACTIONS` in `puppyLooks.ts` (13 looks × eat, pat;
+   `assets/garden/critters/maltese-actions/`), played from its ring menu like the puppy's, hearts
+   after. Everything is in `~/dev/petalpal-motion/maltese/actions/` (`build.sh` makes all 26 sheets
+   from the clips). Each clip starts and ends on the look's held sitting frame (`f077` of its sit clip,
+   `find_sit.py`, `make_bases.py`); eating's first frame is that frame with only the bowl taken from a
+   gpt-image edit (`paste_bowl.py`: the golden's cream bowl with the lilac band). The pat prompts use
+   the golden's hand words unchanged (`write_prompts.py`). Own clips: bare, light capelet, petal,
+   Noble capelet (eat and pat); the whole Noble look's eat and pat are the capelet's with the
+   headpiece laid on (its own Noble eating clip is no longer used). Pieces laid on with a frame-to-frame head and
+   throat track (`maltese_track.py`, after the golden's `action_track.py`; `--probe`, `--track`,
+   `--hand` added to `overlay_maltese.py` / `overlay_noble.py`): light and Noble hat/necklace/both on
+   the bare clips, light hat and bow (no ribbon) on the light capelet's, and **Noble's pat is the
+   Noble capelet's pat with the headpiece laid on**: both of Noble's own pat clips painted a long lace
+   sleeve hanging down the frame, unlike the golden's hand (`noble-pat*.mp4`, not used). For these
+   clips only, the flower clip and Noble headpiece layers have the patch of ear fur cut with them
+   removed (`clean_layers.py` → `*-action.png`): it showed when the ear swung into the bowl. Packed
+   at the sit sheets' scale (`action_sheet.py`, 8 columns, 71 frames at 12 fps; cells cut from video
+   x 110, 80 px left of the sit sheets' crop, because the capelets' tails reach past it: eat 319 × 230,
+   pat 393 × 239 reaching the frame's top right for the hand, its sheer lace's green taken off;
+   `anchorX` 172 is the sit cell's centre; the belly shadow cleared left of the bowl). Its
+   `--hand-match` (skin tinted to the golden's hand, `hand_colour.py`) is not used: its mask caught
+   the apricot ear beside the hand and turned it green. Retakes: the light capelet's and petal's first pat clips had a
+   different hand (level from the right, a solid sleeve; stroking the chin), so they were redone with
+   the hand's way in pinned down (`write_pat2.py`, seed 7). Paid: 5 gpt-image edits, 14 videos (10 +
+   3 pat retakes + 1 more Noble pat retake that also failed: black backdrop, sleeve again). The
+   preview page has eat and pat for the Maltese (`critters-test`, not with "with puppy"). Committed
+   on `feat/maltese-noble-pieces` (after the Noble pieces commit `b617fe2d`), not pushed. Next:
+   the owner reviews it in the preview; if Noble should get a pat clip of its own (now the capelet's
+   pat with the headpiece laid on), that needs a new prompt approach (both tries painted a hanging
+   sleeve). Do not put the `noble-pat*.mp4` clips or `--hand-match` back.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

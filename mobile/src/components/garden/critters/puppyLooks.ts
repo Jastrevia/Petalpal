@@ -96,6 +96,36 @@ export const PUPPY_ACTIONS: Record<PuppyLook, Record<PuppyAction, ActionFrames>>
 };
 export const actionSeconds = (frames: ActionFrames) => frames.count / ACTION_FPS;
 
+// Xiaobai eats and is patted too, in every look, with the golden's bowl and the golden's hand
+// (2026-11-05, Kiro; ~/dev/petalpal-motion/maltese/actions): oil-motion clips that start and end on
+// each look's held sitting frame (its sit sheet's last cell), cut at the sit sheets' scale
+// (220 / 690). Its own clips for bare, the light capelet, petal and the Noble capelet; the light
+// and Noble hats and necklaces are laid onto the bare clips, the light ones onto the capelet's, and
+// the whole Noble look's eat and pat are the Noble capelet's with the headpiece laid on, like its
+// walk, sit and run (2026-11-06: its own Noble eating clip sat differently from its sit; its own
+// pat clips both brought a long lace sleeve, unlike the golden's hand). Cells start 80 video px left of the
+// sit cells (the capelets' tails reach past them), eat cells a little taller (the bowl), pat cells
+// up to the frame's top and right edge for the hand; `anchorX` is the sit cell's centre in them.
+const malteseActions = (eat: number, pat: number): Record<PuppyAction, ActionFrames> => ({
+  eat: { source: eat, columns: 8, count: 71, w: 319, h: 230, anchorX: 172, ground: 216 },
+  pat: { source: pat, columns: 8, count: 71, w: 393, h: 239, anchorX: 172, ground: 225.6 },
+});
+export const MALTESE_ACTIONS: Record<MalteseLook, Record<PuppyAction, ActionFrames>> = {
+  bare: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-bare.webp'), require('@/assets/garden/critters/maltese-actions/pat-bare.webp')),
+  hat: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-hat.webp')),
+  necklace: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-necklace.webp')),
+  'hat-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-hat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-hat-necklace.webp')),
+  cape: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape.webp')),
+  'cape-hat': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape-hat.webp')),
+  'cape-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape-necklace.webp')),
+  petal: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-petal.webp'), require('@/assets/garden/critters/maltese-actions/pat-petal.webp')),
+  'noble-hat': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-hat.webp')),
+  'noble-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-necklace.webp')),
+  'noble-hat-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-hat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-hat-necklace.webp')),
+  'noble-cape': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-cape.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-cape.webp')),
+  noble: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble.webp')),
+};
+
 // Set 2's pieces (catalog ids, lib/garden-pets.js); every other piece the puppy wears is set 1.
 export const PUPPY_SET_2: ReadonlySet<string> = new Set(['flower-sprig', 'petal-capelet', 'crystal-drop']);
 const setOf = (id: string | null) => (id ? (PUPPY_SET_2.has(id) ? 2 : 1) : 0);
@@ -114,19 +144,31 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
 
 // The Maltese's looks (its sheets: MALTESE_LOOKS in GardenCritters.tsx), in its own pieces: a
 // flower clip (hat), a pink bow with two charms (necklace) and a lilac capelet fastened by a gold
-// clasp (cape); all three on is its petal look. It has no wardrobe of its own yet: it wears the
-// kinds of piece its friend the puppy has on (any set), malteseLookOfOutfit.
-// `noble`: its second outfit (the Noble design sheet: lilac flower headpiece with gold beads, deep
-// violet capelet with gold embroidery, violet crystal clasp), whole; not in its closet yet.
-export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal' | 'noble';
+// clasp (cape); all three on is its petal look. It wears its own outfit (the server keeps one for
+// it): malteseLookOfOutfit; on a server from before it had one, the kinds of piece its friend wears.
+// Its second set, Noble (the Noble design sheet: lilac flower headpiece with gold beads, deep violet
+// capelet with gold embroidery, violet crystal clasp), piece by piece like the first: `noble-hat`,
+// `noble-necklace` (the clasp on a fine gold chain), `noble-hat-necklace`, `noble-cape` (the capelet
+// carries the clasp, so a pendant under it adds nothing) and `noble` (capelet and headpiece). One set
+// is worn at a time, as the puppy wears its sets: the cape's set wins, else the hat's, else the
+// pendant's, and a piece of the other set is left off.
+export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal'
+  | 'noble-hat' | 'noble-necklace' | 'noble-hat-necklace' | 'noble-cape' | 'noble';
+export const MALTESE_NOBLE: ReadonlySet<string> = new Set(['golden-circlet', 'midnight-cape', 'crystal-spire']);
 const MALTESE_BY_PIECES: Record<string, MalteseLook> = {
   '': 'bare', h: 'hat', n: 'necklace', hn: 'hat-necklace', c: 'cape', ch: 'cape-hat', cn: 'cape-necklace', chn: 'petal',
 };
-const malteseLookWith = (cape: boolean, hat: boolean, necklace: boolean) =>
-  MALTESE_BY_PIECES[`${cape ? 'c' : ''}${hat ? 'h' : ''}${necklace ? 'n' : ''}`];
+const NOBLE_BY_PIECES: Record<string, MalteseLook> = {
+  '': 'bare', h: 'noble-hat', n: 'noble-necklace', hn: 'noble-hat-necklace', c: 'noble-cape', ch: 'noble', cn: 'noble-cape', chn: 'noble',
+};
+const malteseLookWith = (cape: boolean, hat: boolean, necklace: boolean, noble = false) =>
+  (noble ? NOBLE_BY_PIECES : MALTESE_BY_PIECES)[`${cape ? 'c' : ''}${hat ? 'h' : ''}${necklace ? 'n' : ''}`];
+const malteseSetOf = (id: string | null) => (id ? (MALTESE_NOBLE.has(id) ? 2 : 1) : 0);
 export function malteseLookOfOutfit(outfit: PetOutfit | null): MalteseLook {
   if (!outfit) return 'bare';
-  return malteseLookWith(!!outfit.collar, !!outfit.hat, !!outfit.pendant);
+  const set = malteseSetOf(outfit.collar) || malteseSetOf(outfit.hat) || malteseSetOf(outfit.pendant);
+  const on = (id: string | null) => !!id && malteseSetOf(id) === set;
+  return malteseLookWith(on(outfit.collar), on(outfit.hat), on(outfit.pendant), set === 2);
 }
 // From a puppy look alone (the preview's chosen look): what it shows (a cape hides its necklace).
 export function malteseLookOf(look: PuppyLook): MalteseLook {

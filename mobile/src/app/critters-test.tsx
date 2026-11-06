@@ -22,7 +22,11 @@ const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
 // The puppy beside the Maltese wears the look the Maltese matches (malteseLookOf).
 const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace',
-  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat', noble: 'cape-hat' };
+  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat',
+  'noble-hat': 'hat', 'noble-necklace': 'necklace', 'noble-hat-necklace': 'hat-necklace', 'noble-cape': 'cape', noble: 'cape-hat' };
+
+const LOOK_LABEL: Partial<Record<MalteseLook, string>> = { petal: 'petal 花仙装', 'noble-hat': 'noble 头饰', 'noble-necklace': 'noble 水晶扣',
+  'noble-hat-necklace': 'noble 头饰+水晶扣', 'noble-cape': 'noble 披肩', noble: 'noble 披肩+头饰' };
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
@@ -33,7 +37,7 @@ export default function CrittersTestScreen() {
   const [malteseLook, setMalteseLook] = useState<MalteseLook>('bare');
   const [together, setTogether] = useState(false);
   // The puppy's moves: its walk, its gallop (a chase), or sitting a while first, then getting up.
-  // (eat / pat: the puppy's painted actions, petal cape only.)
+  // (eat / pat: the puppy's or the Maltese's painted actions, in its chosen look.)
   const [move, setMove] = useState<'walk' | 'run' | 'sit' | 'eat' | 'pat'>('walk');
   // The pair's painted scenes (puppy and Maltese together), shown on their own.
   const [pair, setPair] = useState<SceneKind | null>(null);
@@ -52,7 +56,7 @@ export default function CrittersTestScreen() {
     const y = CRITTERS[id].kind === 'walker' ? HEIGHT / ZOOM * 0.78 : HEIGHT / ZOOM * 0.5;
     const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
     const spec = CRITTERS[id], puppyMove = id === 'puppy' || id === 'maltese' ? move : 'walk';
-    const acting = id === 'puppy' && (puppyMove === 'eat' || puppyMove === 'pat');
+    const acting = (id === 'puppy' || id === 'maltese') && !together && (puppyMove === 'eat' || puppyMove === 'pat');
     const running = puppyMove === 'run', sitting = puppyMove === 'sit' || acting;
     const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? (id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED) : spec.speed;
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
@@ -124,9 +128,9 @@ export default function CrittersTestScreen() {
     {!otter && !pair && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
       style={[styles.button, look === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     {!otter && !pair && id === 'maltese' ? <View style={styles.row}>{(Object.keys(MATE_LOOK) as MalteseLook[]).map(item => <Pressable key={item} onPress={() => setMalteseLook(item)}
-      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{item === 'petal' ? 'petal 花仙装' : item}</Text></Pressable>)}
+      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{LOOK_LABEL[item] ?? item}</Text></Pressable>)}
       <Pressable onPress={() => { setTogether(value => !value); setRound(value => value + 1); }} style={[styles.button, together && styles.selected]}><Text style={styles.label}>with puppy 和小金毛一起</Text></Pressable></View> : null}
-    {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
+    {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' || !together ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
       onPress={() => { setMove(item); setRound(value => value + 1); }}
       style={[styles.button, move === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     <View style={styles.row}>

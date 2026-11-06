@@ -6,7 +6,7 @@ import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
-import { ACTION_FPS, actionSeconds, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
+import { ACTION_FPS, actionSeconds, MALTESE_ACTIONS, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
 export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
@@ -68,12 +68,26 @@ const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
     require('@/assets/garden/critters/maltese-looks/run-cape.webp')),
   'cape-hat': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-hat.webp'),
     require('@/assets/garden/critters/maltese-looks/run-cape-hat.webp')),
-  // Its Noble outfit (2026-11-05): its own clips from today's painting dressed by one gpt-image edit,
-  // only the outfit pasted back so the dog is the same (~/dev/petalpal-motion/maltese/noble); walk one
-  // 43-frame stride, gallop from the bare gallop's key dressed the same way.
-  noble: { source: require('@/assets/garden/critters/maltese-looks/walk-noble.webp'), columns: 8, count: 43, ground: 216, loop: 51.1,
+  // Its Noble outfit: the Noble capelet's clips with the headpiece laid on (2026-11-06; noble/pieces/
+  // rebuild_noble.sh), like its pat and eat, so every move of the look comes from one set of clips
+  // and eating or patting starts and ends on its own sitting frame; the capelet's loops and strides.
+  noble: { source: require('@/assets/garden/critters/maltese-looks/walk-noble.webp'), columns: 8, count: 46, ground: 216, loop: 30.6,
     rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble.webp'), count: 20, rise: 1 },
-    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble.webp'), columns: 8, count: 59, loop: 70,
+    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble.webp'), columns: 8, count: 59, loop: 66.9,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
+  // Its Noble pieces one by one (2026-11-05, Kiro; ~/dev/petalpal-motion/maltese/noble/pieces):
+  // the headpiece and the clasp on its chain laid onto the bare clips like the light pieces, so they
+  // share the bare cells; the capelet alone has its own clips (from the Noble painting with the
+  // headpiece taken off), walk one 46-frame stride, gallop 59 frames, strides from their measured paw slide.
+  'noble-hat': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-hat.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-hat.webp')),
+  'noble-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-necklace.webp')),
+  'noble-hat-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-hat-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-hat-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-hat-necklace.webp')),
+  'noble-cape': { source: require('@/assets/garden/critters/maltese-looks/walk-noble-cape.webp'), columns: 8, count: 46, ground: 216, loop: 30.6,
+    rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble-cape.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble-cape.webp'), columns: 8, count: 59, loop: 66.9,
       cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
   'cape-necklace': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-necklace.webp'),
     require('@/assets/garden/critters/maltese-looks/run-cape-necklace.webp')),
@@ -372,8 +386,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         update('maltese', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
       },
       act: (id, kind) => {
-        // (The Maltese has no painted eating or patting yet: its menu shows hearts.)
-        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind] : undefined;
+        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind]
+          : id === 'maltese' ? MALTESE_ACTIONS[shownMalteseRef.current]?.[kind] : undefined;
         const visit = visitsRef.current.find(v => v.id === id && v.held);
         if (!frames || !visit || reducedRef.current) return 0;
         update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
@@ -490,7 +504,8 @@ function Maltese({ visit, clock, look }: { visit: Visit; clock: SharedValue<numb
 function MalteseLookWalker({ visit, clock, look, fade, onReady }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook; fade?: DerivedValue<number>; onReady?: () => void }) {
   const sheet = useImage(MALTESE_LOOKS[look].source);
   if (!sheet) return null;
-  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} onReady={onReady} />;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} onReady={onReady}
+    actions={MALTESE_ACTIONS[look]} />;
 }
 
 // The puppy in its outfit. A new outfit simply goes on: the old look fades off the new one in a

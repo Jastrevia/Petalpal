@@ -450,6 +450,23 @@ test('the puppy eats and is patted in every look: each has both painted sheets, 
   }
 });
 
+test('the Maltese eats and is patted in every look: each has both painted sheets, on its sit cells', async () => {
+  const fs = await import('node:fs');
+  const looks = load('../critters/puppyLooks');
+  const all = ['bare', 'hat', 'necklace', 'hat-necklace', 'cape', 'cape-hat', 'cape-necklace', 'petal',
+    'noble-hat', 'noble-necklace', 'noble-hat-necklace', 'noble-cape', 'noble'];
+  assert.deepEqual(Object.keys(looks.MALTESE_ACTIONS).sort(), [...all].sort());
+  for (const look of all) {
+    for (const kind of ['eat', 'pat']) {
+      const frames = looks.MALTESE_ACTIONS[look][kind];
+      assert.ok(fs.existsSync(new URL(`../${frames.source.replace('@/', '')}`, import.meta.url)), `${look} ${kind}: ${frames.source}`);
+      // The sit cell's centre (146.5 of its 293, crop from video x 190, scale 220 / 690) in a cell
+      // cut from video x 110.
+      assert.ok(Math.abs(frames.anchorX - (146.5 + 80 * 220 / 690)) < 0.5, 'the clip lies over the sitting Maltese');
+      assert.ok(looks.actionSeconds(frames) > 5 && looks.actionSeconds(frames) < 7);
+    }
+  }
+});
 test('the Maltese walks, sits and runs in every look, about half the puppy\'s size', async () => {
   const fs = await import('node:fs');
   const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
@@ -477,6 +494,16 @@ test('the Maltese wears the kinds of piece its friend wears: hat, necklace, cape
   assert.equal(malteseLookOfOutfit(outfit('a', 'b', null)), 'cape-hat');
   assert.equal(malteseLookOfOutfit(outfit(null, 'b', 'c')), 'cape-necklace');
   assert.equal(malteseLookOfOutfit(outfit('a', 'b', 'c')), 'petal');
+  // Its Noble set, piece by piece; the capelet carries its own clasp.
+  assert.equal(malteseLookOfOutfit(outfit('golden-circlet', null, null)), 'noble-hat');
+  assert.equal(malteseLookOfOutfit(outfit(null, null, 'crystal-spire')), 'noble-necklace');
+  assert.equal(malteseLookOfOutfit(outfit('golden-circlet', null, 'crystal-spire')), 'noble-hat-necklace');
+  assert.equal(malteseLookOfOutfit(outfit(null, 'midnight-cape', 'crystal-spire')), 'noble-cape');
+  assert.equal(malteseLookOfOutfit(outfit('golden-circlet', 'midnight-cape', 'crystal-spire')), 'noble');
+  // One set at a time: the cape's set wins, else the hat's.
+  assert.equal(malteseLookOfOutfit(outfit('flower-sprig', 'midnight-cape', null)), 'noble-cape');
+  assert.equal(malteseLookOfOutfit(outfit('golden-circlet', 'petal-capelet', null)), 'cape');
+  assert.equal(malteseLookOfOutfit(outfit('golden-circlet', null, 'crystal-drop')), 'noble-hat');
   // From a puppy look alone (the preview), what the puppy shows: its cape hides a necklace.
   const expected = { bare: 'bare', hat: 'hat', hat2: 'hat', necklace: 'necklace', necklace2: 'necklace', 'hat-necklace': 'hat-necklace',
     'hat-necklace2': 'hat-necklace', cape: 'cape', 'cape-hat': 'cape-hat', cape2: 'cape', 'cape2-hat': 'cape-hat' };
@@ -512,7 +539,7 @@ test('tapping the puppy holds its friend too: a running Maltese sits with it, no
   assert.equal(up.held, false);
 });
 
-test('Xiaobai\'s closet holds its own three pieces, named as its own; the puppy\'s holds every row', () => {
+test('Xiaobai\'s closet holds its own pieces (light and Noble), named as its own; the puppy\'s holds every row', async () => {
   const ring = load('../critters/petRing');
   const accessories = [
     { id: 'flower-sprig', row: 'hat', collection: 'light', name: 'Flower Sprig', unlocked: true, unlockedAtLevel: 4 },
@@ -525,7 +552,13 @@ test('Xiaobai\'s closet holds its own three pieces, named as its own; the puppy\
   assert.deepEqual(ring.petShelf(accessories, 'collar', 'maltese', 'en').map(p => [p.id, p.name, p.unlocked]), [['petal-capelet', 'Lilac Capelet', false]], 'still locked until it opens');
   assert.deepEqual(ring.petShelf(accessories, 'pendant', 'maltese', 'en').map(p => p.name), ['Pink Bow']);
   assert.deepEqual(ring.petShelf(accessories, 'hat', 'puppy', 'en').map(p => p.id), ['flower-sprig', 'lilac-beret']);
-  // Its pieces are the ones the server lets it wear (lib/garden-pets.js PET_OWN_PIECES).
-  assert.deepEqual(Object.fromEntries(Object.entries(ring.PET_OWN_PIECES.maltese).map(([slot, piece]) => [slot, piece.id])),
-    { hat: 'flower-sprig', collar: 'petal-capelet', pendant: 'crystal-drop' });
+  // Its pieces are the ones the server lets it wear (lib/garden-pets.js PET_OWN_PIECES), light then Noble.
+  const { PET_OWN_PIECES: server } = await import('../../lib/garden-pets.js');
+  assert.deepEqual(plain(Object.fromEntries(Object.entries(ring.PET_OWN_PIECES.maltese).map(([slot, pieces]) => [slot, pieces.map(piece => piece.id)]))),
+    plain(server.maltese));
+  const withNoble = [...accessories, { id: 'golden-circlet', row: 'hat', collection: 'noble', name: 'Golden Circlet', unlocked: false, unlockedAtLevel: null }];
+  assert.deepEqual(ring.petShelf(withNoble, 'hat', 'maltese', 'zh-Hans').map(p => [p.id, p.name]), [['flower-sprig', '小花夹'], ['golden-circlet', '紫藤金叶头饰']]);
+  // Worn but not shown: the other set's pieces, and a pendant under the Noble capelet (it has its own clasp).
+  assert.deepEqual([...ring.malteseHiddenPieces({ hat: 'flower-sprig', collar: 'midnight-cape', pendant: 'crystal-spire' })].sort(), ['crystal-spire', 'flower-sprig']);
+  assert.equal(ring.malteseHiddenPieces({ hat: 'flower-sprig', collar: 'petal-capelet', pendant: 'crystal-drop' }).size, 0);
 });

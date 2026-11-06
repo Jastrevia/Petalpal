@@ -39,5 +39,8 @@ export const OWN_PIECE_ICONS: Record<string, Record<string, number>> = {
     'flower-sprig': require('@/assets/garden/pets/accessories/maltese-flower-clip.webp'),
     'petal-capelet': require('@/assets/garden/pets/accessories/maltese-capelet.webp'),
     'crystal-drop': require('@/assets/garden/pets/accessories/maltese-bow.webp'),
+    'golden-circlet': require('@/assets/garden/pets/accessories/maltese-noble-headpiece.webp'),
+    'midnight-cape': require('@/assets/garden/pets/accessories/maltese-noble-capelet.webp'),
+    'crystal-spire': require('@/assets/garden/pets/accessories/maltese-noble-pendant.webp'),
   },
 };
