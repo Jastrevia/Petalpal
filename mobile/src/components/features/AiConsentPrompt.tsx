@@ -18,7 +18,8 @@ const COPY = {
 };
 type Consent = { aiProcessing: boolean; createdAt?: string; updatedAt?: string };
 
-export function AiConsentPrompt() {
+// `onOpenChange` lets the Garden hold other celebrations (the Fairy Bond level-up) until this is answered.
+export function AiConsentPrompt({ onOpenChange }: { onOpenChange?: (open: boolean) => void } = {}) {
   const owner = useAuth().session?.user.id;
   const copy = COPY[useAppLocale()];
   const { theme } = usePanelTheme();
@@ -32,6 +33,8 @@ export function AiConsentPrompt() {
     }).catch(() => undefined);
     return () => { active = false; };
   }, [owner]);
+  const open = Boolean(version && owner);
+  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
   if (!version || !owner) return null;
   const save = async (on: boolean) => {
     setBusy(true); setError('');

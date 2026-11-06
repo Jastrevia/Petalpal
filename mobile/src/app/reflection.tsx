@@ -534,6 +534,8 @@ export default function Reflection() {
           onSelectReport={show}
           onClose={closeBook}
           onWriteEvent={() => router.dismissTo({ pathname: '/', params: { feature: 'events' } })}
+          reportPage={weekly2Page}
+          collectionPage={() => <PetalCollection headingSize={compact ? 20 : 22} />}
         />
       </Animated.View>}
       {__DEV__ && <Pressable testID="reflection-lantern" accessibilityRole="switch" accessibilityLabel={t.lantern} accessibilityState={{ checked: night }} aria-checked={night}

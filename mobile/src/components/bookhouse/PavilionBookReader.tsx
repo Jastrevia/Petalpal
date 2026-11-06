@@ -39,6 +39,11 @@ export interface BookReaderProps {
   onSelectReport: (report: SavedReport) => void;
   onClose: () => void;
   onWriteEvent?: () => void;
+  /** Main's Weekly 2.0 / Monthly 2.0 report view (insights, hide, follow, keep, answer, report link) for one
+   * page part; the book uses it whenever the selected report is a 2.0 report. */
+  reportPage?: (report: SavedReport, part: 'left' | 'right' | 'all', interactive: boolean) => ReactNode;
+  /** The Petal collection (kept insights and cards, letters to a later week, never-use names): the Weekly book's last page. */
+  collectionPage?: () => ReactNode;
 }
 
 interface PageData {
@@ -52,7 +57,7 @@ const TURN_DURATION = 540;
 
 export function PavilionBookReader({
   bookId, locale, leaves, readingRect, compact,
-  reports, details, selectedReport, onSelectReport, onClose, onWriteEvent,
+  reports, details, selectedReport, onSelectReport, onClose, onWriteEvent, reportPage, collectionPage,
 }: BookReaderProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [turning, setTurning] = useState<{ from: number; to: number; dir: 1 | -1 } | null>(null);
@@ -99,13 +104,23 @@ export function PavilionBookReader({
       case 'collection':
         return flowerCollection.pages;
       case 'weekly':
-        return buildWeeklyPages(locale, selectedReport, details, onWriteEvent);
-      case 'monthly':
-        return buildMonthlyPages(locale, selectedReport, details);
+      case 'monthly': {
+        const detail = selectedReport ? details[selectedReport.id] ?? null : null;
+        const twoPointO = !!detail && (bookId === 'monthly' ? !!monthly2(detail) : !!shortWeekly(detail)?.version2);
+        const parts: Array<'left' | 'right' | 'all'> = compact ? ['all'] : ['left', 'right'];
+        const report = selectedReport;
+        const book = twoPointO && reportPage && report
+          ? parts.map((part, i) => ({ pageNumber: i + 1, render: (interactive: boolean) => reportPage(report, part, interactive) }))
+          : bookId === 'weekly' ? buildWeeklyPages(locale, selectedReport, details, onWriteEvent) : buildMonthlyPages(locale, selectedReport, details);
+        if (bookId !== 'weekly' || !collectionPage) return book;
+        // The collection starts on a page of its own (a fresh spread on wide screens).
+        const pad = !compact && book.length % 2 ? [{ pageNumber: book.length + 1, render: () => null }] : [];
+        return [...book, ...pad, { pageNumber: book.length + pad.length + 1, render: () => collectionPage() }];
+      }
       default:
         return [];
     }
-  }, [bookId, locale, flowerCollection, instructionCollection, selectedReport, details, onWriteEvent]);
+  }, [bookId, locale, compact, flowerCollection, instructionCollection, selectedReport, details, onWriteEvent, reportPage, collectionPage]);
 
   // Group pages into spreads
   const spreads = useMemo(() => {
