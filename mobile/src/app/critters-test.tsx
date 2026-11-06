@@ -37,7 +37,7 @@ export default function CrittersTestScreen() {
   const [malteseLook, setMalteseLook] = useState<MalteseLook>('bare');
   const [together, setTogether] = useState(false);
   // The puppy's moves: its walk, its gallop (a chase), or sitting a while first, then getting up.
-  // (eat / pat: the puppy's painted actions, petal cape only.)
+  // (eat / pat: the puppy's or the Maltese's painted actions, in its chosen look.)
   const [move, setMove] = useState<'walk' | 'run' | 'sit' | 'eat' | 'pat'>('walk');
   // The pair's painted scenes (puppy and Maltese together), shown on their own.
   const [pair, setPair] = useState<SceneKind | null>(null);
@@ -56,7 +56,7 @@ export default function CrittersTestScreen() {
     const y = CRITTERS[id].kind === 'walker' ? HEIGHT / ZOOM * 0.78 : HEIGHT / ZOOM * 0.5;
     const path = [{ x: margin, y }, { x: WIDTH / ZOOM - margin, y: y - 6 }, { x: margin + 8, y: y + 4 }];
     const spec = CRITTERS[id], puppyMove = id === 'puppy' || id === 'maltese' ? move : 'walk';
-    const acting = id === 'puppy' && (puppyMove === 'eat' || puppyMove === 'pat');
+    const acting = (id === 'puppy' || id === 'maltese') && !together && (puppyMove === 'eat' || puppyMove === 'pat');
     const running = puppyMove === 'run', sitting = puppyMove === 'sit' || acting;
     const rhythm = running ? { cycle: 0, moving: 1 } : RHYTHMS[id], speed = running ? (id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED) : spec.speed;
     const length = Math.hypot(path[1].x - path[0].x, path[1].y - path[0].y) + Math.hypot(path[2].x - path[1].x, path[2].y - path[1].y);
@@ -130,7 +130,7 @@ export default function CrittersTestScreen() {
     {!otter && !pair && id === 'maltese' ? <View style={styles.row}>{(Object.keys(MATE_LOOK) as MalteseLook[]).map(item => <Pressable key={item} onPress={() => setMalteseLook(item)}
       style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{LOOK_LABEL[item] ?? item}</Text></Pressable>)}
       <Pressable onPress={() => { setTogether(value => !value); setRound(value => value + 1); }} style={[styles.button, together && styles.selected]}><Text style={styles.label}>with puppy 和小金毛一起</Text></Pressable></View> : null}
-    {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
+    {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' || !together ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
       onPress={() => { setMove(item); setRound(value => value + 1); }}
       style={[styles.button, move === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     <View style={styles.row}>

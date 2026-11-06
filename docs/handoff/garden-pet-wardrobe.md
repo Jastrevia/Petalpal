@@ -81,8 +81,8 @@ Not done yet (next work, in the owner's order):
    a prop, context does not reach a Skia canvas). Its closet holds only its own three pieces, each
    kept under a catalog id and opening with it: flower clip `flower-sprig`, lilac capelet
    `petal-capelet`, pink bow `crystal-drop` (`PET_OWN_PIECES` in `petRing.ts` and, enforced, in
-   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat show hearts
-   (no painted clips yet). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
+   `lib/garden-pets.js`; icons painted from its own art, `maltese-*.webp`). Feed and Pat play its
+   painted clips, then hearts (see "eats and is patted in every look" below). The server has `maltese` in `GARDEN_PETS` (no migration: `petId` is a
    string); until that is deployed the menu says it is almost ready and Xiaobai keeps following the
    puppy's outfit. It wears its own outfit (`malteseLookOfOutfit`): hat, necklace, cape, any of them
    together (all three: its petal look), a necklace with its cape too. When dressing happens (the owner's rules, 2026-11-05): both dogs change together, and only
@@ -137,6 +137,36 @@ Not done yet (next work, in the owner's order):
    from the measured paw slide, 30.6 and 66.9), and `noble` (capelet and headpiece, as before). All
    in `~/dev/petalpal-motion/maltese/noble/`. Closet icons from its own art (`pieces/make_icons.py`
    → `maltese-noble-*.webp`). Paid this round: 1 gpt-image edit, 4 videos.
+   *Xiaobai eats and is patted in every look (2026-11-05, Kiro, owner's request: the patting hand
+   must be the golden's hand):* `MALTESE_ACTIONS` in `puppyLooks.ts` (13 looks × eat, pat;
+   `assets/garden/critters/maltese-actions/`), played from its ring menu like the puppy's, hearts
+   after. Everything is in `~/dev/petalpal-motion/maltese/actions/` (`build.sh` makes all 26 sheets
+   from the clips). Each clip starts and ends on the look's held sitting frame (`f077` of its sit clip,
+   `find_sit.py`, `make_bases.py`); eating's first frame is that frame with only the bowl taken from a
+   gpt-image edit (`paste_bowl.py`: the golden's cream bowl with the lilac band). The pat prompts use
+   the golden's hand words unchanged (`write_prompts.py`). Own clips: bare, light capelet, petal,
+   Noble capelet (eat and pat), Noble (eat only). Pieces laid on with a frame-to-frame head and
+   throat track (`maltese_track.py`, after the golden's `action_track.py`; `--probe`, `--track`,
+   `--hand` added to `overlay_maltese.py` / `overlay_noble.py`): light and Noble hat/necklace/both on
+   the bare clips, light hat and bow (no ribbon) on the light capelet's, and **Noble's pat is the
+   Noble capelet's pat with the headpiece laid on**: both of Noble's own pat clips painted a long lace
+   sleeve hanging down the frame, unlike the golden's hand (`noble-pat*.mp4`, not used). For these
+   clips only, the flower clip and Noble headpiece layers have the patch of ear fur cut with them
+   removed (`clean_layers.py` → `*-action.png`): it showed when the ear swung into the bowl. Packed
+   at the sit sheets' scale (`action_sheet.py`, 8 columns, 71 frames at 12 fps; cells cut from video
+   x 110, 80 px left of the sit sheets' crop, because the capelets' tails reach past it: eat 319 × 230,
+   pat 393 × 239 reaching the frame's top right for the hand, its sheer lace's green taken off;
+   `anchorX` 172 is the sit cell's centre; the belly shadow cleared left of the bowl). Its
+   `--hand-match` (skin tinted to the golden's hand, `hand_colour.py`) is not used: its mask caught
+   the apricot ear beside the hand and turned it green. Retakes: the light capelet's and petal's first pat clips had a
+   different hand (level from the right, a solid sleeve; stroking the chin), so they were redone with
+   the hand's way in pinned down (`write_pat2.py`, seed 7). Paid: 5 gpt-image edits, 14 videos (10 +
+   3 pat retakes + 1 more Noble pat retake that also failed: black backdrop, sleeve again). The
+   preview page has eat and pat for the Maltese (`critters-test`, not with "with puppy"). Committed
+   on `feat/maltese-noble-pieces` (after the Noble pieces commit `b617fe2d`), not pushed. Next:
+   the owner reviews it in the preview; if Noble should get a pat clip of its own (now the capelet's
+   pat with the headpiece laid on), that needs a new prompt approach (both tries painted a hanging
+   sleeve). Do not put the `noble-pat*.mp4` clips or `--hand-match` back.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

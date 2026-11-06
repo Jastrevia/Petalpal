@@ -19,7 +19,8 @@ import {
 // The puppy plays its painted eating or patting clip in whatever it wears (puppyLooks.ts
 // PUPPY_ACTIONS), then small hearts float up; with reduced motion only the hearts show.
 // Xiaobai (the Maltese) has the same menu in the Garden's forest green (its own TONE), a closet of
-// its own pieces, two sets (petRing.ts PET_OWN_PIECES), and hearts for feeding and patting.
+// its own pieces, two sets (petRing.ts PET_OWN_PIECES), and its own eating and patting clips in
+// every look (puppyLooks.ts MALTESE_ACTIONS), then the hearts.
 
 const COPY = {
   en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', closeShort: 'Close', loading: 'Opening…',

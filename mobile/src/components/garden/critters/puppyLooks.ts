@@ -96,6 +96,35 @@ export const PUPPY_ACTIONS: Record<PuppyLook, Record<PuppyAction, ActionFrames>>
 };
 export const actionSeconds = (frames: ActionFrames) => frames.count / ACTION_FPS;
 
+// Xiaobai eats and is patted too, in every look, with the golden's bowl and the golden's hand
+// (2026-11-05, Kiro; ~/dev/petalpal-motion/maltese/actions): oil-motion clips that start and end on
+// each look's held sitting frame (its sit sheet's last cell), cut at the sit sheets' scale
+// (220 / 690). Its own clips for bare, the light capelet, petal, the Noble capelet and Noble eating;
+// the light and Noble hats and necklaces are laid onto the bare clips, the light ones onto the
+// capelet's, and Noble's pat is the Noble capelet's with the headpiece laid on (its own pat clips
+// both brought a long lace sleeve, unlike the golden's hand). Cells start 80 video px left of the
+// sit cells (the capelets' tails reach past them), eat cells a little taller (the bowl), pat cells
+// up to the frame's top and right edge for the hand; `anchorX` is the sit cell's centre in them.
+const malteseActions = (eat: number, pat: number): Record<PuppyAction, ActionFrames> => ({
+  eat: { source: eat, columns: 8, count: 71, w: 319, h: 230, anchorX: 172, ground: 216 },
+  pat: { source: pat, columns: 8, count: 71, w: 393, h: 239, anchorX: 172, ground: 225.6 },
+});
+export const MALTESE_ACTIONS: Record<MalteseLook, Record<PuppyAction, ActionFrames>> = {
+  bare: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-bare.webp'), require('@/assets/garden/critters/maltese-actions/pat-bare.webp')),
+  hat: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-hat.webp')),
+  necklace: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-necklace.webp')),
+  'hat-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-hat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-hat-necklace.webp')),
+  cape: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape.webp')),
+  'cape-hat': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape-hat.webp')),
+  'cape-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-cape-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-cape-necklace.webp')),
+  petal: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-petal.webp'), require('@/assets/garden/critters/maltese-actions/pat-petal.webp')),
+  'noble-hat': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-hat.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-hat.webp')),
+  'noble-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-necklace.webp')),
+  'noble-hat-necklace': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-hat-necklace.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-hat-necklace.webp')),
+  'noble-cape': malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble-cape.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble-cape.webp')),
+  noble: malteseActions(require('@/assets/garden/critters/maltese-actions/eat-noble.webp'), require('@/assets/garden/critters/maltese-actions/pat-noble.webp')),
+};
+
 // Set 2's pieces (catalog ids, lib/garden-pets.js); every other piece the puppy wears is set 1.
 export const PUPPY_SET_2: ReadonlySet<string> = new Set(['flower-sprig', 'petal-capelet', 'crystal-drop']);
 const setOf = (id: string | null) => (id ? (PUPPY_SET_2.has(id) ? 2 : 1) : 0);

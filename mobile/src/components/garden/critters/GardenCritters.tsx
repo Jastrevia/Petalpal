@@ -6,7 +6,7 @@ import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from '../fairy/
 import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
-import { ACTION_FPS, actionSeconds, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
+import { ACTION_FPS, actionSeconds, MALTESE_ACTIONS, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
 export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
@@ -386,8 +386,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         update('maltese', (v, now) => (sittable(v, now) ? holdVisit(v, now) : v));
       },
       act: (id, kind) => {
-        // (The Maltese has no painted eating or patting yet: its menu shows hearts.)
-        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind] : undefined;
+        const frames = id === 'puppy' ? PUPPY_ACTIONS[shownLookRef.current]?.[kind]
+          : id === 'maltese' ? MALTESE_ACTIONS[shownMalteseRef.current]?.[kind] : undefined;
         const visit = visitsRef.current.find(v => v.id === id && v.held);
         if (!frames || !visit || reducedRef.current) return 0;
         update(id, (v, now) => ({ ...v, action: { kind, start: now } }));
@@ -504,7 +504,8 @@ function Maltese({ visit, clock, look }: { visit: Visit; clock: SharedValue<numb
 function MalteseLookWalker({ visit, clock, look, fade, onReady }: { visit: Visit; clock: SharedValue<number>; look: MalteseLook; fade?: DerivedValue<number>; onReady?: () => void }) {
   const sheet = useImage(MALTESE_LOOKS[look].source);
   if (!sheet) return null;
-  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} onReady={onReady} />;
+  return <FrameWalker visit={visit} clock={clock} sheet={sheet} frames={MALTESE_LOOKS[look]} w={ART.maltese.w} h={ART.maltese.h} fade={fade} onReady={onReady}
+    actions={MALTESE_ACTIONS[look]} />;
 }
 
 // The puppy in its outfit. A new outfit simply goes on: the old look fades off the new one in a

@@ -450,6 +450,23 @@ test('the puppy eats and is patted in every look: each has both painted sheets, 
   }
 });
 
+test('the Maltese eats and is patted in every look: each has both painted sheets, on its sit cells', async () => {
+  const fs = await import('node:fs');
+  const looks = load('../critters/puppyLooks');
+  const all = ['bare', 'hat', 'necklace', 'hat-necklace', 'cape', 'cape-hat', 'cape-necklace', 'petal',
+    'noble-hat', 'noble-necklace', 'noble-hat-necklace', 'noble-cape', 'noble'];
+  assert.deepEqual(Object.keys(looks.MALTESE_ACTIONS).sort(), [...all].sort());
+  for (const look of all) {
+    for (const kind of ['eat', 'pat']) {
+      const frames = looks.MALTESE_ACTIONS[look][kind];
+      assert.ok(fs.existsSync(new URL(`../${frames.source.replace('@/', '')}`, import.meta.url)), `${look} ${kind}: ${frames.source}`);
+      // The sit cell's centre (146.5 of its 293, crop from video x 190, scale 220 / 690) in a cell
+      // cut from video x 110.
+      assert.ok(Math.abs(frames.anchorX - (146.5 + 80 * 220 / 690)) < 0.5, 'the clip lies over the sitting Maltese');
+      assert.ok(looks.actionSeconds(frames) > 5 && looks.actionSeconds(frames) < 7);
+    }
+  }
+});
 test('the Maltese walks, sits and runs in every look, about half the puppy\'s size', async () => {
   const fs = await import('node:fs');
   const source = fs.readFileSync(new URL('../src/components/garden/critters/GardenCritters.tsx', import.meta.url), 'utf8');
