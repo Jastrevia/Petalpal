@@ -99,10 +99,11 @@ export const actionSeconds = (frames: ActionFrames) => frames.count / ACTION_FPS
 // Xiaobai eats and is patted too, in every look, with the golden's bowl and the golden's hand
 // (2026-11-05, Kiro; ~/dev/petalpal-motion/maltese/actions): oil-motion clips that start and end on
 // each look's held sitting frame (its sit sheet's last cell), cut at the sit sheets' scale
-// (220 / 690). Its own clips for bare, the light capelet, petal, the Noble capelet and Noble eating;
-// the light and Noble hats and necklaces are laid onto the bare clips, the light ones onto the
-// capelet's, and Noble's pat is the Noble capelet's with the headpiece laid on (its own pat clips
-// both brought a long lace sleeve, unlike the golden's hand). Cells start 80 video px left of the
+// (220 / 690). Its own clips for bare, the light capelet, petal and the Noble capelet; the light
+// and Noble hats and necklaces are laid onto the bare clips, the light ones onto the capelet's, and
+// the whole Noble look's eat and pat are the Noble capelet's with the headpiece laid on, like its
+// walk, sit and run (2026-11-06: its own Noble eating clip sat differently from its sit; its own
+// pat clips both brought a long lace sleeve, unlike the golden's hand). Cells start 80 video px left of the
 // sit cells (the capelets' tails reach past them), eat cells a little taller (the bowl), pat cells
 // up to the frame's top and right edge for the hand; `anchorX` is the sit cell's centre in them.
 const malteseActions = (eat: number, pat: number): Record<PuppyAction, ActionFrames> => ({
@@ -143,8 +144,8 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
 
 // The Maltese's looks (its sheets: MALTESE_LOOKS in GardenCritters.tsx), in its own pieces: a
 // flower clip (hat), a pink bow with two charms (necklace) and a lilac capelet fastened by a gold
-// clasp (cape); all three on is its petal look. It has no wardrobe of its own yet: it wears the
-// kinds of piece its friend the puppy has on (any set), malteseLookOfOutfit.
+// clasp (cape); all three on is its petal look. It wears its own outfit (the server keeps one for
+// it): malteseLookOfOutfit; on a server from before it had one, the kinds of piece its friend wears.
 // Its second set, Noble (the Noble design sheet: lilac flower headpiece with gold beads, deep violet
 // capelet with gold embroidery, violet crystal clasp), piece by piece like the first: `noble-hat`,
 // `noble-necklace` (the clasp on a fine gold chain), `noble-hat-necklace`, `noble-cape` (the capelet

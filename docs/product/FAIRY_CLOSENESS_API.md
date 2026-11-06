@@ -206,7 +206,7 @@
 - `PUT /api/fairy/pets/:petId/outfit`，请求体 `{ hat, collar, pendant }`，传 `null` 是脱下。没解锁返回 409 `ACCESSORY_LOCKED`，不是这一行的件返回 400。
 - `POST /api/fairy/pets/:petId/feed`，请求体 `{ foodId }`，返回 `{ foodId, count }`。没有库存返回 409 `NO_FOOD`。
 - `petId`：`puppy` `hedgehog` `butterfly` `rabbit` `bluebird` `maltese`。喂食和摸头不加亲密度。
-- 小白（`maltese`）只能穿自己的三件：头饰 `flower-sprig`（花夹）、披风 `petal-capelet`（披肩）、挂饰 `crystal-drop`（蝴蝶结），别的件返回 400 `UNKNOWN_ACCESSORY`。解锁规则和其他件一样。
+- 小白（`maltese`）只能穿自己的两套，每格两件：浅色款是头饰 `flower-sprig`（小花夹）、披风 `petal-capelet`（紫色小披肩）、挂饰 `crystal-drop`（粉色蝴蝶结）；Noble 款是头饰 `golden-circlet`（紫藤金叶头饰）、披风 `midnight-cape`（星夜紫披肩）、挂饰 `crystal-spire`（紫晶扣链）。别的件返回 400 `UNKNOWN_ACCESSORY`（`lib/garden-pets.js` 的 `PET_OWN_PIECES`）。解锁规则和其他件一样。花园里一次只显示一套：有披风就以披风那套为准，没有就看头饰，再看挂饰；Noble 披风自带水晶扣，同时戴的 Noble 挂饰不显示。
 
 **花园里怎么显示（App，[puppyLooks.ts](../../mobile/src/components/garden/critters/puppyLooks.ts)）**
 

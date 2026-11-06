@@ -134,7 +134,10 @@ Not done yet (next work, in the owner's order):
    loops), `noble-cape` (its own clips: the Noble painting and gallop key with the headpiece taken
    off, `cape/compose_cape.py`, no paid edit; 3 minimax videos plus one walk retry because the first
    walk's backdrop turned grey and keyed into the fur; walk 41+46, sit 0+80 → 20, run 24+59; strides
-   from the measured paw slide, 30.6 and 66.9), and `noble` (capelet and headpiece, as before). All
+   from the measured paw slide, 30.6 and 66.9), and `noble` (capelet and headpiece; since 2026-11-06
+   the capelet's clips with the headpiece laid on, `pieces/rebuild_noble.sh`, so its sit matches its
+   eat and pat: its own Noble clips from `f01364e0` sat differently and patting jumped at both ends;
+   the capelet's loops and strides). All
    in `~/dev/petalpal-motion/maltese/noble/`. Closet icons from its own art (`pieces/make_icons.py`
    → `maltese-noble-*.webp`). Paid this round: 1 gpt-image edit, 4 videos.
    *Xiaobai eats and is patted in every look (2026-11-05, Kiro, owner's request: the patting hand
@@ -145,7 +148,8 @@ Not done yet (next work, in the owner's order):
    `find_sit.py`, `make_bases.py`); eating's first frame is that frame with only the bowl taken from a
    gpt-image edit (`paste_bowl.py`: the golden's cream bowl with the lilac band). The pat prompts use
    the golden's hand words unchanged (`write_prompts.py`). Own clips: bare, light capelet, petal,
-   Noble capelet (eat and pat), Noble (eat only). Pieces laid on with a frame-to-frame head and
+   Noble capelet (eat and pat); the whole Noble look's eat and pat are the capelet's with the
+   headpiece laid on (its own Noble eating clip is no longer used). Pieces laid on with a frame-to-frame head and
    throat track (`maltese_track.py`, after the golden's `action_track.py`; `--probe`, `--track`,
    `--hand` added to `overlay_maltese.py` / `overlay_noble.py`): light and Noble hat/necklace/both on
    the bare clips, light hat and bow (no ribbon) on the light capelet's, and **Noble's pat is the
