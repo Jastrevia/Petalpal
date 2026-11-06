@@ -7,7 +7,7 @@ import { exportOpsMetrics, gatewayDaily, toCsv } from "../../scripts/export-ops-
 async function fixture(t) {
   const pg = new PGlite(); t.after(() => pg.close());
   await pg.exec(`
-    CREATE TABLE "User" ("id" text PRIMARY KEY, "email" text, "createdAt" timestamp(3) NOT NULL);
+    CREATE TABLE "User" ("id" text PRIMARY KEY, "email" text, "createdAt" timestamp(3) NOT NULL, "emailVerifiedAt" timestamp(3) DEFAULT now());
     CREATE TABLE "Event" ("id" text PRIMARY KEY, "ownerId" text, "content" text, "occurredAt" timestamp(3) NOT NULL);
     CREATE TABLE "Flower" ("id" text PRIMARY KEY, "userId" text, "createdAt" timestamp(3) NOT NULL);
     CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY, "createdAt" timestamp(3) NOT NULL, "eventType" varchar(64), "actorUserId" text,

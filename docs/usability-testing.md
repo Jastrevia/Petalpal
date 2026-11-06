@@ -112,7 +112,7 @@ The script regenerates `ios/` when the bundle ID changes. Each Release build sta
 - [ ] Confirm with the team: no TEST deployments or migrations until the round ends.
 - [ ] Reinstall if the app is close to 7 days old.
 - [ ] Confirm the app is named **PetalPal Dev**.
-- [ ] Create one TEST account per tester ahead of time. Sign-up needs an email inbox you can verify, so use a team-controlled address rather than the tester's own.
+- [ ] Create one TEST account per tester ahead of time. Sign-up needs only a name and avatar; set a password on it so the account can be reopened on another phone.
 
 **Before each tester**
 - [ ] Open the app after a reset: it should show the guest Garden.

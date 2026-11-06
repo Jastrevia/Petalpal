@@ -88,6 +88,16 @@ test("verified UID session budget survives IP rotation without using submitted a
   assert.equal((await run(authAccount, { ...first, firebase: { uid: "victim" } }, 200)).statusCode, 200);
 });
 
+test("wrong current passwords are counted per signed-in account across IPs; successes and other accounts are free", async () => {
+  const { passwordChange } = rateLimiters({ RATE_LIMIT_PASSWORD_CHANGE_MAX: "2" });
+  const owner = { ip: "one", auth: { userId: "user-a" }, body: { login: "someone-else", currentPassword: "guess" } };
+  for (let i = 0; i < 3; i++) assert.equal((await run(passwordChange, owner, 200)).statusCode, 200, "a saved password costs nothing");
+  assert.equal((await run(passwordChange, owner, 403)).statusCode, 200);
+  assert.equal((await run(passwordChange, { ...owner, ip: "two" }, 403)).statusCode, 200);
+  assert.equal((await run(passwordChange, { ...owner, ip: "three" }, 403)).statusCode, 429, "a new IP does not reset the account's budget");
+  assert.equal((await run(passwordChange, { ...owner, auth: { userId: "user-b" } }, 403)).statusCode, 200, "another account keeps its own budget");
+});
+
 test("capacity pressure cannot evict an active budget; expired buckets free capacity", async () => {
   let timestamp = 1000;
   const limiter = createRateLimiter({ limit: 1, windowMs: 1000, maxKeys: 2, key: req => req.ip, now: () => timestamp });

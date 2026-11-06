@@ -8,7 +8,7 @@ import { Critter, PairSceneClip, type MalteseLook } from '@/components/garden/cr
 import { PUPPY_LOOKS, type PuppyLook } from '@/components/garden/critters/puppyLooks';
 import PetRingMenu from '@/components/garden/critters/PetRingMenu';
 import { Otter } from '@/components/garden/spirits/MemoryOtter';
-import { OTTER_SPEED, swimEnd, type Swim } from '@/components/garden/spirits/otterSwims';
+import { getSwimNetwork } from '@/components/garden/spirits/otterSwims';
 import { CRITTER_IDS, CRITTERS, MALTESE_RUN_SPEED, RHYTHMS, RUN_SPEED, SCENE_SPECS, travelSeconds, visitPose, FADE_SECONDS, type CritterId, type Scene, type SceneKind, type Visit } from '@/components/garden/critters/critterVisits';
 
 // Development preview: each Garden visitor large, crossing a plain lawn back and forth, so its
@@ -84,22 +84,14 @@ export default function CrittersTestScreen() {
     const timer = setInterval(() => { if (seconds.value > visit.start + visit.duration) setRound(value => value + 1); }, 200);
     return () => clearInterval(timer);
   }, [visit, seconds]);
-  // Memory Otter on night water: it swims across, dives, and comes back the other way.
+  // Same persistent water-network explorer as production, framed in world space.
   const [otter, setOtter] = useState(false);
   // Each pet's ring menu over this page, as if it had been tapped at the middle of the preview.
   const [ring, setRing] = useState<'puppy' | 'maltese' | null>(null);
   const viewport = useWindowDimensions();
-  const [swimRound, setSwimRound] = useState(0);
-  const swim = useMemo<Swim>(() => {
-    const left = { x: 60, y: HEIGHT * 0.55 }, right = { x: WIDTH - 60, y: HEIGHT * 0.5 };
-    const [a, b] = swimRound % 2 ? [right, left] : [left, right];
-    return { a, b, start, swim: Math.hypot(b.x - a.x, b.y - a.y) / OTTER_SPEED, under: 1 };
-  }, [swimRound, start]);
-  useEffect(() => {
-    if (!otter) return;
-    const timer = setInterval(() => { if (seconds.value > swimEnd(swim)) { setSwimRound(value => value + 1); setStart(seconds.value); } }, 200);
-    return () => clearInterval(timer);
-  }, [otter, swim, seconds]);
+  const swimNetwork = useMemo(() => getSwimNetwork(), []);
+  const bounds = swimNetwork.bounds;
+  const otterScale = Math.min(WIDTH / (bounds.maxX-bounds.minX+200), HEIGHT / (bounds.maxY-bounds.minY+200));
   const [debug, setDebug] = useState('');
   useEffect(() => { const timer = setInterval(() => { const pose = visitPose(visit, seconds.value);
     setDebug(`t ${seconds.value.toFixed(1)} · x ${pose.x.toFixed(0)} y ${pose.y.toFixed(0)} · opacity ${pose.opacity.toFixed(2)}`); }, 250);
@@ -109,7 +101,10 @@ export default function CrittersTestScreen() {
     <Text style={styles.title}>Garden visitors</Text>
     {otter ? <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
       <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#123C4A" />
-      <Otter key={swimRound} swim={swim} clock={seconds} />
+      <Group transform={[{translateX:WIDTH/2},{translateY:HEIGHT/2},{scale:otterScale},
+        {translateX:-(bounds.minX+bounds.maxX)/2},{translateY:-(bounds.minY+bounds.maxY)/2}]}>
+        <Otter clock={seconds} network={swimNetwork} />
+      </Group>
     </Canvas> : <Canvas style={{ width: WIDTH, height: HEIGHT, borderRadius: 16 }}>
       <Rect x={0} y={0} width={WIDTH} height={HEIGHT} color="#5C7F45" />
       <Rect x={0} y={HEIGHT * 0.62} width={WIDTH} height={HEIGHT * 0.3} color="#B9AA8C" />

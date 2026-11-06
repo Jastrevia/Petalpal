@@ -1,9 +1,9 @@
 import LotusSurfaceRipples from './LotusSurfaceRipples';
 import { useWaterTopFlow, type WaterTopFlow } from './WaterTopAssembly';
-import type { SharedValue } from 'react-native-reanimated';
+import type { DerivedValue, SharedValue } from 'react-native-reanimated';
 import {runtimeAudit} from '../performance/runtimeAudit';
 import GardenLotusContact from './GardenLotusContact';
-import { Group, Image, useImage } from '@shopify/react-native-skia';
+import { Group, Image, useImage, type SkImage, type Transforms3d } from '@shopify/react-native-skia';
 import { memo, useMemo } from 'react';
 import {
   cancelAnimation,
@@ -227,12 +227,25 @@ export const DEFAULT_LOTUS_PLACEMENTS: readonly LotusClusterPlacement[] = [
   },
 ] as const;
 
+// The otter consumes the SAME image and UI-thread transform as the visible
+// cluster. No duplicate sway animation or second copy of the plant is drawn.
+export type LotusOccluder = {
+  id: string;
+  image: SkImage;
+  transform: DerivedValue<Transforms3d>;
+  width: number;
+  height: number;
+  opacity: number;
+};
+export type LotusOccluderListener = (id: string, occluder: LotusOccluder | null) => void;
+
 type LotusClusterItemProps = {
   seconds: SharedValue<number>;
   placement: LotusClusterPlacement;
   mode: 'static' | 'sway';
   opacity: number;
   active: boolean;
+  onOccluder?: LotusOccluderListener;
 };
 
 const LotusClusterItem = memo(function LotusClusterItem({
@@ -241,6 +254,7 @@ const LotusClusterItem = memo(function LotusClusterItem({
   mode,
   opacity,
   active,
+  onOccluder,
 }: LotusClusterItemProps) {
   const asset = LOTUS_CLUSTER_ASSETS[placement.variant];
   const staticImg = useImage(asset.static);
@@ -275,7 +289,7 @@ const LotusClusterItem = memo(function LotusClusterItem({
   // Rotation: ±1.4° (0.025 rad) around center
   // Micro-offset: max ±0.6px, imperceptible wander, zero drifting or sliding
   // Single crisp image, zero ghosting/afterimages
-  const clusterTransform = useDerivedValue(() => {
+  const clusterTransform = useDerivedValue<Transforms3d>(() => {
     const baseRot = placement.rotation ?? 0;
     if (mode === 'static' || reducedMotion || !active) {
       return [
@@ -298,6 +312,13 @@ const LotusClusterItem = memo(function LotusClusterItem({
       { translateY: -worldH / 2 },
     ];
   }, [mode, reducedMotion, active, placement.x, placement.y, placement.rotation, worldW, worldH]);
+
+  useEffect(() => {
+    if (!staticImg || !onOccluder) return;
+    onOccluder(placement.id, { id: placement.id, image: staticImg, transform: clusterTransform,
+      width: worldW, height: worldH, opacity });
+    return () => onOccluder(placement.id, null);
+  }, [onOccluder, placement.id, staticImg, clusterTransform, worldW, worldH, opacity]);
 
   if (!staticImg) return null;
 
@@ -328,6 +349,7 @@ export type LotusLayerProps = {
   mode?: LotusRenderMode;
   active?: boolean;
   placements?: readonly LotusClusterPlacement[];
+  onOccluder?: LotusOccluderListener;
 };
 
 export default function LotusLayer({
@@ -337,6 +359,7 @@ export default function LotusLayer({
   active = true,
   placements = DEFAULT_LOTUS_PLACEMENTS,
   flow: sharedFlow,
+  onOccluder,
 }: LotusLayerProps) {
   runtimeAudit.render('LotusLayer');
   const standalone = useWaterTopFlow(active && visible && !sharedFlow, mode === 'sway' && !sharedFlow);
@@ -358,6 +381,7 @@ export default function LotusLayer({
           key={p.id}
           seconds={rippleSeconds}
           placement={p}
+          onOccluder={onOccluder}
           mode={mode}
           opacity={opacity}
           active={active}

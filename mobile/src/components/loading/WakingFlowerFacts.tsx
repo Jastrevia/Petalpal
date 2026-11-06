@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { factAt, FLOWER_FACTS, WAKING_COPY, type FactLocale } from './flowerFacts';
+import { peekFairyName } from '../../services/fairyName';
 
 // The app's display language is only known once the server answers, which is exactly what
 // we are waiting for, so the last signed-in choice on this device is remembered (no user data).
@@ -41,7 +42,7 @@ export function WakingFlowerFacts({ delayMs = 2500, showNote = true }: { delayMs
         <FactArt species={fact.species} name={fact.flower.en} />
         <Text accessibilityLiveRegion="polite" style={styles.flower}>{fact.flower[locale]}</Text>
       </View>
-      <Text style={styles.text}>{fact.text[locale]}</Text>
+      <Text style={styles.text}>{fact.text[locale].split('{fairy}').join(peekFairyName())}</Text>
       <Text style={styles.next}>{copy.next} →</Text>
     </Pressable>
   </View>;

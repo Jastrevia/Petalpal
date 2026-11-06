@@ -9,7 +9,8 @@ import { calendarDateKey as dateKey, calendarRecordDay, calendarToday } from './
 import { useAuth } from '../../services/auth';
 import { useCheckInMonth, useClosenessSummary } from '../../services/fairyCloseness';
 import { momentLocale } from '../moments/momentFormat';
-import { BOND_COPY } from '../bond/bondCopy';
+import { bondCopy } from '../bond/bondCopy';
+import { useFairyName } from '../../services/fairyName';
 import { CalendarCheckIn } from '../bond/CalendarCheckIn';
 import { flowerNameText } from '../../services/flowerNames';
 
@@ -34,7 +35,8 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
   // The daily check-in with PPL (lib/fairy-closeness.js): its card on top, a petal on each
   // checked-in day, a vine between consecutive ones. Hidden while the server switch is off.
   const locale = momentLocale(useAuth().experience?.user.preferredLocale);
-  const bondCopy = BOND_COPY[locale], copy = COPY[locale];
+  const fairyName = useFairyName();
+  const bondText = bondCopy(locale, fairyName), copy = COPY[locale];
   const closeness = useClosenessSummary(open);
   const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
   const checkInMonth = useCheckInMonth(monthKey, open && closeness.on === true);
@@ -95,18 +97,18 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
               const count = days.get(key)?.length || 0;
               const checked = checkedDays.has(key);
               const vine = checked && day > 1 && checkedDays.has(dateKey(new Date(month.getFullYear(), month.getMonth(), day - 1)));
-              return day < 1 ? <View key={i} style={{ width: '14.285%' }} /> : <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${key}, ${copy.count(count)}${checked ? `, ${bondCopy.legendCheckIn}` : ''}${key === dateKey(today) ? copy.today : ''}`} accessibilityState={{ selected: key === selected }} onPress={() => setSelected(key)} style={{ width: '14.285%', height: 45, alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: key === selected ? popup.selected : 'transparent', borderWidth: key === selected || key === dateKey(today) ? 1 : 0, borderColor: key === selected ? popup.outline : popup.edge, ...focus }}>{vine ? <View pointerEvents="none" style={{ position: 'absolute', left: '-50%', width: '100%', bottom: 8, height: 2, borderRadius: 1, backgroundColor: '#C9A6E4' }} /> : null}<Text style={popupLabel}>{day}</Text><Text style={{ color: popup.muted, fontSize: 9, height: 12 }}>{checked ? <Text style={{ color: '#B486D8', fontSize: 11 }}>✿</Text> : null}{count ? ` · ${count}` : ''}</Text></Pressable>;
+              return day < 1 ? <View key={i} style={{ width: '14.285%' }} /> : <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${key}, ${copy.count(count)}${checked ? `, ${bondText.legendCheckIn}` : ''}${key === dateKey(today) ? copy.today : ''}`} accessibilityState={{ selected: key === selected }} onPress={() => setSelected(key)} style={{ width: '14.285%', height: 45, alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: key === selected ? popup.selected : 'transparent', borderWidth: key === selected || key === dateKey(today) ? 1 : 0, borderColor: key === selected ? popup.outline : popup.edge, ...focus }}>{vine ? <View pointerEvents="none" style={{ position: 'absolute', left: '-50%', width: '100%', bottom: 8, height: 2, borderRadius: 1, backgroundColor: '#C9A6E4' }} /> : null}<Text style={popupLabel}>{day}</Text><Text style={{ color: popup.muted, fontSize: 9, height: 12 }}>{checked ? <Text style={{ color: '#B486D8', fontSize: 11 }}>✿</Text> : null}{count ? ` · ${count}` : ''}</Text></Pressable>;
             })}</View>
             {checkInMonth ? <View style={{ flexDirection: 'row', gap: 14, justifyContent: 'center' }}>
-              <Text style={{ color: popup.muted, fontSize: 11 }}><Text style={{ color: '#B486D8' }}>✿</Text> {bondCopy.legendCheckIn}</Text>
-              <Text style={{ color: popup.muted, fontSize: 11 }}>{bondCopy.legendFlowers}</Text>
+              <Text style={{ color: popup.muted, fontSize: 11 }}><Text style={{ color: '#B486D8' }}>✿</Text> {bondText.legendCheckIn}</Text>
+              <Text style={{ color: popup.muted, fontSize: 11 }}>{bondText.legendFlowers}</Text>
             </View> : null}
             <Text style={[popupLabel, { marginVertical: 10 }]}>{selected}</Text>
             {checkInMonth?.petalCards?.find(day => day.localDate === selected) ? <Text style={[popupLabel, { fontSize: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: popup.rule }]}>
-              <Text style={{ color: '#C9A55C' }}>✦ </Text>{bondCopy.dayPetal(checkInMonth.petalCards.find(day => day.localDate === selected)!.name)}
+              <Text style={{ color: '#C9A55C' }}>✦ </Text>{bondText.dayPetal(checkInMonth.petalCards.find(day => day.localDate === selected)!.name)}
             </Text> : null}
             {checkedDays.get(selected) ? <Text style={[popupLabel, { fontSize: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: popup.rule }]}>
-              <Text style={{ color: '#B486D8' }}>✿ </Text>{bondCopy.dayCheckIn(checkedDays.get(selected)!.keepsakes[0]?.name ?? '', checkedDays.get(selected)!.points)}
+              <Text style={{ color: '#B486D8' }}>✿ </Text>{bondText.dayCheckIn(checkedDays.get(selected)!.keepsakes[0]?.name ?? '', checkedDays.get(selected)!.points)}
             </Text> : null}
             {isGardenLoading ? <Text style={popupLabel}>{copy.loading}</Text> : gardenError ? <Text style={popupLabel}>{gardenError}</Text> : !(days.get(selected)?.length) ? <Text style={popupLabel}>{copy.none}</Text> : days.get(selected)!.map(flower => <Pressable key={flower.flowerId} accessibilityRole="button" accessibilityLabel={`${awaitsPlanting(flower) ? copy.plant : copy.view} ${flowerNameText(flower.flowerName ?? '', locale)}`} onPress={() => { setOpen(false); onFocusFlower(flower); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: popup.rule, ...focus }}><Text style={popupLabel}>{flowerNameText(flower.flowerName ?? '', locale)} · {flower.sourceType === 'EVENT' ? copy.event : copy.flower}</Text><Text style={[popupLabel, { fontSize: 12, color: popup.muted }]}>{awaitsPlanting(flower) ? copy.plant : copy.view}</Text></Pressable>)}
             {__DEV__ && <View style={{ borderTopWidth: 1, borderColor: popup.rule, marginTop: 16, paddingTop: 12, gap: 12 }}>

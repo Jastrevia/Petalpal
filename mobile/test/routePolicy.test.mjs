@@ -16,6 +16,9 @@ function runtime(path, development = false, signedIn = true) {
     './features/CommunityGuidelines': { COMMUNITY_VERSION: 'fixture-version', COMMUNITY_TEXT: 'Guidelines' },
     './features/PrivacyAndSupport': { PrivacyAndSupport: () => null, PrivacyLinks: () => null },
     './auth/LoginPreviewPage': { LoginPreviewPage: () => 'INVITATION_SIGN_IN' },
+    // The account pages draw with Skia: here they only need to exist.
+    './auth/AccountPages': Object.fromEntries(['AccountFrame', 'AvatarChoice', 'Check', 'CornerButton', 'Field', 'FooterLinks', 'Message', 'PrimaryButton', 'TextLink']
+      .map(name => [name, ({ children }) => children ?? null])),
     'expo-router': { Redirect: 'Redirect', ThemeProvider: Pass, DarkTheme: {}, DefaultTheme: {}, Stack, Slot: Stack, usePathname: () => path, router: { dismissTo: to => navigation.push(to) }, useLocalSearchParams: () => ({ feature: 'fairy' }) },
     'react-native': { Text: 'Text', View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', TextInput: 'TextInput', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator', Platform: { OS: 'web' }, StyleSheet: { create: value => value }, AppState: {}, useColorScheme: () => 'light' },
     'expo-splash-screen': { preventAutoHideAsync() {}, hideAsync: async () => {} },

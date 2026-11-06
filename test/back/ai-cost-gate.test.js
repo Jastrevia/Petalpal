@@ -13,7 +13,7 @@ import { getEmbeddingProfile, CLOUDFLARE_EMBEDDING_PROFILE_KEY } from "../../lib
 async function fixture(t, env = {}) {
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } }); t.after(() => pg.close());
   await pg.exec(`
-    CREATE TABLE "User" ("id" text PRIMARY KEY);
+    CREATE TABLE "User" ("id" text PRIMARY KEY, "emailVerifiedAt" timestamp(3) DEFAULT now());
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY, "aiProcessing" boolean, "personalization" boolean, "memoryEnabled" boolean, "updatedAt" timestamp(3) DEFAULT '2000-01-01');
     CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY, "createdAt" timestamp NOT NULL DEFAULT now(), "eventType" varchar(64),
       "outcome" varchar(32), "actorUserId" varchar(128), "targetClass" varchar(64), "actionCode" varchar(64), "reasonCode" varchar(64));

@@ -25,7 +25,7 @@ function native(model, { data = { summary: "A synthetic reflection" }, usage = {
 async function fixture(t, { env = enabled, fetchImpl, authorize = async () => true } = {}) {
   // Disposable in-memory PostgreSQL only. No environment files, sockets, migrations or provider calls.
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } }); t.after(() => pg.close());
-  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY);
+  await pg.exec(`CREATE TABLE "User" ("id" text PRIMARY KEY, "emailVerifiedAt" timestamp(3) DEFAULT now());
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY,"aiProcessing" boolean,"personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));
     CREATE TABLE "Event" ("id" text PRIMARY KEY,"ownerId" text);
     CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY,"createdAt" timestamp NOT NULL DEFAULT now(),"eventType" varchar(64),"outcome" varchar(32),

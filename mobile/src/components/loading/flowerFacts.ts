@@ -6,8 +6,8 @@ export interface FlowerFact { species: string; flower: Record<FactLocale, string
 
 export const FLOWER_FACTS: FlowerFact[] = [
   { species: 'CROCUS', flower: { en: 'Crocus', 'zh-Hans': '番红花' },
-    text: { en: "PPL's favourite flower. Crocuses are among the first to bloom in spring, sometimes pushing up through late snow. Her words for it: cherish the present, rejoice in new beginnings.",
-      'zh-Hans': '番红花是 PPL 最喜欢的花。它是春天最早开的花之一，有时会顶着残雪冒出来。她给它的花语是：珍惜当下，喜悦新生。' } },
+    text: { en: "{fairy}'s favourite flower. Crocuses are among the first to bloom in spring, sometimes pushing up through late snow. Her words for it: cherish the present, rejoice in new beginnings.",
+      'zh-Hans': '番红花是 {fairy} 最喜欢的花。它是春天最早开的花之一，有时会顶着残雪冒出来。她给它的花语是：珍惜当下，喜悦新生。' } },
   { species: 'SAFFRON', flower: { en: 'Crocus', 'zh-Hans': '番红花' },
     text: { en: 'Saffron is the dried threads of one kind of crocus. It takes about 150 flowers to make a single gram.',
       'zh-Hans': '香料藏红花，其实是一种番红花的花丝晒干而成。大约 150 朵花，才能凑出 1 克。' } },

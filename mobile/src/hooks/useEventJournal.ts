@@ -37,7 +37,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
   }, [session]);
   useEffect(() => { void refresh(); }, [refresh]);
   async function saveEvent() {
-    if (busy || !content.trim() || !session || !mood) return;
+    if (busy || !session || !mood) return;
     setBusy(true); setError('');
     const draft = pending.current;
     // Keep the same key after transport failure; a retry cannot duplicate an Event.

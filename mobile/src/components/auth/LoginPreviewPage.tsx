@@ -110,19 +110,6 @@ function SparkleIcon({ size = 15, color = '#FAF7F0' }: { size?: number; color?: 
   );
 }
 
-// Mail SVG Icon
-function MailIcon({ size = 19, color = '#3A635B' }: { size?: number; color?: string }) {
-  if (Platform.OS !== 'web') {
-    return <Text style={{ fontSize: size * 0.8, color }}>✉</Text>;
-  }
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2.5" y="4.5" width="19" height="15" rx="3.5" />
-      <path d="M4 6.5l8 6.5 8-6.5" />
-    </svg>
-  );
-}
-
 // Padlock SVG Icon
 function LockIcon({ size = 19, color = '#3A635B' }: { size?: number; color?: string }) {
   if (Platform.OS !== 'web') {
@@ -200,13 +187,19 @@ function GoogleIcon({ size = 17 }: { size?: number }) {
   );
 }
 
+const LOGIN_COPY = /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale)
+  ? { label: '用户名 / PP 号', placeholder: '你的名字或 PP 号', missing: '请输入用户名或 PP 号',
+    forgot: '密码只能通过已连接的邮箱重置：请在上面输入你的邮箱，再点“忘记密码”。' }
+  : { label: 'Username / PP number', placeholder: 'Your name or PP number', missing: 'Please enter your username or PP number',
+    forgot: 'A password can only be reset through a connected email: enter that email above, then tap Forgot password.' };
+
 export interface LoginPreviewPageProps {
   isHandoffTransitioning?: boolean;
   onEntranceReady?: () => void;
   onEntranceStart?: () => void;
   onEntranceComplete?: () => void;
   onEntranceReset?: () => void;
-  /** Real email/password sign-in from AuthGate. Without it the page stays the DEV-only simulation. */
+  /** Real sign-in from AuthGate (name, PP number or connected email, with the password). Without it the page stays the DEV-only simulation. */
   onSignIn?: (email: string, password: string) => Promise<void>;
   onCreateAccount?: () => void;
   /** Real Firebase password-reset email for the address in the field. */
@@ -345,12 +338,8 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
     setEmailError(null);
     setPasswordError(null);
 
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setEmailError('Please enter your garden email address');
-      valid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setEmailError('Please enter a valid email (e.g. fairy@petalpal.me)');
+    if (!email.trim()) {
+      setEmailError(LOGIN_COPY.missing);
       valid = false;
     }
 
@@ -393,7 +382,8 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   const handleForgotPassword = useCallback(async () => {
     if (onForgotPassword) {
       if (sendingReset) return;
-      if (!email.trim()) { setEmailError('Enter your email above, then tap Forgot password'); return; }
+      // A password can only be reset through a connected email: there is nowhere else to send the link.
+      if (!/^[^\s@]+@[^\s@]+$/.test(email.trim())) { setEmailError(LOGIN_COPY.forgot); return; }
       setEmailError(null); setBannerNotice(null); setDismissedAuth(null); setSendingReset(true);
       try { await onForgotPassword(email.trim()); } finally { setSendingReset(false); }
       return;
@@ -588,15 +578,15 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                     ]}
                   >
                     <View style={styles.inputIconWrapper}>
-                      <MailIcon
-                        size={17}
+                      <SparkleIcon
+                        size={15}
                         color={focusedField === 'email' ? '#246B5F' : '#4C6963'}
                       />
                     </View>
                     <View style={styles.inputTextColumn}>
-                    <Text nativeID="login-email-label" pointerEvents="none" style={styles.inputLabel}>Email address</Text>
+                    <Text nativeID="login-email-label" pointerEvents="none" style={styles.inputLabel}>{LOGIN_COPY.label}</Text>
                     <TextInput
-                      accessibilityLabel="Email address"
+                      accessibilityLabel={LOGIN_COPY.label}
                       aria-invalid={!!emailError}
                       aria-describedby={emailError ? 'login-email-error' : undefined}
                       style={styles.textInput}
@@ -606,15 +596,9 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                         if (emailError) setEmailError(null);
                       }}
                       onFocus={() => setFocusedField('email')}
-                      onBlur={() => {
-                        setFocusedField(null);
-                        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-                          setEmailError('Please enter a valid email address');
-                        }
-                      }}
-                      placeholder="you@example.com"
+                      onBlur={() => setFocusedField(null)}
+                      placeholder={LOGIN_COPY.placeholder}
                       placeholderTextColor="#71685B"
-                      keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
                       textContentType="username"

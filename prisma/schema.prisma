@@ -18,12 +18,15 @@ model User {
   firebaseUid           String?     @unique
   emailVerifiedAt       DateTime?
   avatar                String      @default("🦋")
+  /// When the one-time welcome avatar gift was given (lib/avatar-collection.js); null = still to choose.
+  avatarWelcomeAt       DateTime?
   timezone              String      @default("UTC") @db.VarChar(64)
   preferredLocale       String      @default("en") @db.VarChar(35)
   allowGardenVisits     Boolean     @default(true)
   socialRestricted      Boolean     @default(false)
   communityTermsVersion String?     @db.VarChar(64)
   communityAcceptedAt   DateTime?
+  accountPassword       AccountPassword?
   blocksMade            UserBlock[] @relation("Blocker")
   blocksReceived        UserBlock[] @relation("Blocked")
   createdAt             DateTime    @default(now())
@@ -56,6 +59,7 @@ model User {
   fairyClosenessAwards    FairyClosenessAward[]
   gardenPetFoods          GardenPetFood[]
   gardenPetOutfits        GardenPetOutfit[]
+  avatarOwnerships        AvatarOwnership[]
   petalCardDraws          PetalCardDraw[]
   petalCardReadings       PetalCardReading[]
   redeemCodeClaims        RedeemCodeClaim[]
@@ -74,6 +78,14 @@ model User {
   aiJobs                  AiJob[]
   aiEvidence              AiEvidence[]
   messageReactions MessageReaction[] @relation("MessageReactionUser")
+}
+
+// Lets an account without email sign in again with its name or PP number. Never returned to a client.
+model AccountPassword {
+  userId    String   @id
+  hash      String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Garden {
@@ -441,6 +453,23 @@ model GardenPetOutfit {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, petId])
+}
+
+/// Avatars an account owns (lib/avatar-collection.js), one row per avatar, kept forever.
+/// `source`: LEGACY (accounts from before the collection keep the original eight), WELCOME_CHOICE,
+/// WELCOME_GIFT or LEVEL; `rewardLevel` is the Fairy Bond level a LEVEL row claimed, so each level's
+/// reward is granted at most once and the rows double as the claim history.
+model AvatarOwnership {
+  userId      String
+  avatarId    String   @db.VarChar(32)
+  source      String   @db.VarChar(16)
+  rewardLevel Int?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, avatarId])
+  @@unique([userId, rewardLevel])
 }
 
 /// Closeness ledger: one row per award, `awardKey` makes each award idempotent and the

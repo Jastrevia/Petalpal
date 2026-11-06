@@ -214,7 +214,7 @@ async function fixture(t, { locale = "zh-CN", count = 2 } = {}) {
   const pg = new PGlite({ parsers: { 1114: value => new Date(`${value}Z`) } }); closeAfter(t, pg);
   await pg.exec(`CREATE TYPE "AIJobType" AS ENUM ('WEEKLY_REPORT','MONTHLY_REPORT');
     CREATE TYPE "AIJobStatus" AS ENUM ('PENDING','RUNNING','SUCCEEDED','FAILED','CANCELLED');
-    CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text);
+    CREATE TABLE "User" ("id" text PRIMARY KEY,"timezone" text,"preferredLocale" text, "emailVerifiedAt" timestamp(3) DEFAULT now());
     CREATE TABLE "AiConsent" ("userId" text PRIMARY KEY,"aiProcessing" boolean,"personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));
     INSERT INTO "AiConsent" VALUES ('alice',true,true,true,'2000-01-01'),('bob',true,true,true,'2000-01-01');
     CREATE TABLE "Event" ("id" text PRIMARY KEY,"ownerId" text,"occurredAt" timestamp(3),"updatedAt" timestamp(3),"memoryProcessingAllowed" boolean);

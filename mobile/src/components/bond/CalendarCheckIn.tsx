@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { checkInWithFairy, type CheckInResult, type ClosenessSummary } from '../../services/fairyCloseness';
-import { BOND, BOND_COPY, type BondLocale } from './bondCopy';
+import { BOND, bondCopy, type BondLocale } from './bondCopy';
+import { useFairyName } from '../../services/fairyName';
 import { KeepsakeReveal } from './KeepsakeReveal';
 import { PetalRing } from '../petalCards/PetalRing';
 import { usePetalToday } from '../../services/petalCardDraw';
@@ -13,7 +14,8 @@ const REWARD = require('@/assets/keepsakes/star-candy-jar.webp');
 export function CalendarCheckIn({ summary, locale, ink, muted, light = true }: {
   summary: ClosenessSummary; locale: BondLocale; ink: string; muted: string; light?: boolean;
 }) {
-  const copy = BOND_COPY[locale];
+  const fairyName = useFairyName();
+  const copy = bondCopy(locale, fairyName);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [result, setResult] = useState<CheckInResult | null>(null);
   // After the keepsake, today's petal card from the ring (once a day; off with the petal card switch).
   const petal = usePetalToday(result), [ringOpen, setRingOpen] = useState(false);

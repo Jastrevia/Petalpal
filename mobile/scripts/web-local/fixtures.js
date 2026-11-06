@@ -4,8 +4,11 @@
 (function () {
   const API = 'https://api.synthetic.invalid';
   const nativeFetch = window.fetch.bind(window);
-  const uid = 'local-preview-owner', email = 'preview@example.invalid', password = 'preview-only';
-  const user = { id: uid, name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale: 'en', aiConsent: true };
+  const uid = 'local-preview-owner', email = 'preview@example.invalid';
+  let password = 'preview-only'; // (a new preview account sets its own)
+  let fairyName = 'PPL'; // (and names its Garden Fairy)
+  const preferredLocale = new URLSearchParams(location.search).get('lang') === 'zh-Hans' ? 'zh-Hans' : 'en';
+  const user = { id: uid, accountId: 'PP12345678', name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale, aiConsent: true };
   // People to find and friend requests, so every state of Friends → Requests can be tried.
   const ago = days => new Date(Date.now() - days * 86400e3).toISOString();
   const people = [
@@ -23,8 +26,8 @@
     const now = Math.floor(Date.now() / 1000);
     const encode = v => btoa(JSON.stringify(v)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: uid, user_id: uid, aud: 'petalpal-synthetic',
-      iss: 'https://securetoken.google.com/petalpal-synthetic', email, email_verified: true, iat: now, auth_time: now,
-      exp: now + 3600, firebase: { sign_in_provider: 'password' } })}.synthetic`;
+      iss: 'https://securetoken.google.com/petalpal-synthetic', email: accountEmail || undefined, email_verified: emailVerified, iat: now, auth_time: now,
+      exp: now + 3600, firebase: { sign_in_provider: accountEmail ? 'password' : 'custom' } })}.synthetic`;
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
@@ -46,6 +49,35 @@
   const petalTopics = [['FORTUNE', 'Today’s fortune'], ['DIRECTION', 'The way ahead'], ['LOVE', 'Love'], ['WORK', 'Work & study'],
     ['PEOPLE', 'People around you']].map(([id, label]) => ({ id, label }));
   let redemptions = [];
+  // Avatars (lib/avatar-collection.js rules), kept for this tab so a reload keeps them; a new tab
+  // starts with the welcome choice. ?bondLevel=N (1–20, default 2) sets the preview Fairy Bond level.
+  const bondLevel = Math.min(20, Math.max(1, Math.floor(Number(new URLSearchParams(location.search).get('bondLevel'))) || 2));
+  const numbered = (prefix, count) => Array.from({ length: count }, (_, i) => `${prefix}-${String(i + 1).padStart(2, '0')}`);
+  const avatarTiers = [[...Array.from({ length: 8 }, (_, i) => `fairy-${i + 1}`), ...numbered('l1', 24)], numbered('l2', 16), numbered('l3', 27)];
+  const tierOf = id => avatarTiers.findIndex(ids => ids.includes(id)) + 1;
+  const rewardTier = level => (level >= 14 ? 3 : level >= 6 ? 2 : 1);
+  const AVATARS_KEY = 'petalpal_local_preview_avatars_v1';
+  let avatars = null;
+  try { avatars = JSON.parse(sessionStorage.getItem(AVATARS_KEY) || 'null'); } catch { /* storage off: start fresh */ }
+  avatars = { welcomed: false, owned: [], selected: null, gifted: [], claims: {}, equipped: null, ...(avatars || {}) };
+  if (!avatars.claims || typeof avatars.claims !== 'object' || Array.isArray(avatars.claims)) avatars.claims = {};
+  if (!Array.isArray(avatars.owned)) avatars.owned = [];
+  if (!Array.isArray(avatars.gifted)) avatars.gifted = [];
+  if (avatars.equipped) user.avatar = avatars.equipped;
+  const saveAvatars = () => { avatars.equipped = user.avatar; try { sessionStorage.setItem(AVATARS_KEY, JSON.stringify(avatars)); } catch { /* fine */ } };
+  const avatarCollection = () => {
+    const pending = [];
+    for (let level = 2; level <= bondLevel; level += 1) {
+      if (avatars.claims[level]) continue;
+      const tier = rewardTier(level);
+      pending.push({ level, tier, eligible: avatarTiers.flat().filter(id => tierOf(id) <= tier && !avatars.owned.includes(id)).length });
+    }
+    return { equipped: user.avatar, bondOn: true, level: bondLevel, total: 75, owned: [...avatars.owned],
+      tiers: [[1, 1, 32], [2, 6, 16], [3, 14, 27]].map(([tier, unlockLevel, total]) => ({ tier, unlockLevel, total, unlocked: bondLevel >= unlockLevel })),
+      welcome: { needed: !avatars.welcomed, selected: avatars.selected, gifted: [...avatars.gifted] }, pending,
+      ready: pending.filter(reward => reward.eligible > 0).length, nextRewardLevel: bondLevel < 20 ? bondLevel + 1 : null,
+      claims: Object.entries(avatars.claims).map(([level, avatar]) => ({ level: Number(level), avatar: typeof avatar === 'string' ? avatar : avatar?.avatar || '', claimedAt: new Date().toISOString() })) };
+  };
   const journals = [[3, 'A slow morning with tea and the window open.'], [12, 'Walked home the long way.'], [35, 'Started a new notebook.']]
     .map(([offset, content], i) => ({ id: 'c' + i, localDate: day(offset), createdAt: day(offset) + 'T18:00:00.000Z',
       journal: { id: 'j' + i, content }, emotionResult: null, flower: null }));
@@ -92,7 +124,15 @@
   const friendFlower = { id: 'ff1', userId: friend, name: 'Sunflower', speciesCode: 'SUNFLOWER', mood: 'SUNNY_BLOOM', img: 'sunflower.png', worldX: 607, worldY: 1081, regionId: `Land${day(6).slice(5, 7)}`,
     createdAt: day(6) + 'T18:00:00.000Z', supportCount: 1, sourceType: 'EVENT', sourceEventId: 'fe1',
     supportState: { supportedToday: false, canSupport: true }, messages: [] };
+  const SIGNED_IN_KEY = 'petalpal_local_preview_signed_in_v1';
+  // A name-and-avatar account has no email until one is connected; the link counts as opened on the second check.
+  let accountEmail = email, emailVerified = true, emailChecks = 0, hasPassword = true, linked = true;
   let signedIn = false, blocked = false, checkedInToday = false, momentsUnread = true;
+  try { signedIn = sessionStorage.getItem(SIGNED_IN_KEY) === 'true'; } catch { /* storage off */ }
+  const setSignedIn = val => {
+    signedIn = Boolean(val);
+    try { sessionStorage.setItem(SIGNED_IN_KEY, signedIn ? 'true' : 'false'); } catch { /* fine */ }
+  };
   // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
   const ownFlowers = [], events = new Map();
   for (const [id, item] of Object.entries(SHORT_EVENTS)) events.set(id, { id, content: item.content, occurredAt: item.occurredAt,
@@ -115,25 +155,105 @@
     const method = (options.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const body = options.body || (input instanceof Request ? await input.clone().text() : '');
     let request = {}; try { request = JSON.parse(body); } catch { /* Not JSON. */ }
-    if (url.origin === location.origin) return nativeFetch(input, options);
+    const isSyntheticApi = url.origin === API || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/users/') || url.pathname.startsWith('/ai/');
+    if (url.origin === location.origin && !isSyntheticApi) return nativeFetch(input, options);
     if (url.origin === 'https://identitytoolkit.googleapis.com') {
       if (url.pathname === '/v1/accounts:signInWithPassword') {
         // Like Firebase, the email ignores case and stray spaces (phones capitalise the first letter).
         if (String(request.email || '').trim().toLowerCase() !== email || String(request.password || '').trim() !== password) return json({ error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } }, 400);
-        signedIn = true;
+        setSignedIn(true); accountEmail = email; emailVerified = true;
         return json({ localId: uid, email, displayName: user.name, registered: true, idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600' });
       }
-      if (url.pathname === '/v1/accounts:lookup') { signedIn = true; return json({ users: [{ localId: uid, email, emailVerified: true, displayName: user.name, providerUserInfo: [{ providerId: 'password', rawId: email, email }] }] }); }
+      if (url.pathname === '/v1/accounts:signInWithCustomToken') {
+        setSignedIn(true);
+        return json({ idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600', isNewUser: false });
+      }
+      if (url.pathname === '/v1/accounts:signUp') {
+        if (/taken/i.test(request.email)) return json({ error: { code: 400, message: 'EMAIL_EXISTS' } }, 400);
+        accountEmail = request.email; emailVerified = false; linked = true;
+        return json({ localId: uid, email: accountEmail, idToken: token(), refreshToken: 'local-preview-refresh', expiresIn: '3600' });
+      }
+      if (url.pathname === '/v1/accounts:lookup') {
+        if (accountEmail && !emailVerified && ++emailChecks >= 3) emailVerified = true;
+        setSignedIn(true); return json({ users: [{ localId: uid, email: accountEmail || undefined, emailVerified, displayName: user.name, providerUserInfo: linked ? [{ providerId: 'password', rawId: email, email }] : [] }] }); }
       if (url.pathname === '/v1/accounts:sendOobCode') return json({ email: request.email });
       return json({ error: { code: 400, message: 'OPERATION_NOT_ALLOWED' } }, 400);
     }
     if (url.origin === 'https://securetoken.googleapis.com') {
-      signedIn = true;
+      setSignedIn(true);
       return json({ access_token: token(), id_token: token(), refresh_token: 'local-preview-refresh', expires_in: '3600', token_type: 'Bearer', user_id: uid, project_id: 'petalpal-synthetic' });
     }
-    if (url.origin === API) {
-      const p = url.pathname;
+    if (url.origin === API || isSyntheticApi) {
+      const p = url.pathname.replace(/\/+$/, '');
+      let authHeader = '';
+      if (options.headers) {
+        if (typeof options.headers.get === 'function') {
+          authHeader = options.headers.get('authorization') || options.headers.get('Authorization') || '';
+        } else {
+          authHeader = options.headers.Authorization || options.headers.authorization || '';
+        }
+      }
+      if (!authHeader && input instanceof Request && input.headers) {
+        authHeader = input.headers.get?.('authorization') || input.headers.get?.('Authorization') || '';
+      }
+      if (authHeader.startsWith('Bearer ')) setSignedIn(true);
+
+      // Avatar endpoints in the local preview: always authorized
+      if (p === '/api/avatars' && method === 'GET') {
+        setSignedIn(true);
+        console.log('[Preview API] GET /api/avatars -> 200 OK (total 75 avatars)');
+        return json(avatarCollection(), 200, 150);
+      }
+      if (p === '/api/avatars/welcome' && method === 'POST') {
+        setSignedIn(true);
+        if (avatars.welcomed) return json({ created: false, ...avatarCollection() });
+        if (tierOf(request.avatar) !== 1) return json({ error: 'Choose a Level 1 avatar to begin', code: 'NOT_ELIGIBLE' }, 400);
+        const pool = avatarTiers[0].filter(id => id !== request.avatar);
+        const gifts = [0, 1, 2].map(() => pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        Object.assign(avatars, { welcomed: true, selected: request.avatar, gifted: gifts, owned: [request.avatar, ...gifts] });
+        user.avatar = request.avatar; saveAvatars();
+        console.log('[Preview API] POST /api/avatars/welcome -> 200 OK');
+        return json({ created: true, ...avatarCollection() }, 200, 300);
+      }
+      if (p === '/api/avatars/claim' && method === 'POST') {
+        setSignedIn(true);
+        const { level, avatar } = request;
+        if (avatars.claims[level] === avatar) return json({ created: false, avatar, level, ...avatarCollection() });
+        if (avatars.claims[level]) return json({ error: 'This reward was already claimed', code: 'ALREADY_CLAIMED' }, 409);
+        if (!Number.isInteger(level) || level < 2 || level > bondLevel) return json({ error: 'Reach this Fairy Bond level first', code: 'NOT_EARNED' }, 403);
+        if (!tierOf(avatar) || tierOf(avatar) > rewardTier(level)) return json({ error: 'Not eligible', code: 'NOT_ELIGIBLE' }, 403);
+        if (avatars.owned.includes(avatar)) return json({ error: 'You already have this avatar', code: 'OWNED' }, 409);
+        avatars.claims[level] = avatar; avatars.owned.push(avatar); saveAvatars();
+        console.log('[Preview API] POST /api/avatars/claim -> 200 OK');
+        return json({ created: true, avatar, level, ...avatarCollection() }, 200, 300);
+      }
+      if (p === '/users/avatar' && method === 'PUT') {
+        setSignedIn(true);
+        if (tierOf(request.avatar) && !avatars.owned.includes(request.avatar) && request.avatar !== user.avatar) return json({ error: 'Unlock this avatar first', code: 'AVATAR_NOT_OWNED' }, 403);
+        user.avatar = request.avatar; saveAvatars();
+        console.log('[Preview API] PUT /users/avatar -> 200 OK');
+        return json({ id: uid, avatar: user.avatar }, 200, 200);
+      }
+
+      if (p === '/auth/register') {
+        if (/taken/i.test(request.name)) return json({ error: 'That name is taken. Try another one.', code: 'USERNAME_TAKEN' }, 409);
+        user.name = request.name; user.avatar = request.avatar; accountEmail = null; emailVerified = false; emailChecks = 0; linked = false;
+        // The sign-up page sets the password and picks an original portrait (so no avatar welcome after).
+        hasPassword = typeof request.password === 'string'; if (hasPassword) password = request.password;
+        fairyName = request.fairyName || 'PPL';
+        if (avatars) { Object.assign(avatars, { welcomed: true, selected: request.avatar }); saveAvatars(); }
+        return json({ signInToken: 'local-preview-pass' }, 201);
+      }
+      if (p === '/auth/password-login') {
+        if (![user.name.toLowerCase(), String(user.accountId).toLowerCase()].includes(String(request.login).replace(/^@/, '').toLowerCase()) || request.password !== password) {
+          return json({ error: 'Check your name or PP number and password, then try again.', code: 'LOGIN_FAILED' }, 400);
+        }
+        accountEmail = null; emailVerified = false; emailChecks = 0; linked = false;
+        return json({ signInToken: 'local-preview-pass' });
+      }
       if (!signedIn) return json({ error: 'Sign in to the local preview first' }, 401);
+      if (p === '/auth/recovery') return json({ name: user.name, accountId: user.accountId, email: emailVerified ? accountEmail : null, hasPassword });
+      if (p === '/auth/password') { hasPassword = true; return json({ hasPassword }); }
       if (p === '/auth/session') return json({ user });
       if (p === '/ai/reports/weekly/trigger' || p === '/ai/reports/monthly/trigger') return json({ error: 'Reflections are not written in the local preview' }, 409);
       // Weekly 2.0 "不准确 / 隐藏": the mark stays on that insight of the preview report.
@@ -306,11 +426,12 @@
         return json(people.filter(person => `${person.name} ${person.accountId}`.toLowerCase().includes(q)), 200, 400); }
       if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview', avatar: '🌼', accountId: 'PP12345678' }] : [], nextCursor: null });
       if (p === `/users/${uid}/ai-consent`) return json(consent);
-      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true, moments: { unread: momentsUnread } });
-      if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'PPL', name: 'PPL', avatar: null, cover: null }, locale: 'en', nextBefore: null,
+      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true, moments: { unread: momentsUnread }, fairy: { id: 'local-fairy', type: 'BLOOM', name: fairyName } });
+      if (p === '/api/fairies') return json({ fairies: [{ id: 'local-fairy', type: 'BLOOM', name: fairyName, isActive: true }], activeFairyId: 'local-fairy' });
+      if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'BLOOM', name: fairyName, avatar: null, cover: null }, locale: 'en', nextBefore: null,
         posts: [{ id: 'mo2', postedAt: ago(0), state: 'TEA_TIME', location: 'TEA_TIME', mood: null, photoKey: 'TEA_TIME/3', caption: 'Tea in the sun this morning.', liked: false },
           { id: 'mo1', postedAt: ago(2), state: 'IN_TREEHOUSE', location: 'IN_TREEHOUSE', mood: null, photoKey: null, caption: 'I found a tiny blue feather.', liked: false }] }); }
-      if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: 2, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
+      if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: bondLevel, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,
         nextTitle: { level: 3, title: 'Close friends' }, maxed: false, greeting: 'Hello again!', daysTogether: 5, today: [],
         checkIn: { checkedInToday, streak: checkedInToday ? 4 : 3, cycleDay: checkedInToday ? 4 : 3, graceAvailable: true, checkInsToStreakReward: 4 }, monthly: null,
         collection: { owned: 1, received: 1, total: 20 }, unlocks: [] });
@@ -325,10 +446,15 @@
       if (p === `/users/${friend}/flowers/ff1`) return json(friendFlower);
       if (p === '/ai/reports') return json({ reports, nextCursor: null });
       const reflection = p.match(/^\/ai\/reports\/(weekly|monthly)\/(.+)$/); if (reflection) return json(detail(reflection[2]));
+      console.warn('[Preview API] Unhandled route:', method, p);
       return json({ error: 'Not available in the local preview' }, 403);
     }
     // Anything else would leave this computer: refuse it.
     throw new TypeError('Network requests outside the local preview are disabled');
+  };
+  window.__petalpal_preview = {
+    getAvatars: () => avatarCollection(),
+    resetAvatars: () => { try { sessionStorage.removeItem(AVATARS_KEY); } catch {} location.reload(); },
   };
   document.addEventListener('DOMContentLoaded', () => {
     const notice = document.createElement('aside');

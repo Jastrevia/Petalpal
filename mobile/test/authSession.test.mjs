@@ -23,9 +23,9 @@ function user(uid = 'alice', verified = true) {
     getIdToken: async () => `synthetic-token-${uid}` };
 }
 function setup(initial = null, apiOrigin = '') {
-  const hooks = hookHarness(); const requests = [], emails = [], tokens = [], writes = [], resets = [];
+  const hooks = hookHarness(); const requests = [], emails = [], tokens = [], writes = [], resets = [], links = [];
   const auth = { currentUser: initial, authStateReady: async () => {} };
-  let changed, handler, emailError, registrationError, loginError, signOutError, storageError, resetError;
+  let changed, handler, emailError, customTokenError, linkError, loginError, signOutError, storageError, resetError;
   let needsProfile = false;
   const instrument = (value) => {
     if (!value || value.instrumented) return value;
@@ -38,10 +38,18 @@ function setup(initial = null, apiOrigin = '') {
   const backendUser = () => ({ id: `owner-${auth.currentUser.uid}`, name: 'Petal', email: auth.currentUser.email, timezone: 'UTC' });
   const firebase = {
     onAuthStateChanged: (_auth, callback) => { changed = callback; return () => {}; },
-    signInWithEmailAndPassword: async (_auth, email) => { if (loginError) throw loginError; emit(user(email.split('@')[0])); },
-    createUserWithEmailAndPassword: async (_auth, email) => {
-      if (registrationError) throw registrationError;
-      const value = user(email.split('@')[0], false); emit(value); return { user: value };
+    signInWithEmailAndPassword: async (_auth, email) => {
+      if (loginError) throw loginError;
+      const uid = email.split('@')[0], value = user(uid, !uid.startsWith('unverified')); emit(value); return { user: value };
+    },
+    signInWithCustomToken: async () => {
+      if (customTokenError) throw customTokenError;
+      const value = user('pass-new', false); value.email = null; emit(value); return { user: value };
+    },
+    EmailAuthProvider: { credential: (email, password) => ({ email, password }) },
+    linkWithCredential: async (value, credential) => {
+      if (linkError) throw linkError;
+      links.push([value.uid, credential.email, credential.password]); value.email = credential.email;
     },
     sendEmailVerification: async (value) => { emails.push(value.uid); if (emailError) throw emailError; },
     sendPasswordResetEmail: async (_auth, email) => { if (resetError) throw resetError; resets.push(email); },
@@ -58,6 +66,7 @@ function setup(initial = null, apiOrigin = '') {
       requests.push({ path, options });
       if (apiOrigin) path = path.replace(apiOrigin, '');
       if (handler) return handler(path, options);
+      if (path === '/auth/register' || path === '/auth/password-login') return response({ signInToken: 'synthetic-pass' });
       if (path === '/auth/session') {
         const payload = JSON.parse(options.body);
         return response(needsProfile && payload.deferProfileCreation ? { user: null, needsProfile: true } : { user: backendUser() });
@@ -71,11 +80,11 @@ function setup(initial = null, apiOrigin = '') {
   });
   const provider = load('../../../services/auth');
   hooks.mount(() => provider.AuthProvider({ children: 'app' }).props.value);
-  return { hooks, auth, requests, emails, tokens, writes, items, emit, load, resets,
+  return { hooks, auth, requests, emails, tokens, writes, items, emit, load, resets, links,
     api: load('../../../services/api'), storage: load('plantingPersistence'),
     setHandler: (value) => { handler = value; }, setNeedsProfile: () => { needsProfile = true; },
     setLoginError: (value) => { loginError = value; }, setResetError: (value) => { resetError = value; },
-    setEmailError: (value) => { emailError = value; }, setRegistrationError: (value) => { registrationError = value; },
+    setEmailError: (value) => { emailError = value; }, setCustomTokenError: (value) => { customTokenError = value; }, setLinkError: (value) => { linkError = value; },
     setStorageError: value => { storageError = value; },
     setSignOutError: (value) => { signOutError = value; },
     ready: async () => { emit(auth.currentUser); return hooks.flush(); } };
@@ -90,7 +99,7 @@ test('Phase 1 existing login hydrates owner experience only after both backend r
   assert.equal(state.experience.hasCheckedInToday, true);
   assert.equal(state.experience.fairyState.onboardingStep, 'MOOD_SELECTION');
   assert.deepEqual(plain(state.experience.todayCheckIn), { id: 'checkin', localDate: '2026-09-29' });
-  assert.deepEqual(s.requests.map((r) => r.path), ['/auth/session', '/session?view=metadata']);
+  assert.deepEqual(s.requests.map((r) => r.path).slice(0, 2), ['/auth/session', '/session?view=metadata']);
   assert.deepEqual(s.writes, []); // App auth stores no password, token, user or pending-registration cache.
 });
 test('Phase 1 refresh-first transport succeeds after one 401 without invalidation', async () => {
@@ -139,78 +148,122 @@ test('Phase 1 failed credential refresh invalidates, while refresh network failu
     assert.equal(invalidations, shouldInvalidate ? 1 : 0); assert.equal(s.requests.length, 1);
   }
 });
-test('Phase 1 registration validates confirmation/minimum before Firebase and sends verification without backend access', async () => {
+test('Name and avatar make the account: no email, no password, and the session opens at once', async () => {
   const s = setup(); let state = await s.ready();
-  await state.register('new@example.test', 'short', 'short'); state = await s.hooks.flush();
-  assert.match(state.error, /at least 6/); assert.equal(s.auth.currentUser, null);
-  await state.register('new@example.test', 'synthetic password', 'different'); state = await s.hooks.flush();
-  assert.match(state.error, /do not match/);
-  await state.register('new@example.test', 'synthetic password', 'synthetic password'); state = await s.hooks.flush();
-  assert.equal(state.phase, 'verificationPending'); assert.equal(state.identity.uid, 'new');
-  assert.deepEqual(s.emails, ['new']); assert.equal(s.requests.length, 0); assert.deepEqual(s.writes, []);
+  await state.register({ name: '  ', avatar: '🐝' }); state = await s.hooks.flush();
+  assert.match(state.error, /Enter a name/); assert.equal(s.requests.length, 0);
+  await state.register({ name: '  New Petal  ', avatar: '🐝', communityTermsVersion: 'v1' }); state = await s.hooks.flush();
+  assert.equal(state.phase, 'signedIn');
+  const made = s.requests.find(r => r.path === '/auth/register');
+  assert.equal(made.options.headers.Authorization, undefined, 'it comes before any account');
+  const body = JSON.parse(made.options.body);
+  assert.equal(body.name, 'New Petal'); assert.equal(body.avatar, '🐝'); assert.equal(body.communityTermsVersion, 'v1');
+  assert.equal(body.email, undefined); assert.equal(body.password, undefined);
+  assert.equal(s.auth.currentUser.uid, 'pass-new'); assert.deepEqual(s.emails, []); assert.deepEqual(s.writes, []);
 });
-test('Phase 1 registration errors are readable and create no backend session', async () => {
+test('A taken name comes back as its message, with nobody signed in and the name page still there', async () => {
+  const s = setup(); let state = await s.ready();
+  s.setHandler(async () => response({ error: 'That name is taken. Try another one.', code: 'USERNAME_TAKEN' }, 409));
+  await state.register({ name: 'Bloom' }); state = await s.hooks.flush();
+  assert.equal(state.phase, 'signedOut'); assert.equal(state.error, 'That name is taken. Try another one.');
+  assert.equal(s.auth.currentUser, null);
+});
+test('A taken name on the profile step of an existing identity stays on that step', async () => {
+  const s = setup(user('new', false)); s.setNeedsProfile(); let state = await s.ready();
+  assert.equal(state.phase, 'profileRequired');
+  s.setHandler(async () => response({ error: 'That name is taken. Try another one.', code: 'USERNAME_TAKEN' }, 409));
+  await state.completeProfile({ name: 'Bloom' }); state = await s.hooks.flush();
+  assert.equal(state.phase, 'profileRequired'); assert.match(state.error, /taken/); assert.equal(s.auth.currentUser.uid, 'new');
+});
+test('Registration errors are readable and create no session', async () => {
   for (const code of ['auth/internal-error', undefined]) {
     const s = setup(); const state = await s.ready();
-    s.setRegistrationError(Object.assign(new Error('EMAIL_EXISTS private@example.test provider diagnostic'), { code }));
-    await state.register('known@example.test', 'synthetic password', 'synthetic password');
+    s.setCustomTokenError(Object.assign(new Error('private@example.test provider diagnostic'), { code }));
+    await state.register({ name: 'Bloom' });
     const result = await s.hooks.flush();
     assert.equal(result.phase, 'signedOut');
     assert.equal(result.error, 'We couldn’t connect to your account. Please try again.');
-    assert.doesNotMatch(result.error, /EMAIL_EXISTS|private@example.test|provider diagnostic/);
-    assert.equal(result.identity, null); assert.equal(result.session, null); assert.equal(result.message, '');
-    assert.equal(s.auth.currentUser, null); assert.equal(s.requests.length, 0); assert.equal(s.emails.length, 0);
+    assert.doesNotMatch(result.error, /private@example.test|provider diagnostic/);
+    assert.equal(result.identity, null); assert.equal(result.session, null); assert.equal(s.auth.currentUser, null);
   }
 });
-test('Phase 1 reload recovers unverified registration solely from the current Firebase identity', async () => {
-  const first = setup(user('new', false)); let state = await first.ready();
-  assert.equal(state.phase, 'verificationPending'); assert.equal(first.requests.length, 0);
-  const restored = setup(first.auth.currentUser); state = await restored.ready();
-  assert.equal(state.phase, 'verificationPending'); assert.equal(state.identity.email, 'new@example.test');
-  restored.emit(user('other', false)); state = await restored.hooks.flush();
-  assert.equal(state.identity.email, 'other@example.test'); assert.deepEqual(restored.writes, []);
+test('A name or PP number signs in through the server; an email through Firebase, which then keeps the password in step', async () => {
+  const s = setup(); let state = await s.ready();
+  await state.login(' Bloom ', 'synthetic password'); state = await s.hooks.flush();
+  assert.equal(state.phase, 'signedIn');
+  const asked = s.requests.find(r => r.path === '/auth/password-login');
+  assert.deepEqual(JSON.parse(asked.options.body), { login: 'Bloom', password: 'synthetic password' });
+  assert.equal(s.requests.some(r => r.path === '/auth/password'), false);
+  await state.logout(); state = await s.hooks.flush();
+
+  const e = setup(); state = await e.ready();
+  await state.login('alice@example.test', 'synthetic password'); state = await e.hooks.flush();
+  assert.equal(state.phase, 'signedIn');
+  assert.equal(e.requests.some(r => r.path === '/auth/password-login'), false);
+  assert.deepEqual(JSON.parse(e.requests.find(r => r.path === '/auth/password').options.body), { password: 'synthetic password' });
+  await state.logout(); state = await e.hooks.flush();
+  // An email never verified is no way in (it could be anyone's): signed out again, the password left alone.
+  const u = setup(); state = await u.ready();
+  await state.login('unverified@example.test', 'synthetic password'); state = await u.hooks.flush();
+  assert.equal(state.phase, 'signedOut'); assert.match(state.error, /isn’t verified/);
+  assert.equal(u.requests.some(r => r.path === '/auth/password'), false);
 });
-test('Phase 1 verification resend handles success, rate limits, and recheck without restarting registration', async () => {
+test('A wrong password shows the one failure message and signs nobody in', async () => {
+  const s = setup(); let state = await s.ready();
+  s.setHandler(async () => response({ error: 'Check your name or PP number and password, then try again.', code: 'LOGIN_FAILED' }, 400));
+  await state.login('Bloom', 'wrong password'); state = await s.hooks.flush();
+  assert.equal(state.phase, 'signedOut'); assert.match(state.error, /Check your name/); assert.equal(s.auth.currentUser, null);
+});
+test('An identity without a verified email goes straight in, and the app never waits on verification', async () => {
+  const s = setup(user('new', false)); const state = await s.ready();
+  assert.equal(state.phase, 'signedIn'); assert.deepEqual(s.emails, []);
+  assert.ok(s.tokens.some(token => token.force));
+});
+test('An email filled in on the sign-up page is connected once the account exists, keeping its uid', async () => {
+  const s = setup(); let state = await s.ready();
+  await state.register({ name: 'Bloom' }, { email: ' me@example.test ', password: 'synthetic password' }); state = await s.hooks.flush();
+  assert.equal(state.phase, 'signedIn'); assert.equal(s.auth.currentUser.uid, 'pass-new');
+  assert.deepEqual(s.links, [['pass-new', 'me@example.test', 'synthetic password']]);
+  assert.deepEqual(s.emails, ['pass-new']);
+  assert.deepEqual(JSON.parse(s.requests.find(r => r.path === '/auth/password').options.body), { password: 'synthetic password', currentPassword: 'synthetic password' });
+  assert.match(state.message, /Verification email sent to me@example.test/);
+});
+test('Connecting an email that belongs to another account keeps this account and says what to do', async () => {
+  const s = setup(); let state = await s.ready();
+  await state.register({ name: 'Bloom' }); state = await s.hooks.flush();
+  s.setLinkError(Object.assign(new Error('provider diagnostic'), { code: 'auth/email-already-in-use' }));
+  await assert.rejects(state.connectEmail('taken@example.test', 'synthetic password'), /already has a PetalPal account/);
+  assert.equal(s.auth.currentUser.uid, 'pass-new'); assert.deepEqual(s.emails, []);
+  await assert.rejects(state.connectEmail('not-an-email', 'synthetic password'), /valid email/);
+  await assert.rejects(state.connectEmail('me@example.test', 'short'), /at least 8/);
+});
+test('Opening the link is checked on request: the server is told only with refreshed claims', async () => {
   const s = setup(user('new', false)); let state = await s.ready();
-  await state.resendVerification(); state = await s.hooks.flush(); assert.match(state.message, /email sent/);
-  s.setEmailError(Object.assign(new Error('synthetic'), { code: 'auth/too-many-requests' }));
-  await state.resendVerification(); state = await s.hooks.flush(); assert.match(state.error, /wait/);
-  await state.checkVerification(); state = await s.hooks.flush(); assert.match(state.message, /isn’t verified yet/);
-  assert.equal(state.phase, 'verificationPending'); assert.equal(s.requests.length, 0);
+  const before = s.requests.length;
+  assert.equal(await state.checkEmailVerified(), false); assert.equal(s.requests.length, before);
+  s.auth.currentUser.emailVerified = true; s.tokens.length = 0;
+  assert.equal(await state.checkEmailVerified(), true);
+  assert.ok(s.tokens.some(token => token.force));
+  assert.deepEqual(JSON.parse(s.requests.at(-1).options.body), { deferProfileCreation: true });
+  await state.resendEmailVerification(); assert.deepEqual(s.emails, ['new']);
+  assert.deepEqual(plain(state.connectedEmail()), { email: 'new@example.test', verified: true });
 });
-test('Phase 1 verified email refreshes claims, then resumes into profile completion with safe consent', async () => {
-  const s = setup(user('new', false)); s.setNeedsProfile(); let state = await s.ready();
-  s.auth.currentUser.emailVerified = true;
-  await state.checkVerification(); state = await s.hooks.flush();
-  assert.equal(state.phase, 'profileRequired'); assert.equal(state.session, null);
-  assert.ok(s.tokens.some((token) => token.force));
+test('A stale control cannot connect or resend for another account', async () => {
+  const s = setup(user('alice', false)); const previous = await s.ready();
+  s.emit(user('bob', false)); await s.hooks.flush();
+  await assert.rejects(previous.resendEmailVerification());
+  await assert.rejects(previous.connectEmail('me@example.test', 'synthetic password'));
+  assert.deepEqual(s.emails, []); assert.deepEqual(s.links, []);
+});
+test('Profile completion keeps safe consent and accepts only explicit initial AI consent', async () => {
+  const s = setup(user('new')); s.setNeedsProfile(); let state = await s.ready();
+  assert.equal(state.phase, 'profileRequired');
   await state.completeProfile({ name: '  New Petal  ', avatar: '🐝' }); state = await s.hooks.flush();
   assert.equal(state.phase, 'signedIn');
   const payload = JSON.parse(s.requests.find((r) => r.path === '/auth/session' && !JSON.parse(r.options.body).deferProfileCreation).options.body);
   assert.equal(payload.name, 'New Petal'); assert.equal(payload.avatar, '🐝'); assert.equal(payload.aiConsent, false);
-  assert.equal(payload.preferredLocale, 'en');
-});
-test('Phase 1 verified registration reload resumes profile and accepts only explicit initial AI consent', async () => {
-  const s = setup(user('new')); s.setNeedsProfile(); let state = await s.ready();
-  assert.equal(state.phase, 'profileRequired');
-  await state.completeProfile({ name: 'Petal', aiConsent: true, preferredLocale: 'zh' }); state = await s.hooks.flush();
-  const body = JSON.parse(s.requests.find((r) => r.path === '/auth/session' && !JSON.parse(r.options.body).deferProfileCreation).options.body);
-  assert.equal(body.aiConsent, true); assert.equal(body.preferredLocale, 'zh'); assert.equal(body.memoryEnabled, undefined);
-  assert.equal(state.phase, 'signedIn'); assert.deepEqual(s.writes, []);
-});
-test('Phase 1 already-verified resend resumes instead of sending another verification email', async () => {
-  const s = setup(user('new', false)); let state = await s.ready(); s.auth.currentUser.emailVerified = true;
-  await state.resendVerification(); state = await s.hooks.flush();
-  assert.equal(state.phase, 'signedIn'); assert.equal(s.emails.length, 0);
-});
-test('Phase 1 delayed verification cannot publish state or authenticate the wrong account', async () => {
-  const s = setup(user('alice', false)); let state = await s.ready(); const reload = deferred();
-  s.auth.currentUser.reload = () => reload.promise;
-  const pending = state.checkVerification();
-  s.emit(user('bob', false)); state = await s.hooks.flush();
-  reload.resolve(); await pending; state = await s.hooks.flush();
-  assert.equal(state.identity.uid, 'bob'); assert.equal(state.phase, 'verificationPending');
-  assert.equal(state.message, ''); assert.equal(s.requests.length, 0);
+  assert.equal(payload.preferredLocale, 'en'); assert.equal(payload.memoryEnabled, undefined);
+  assert.deepEqual(s.writes, []);
 });
 test('Phase 1 stale hydration after account switching or logout never restores private experience', async () => {
   for (const switchAccount of [true, false]) {
@@ -248,65 +301,123 @@ test('Phase 1 failed Firebase sign-out cannot restore a terminally invalidated a
   s.emit(s.auth.currentUser); state = await s.hooks.flush(); assert.equal(state.phase, 'signedOut'); assert.equal(state.session, null);
 });
 
-test('Phase 1 auth gate separates loading, signed-out, verification, profile and authenticated controls', async () => {
+test('Phase 1 auth gate: guest Garden, create account (name and password), welcome (fairy name and avatar), forgot pages, sign-in', async () => {
   let auth = { phase: 'initializing', loading: true, session: null, identity: null, error: '', message: '' };
   const replaced = [];
   const hooks = hookHarness(); const nodes = (tree) => Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object'
     ? [tree, ...nodes(tree.props?.children)] : [];
   const text = (tree) => nodes(tree).filter((n) => n.type === 'Text').map((n) => n.props.children).flat().join(' ');
+  const field = (tree, label) => nodes(tree).find((n) => n.type === 'Field' && n.props.label === label);
+  const byId = (tree, id) => nodes(tree).find((n) => n.props?.testID === id);
+  const corner = (tree) => nodes(tree).find((n) => n.type === 'AccountFrame').props.right;
   const load = loadPlantingModules(undefined, hooks.react, {}, false, {
     '../services/auth': { useAuth: () => auth },
+    '../services/auth/registrationValidation': {
+      accountNameError: (name) => (/^[A-Za-z0-9_]{4,20}$/.test(name) && !/^pp\d+$/i.test(name) ? '' : 'Use 4–20 letters, numbers or underscores.'),
+      passwordError: (password) => (/^(?=.*[A-Za-z])(?=.*\d).{8,16}$/.test(password) ? '' : 'Use 8–16 characters with letters and numbers.'),
+    },
     './auth/LoginPreviewPage': { LoginPreviewPage: 'LoginPreviewPage' },
+    './auth/AccountPages': { AccountFrame: 'AccountFrame', AvatarChoice: 'AvatarChoice', Check: 'Check', CornerButton: 'CornerButton', Field: 'Field',
+      FooterLinks: 'FooterLinks', Message: 'Message', PrimaryButton: 'PrimaryButton', TextLink: 'TextLink' },
+    './avatars/avatarArt': { LEGACY_AVATAR_IDS: ['fairy-1', 'fairy-2'] },
+    './features/AccountRecovery': { ConnectEmailScreen: 'ConnectEmailScreen' },
     '../constants/theme': { Fonts: { sans: 'sans', rounded: 'rounded' }, Spacing: { two: 8, three: 16, four: 24 } },
     'expo-splash-screen': { hideAsync: async () => {} },
     'expo-router': { router: { replace: (path) => replaced.push(path) }, usePathname: () => '/' },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) },
     '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },
     '../services/deviceReset': { devVariant: false }, './features/DeviceReset': { DeviceResetButton: 'DeviceResetButton' },
-    'react-native': { ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView',
-      Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View',
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', Modal: 'Modal',
       Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } },
   });
   const gate = load('../../../components/AuthGate'); let tree = hooks.mount(() => gate.AuthGate({ children: 'real-app' }));
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0); assert.doesNotMatch(text(tree), /Sign in|Sign out/i);
-  // Signed out: guest mode shows the app itself (the Garden) with no sign-in form, until an account is asked for.
-  const logins = [];
-  auth = { ...auth, phase: 'signedOut', loading: false, login: async (...values) => { logins.push(values); } }; tree = hooks.render();
+  assert.equal(nodes(tree).some((n) => n.type === 'Field'), false); assert.doesNotMatch(text(tree), /Sign in|Sign out/i);
+  // Signed out: guest mode shows the app itself (the Garden) with no form, until an account is asked for.
+  const logins = [], registered = [], resets = [];
+  auth = { ...auth, phase: 'signedOut', loading: false, login: async (...values) => { logins.push(values); },
+    register: async (...values) => { registered.push(values); }, resetPassword: async (email) => { resets.push(email); }, clearMessage: () => {} };
+  tree = hooks.render();
   const guest = nodes(tree).find((n) => n.type === 'GuestProvider');
-  assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0);
+  assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'Field'), false);
   guest.props.value.requestAccount(); tree = hooks.render();
-  // Then the invitation page lies over the still-mounted app, signs in through the real auth provider and keeps the policy links.
-  assert.ok(nodes(tree).includes('real-app') || JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
-  const back = nodes(tree).find((n) => n.props?.accessibilityLabel === 'Back to the Garden');
-  assert.ok(back);
+  // "Create your account" lies over the still-mounted Garden: account name, password, confirm; no email.
+  assert.ok(JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Create your account');
+  assert.deepEqual(nodes(tree).filter((n) => n.type === 'Field').map((n) => n.props.label), ['Account Name', 'Password', 'Confirm Password']);
+  assert.equal(field(tree, 'Password').props.secret, true); assert.equal(field(tree, 'Confirm Password').props.secret, true);
+  assert.ok(byId(tree, 'forgot-password')); assert.ok(byId(tree, 'forgot-username'));
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.left.props.label, 'Back to the Garden');
+  // The rules are checked before the welcome page: a bad name, a weak password, two different passwords.
+  field(tree, 'Account Name').props.onChangeText('ab'); field(tree, 'Password').props.onChangeText('petals2026');
+  field(tree, 'Confirm Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  assert.match(nodes(tree).find((n) => n.type === 'Message').props.text, /4–20/);
+  field(tree, 'Account Name').props.onChangeText('Bloom_22'); field(tree, 'Confirm Password').props.onChangeText('petals2027'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  assert.match(nodes(tree).find((n) => n.type === 'Message').props.text, /match/);
+  field(tree, 'Confirm Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  // "Welcome to your garden": the same account name, shown, not typed again; the fairy's name; an avatar.
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Welcome to your garden');
+  assert.equal(field(tree, 'Account Name').props.fixedValue, 'Bloom_22');
+  assert.ok(field(tree, 'Your Garden Fairy’s Name')); assert.ok(nodes(tree).find((n) => n.type === 'AvatarChoice'));
+  assert.equal(byId(tree, 'enter-garden').props.disabled, true, 'the Community Guidelines first');
+  nodes(tree).find((n) => n.type === 'Check').props.onLink(); tree = hooks.render();
+  const guidelines = nodes(tree).find((n) => n.type?.name === 'Guidelines');
+  assert.ok(guidelines, 'the guidelines open'); guidelines.props.onClose(); tree = hooks.render();
+  assert.equal(nodes(tree).some((n) => n.type?.name === 'Guidelines'), false);
+  nodes(tree).find((n) => n.type === 'Check').props.onPress(); tree = hooks.render();
+  field(tree, 'Your Garden Fairy’s Name').props.onChangeText('Lumi'); tree = hooks.render();
+  // Connecting an email takes the address only: the password is the account's own.
+  corner(tree).props.onPress(); tree = hooks.render();
+  const connect = nodes(tree).find((n) => n.type === 'ConnectEmailScreen');
+  assert.equal(connect.props.knownPassword, 'petals2026');
+  connect.props.onSave({ email: 'me@example.test', password: 'petals2026' }); tree = hooks.render();
+  assert.equal(corner(tree).props.label, '✓ me@example.test');
+  assert.equal(byId(tree, 'enter-garden').props.disabled, false);
+  byId(tree, 'enter-garden').props.onPress(); await hooks.flush();
+  assert.equal(registered.length, 1);
+  const [details, connected] = registered[0];
+  assert.equal(details.name, 'Bloom_22'); assert.equal(details.password, 'petals2026'); assert.equal(details.fairyName, 'Lumi');
+  assert.equal(details.avatar, 'fairy-1'); assert.ok(details.communityTermsVersion); assert.equal(connected.email, 'me@example.test');
+  tree = hooks.render();
+  // Back to the first page, then the forgot pages: both go through the verified email only.
+  nodes(tree).find((n) => n.type === 'AccountFrame').props.left.props.onPress(); tree = hooks.render();
+  byId(tree, 'forgot-password').props.onPress(); tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Forgot your password?');
+  field(tree, 'Email').props.onChangeText('me@example.test'); tree = hooks.render();
+  byId(tree, 'send-reset-link').props.onPress(); await hooks.flush();
+  assert.deepEqual(resets, ['me@example.test']);
+  tree = hooks.render();
+  nodes(tree).find((n) => n.type === 'TextLink').props.onPress(); tree = hooks.render();
+  byId(tree, 'forgot-username').props.onPress(); tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Forgot your username?');
+  field(tree, 'Email').props.onChangeText('me@example.test'); field(tree, 'Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'find-account').props.onPress(); await hooks.flush();
+  assert.deepEqual(logins.at(-1), ['me@example.test', 'petals2026']);
+  // Signed in that way, the account name and PP number show before the Garden.
+  auth = { ...auth, phase: 'signedIn', session: { user: { id: 'owner', name: 'Bloom_22', accountId: 'PP12345678' } } }; tree = hooks.render();
+  assert.equal(field(tree, 'PP Number').props.fixedValue, 'PP12345678');
+  byId(tree, 'account-found-enter').props.onPress(); tree = hooks.render();
+  assert.equal(tree.props.children, 'real-app');
+  // Coming back to an account is the invitation page, which signs in through the real auth provider and keeps the policy links.
+  auth = { ...auth, phase: 'signedOut', session: null }; tree = hooks.render();
+  guest.props.value.requestAccount(); tree = hooks.render();
+  nodes(tree).find((n) => n.type === 'AccountFrame').props.right.props.onPress(); tree = hooks.render();
   const invitation = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
   assert.ok(invitation); assert.ok(invitation.props.footer); assert.doesNotMatch(text(tree), /Sign out/i);
-  await invitation.props.onSignIn('fixture@example.test', 'synthetic password');
-  assert.deepEqual(logins, [['fixture@example.test', 'synthetic password']]);
+  await invitation.props.onSignIn('Bloom_22', 'petals2026');
+  assert.deepEqual(logins.at(-1), ['Bloom_22', 'petals2026']);
   invitation.props.onCreateAccount(); tree = hooks.render();
-  assert.match(text(tree), /Create your PetalPal account/); assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
-  assert.equal(nodes(tree).find((n) => n.props.testID === 'auth-card').props.style.maxWidth, 440);
-  auth = { ...auth, phase: 'verificationPending', identity: { uid: 'new', email: 'new@example.test' } }; tree = hooks.render();
-  assert.match(text(tree), /Verify your email/); assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0);
-  auth = { ...auth, phase: 'profileRequired' }; tree = hooks.render();
-  assert.equal(nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.accessibilityState.checked, false);
+  assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
+  // An identity that never finished its profile finishes it on the welcome page, typing its name there, and can leave it.
+  auth = { ...auth, phase: 'profileRequired', identity: { uid: 'new', email: 'new@example.test' } }; tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Welcome to your garden');
+  assert.equal(field(tree, 'Account Name').props.fixedValue, undefined);
+  assert.equal(corner(tree), null, 'it already has an address');
   auth = { ...auth, phase: 'signedIn', session: { user: { id: 'owner-new' } } }; tree = hooks.render();
   assert.equal(tree.props.children, 'real-app');
 });
 
-test('Phase 1 pending reload detects verification completed elsewhere and refreshes claims automatically', async () => {
-  const value = user('new', false); value.reload = async () => { value.emailVerified = true; };
-  const s = setup(value); const state = await s.ready();
-  assert.equal(state.phase, 'signedIn'); assert.equal(s.tokens[0].force, true);
-});
-test('Phase 1 first verification email failure retains the newly created Firebase identity for resend', async () => {
-  const s = setup(); let state = await s.ready(); s.setEmailError(new Error('synthetic delivery failure'));
-  await state.register('new@example.test', 'synthetic password', 'synthetic password'); state = await s.hooks.flush();
-  assert.equal(state.phase, 'verificationPending'); assert.equal(state.identity.uid, 'new'); assert.ok(state.error);
-  s.setEmailError(null); await state.resendVerification(); state = await s.hooks.flush();
-  assert.match(state.message, /email sent/); assert.equal(s.requests.length, 0);
-});
 test('Phase 1 simultaneous terminal 401s invoke the invalidation callback once', async () => {
   const s = setup(); let invalidations = 0; const final = deferred(); let attempts = 0;
   s.api.configureApi({ apiBaseUrl: '', getAccessToken: async () => 'synthetic-token', onUnauthorized: () => invalidations++ });
@@ -316,23 +427,6 @@ test('Phase 1 simultaneous terminal 401s invoke the invalidation callback once',
   const results = await Promise.allSettled([first, second]);
   assert.ok(results.every((result) => result.status === 'rejected'));
   assert.equal(attempts, 4); assert.equal(invalidations, 1);
-});
-
-test('Phase 1 delayed verification after logout cannot restore identity or experience', async () => {
-  const s = setup(user('alice', false)); let state = await s.ready();
-  const reload = deferred(); const previous = s.auth.currentUser;
-  previous.reload = () => reload.promise;
-  const checking = state.checkVerification();
-  await state.logout(); state = await s.hooks.flush();
-  previous.emailVerified = true; reload.resolve(); await checking; state = await s.hooks.flush();
-  assert.equal(state.phase, 'signedOut'); assert.equal(state.identity, null);
-  assert.equal(state.session, null); assert.equal(state.experience, null); assert.equal(s.requests.length, 0);
-});
-test('Phase 1 stale verification control cannot send email for another account', async () => {
-  const s = setup(user('alice', false)); const previous = await s.ready();
-  s.emit(user('bob', false)); await s.hooks.flush();
-  await previous.resendVerification();
-  assert.equal(s.emails.length, 0);
 });
 
 test('DELTA-P2-2 logout erases durable private cache, preserves globals/SDK and reloads empty', async () => {
@@ -382,14 +476,15 @@ test('DELTA-P2-2 cleanup failure closes auth and API; retry erases retained owne
   assert.equal(state.session.user.id, 'owner-bob'); assert.equal(s.items.size, 0);
 });
 
-test('an email from an earlier version is told to sign in or reset, never shown provider details', async () => {
-  const s = setup(); const state = await s.ready();
-  s.setRegistrationError(Object.assign(new Error('EMAIL_EXISTS private@example.test provider diagnostic'), { code: 'auth/email-already-in-use' }));
-  await state.register('known@example.test', 'synthetic password', 'synthetic password');
-  const result = await s.hooks.flush();
-  assert.equal(result.phase, 'signedOut');
-  assert.equal(result.error, 'This email already has a PetalPal account. Sign in instead, or tap “Forgot password?” to set a new one.');
-  assert.equal(s.auth.currentUser, null); assert.equal(s.requests.length, 0); assert.equal(s.emails.length, 0);
+test('an email that already has an account is told to sign in or reset, never shown provider details', async () => {
+  const s = setup(); let state = await s.ready();
+  await state.register({ name: 'Bloom' }); state = await s.hooks.flush();
+  s.setLinkError(Object.assign(new Error('EMAIL_EXISTS private@example.test provider diagnostic'), { code: 'auth/email-already-in-use' }));
+  await assert.rejects(state.connectEmail('known@example.test', 'synthetic password'), (error) => {
+    assert.equal(error.message, 'This email already has a PetalPal account. Sign in instead, or tap “Forgot password?” to set a new one.');
+    return true;
+  });
+  assert.equal(s.emails.length, 0);
 });
 test('Forgot password sends a Firebase reset email with the same reply for every address', async () => {
   const s = setup(); let state = await s.ready();

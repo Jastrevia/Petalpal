@@ -65,7 +65,7 @@ try {
     await page.route('**/*', route => new URL(route.request().url()).hostname === new URL(BASE).hostname ? route.continue() : route.abort());
 
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('textbox', { name: 'Email address' }).fill('preview@example.invalid', { timeout: 120_000 });
+    await page.getByRole('textbox', { name: 'Username / PP number' }).fill('preview@example.invalid', { timeout: 120_000 });
     await page.getByRole('textbox', { name: 'Password' }).fill('preview-only');
     await page.getByRole('textbox', { name: 'Password' }).press('Enter');
 

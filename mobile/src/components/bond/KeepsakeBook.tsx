@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { loadKeepsakeBook, type KeepsakeBook as Book } from '../../services/fairyCloseness';
-import { BOND, BOND_COPY, type BondLocale } from './bondCopy';
+import { BOND, bondCopy, type BondLocale } from './bondCopy';
+import { useFairyName } from '../../services/fairyName';
 import { keepsakeArt } from './keepsakeArt';
 
 type Filter = 'ALL' | 'COMMON' | 'RARE' | 'MONTHLY';
@@ -10,7 +11,8 @@ type Entry = Book['keepsakes'][number];
 // The keepsake book (design screens 9 and 10): every keepsake, collected ones in colour,
 // the rest as faded silhouettes; tap a collected one for her note and the day it came.
 export function KeepsakeBook({ visible, locale, onClose }: { visible: boolean; locale: BondLocale; onClose: () => void }) {
-  const copy = BOND_COPY[locale];
+  const fairyName = useFairyName();
+  const copy = bondCopy(locale, fairyName);
   const [book, setBook] = useState<Book | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>('ALL');

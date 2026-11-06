@@ -36,12 +36,13 @@ test('session endpoints reject unauthenticated known/unknown probes before profi
   assert.equal(lookups, 0);
 });
 
-test('verified session setup preserves own profile recovery and legacy linking; unverified identities cannot query profiles', async (t) => {
-  const originalFind = prisma.user.findUnique, originalUpdate = prisma.user.update;
+test('session setup preserves own profile recovery and legacy linking; an unverified address never looks up an account', async (t) => {
+  const originalFind = prisma.user.findUnique, originalUpdate = prisma.user.update, originalDeletion = prisma.accountDeletion.findUnique;
+  prisma.accountDeletion.findUnique = async () => null;
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(async () => {
-    prisma.user.findUnique = originalFind; prisma.user.update = originalUpdate;
+    prisma.user.findUnique = originalFind; prisma.user.update = originalUpdate; prisma.accountDeletion.findUnique = originalDeletion;
     setFirebaseTokenVerifierForTests();
     await new Promise(resolve => server.close(resolve));
   });
@@ -69,7 +70,8 @@ test('verified session setup preserves own profile recovery and legacy linking; 
     });
     const body = await response.json();
     if (mode === 'unverified') {
-      assert.equal(response.status, 403); assert.equal(lookups, 0);
+      assert.equal(response.status, 200); assert.equal(body.needsProfile, true); assert.equal(body.email, null);
+      assert.equal(lookups, 1, 'by uid only, never by the unverified address');
     } else {
       assert.equal(response.status, 200);
       if (mode === 'new') { assert.equal(body.needsProfile, true); assert.equal(body.email, profile.email); }

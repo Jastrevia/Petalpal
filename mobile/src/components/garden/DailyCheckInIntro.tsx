@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkInWithFairy, loadClosenessSummary, type CheckInResult } from '../../services/fairyCloseness';
+import { isWelcomeActive, loadAvatarCollection, useWelcomeActive } from '../../services/avatars';
 import { KeepsakeReveal } from '../bond/KeepsakeReveal';
 import { PetalRing } from '../petalCards/PetalRing';
 import { loadPetalToday, type PetalToday } from '../../services/petalCardDraw';
 import { keepsakeArt } from '../bond/keepsakeArt';
+import { useFairyName } from '../../services/fairyName';
 import { useAppLocale } from '../../services/locale';
 import { calendarDateKey } from './calendarDates';
 import { usePlanting } from './planting/PlantingContext';
@@ -22,14 +24,14 @@ const HOLD_MS = 2600, SHRINK_MS = 900;
 // Her own photo, the same one Fairy Moments uses as her avatar.
 const PPL = require('@/assets/moments/TEA_TIME-3.jpg');
 const COPY = {
-  en: { title: 'Checked in for today', at: (time: string) => `Today at ${time}`, earlier: 'Earlier today', streak: (n: number) => `${n}-day streak with PPL`,
+  en: { title: 'Checked in for today', at: (time: string) => `Today at ${time}`, earlier: 'Earlier today', streak: (n: number, fairy: string) => `${n}-day streak with ${fairy}`,
     hint: 'Your check-ins and keepsakes live in the calendar, top right.', dismiss: 'Go to the calendar' },
-  'zh-Hans': { title: '今天已签到', at: (time: string) => `今天 ${time}`, earlier: '今天早些时候', streak: (n: number) => `和小花仙连续签到 ${n} 天`,
+  'zh-Hans': { title: '今天已签到', at: (time: string) => `今天 ${time}`, earlier: '今天早些时候', streak: (n: number, _fairy: string) => `和小花仙连续签到 ${n} 天`,
     hint: '签到记录和信物都在右上角的日历里，点开就能看。', dismiss: '去日历看看' },
 };
 
 export function DailyCheckInIntro() {
-  const locale = useAppLocale(), copy = COPY[locale];
+  const locale = useAppLocale(), copy = COPY[locale], fairyName = useFairyName();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Same size rule as the calendar button (GardenCalendar).
@@ -37,6 +39,9 @@ export function DailyCheckInIntro() {
   const progress = useRef(new Animated.Value(0)).current;
   const [card, setCard] = useState<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const [reveal, setReveal] = useState<CheckInResult | null>(null);
+  const [deferredReveal, setDeferredReveal] = useState<CheckInResult | null>(null);
+  const [deferredToday, setDeferredToday] = useState<{ today: PetalToday | null } | null>(null);
+  const welcomeActive = useWelcomeActive();
   const [petal, setPetal] = useState<PetalToday | null>(null), [ringOpen, setRingOpen] = useState(false);
   const pendingCard = useRef<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const showCard = (next: { time: string | null; streak: number; keepsake?: string }) => {
@@ -49,6 +54,19 @@ export function DailyCheckInIntro() {
     if (pendingCard.current) showCard(pendingCard.current);
     pendingCard.current = null;
   };
+
+  // When the welcome flow finishes, any deferred keepsake reveal or tarot check-in runs.
+  useEffect(() => {
+    if (welcomeActive) return;
+    if (deferredReveal) {
+      setReveal(deferredReveal);
+      setDeferredReveal(null);
+    } else if (deferredToday) {
+      afterKeepsake(deferredToday.today);
+      setDeferredToday(null);
+    }
+  }, [welcomeActive, deferredReveal, deferredToday]);
+
   // Waits for the Garden to appear, so the card lands on her Garden, not on an empty screen.
   const { isGardenLoading } = usePlanting();
 
@@ -79,9 +97,18 @@ export function DailyCheckInIntro() {
       const time = at ? new Date(at).toLocaleTimeString(locale === 'zh-Hans' ? 'zh-CN' : 'en', { hour: 'numeric', minute: '2-digit' }) : null;
       const today = await loadPetalToday().catch(() => null);
       if (!active) return;
+      const avatars = await loadAvatarCollection().catch(() => null);
+      if (!active) return;
+      const welcomeWaiting = isWelcomeActive() || Boolean(avatars?.welcome.needed);
       setPetal(today);
       pendingCard.current = { time, streak, keepsake: earned?.keepsakes[0].id };
-      if (earned) setReveal(earned); else afterKeepsake(today);
+      if (earned) {
+        if (welcomeWaiting) setDeferredReveal(earned);
+        else setReveal(earned);
+      } else {
+        if (welcomeWaiting) setDeferredToday({ today });
+        else afterKeepsake(today);
+      }
     })();
     return () => { active = false; };
   }, [locale, progress, isGardenLoading]);
@@ -118,7 +145,7 @@ export function DailyCheckInIntro() {
   const scale = progress.interpolate({ inputRange: [0, 1, 2], outputRange: [.85, 1, 64 / cardHeight] });
   return <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.layer]}>
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, { opacity: progress.interpolate({ inputRange: [0, 1, 1.6, 2], outputRange: [0, 1, .2, 0] }) }]} />
-    <Animated.View accessibilityRole="alert" accessibilityLabel={`${copy.title}. ${card.time ? copy.at(card.time) : copy.earlier}. ${copy.streak(card.streak)}. ${copy.hint}`}
+    <Animated.View accessibilityRole="alert" accessibilityLabel={`${copy.title}. ${card.time ? copy.at(card.time) : copy.earlier}. ${copy.streak(card.streak, fairyName)}. ${copy.hint}`}
       style={[styles.card, { width: cardWidth, height: cardHeight, left: (width - cardWidth) / 2, top: (height - cardHeight) / 2,
         opacity: progress.interpolate({ inputRange: [0, .4, 1, 1.75, 2], outputRange: [0, 1, 1, .9, 0] }),
         transform: [
@@ -131,7 +158,7 @@ export function DailyCheckInIntro() {
         <Text style={styles.check}>✓</Text>
         <Text style={styles.title}>{copy.title}</Text>
         <Text style={styles.time}>{card.time ? copy.at(card.time) : copy.earlier}</Text>
-        <Text style={styles.streak}>✿ {copy.streak(card.streak)}</Text>
+        <Text style={styles.streak}>✿ {copy.streak(card.streak, fairyName)}</Text>
         <Text style={styles.hint}>{copy.hint}</Text>
       </Pressable>
     </Animated.View>
