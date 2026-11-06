@@ -54,7 +54,7 @@ import {
   setFairyMomentsCover
 } from "./lib/fairy-moments.js";
 import { isMomentCover } from "./lib/moment-covers.js";
-import { isLibraryAvatar } from "./lib/avatars.js";
+import { isLibraryAvatar, LEGACY_AVATAR_IDS } from "./lib/avatars.js";
 import { AvatarError, avatarCollection, claimLevelAvatar, grantWelcomeAvatars, ownsAvatar } from "./lib/avatar-collection.js";
 import {
   awardCloseness,
@@ -145,8 +145,8 @@ import {
 import { createRealtimeSecurity, SOCKET_MAX_PACKET_BYTES } from "./lib/socket-security.js";
 import { createRateLimiter, rateLimiters } from "./lib/rate-limit.js";
 import {
-  findUserByLogin, findUserByName, hashPassword, MIN_PASSWORD_LENGTH, newAccountNumber,
-  spendPasswordTime, usernameProblem, validNewPassword, verifyPassword
+  accountNameProblem, findUserByLogin, findUserByName, hashPassword, MAX_FAIRY_NAME_LENGTH, newAccountNumber,
+  PASSWORD_RULE, spendPasswordTime, usernameProblem, validNewPassword, verifyPassword
 } from "./lib/accounts.js";
 import { deleteFirebaseUser } from "./lib/firebase-admin.js";
 import { verifyFirebaseIdToken, findFirebaseUserByEmail } from './lib/firebase-admin.js';
@@ -1064,7 +1064,10 @@ function newProfileProblem(name, body) {
   if (body?.preferredLocale !== undefined && !normalizeLocale(body.preferredLocale)) return { status: 400, error: "Invalid preferred locale" };
   return null;
 }
-async function createProfile({ firebaseUid, name, body, email = null }) {
+// `signUp` (an account made on the sign-up page): its password hash, its fairy's name, and its
+// avatar picked from the original portraits, which it owns like any older account (so it never
+// sees the Garden's new-account avatar welcome). All written with the account in one create.
+async function createProfile({ firebaseUid, name, body, email = null, signUp = null }) {
   const fairyEvent = resolveFairyEvent({ onboardingStep: "EMPTY_GARDEN", onboardingCompleted: false, distinctCheckInCount: 0 });
   for (let attempt = 1; ; attempt++) {
     try {
@@ -1084,7 +1087,14 @@ async function createProfile({ firebaseUid, name, body, email = null }) {
           garden: { create: { year: new Date().getFullYear() } },
           fairyState: { create: { lastEvent: fairyEvent.code } },
           aiConsent: { create: { termsVersion: AI_TERMS_VERSION, aiProcessing: false, grantedAt: null } },
-          subscriptionEntitlement: { create: {} }
+          subscriptionEntitlement: { create: {} },
+          ...(signUp ? {
+            accountPassword: { create: { hash: signUp.passwordHash } },
+            fairies: { create: { fairyType: STARTER_FAIRY.type, name: signUp.fairyName || STARTER_FAIRY.name, unlockSource: STARTER_FAIRY.unlockSource,
+              isActive: true, runtime: { create: {} } } },
+            avatarWelcomeAt: new Date(),
+            avatarOwnerships: { create: LEGACY_AVATAR_IDS.map(avatarId => ({ avatarId, source: "SIGNUP" })) }
+          } : {})
         }
       });
       return { user, fairyEvent };
@@ -1169,16 +1179,31 @@ app.post("/auth/session", authenticateFirebaseIdentity, authAccountRateLimit, li
 });
 
 // Name and avatar make the account. The uid is ours to choose: Firebase creates that user when the pass is first used.
+// A new account: its unique account name and its password (the way back in; an email is optional and
+// comes later), its fairy's name (any name, shared by many) and one of the original portraits.
 app.post("/auth/register", newAccountRateLimit,
-  allowBodyFields(["name", "avatar", "timezone", "preferredLocale", "communityTermsVersion"]), async (req, res) => {
+  allowBodyFields(["name", "password", "fairyName", "avatar", "timezone", "preferredLocale", "communityTermsVersion"]), async (req, res) => {
   res.set("Cache-Control", "no-store");
   try {
-    const name = String(req.body?.name || "").trim();
-    const problem = newProfileProblem(name, req.body);
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const shape = accountNameProblem(name);
+    if (shape) return res.status(422).json({ error: shape, code: "USERNAME_INVALID" });
+    if (!validNewPassword(req.body?.password)) return res.status(400).json({ error: PASSWORD_RULE, code: "PASSWORD_INVALID" });
+    const avatar = req.body?.avatar ?? LEGACY_AVATAR_IDS[0];
+    if (!LEGACY_AVATAR_IDS.includes(avatar)) return res.status(400).json({ error: "Choose one of the avatars shown.", code: "AVATAR_INVALID" });
+    const fairyName = typeof req.body?.fairyName === "string" ? req.body.fairyName.normalize("NFKC").replace(/\s+/g, " ").trim() : "";
+    if (req.body?.fairyName !== undefined && typeof req.body.fairyName !== "string" || fairyName.length > MAX_FAIRY_NAME_LENGTH) {
+      return res.status(400).json({ error: `Give your fairy a name of ${MAX_FAIRY_NAME_LENGTH} characters or fewer.`, code: "FAIRY_NAME_INVALID" });
+    }
+    const body = { ...req.body, avatar };
+    const problem = newProfileProblem(name, body);
     if (problem) return res.status(problem.status).json({ error: problem.error, ...(problem.code ? { code: problem.code } : {}) });
+    if (fairyName) assertSocialContent(fairyName);
+    const passwordHash = await hashPassword(req.body.password);
     const firebaseUid = `pp_${randomUUID().replaceAll("-", "")}`;
+    await createProfile({ firebaseUid, name, body, signUp: { passwordHash, fairyName } });
+    // The token only once the account exists: a refused name never leaves a way into an empty sign-in.
     const signInToken = await issueFirebaseSignInToken(firebaseUid);
-    await createProfile({ firebaseUid, name, body: req.body });
     return res.status(201).json({ signInToken });
   } catch (error) {
     if (error?.code === "USERNAME_TAKEN") return res.status(409).json(USERNAME_TAKEN);
@@ -1227,9 +1252,12 @@ app.put("/auth/password", authRateLimit, allowBodyFields(["password", "currentPa
   res.set("Cache-Control", "no-store");
   try {
     const { password, currentPassword } = req.body || {};
-    if (!validNewPassword(password)) return res.status(400).json({ error: `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`, code: "PASSWORD_INVALID" });
+    if (!validNewPassword(password)) return res.status(400).json({ error: PASSWORD_RULE, code: "PASSWORD_INVALID" });
     const existing = await prisma.accountPassword.findUnique({ where: { userId: req.auth.userId }, select: { hash: true } });
-    if (existing && !(req.firebase.provider === "password" && signedInRecently(req)) && !await verifyPassword(currentPassword, existing.hash)) {
+    // The way back for a forgotten password: a sign-in just now with the account's email, and only a
+    // verified one (an unverified address could be anyone's).
+    const emailProof = req.firebase.provider === "password" && req.firebase.emailVerified === true && signedInRecently(req);
+    if (existing && !emailProof && !await verifyPassword(currentPassword, existing.hash)) {
       return res.status(403).json({ error: "That isn’t your current password.", code: "CURRENT_PASSWORD_REQUIRED" });
     }
     const hash = await hashPassword(password);

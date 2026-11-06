@@ -4,7 +4,8 @@
 (function () {
   const API = 'https://api.synthetic.invalid';
   const nativeFetch = window.fetch.bind(window);
-  const uid = 'local-preview-owner', email = 'preview@example.invalid', password = 'preview-only';
+  const uid = 'local-preview-owner', email = 'preview@example.invalid';
+  let password = 'preview-only'; // (a new preview account sets its own)
   const preferredLocale = new URLSearchParams(location.search).get('lang') === 'zh-Hans' ? 'zh-Hans' : 'en';
   const user = { id: uid, accountId: 'PP12345678', name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale, aiConsent: true };
   // People to find and friend requests, so every state of Friends → Requests can be tried.
@@ -235,7 +236,10 @@
 
       if (p === '/auth/register') {
         if (/taken/i.test(request.name)) return json({ error: 'That name is taken. Try another one.', code: 'USERNAME_TAKEN' }, 409);
-        user.name = request.name; user.avatar = request.avatar; accountEmail = null; emailVerified = false; hasPassword = false; emailChecks = 0; linked = false;
+        user.name = request.name; user.avatar = request.avatar; accountEmail = null; emailVerified = false; emailChecks = 0; linked = false;
+        // The sign-up page sets the password and picks an original portrait (so no avatar welcome after).
+        hasPassword = typeof request.password === 'string'; if (hasPassword) password = request.password;
+        if (avatars) { Object.assign(avatars, { welcomed: true, selected: request.avatar }); saveAvatars(); }
         return json({ signInToken: 'local-preview-pass' }, 201);
       }
       if (p === '/auth/password-login') {

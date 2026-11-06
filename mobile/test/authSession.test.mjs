@@ -38,7 +38,10 @@ function setup(initial = null, apiOrigin = '') {
   const backendUser = () => ({ id: `owner-${auth.currentUser.uid}`, name: 'Petal', email: auth.currentUser.email, timezone: 'UTC' });
   const firebase = {
     onAuthStateChanged: (_auth, callback) => { changed = callback; return () => {}; },
-    signInWithEmailAndPassword: async (_auth, email) => { if (loginError) throw loginError; emit(user(email.split('@')[0])); },
+    signInWithEmailAndPassword: async (_auth, email) => {
+      if (loginError) throw loginError;
+      const uid = email.split('@')[0], value = user(uid, !uid.startsWith('unverified')); emit(value); return { user: value };
+    },
     signInWithCustomToken: async () => {
       if (customTokenError) throw customTokenError;
       const value = user('pass-new', false); value.email = null; emit(value); return { user: value };
@@ -198,6 +201,12 @@ test('A name or PP number signs in through the server; an email through Firebase
   assert.equal(state.phase, 'signedIn');
   assert.equal(e.requests.some(r => r.path === '/auth/password-login'), false);
   assert.deepEqual(JSON.parse(e.requests.find(r => r.path === '/auth/password').options.body), { password: 'synthetic password' });
+  await state.logout(); state = await e.hooks.flush();
+  // An email never verified is no way in (it could be anyone's): signed out again, the password left alone.
+  const u = setup(); state = await u.ready();
+  await state.login('unverified@example.test', 'synthetic password'); state = await u.hooks.flush();
+  assert.equal(state.phase, 'signedOut'); assert.match(state.error, /isn’t verified/);
+  assert.equal(u.requests.some(r => r.path === '/auth/password'), false);
 });
 test('A wrong password shows the one failure message and signs nobody in', async () => {
   const s = setup(); let state = await s.ready();
@@ -292,72 +301,119 @@ test('Phase 1 failed Firebase sign-out cannot restore a terminally invalidated a
   s.emit(s.auth.currentUser); state = await s.hooks.flush(); assert.equal(state.phase, 'signedOut'); assert.equal(state.session, null);
 });
 
-test('Phase 1 auth gate separates loading, signed-out, name and avatar, sign-in and authenticated controls', async () => {
+test('Phase 1 auth gate: guest Garden, create account (name and password), welcome (fairy name and avatar), forgot pages, sign-in', async () => {
   let auth = { phase: 'initializing', loading: true, session: null, identity: null, error: '', message: '' };
   const replaced = [];
   const hooks = hookHarness(); const nodes = (tree) => Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object'
     ? [tree, ...nodes(tree.props?.children)] : [];
   const text = (tree) => nodes(tree).filter((n) => n.type === 'Text').map((n) => n.props.children).flat().join(' ');
+  const field = (tree, label) => nodes(tree).find((n) => n.type === 'Field' && n.props.label === label);
+  const byId = (tree, id) => nodes(tree).find((n) => n.props?.testID === id);
+  const corner = (tree) => nodes(tree).find((n) => n.type === 'AccountFrame').props.right;
   const load = loadPlantingModules(undefined, hooks.react, {}, false, {
     '../services/auth': { useAuth: () => auth },
+    '../services/auth/registrationValidation': {
+      accountNameError: (name) => (/^[A-Za-z0-9_]{4,20}$/.test(name) && !/^pp\d+$/i.test(name) ? '' : 'Use 4–20 letters, numbers or underscores.'),
+      passwordError: (password) => (/^(?=.*[A-Za-z])(?=.*\d).{8,16}$/.test(password) ? '' : 'Use 8–16 characters with letters and numbers.'),
+    },
     './auth/LoginPreviewPage': { LoginPreviewPage: 'LoginPreviewPage' },
+    './auth/AccountPages': { AccountFrame: 'AccountFrame', AvatarChoice: 'AvatarChoice', Check: 'Check', CornerButton: 'CornerButton', Field: 'Field',
+      FooterLinks: 'FooterLinks', Message: 'Message', PrimaryButton: 'PrimaryButton', TextLink: 'TextLink' },
+    './avatars/avatarArt': { LEGACY_AVATAR_IDS: ['fairy-1', 'fairy-2'] },
     './features/AccountRecovery': { ConnectEmailScreen: 'ConnectEmailScreen' },
     '../constants/theme': { Fonts: { sans: 'sans', rounded: 'rounded' }, Spacing: { two: 8, three: 16, four: 24 } },
     'expo-splash-screen': { hideAsync: async () => {} },
     'expo-router': { router: { replace: (path) => replaced.push(path) }, usePathname: () => '/' },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) },
     '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },
     '../services/deviceReset': { devVariant: false }, './features/DeviceReset': { DeviceResetButton: 'DeviceResetButton' },
-    'react-native': { ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView',
-      Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', Modal: 'Modal',
+    'react-native': { ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', Modal: 'Modal',
       Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } },
   });
   const gate = load('../../../components/AuthGate'); let tree = hooks.mount(() => gate.AuthGate({ children: 'real-app' }));
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0); assert.doesNotMatch(text(tree), /Sign in|Sign out/i);
-  // Signed out: guest mode shows the app itself (the Garden) with no sign-in form, until an account is asked for.
-  const logins = [];
-  auth = { ...auth, phase: 'signedOut', loading: false, login: async (...values) => { logins.push(values); } }; tree = hooks.render();
+  assert.equal(nodes(tree).some((n) => n.type === 'Field'), false); assert.doesNotMatch(text(tree), /Sign in|Sign out/i);
+  // Signed out: guest mode shows the app itself (the Garden) with no form, until an account is asked for.
+  const logins = [], registered = [], resets = [];
+  auth = { ...auth, phase: 'signedOut', loading: false, login: async (...values) => { logins.push(values); },
+    register: async (...values) => { registered.push(values); }, resetPassword: async (email) => { resets.push(email); }, clearMessage: () => {} };
+  tree = hooks.render();
   const guest = nodes(tree).find((n) => n.type === 'GuestProvider');
-  assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 0);
+  assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'Field'), false);
   guest.props.value.requestAccount(); tree = hooks.render();
-  // Then the name and avatar card lies over the still-mounted app: no email or password on it, one way to connect an email.
-  assert.ok(nodes(tree).includes('real-app') || JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
-  assert.ok(nodes(tree).find((n) => n.props?.accessibilityLabel === 'Back to the Garden'));
-  assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
-  assert.equal(nodes(tree).find((n) => n.props.testID === 'auth-card').props.style.maxWidth, 440);
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 1);
-  assert.equal(nodes(tree).filter((n) => n.props?.secureTextEntry).length, 0);
-  assert.ok(nodes(tree).some((n) => n.props?.accessibilityRole === 'radio'));
-  assert.equal(nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.accessibilityState.checked, false);
-  nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.onPress(); tree = hooks.render();
-  assert.equal(nodes(tree).find((n) => n.props.accessibilityRole === 'checkbox').props.accessibilityState.checked, true);
-  // The guidelines and the notes stay folded until asked for.
-  assert.doesNotMatch(text(tree), /Be kind|lives on this phone|AI stays off/);
-  nodes(tree).find((n) => n.props?.accessibilityRole === 'link' && text(n).includes('Community Guidelines')).props.onPress(); tree = hooks.render();
-  assert.match(text(nodes(tree).find((n) => n.props.testID === 'community-guidelines')), /Be kind/);
-  nodes(tree).find((n) => n.type === 'Modal').props.onRequestClose(); tree = hooks.render();
-  assert.equal(nodes(tree).some((n) => n.type === 'Modal'), false);
-  nodes(tree).find((n) => n.props?.accessibilityRole === 'button' && text(n).includes('Good to know')).props.onPress(); tree = hooks.render();
-  assert.match(text(tree), /lives on this phone/); assert.match(text(tree), /AI stays off/);
-  nodes(tree).find((n) => n.props?.accessibilityLabel === 'Connect to your email?').props.onPress(); tree = hooks.render();
+  // "Create your account" lies over the still-mounted Garden: account name, password, confirm; no email.
+  assert.ok(JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Create your account');
+  assert.deepEqual(nodes(tree).filter((n) => n.type === 'Field').map((n) => n.props.label), ['Account Name', 'Password', 'Confirm Password']);
+  assert.equal(field(tree, 'Password').props.secret, true); assert.equal(field(tree, 'Confirm Password').props.secret, true);
+  assert.ok(byId(tree, 'forgot-password')); assert.ok(byId(tree, 'forgot-username'));
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.left.props.label, 'Back to the Garden');
+  // The rules are checked before the welcome page: a bad name, a weak password, two different passwords.
+  field(tree, 'Account Name').props.onChangeText('ab'); field(tree, 'Password').props.onChangeText('petals2026');
+  field(tree, 'Confirm Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  assert.match(nodes(tree).find((n) => n.type === 'Message').props.text, /4–20/);
+  field(tree, 'Account Name').props.onChangeText('Bloom_22'); field(tree, 'Confirm Password').props.onChangeText('petals2027'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  assert.match(nodes(tree).find((n) => n.type === 'Message').props.text, /match/);
+  field(tree, 'Confirm Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'create-account').props.onPress(); tree = hooks.render();
+  // "Welcome to your garden": the same account name, shown, not typed again; the fairy's name; an avatar.
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Welcome to your garden');
+  assert.equal(field(tree, 'Account Name').props.fixedValue, 'Bloom_22');
+  assert.ok(field(tree, 'Your Garden Fairy’s Name')); assert.ok(nodes(tree).find((n) => n.type === 'AvatarChoice'));
+  assert.equal(byId(tree, 'enter-garden').props.disabled, true, 'the Community Guidelines first');
+  nodes(tree).find((n) => n.type === 'Check').props.onLink(); tree = hooks.render();
+  const guidelines = nodes(tree).find((n) => n.type?.name === 'Guidelines');
+  assert.ok(guidelines, 'the guidelines open'); guidelines.props.onClose(); tree = hooks.render();
+  assert.equal(nodes(tree).some((n) => n.type?.name === 'Guidelines'), false);
+  nodes(tree).find((n) => n.type === 'Check').props.onPress(); tree = hooks.render();
+  field(tree, 'Your Garden Fairy’s Name').props.onChangeText('Lumi'); tree = hooks.render();
+  // Connecting an email takes the address only: the password is the account's own.
+  corner(tree).props.onPress(); tree = hooks.render();
   const connect = nodes(tree).find((n) => n.type === 'ConnectEmailScreen');
-  assert.ok(connect, 'it opens its own screen');
-  connect.props.onSave({ email: 'me@example.test', password: 'synthetic password' }); tree = hooks.render();
-  assert.equal(nodes(tree).some((n) => n.type === 'ConnectEmailScreen'), false);
-  assert.ok(nodes(tree).find((n) => n.props?.accessibilityLabel === 'me@example.test'), 'the corner shows what was filled in');
+  assert.equal(connect.props.knownPassword, 'petals2026');
+  connect.props.onSave({ email: 'me@example.test', password: 'petals2026' }); tree = hooks.render();
+  assert.equal(corner(tree).props.label, '✓ me@example.test');
+  assert.equal(byId(tree, 'enter-garden').props.disabled, false);
+  byId(tree, 'enter-garden').props.onPress(); await hooks.flush();
+  assert.equal(registered.length, 1);
+  const [details, connected] = registered[0];
+  assert.equal(details.name, 'Bloom_22'); assert.equal(details.password, 'petals2026'); assert.equal(details.fairyName, 'Lumi');
+  assert.equal(details.avatar, 'fairy-1'); assert.ok(details.communityTermsVersion); assert.equal(connected.email, 'me@example.test');
+  tree = hooks.render();
+  // Back to the first page, then the forgot pages: both go through the verified email only.
+  nodes(tree).find((n) => n.type === 'AccountFrame').props.left.props.onPress(); tree = hooks.render();
+  byId(tree, 'forgot-password').props.onPress(); tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Forgot your password?');
+  field(tree, 'Email').props.onChangeText('me@example.test'); tree = hooks.render();
+  byId(tree, 'send-reset-link').props.onPress(); await hooks.flush();
+  assert.deepEqual(resets, ['me@example.test']);
+  tree = hooks.render();
+  nodes(tree).find((n) => n.type === 'TextLink').props.onPress(); tree = hooks.render();
+  byId(tree, 'forgot-username').props.onPress(); tree = hooks.render();
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Forgot your username?');
+  field(tree, 'Email').props.onChangeText('me@example.test'); field(tree, 'Password').props.onChangeText('petals2026'); tree = hooks.render();
+  byId(tree, 'find-account').props.onPress(); await hooks.flush();
+  assert.deepEqual(logins.at(-1), ['me@example.test', 'petals2026']);
+  // Signed in that way, the account name and PP number show before the Garden.
+  auth = { ...auth, phase: 'signedIn', session: { user: { id: 'owner', name: 'Bloom_22', accountId: 'PP12345678' } } }; tree = hooks.render();
+  assert.equal(field(tree, 'PP Number').props.fixedValue, 'PP12345678');
+  byId(tree, 'account-found-enter').props.onPress(); tree = hooks.render();
+  assert.equal(tree.props.children, 'real-app');
   // Coming back to an account is the invitation page, which signs in through the real auth provider and keeps the policy links.
-  nodes(tree).find((n) => n.props?.accessibilityRole === 'button' && text(n).includes('Already have an account')).props.onPress(); tree = hooks.render();
+  auth = { ...auth, phase: 'signedOut', session: null }; tree = hooks.render();
+  guest.props.value.requestAccount(); tree = hooks.render();
+  nodes(tree).find((n) => n.type === 'AccountFrame').props.right.props.onPress(); tree = hooks.render();
   const invitation = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
   assert.ok(invitation); assert.ok(invitation.props.footer); assert.doesNotMatch(text(tree), /Sign out/i);
-  await invitation.props.onSignIn('Bloom', 'synthetic password');
-  assert.deepEqual(logins, [['Bloom', 'synthetic password']]);
+  await invitation.props.onSignIn('Bloom_22', 'petals2026');
+  assert.deepEqual(logins.at(-1), ['Bloom_22', 'petals2026']);
   invitation.props.onCreateAccount(); tree = hooks.render();
   assert.equal(nodes(tree).some((n) => n.type === 'LoginPreviewPage'), false);
-  // An identity that never finished its profile finishes it on the same card, and can leave it.
+  // An identity that never finished its profile finishes it on the welcome page, typing its name there, and can leave it.
   auth = { ...auth, phase: 'profileRequired', identity: { uid: 'new', email: 'new@example.test' } }; tree = hooks.render();
-  assert.equal(nodes(tree).filter((n) => n.type === 'TextInput').length, 1);
-  assert.equal(nodes(tree).some((n) => n.props?.accessibilityLabel === 'Connect to your email?'), false, 'it already has an address');
+  assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Welcome to your garden');
+  assert.equal(field(tree, 'Account Name').props.fixedValue, undefined);
+  assert.equal(corner(tree), null, 'it already has an address');
   auth = { ...auth, phase: 'signedIn', session: { user: { id: 'owner-new' } } }; tree = hooks.render();
   assert.equal(tree.props.children, 'real-app');
 });

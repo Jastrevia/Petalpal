@@ -4,14 +4,14 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 import prisma from "../../lib/prisma.js";
-import { findUserByName, hashPassword, normalizeUsername, usernameProblem, verifyPassword } from "../../lib/accounts.js";
+import { accountNameProblem, findUserByName, hashPassword, normalizeUsername, usernameProblem, validNewPassword, verifyPassword } from "../../lib/accounts.js";
 import { authenticateSocket, setFirebaseSignInTokenIssuerForTests, setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
 import { AI_COST_ACTIONS } from "../../lib/ai-cost-gate.js";
 import { createRateLimiter } from "../../lib/rate-limit.js";
 import { app } from "../../server.js";
 import { COMMUNITY_VERSION } from "../../lib/community-policy.js";
 
-const MIGRATION = "prisma/migrations/202611020002_unique_names_account_passwords/migration.sql";
+const MIGRATION = "prisma/migrations/202611060001_unique_names_account_passwords/migration.sql";
 
 async function withServer(t) {
   const server = app.listen(0, "127.0.0.1");
@@ -29,7 +29,7 @@ const send = (url, path, method, body, token) => fetch(`${url}${path}`, {
   headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   ...(body ? { body: JSON.stringify(body) } : {})
 });
-const profile = (extra = {}) => ({ name: "Bloom", avatar: "🦋", timezone: "UTC", preferredLocale: "en", communityTermsVersion: COMMUNITY_VERSION, ...extra });
+const profile = (extra = {}) => ({ name: "Bloom_1", password: "garden123", fairyName: "Mimi", avatar: "fairy-2", timezone: "UTC", preferredLocale: "en", communityTermsVersion: COMMUNITY_VERSION, ...extra });
 const issueTokens = t => {
   setFirebaseSignInTokenIssuerForTests(async uid => `pass-for-${uid}`);
   t.after(() => setFirebaseSignInTokenIssuerForTests());
@@ -80,7 +80,7 @@ test("passwords are salted, verified and never stored as written", async () => {
   assert.equal(await verifyPassword("garden-gate", "not-a-hash"), false);
 });
 
-test("name and avatar alone make an account, with no email and AI off", async t => {
+test("an account name and a password make an account, with its fairy, avatar, no email and AI off", async t => {
   issueTokens(t);
   const url = await withServer(t);
   let created;
@@ -96,6 +96,18 @@ test("name and avatar alone make an account, with no email and AI off", async t 
   assert.equal(created.emailVerifiedAt, null);
   assert.match(created.accountId, /^PP\d{8}$/);
   assert.equal(created.aiConsent.create.aiProcessing, false);
+  assert.equal(created.name, "Bloom_1");
+  // The password only as its hash, written with the account in the same create.
+  assert.ok(!JSON.stringify(created).includes("garden123"));
+  assert.equal(await verifyPassword("garden123", created.accountPassword.create.hash), true);
+  assert.equal(created.fairies.create.name, "Mimi");
+  assert.equal(created.avatar, "fairy-2");
+  // It owns the original portraits like any older account, and skips the Garden's avatar welcome.
+  assert.ok(created.avatarWelcomeAt instanceof Date);
+  assert.deepEqual(created.avatarOwnerships.create.map(row => row.avatarId), ["fairy-1", "fairy-2", "fairy-3", "fairy-4", "fairy-5", "fairy-6", "fairy-7", "fairy-8"]);
+  // No fairy name: the fairy keeps its own.
+  await send(url, "/auth/register", "POST", profile({ name: "Bloom_2", fairyName: undefined }));
+  assert.equal(created.fairies.create.name, "PPL");
 });
 
 test("a taken name gets a clear refusal, and an id collision just draws again", async t => {
@@ -105,9 +117,11 @@ test("a taken name gets a clear refusal, and an id collision just draws again", 
 
   mock(t, prisma.user, "create", async () => { throw duplicate(); });
   mock(t, prisma, "$queryRawUnsafe", async () => [{ id: "someone" }]);
+  setFirebaseSignInTokenIssuerForTests(async () => assert.fail("no sign-in for a refused name"));
   const taken = await send(url, "/auth/register", "POST", profile());
   assert.equal(taken.status, 409);
   assert.equal((await taken.json()).code, "USERNAME_TAKEN");
+  issueTokens(t);
 
   let tries = 0;
   const seen = [];
@@ -121,10 +135,23 @@ test("registration refuses a bad profile and needs the Community Guidelines", as
   issueTokens(t);
   const url = await withServer(t);
   mock(t, prisma.user, "create", async () => assert.fail("nothing is created"));
-  assert.equal((await send(url, "/auth/register", "POST", profile({ name: " " }))).status, 400);
-  assert.equal((await send(url, "/auth/register", "POST", profile({ name: "PP12345678" }))).status, 422);
+  // (A few by HTTP: refused sign-ups count against the network's sign-in budget. The full rules are below.)
+  assert.equal((await send(url, "/auth/register", "POST", profile({ password: undefined }))).status, 400);
+  assert.equal((await send(url, "/auth/register", "POST", profile({ avatar: "🦋" }))).status, 400, "an original portrait only");
+  assert.equal((await send(url, "/auth/register", "POST", profile({ fairyName: "x".repeat(21) }))).status, 400);
   assert.equal((await send(url, "/auth/register", "POST", profile({ communityTermsVersion: undefined }))).status, 428);
   assert.equal((await send(url, "/auth/register", "POST", profile({ email: "a@b.co" }))).status, 400);
+});
+
+test("an account name is 4–20 letters, numbers or underscores; a new password 8–16 with letters and numbers", () => {
+  for (const name of ["Bloom", "bloom_23", "ABCD", "a".repeat(20), "PPL_fan"]) assert.equal(accountNameProblem(name), null, name);
+  for (const name of [" ", "", "abc", "Two Words", "小花小花", "a".repeat(21), "PP12345678", "pp123", "me@x.co", "dash-name", 7, null]) {
+    assert.ok(accountNameProblem(name), String(name));
+  }
+  for (const password of ["garden12", "a1b2c3d4", "Abcdefgh1234567x"]) assert.equal(validNewPassword(password), true, password);
+  for (const password of [undefined, "", "short1", "onlyletters", "12345678", "abcdefgh12345678x", 12345678]) {
+    assert.equal(validNewPassword(password), false, String(password));
+  }
 });
 
 test("a stranger gets the same answer for a wrong password and an unknown name", async t => {
@@ -217,16 +244,16 @@ test("replacing a password takes the old one; a first password does not", async 
   mock(t, prisma.accountPassword, "upsert", async ({ update }) => { hash = update.hash; writes++; });
 
   assert.equal((await send(url, "/auth/password", "PUT", { password: "short" }, "t")).status, 400);
-  assert.equal((await send(url, "/auth/password", "PUT", { password: "first-password" }, "t")).status, 200);
-  assert.equal((await send(url, "/auth/password", "PUT", { password: "second-password" }, "t")).status, 403);
-  assert.equal((await send(url, "/auth/password", "PUT", { password: "second-password", currentPassword: "nope" }, "t")).status, 403);
+  assert.equal((await send(url, "/auth/password", "PUT", { password: "first123" }, "t")).status, 200);
+  assert.equal((await send(url, "/auth/password", "PUT", { password: "second123" }, "t")).status, 403);
+  assert.equal((await send(url, "/auth/password", "PUT", { password: "second123", currentPassword: "nope" }, "t")).status, 403);
   assert.equal(writes, 1);
-  assert.equal((await send(url, "/auth/password", "PUT", { password: "second-password", currentPassword: "first-password" }, "t")).status, 200);
-  assert.equal(await verifyPassword("second-password", hash), true);
+  assert.equal((await send(url, "/auth/password", "PUT", { password: "second123", currentPassword: "first123" }, "t")).status, 200);
+  assert.equal(await verifyPassword("second123", hash), true);
 
   // Forgot it: the reset link, then a sign-in with the email just now, is the proof.
-  setFirebaseTokenVerifierForTests(async () => ({ uid: "fb1", firebase: { sign_in_provider: "password" }, auth_time: now }));
-  assert.equal((await send(url, "/auth/password", "PUT", { password: "third-password" }, "t")).status, 200);
+  setFirebaseTokenVerifierForTests(async () => ({ uid: "fb1", firebase: { sign_in_provider: "password" }, email: "a@b.co", email_verified: true, auth_time: now }));
+  assert.equal((await send(url, "/auth/password", "PUT", { password: "third123" }, "t")).status, 200);
 });
 
 test("the password endpoints need a session and recovery status never shows the hash", async t => {

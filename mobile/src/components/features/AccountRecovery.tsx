@@ -31,14 +31,17 @@ const COPY = {
 
 // The dedicated page behind "Connect to your email?". Before an account exists it only holds the details until the
 // account is made (`onSave`). Once signed in, it connects at once and waits for the verification link.
-export function ConnectEmailScreen({ chinese, initial, onSave, onSignIn, onClose }: {
-  chinese: boolean; initial?: EmailToConnect | null; onSave?: (details: EmailToConnect) => void; onSignIn?: () => void; onClose: () => void;
+// `knownPassword`: the password the account is being made with (the sign-up page): the email takes it,
+// so it is not asked again (a second, different one would be refused as not the account's).
+export function ConnectEmailScreen({ chinese, initial, knownPassword, onSave, onSignIn, onClose }: {
+  chinese: boolean; initial?: EmailToConnect | null; knownPassword?: string; onSave?: (details: EmailToConnect) => void; onSignIn?: () => void; onClose: () => void;
 }) {
   const auth = useAuth();
   const copy = COPY[chinese ? 'zh-Hans' : 'en'];
   const insets = useSafeAreaInsets();
   const already = onSave ? null : auth.connectedEmail();
-  const [email, setEmail] = useState(initial?.email || ''), [password, setPassword] = useState(initial?.password || '');
+  const [email, setEmail] = useState(initial?.email || ''), [typedPassword, setPassword] = useState(initial?.password || '');
+  const password = knownPassword ?? typedPassword;
   const [waitingOn, setWaitingOn] = useState(already && !already.verified ? already.email : '');
   const [verified, setVerified] = useState(already?.verified ? already.email : '');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [note, setNote] = useState('');
@@ -90,10 +93,12 @@ export function ConnectEmailScreen({ chinese, initial, onSave, onSignIn, onClose
             <Text style={connectStyles.label}>{copy.email}</Text>
             <TextInput accessibilityLabel={copy.email} value={email} onChangeText={setEmail} editable={!busy} keyboardType="email-address"
               autoCapitalize="none" autoCorrect={false} autoComplete="email" placeholderTextColor="#7a887b" style={connectStyles.input} />
-            <Text style={connectStyles.label}>{copy.password}</Text>
-            <TextInput accessibilityLabel={copy.password} value={password} onChangeText={setPassword} editable={!busy} secureTextEntry
-              autoComplete="new-password" placeholderTextColor="#7a887b" style={connectStyles.input} />
-            <Text style={connectStyles.hint}>{copy.passwordHint}</Text>
+            {knownPassword === undefined ? <>
+              <Text style={connectStyles.label}>{copy.password}</Text>
+              <TextInput accessibilityLabel={copy.password} value={password} onChangeText={setPassword} editable={!busy} secureTextEntry
+                autoComplete="new-password" placeholderTextColor="#7a887b" style={connectStyles.input} />
+              <Text style={connectStyles.hint}>{copy.passwordHint}</Text>
+            </> : null}
             {action(busy ? copy.saving : onSave ? copy.keep : copy.save, () => void submit())}
             {action(copy.cancel, onClose, true)}
             {onSignIn ? <Pressable accessibilityRole="button" disabled={busy} onPress={onSignIn} style={connectStyles.link}><Text style={connectStyles.linkText}>{copy.signIn}</Text></Pressable> : null}

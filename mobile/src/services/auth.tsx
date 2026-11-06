@@ -63,6 +63,8 @@ export function useAuth() {
 }
 const profileBody = (profile: ProfileInput) => ({
   name: profile.name.trim(), avatar: profile.avatar || DEFAULT_AVATAR,
+  ...(profile.password !== undefined ? { password: profile.password } : {}),
+  ...(profile.fairyName?.trim() ? { fairyName: profile.fairyName.trim() } : {}),
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   preferredLocale: profile.preferredLocale || 'en', communityTermsVersion: profile.communityTermsVersion,
 });
@@ -203,7 +205,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The email's password is the account's: a name or PP number now works with it too,
         // including right after a reset link changed it.
         afterSignIn.current = async () => { await apiRequest('/auth/password', 'PUT', { password }); };
-        await signInWithEmailAndPassword(firebaseAuth(), login.trim(), password);
+        const { user } = await signInWithEmailAndPassword(firebaseAuth(), login.trim(), password);
+        // Only a verified email is a way back in (a forgotten name or password); until then, the name or PP number.
+        if (!user.emailVerified) {
+          afterSignIn.current = null;
+          const unverified = Object.assign(new Error('email not verified'), { code: 'petalpal/email-unverified' });
+          // The sign-out below reloads the signed-out page: it keeps this reason on it.
+          signedOutError.current = authErrorMessage(unverified);
+          await signOut(firebaseAuth());
+          throw unverified;
+        }
       } else {
         const { signInToken } = await publicApiRequest<{ signInToken: string }>('/auth/password-login', { login: login.trim(), password });
         await signInWithCustomToken(firebaseAuth(), signInToken);
