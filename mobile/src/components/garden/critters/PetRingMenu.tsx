@@ -6,7 +6,7 @@ import { ApiError } from '@/services/api';
 import { dressPet, feedPet, loadPets, petsChanged, type PetId, type PetsSummary } from '@/services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from './accessoryIcons';
 import {
-  arcOffset, isWorn, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
+  arcOffset, isWorn, malteseHiddenPieces, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
   type Piece, type PetSpot, type RingAction, type RingLayout, type Shelf, type Viewport,
 } from './petRing';
 
@@ -19,7 +19,7 @@ import {
 // The puppy plays its painted eating or patting clip in whatever it wears (puppyLooks.ts
 // PUPPY_ACTIONS), then small hearts float up; with reduced motion only the hearts show.
 // Xiaobai (the Maltese) has the same menu in the Garden's forest green (its own TONE), a closet of
-// its own three pieces (petRing.ts PET_OWN_PIECES), and hearts for feeding and patting.
+// its own pieces, two sets (petRing.ts PET_OWN_PIECES), and hearts for feeding and patting.
 
 const COPY = {
   en: { feed: 'Feed', pat: 'Pat', dress: 'Dress up', back: 'Back', close: 'Close the menu', closeShort: 'Close', loading: 'Opening…',
@@ -256,7 +256,7 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
   const outfit = pets?.outfits[petId] ?? null;
   // A server from before this pet: its corner is shown, nothing in it can be chosen yet.
   const known = !pets || petId in pets.outfits;
-  const hidden = useMemo(() => (petId === 'puppy' ? puppyHiddenPieces(outfit) : new Set<string>()), [petId, outfit]);
+  const hidden = useMemo(() => (petId === 'puppy' ? puppyHiddenPieces(outfit) : petId === 'maltese' ? malteseHiddenPieces(outfit) : new Set<string>()), [petId, outfit]);
   const cards: CardSpec[] = !pets ? [] : mode === 'feed'
     ? pets.foods.map(food => ({ key: food.id, label: food.name, icon: FOOD_ICONS[food.id] ?? '🍽️', badge: `×${food.count}`, dim: food.count === 0,
       a11y: `${food.name} ×${food.count}`, onPress: food.count > 0 && known ? () => onFeed(food.id) : undefined }))

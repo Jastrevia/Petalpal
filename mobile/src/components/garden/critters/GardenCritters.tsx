@@ -75,6 +75,20 @@ const MALTESE_LOOKS: Record<MalteseLook, Frames & { source: number }> = {
     rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble.webp'), count: 20, rise: 1 },
     run: { source: require('@/assets/garden/critters/maltese-looks/run-noble.webp'), columns: 8, count: 59, loop: 70,
       cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
+  // Its Noble pieces one by one (2026-11-05, Kiro; ~/dev/petalpal-motion/maltese/noble/pieces):
+  // the headpiece and the clasp on its chain laid onto the bare clips like the light pieces, so they
+  // share the bare cells; the capelet alone has its own clips (from the Noble painting with the
+  // headpiece taken off), walk one 46-frame stride, gallop 59 frames, strides from their measured paw slide.
+  'noble-hat': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-hat.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-hat.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-hat.webp')),
+  'noble-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-necklace.webp')),
+  'noble-hat-necklace': malteseBare(require('@/assets/garden/critters/maltese-looks/walk-noble-hat-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-noble-hat-necklace.webp'),
+    require('@/assets/garden/critters/maltese-looks/run-noble-hat-necklace.webp')),
+  'noble-cape': { source: require('@/assets/garden/critters/maltese-looks/walk-noble-cape.webp'), columns: 8, count: 46, ground: 216, loop: 30.6,
+    rest: { source: require('@/assets/garden/critters/maltese-looks/sit-noble-cape.webp'), count: 20, rise: 1 },
+    run: { source: require('@/assets/garden/critters/maltese-looks/run-noble-cape.webp'), columns: 8, count: 59, loop: 66.9,
+      cell: { w: 395.4, h: 237.2, x: -47.83, y: -17.8 } } },
   'cape-necklace': malteseCape(require('@/assets/garden/critters/maltese-looks/walk-cape-necklace.webp'), require('@/assets/garden/critters/maltese-looks/sit-cape-necklace.webp'),
     require('@/assets/garden/critters/maltese-looks/run-cape-necklace.webp')),
   petal: { source: require('@/assets/garden/critters/maltese-petal-walk.webp'), columns: 8, count: 42, ground: 216, loop: 34.6,

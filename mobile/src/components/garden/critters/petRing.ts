@@ -1,5 +1,5 @@
 import type { PetId, PetOutfit, PetsSummary } from '@/services/gardenPets';
-import { PUPPY_SET_2 } from './puppyLooks';
+import { MALTESE_NOBLE, PUPPY_SET_2 } from './puppyLooks';
 
 // The pet's ring menu (PetRingMenu.tsx, the owner's mock-up): a one-third ring (120°) standing
 // beside the pet that was tapped, in three segments (feed, pat, dress up), which widens into one
@@ -87,20 +87,27 @@ export const shelfOf = (accessories: readonly Piece[], shelf: Shelf) => accessor
 
 // A pet with its own pieces (the server's PET_OWN_PIECES): its closet holds only those, each under
 // the catalog id it is kept as (it opens with that piece), shown with its own name and painting.
-// The Maltese (Xiaobai): its flower clip, its lilac capelet with a gold clasp, its pink bow.
+// The Maltese (Xiaobai), per shelf its light set's piece then its Noble set's: its flower clip,
+// its lilac capelet with a gold clasp, its pink bow; the Noble headpiece, violet capelet and
+// crystal clasp (puppyLooks.ts MALTESE_NOBLE).
 export type OwnPiece = { id: string; name: { en: string; 'zh-Hans': string } };
-export const PET_OWN_PIECES: Partial<Record<PetId, Record<Shelf, OwnPiece>>> = {
+export const PET_OWN_PIECES: Partial<Record<PetId, Record<Shelf, readonly OwnPiece[]>>> = {
   maltese: {
-    hat: { id: 'flower-sprig', name: { en: 'Flower Clip', 'zh-Hans': '小花夹' } },
-    collar: { id: 'petal-capelet', name: { en: 'Lilac Capelet', 'zh-Hans': '紫色小披肩' } },
-    pendant: { id: 'crystal-drop', name: { en: 'Pink Bow', 'zh-Hans': '粉色蝴蝶结' } },
+    hat: [{ id: 'flower-sprig', name: { en: 'Flower Clip', 'zh-Hans': '小花夹' } },
+      { id: 'golden-circlet', name: { en: 'Noble Headpiece', 'zh-Hans': '紫藤金叶头饰' } }],
+    collar: [{ id: 'petal-capelet', name: { en: 'Lilac Capelet', 'zh-Hans': '紫色小披肩' } },
+      { id: 'midnight-cape', name: { en: 'Noble Capelet', 'zh-Hans': '星夜紫披肩' } }],
+    pendant: [{ id: 'crystal-drop', name: { en: 'Pink Bow', 'zh-Hans': '粉色蝴蝶结' } },
+      { id: 'crystal-spire', name: { en: 'Noble Clasp', 'zh-Hans': '紫晶扣链' } }],
   },
 };
-// The shelf as `petId` sees it: its own piece (renamed) when it has its own, else the whole row.
+// The shelf as `petId` sees it: its own pieces (renamed) when it has its own, else the whole row.
 export function petShelf(accessories: readonly Piece[], shelf: Shelf, petId: PetId, locale: 'en' | 'zh-Hans'): Piece[] {
   const own = PET_OWN_PIECES[petId]?.[shelf];
   if (!own) return shelfOf(accessories, shelf);
-  return accessories.filter(piece => piece.id === own.id).map(piece => ({ ...piece, name: own.name[locale] }));
+  const ids = own.map(item => item.id);
+  return accessories.filter(piece => ids.includes(piece.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
+    .map(piece => ({ ...piece, name: own[ids.indexOf(piece.id)].name[locale] }));
 }
 
 // The whole outfit after choosing `piece` (the PUT sends all three slots): it goes on in its own
@@ -116,6 +123,17 @@ export const isWorn = (outfit: PetOutfit | null, piece: Piece) => outfit?.[piece
 // Pieces the puppy has on but does not show (puppyLooks.ts): it wears one of its sets at a time
 // (the cape's set wins, else the hat's), and a cape carries its own clasp, so a pendant shows
 // only without one.
+// The same for the Maltese (puppyLooks.ts malteseLookOfOutfit): one of its sets at a time, and its
+// Noble capelet carries its own clasp (its light capelet does not: the bow shows over it).
+export function malteseHiddenPieces(outfit: PetOutfit | null): Set<string> {
+  const hidden = new Set<string>();
+  if (!outfit) return hidden;
+  const setOf = (id: string | null) => (id ? (MALTESE_NOBLE.has(id) ? 2 : 1) : 0);
+  const set = setOf(outfit.collar) || setOf(outfit.hat) || setOf(outfit.pendant);
+  for (const id of [outfit.hat, outfit.collar, outfit.pendant]) if (id && setOf(id) !== set) hidden.add(id);
+  if (set === 2 && outfit.collar && outfit.pendant) hidden.add(outfit.pendant);
+  return hidden;
+}
 export function puppyHiddenPieces(outfit: PetOutfit | null): Set<string> {
   const hidden = new Set<string>();
   if (!outfit) return hidden;

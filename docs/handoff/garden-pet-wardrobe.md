@@ -120,10 +120,23 @@ Not done yet (next work, in the owner's order):
    backdrop went near-black halfway: keyed per frame keeping the eyes and the cape's dark purple;
    the belly-shadow clear was changed to leave purple fabric alone (it had cut the hem). Loops: walk
    43 frames, run 59. Look `noble` in `MALTESE_LOOKS` (GardenCritters.tsx), drawn whole (no Noble
-   hat-only or cape-only clips). **Not in its closet yet:** only the preview shows it
-   (`/critters-test` → maltese → noble). Choosing it needs the owner's call on how the closet
-   offers it and which catalog ids it uses (`PET_OWN_PIECES.maltese` in `lib/garden-pets.js`
-   allows only the three light pieces), and that is a backend change to deploy.
+   hat-only or cape-only clips of its own).
+   *Its Noble pieces one by one (2026-11-05, Kiro, owner's request):* Xiaobai's closet now holds two
+   pieces per shelf, light then Noble: headpiece `golden-circlet`, capelet `midnight-cape`, clasp
+   `crystal-spire` (Kiro's pick of catalog ids by likeness; `PET_OWN_PIECES` in `lib/garden-pets.js`,
+   now a list per slot, and in `petRing.ts`; **backend change, needs a deploy**). It wears one set at a
+   time like the puppy (`malteseLookOfOutfit`: the cape's set wins, else the hat's, else the
+   pendant's; `malteseHiddenPieces` marks the other set's pieces "not shown"), and the Noble capelet
+   carries its clasp, so a pendant under it adds nothing. Looks `noble-hat`, `noble-necklace`,
+   `noble-hat-necklace` (the headpiece cut from `noble.png`, `pieces/cut_noble.py`; the clasp on a
+   fine gold chain from one gpt-image edit of `v2/bare.png`, `pieces/cut_necklace.py`; laid onto the
+   bare walk, sit and run by `pieces/overlay_noble.py`, packed by `pieces/build.sh` with the bare
+   loops), `noble-cape` (its own clips: the Noble painting and gallop key with the headpiece taken
+   off, `cape/compose_cape.py`, no paid edit; 3 minimax videos plus one walk retry because the first
+   walk's backdrop turned grey and keyed into the fur; walk 41+46, sit 0+80 → 20, run 24+59; strides
+   from the measured paw slide, 30.6 and 66.9), and `noble` (capelet and headpiece, as before). All
+   in `~/dev/petalpal-motion/maltese/noble/`. Closet icons from its own art (`pieces/make_icons.py`
+   → `maltese-noble-*.webp`). Paid this round: 1 gpt-image edit, 4 videos.
 5. **Per-pet catalogs.** The catalog is still 32 generic pieces shared by all pets. The puppy maps
    pieces to its art like this: `flower-sprig`, `petal-capelet` and `crystal-drop` are its set 2;
    every other piece shows its set 1 art. That is a stand-in until each pet has its own pieces.

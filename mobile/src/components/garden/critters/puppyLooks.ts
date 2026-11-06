@@ -116,17 +116,29 @@ export function puppyLookOf(outfit: PetOutfit | null): PuppyLook {
 // flower clip (hat), a pink bow with two charms (necklace) and a lilac capelet fastened by a gold
 // clasp (cape); all three on is its petal look. It has no wardrobe of its own yet: it wears the
 // kinds of piece its friend the puppy has on (any set), malteseLookOfOutfit.
-// `noble`: its second outfit (the Noble design sheet: lilac flower headpiece with gold beads, deep
-// violet capelet with gold embroidery, violet crystal clasp), whole; not in its closet yet.
-export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal' | 'noble';
+// Its second set, Noble (the Noble design sheet: lilac flower headpiece with gold beads, deep violet
+// capelet with gold embroidery, violet crystal clasp), piece by piece like the first: `noble-hat`,
+// `noble-necklace` (the clasp on a fine gold chain), `noble-hat-necklace`, `noble-cape` (the capelet
+// carries the clasp, so a pendant under it adds nothing) and `noble` (capelet and headpiece). One set
+// is worn at a time, as the puppy wears its sets: the cape's set wins, else the hat's, else the
+// pendant's, and a piece of the other set is left off.
+export type MalteseLook = 'bare' | 'hat' | 'necklace' | 'hat-necklace' | 'cape' | 'cape-hat' | 'cape-necklace' | 'petal'
+  | 'noble-hat' | 'noble-necklace' | 'noble-hat-necklace' | 'noble-cape' | 'noble';
+export const MALTESE_NOBLE: ReadonlySet<string> = new Set(['golden-circlet', 'midnight-cape', 'crystal-spire']);
 const MALTESE_BY_PIECES: Record<string, MalteseLook> = {
   '': 'bare', h: 'hat', n: 'necklace', hn: 'hat-necklace', c: 'cape', ch: 'cape-hat', cn: 'cape-necklace', chn: 'petal',
 };
-const malteseLookWith = (cape: boolean, hat: boolean, necklace: boolean) =>
-  MALTESE_BY_PIECES[`${cape ? 'c' : ''}${hat ? 'h' : ''}${necklace ? 'n' : ''}`];
+const NOBLE_BY_PIECES: Record<string, MalteseLook> = {
+  '': 'bare', h: 'noble-hat', n: 'noble-necklace', hn: 'noble-hat-necklace', c: 'noble-cape', ch: 'noble', cn: 'noble-cape', chn: 'noble',
+};
+const malteseLookWith = (cape: boolean, hat: boolean, necklace: boolean, noble = false) =>
+  (noble ? NOBLE_BY_PIECES : MALTESE_BY_PIECES)[`${cape ? 'c' : ''}${hat ? 'h' : ''}${necklace ? 'n' : ''}`];
+const malteseSetOf = (id: string | null) => (id ? (MALTESE_NOBLE.has(id) ? 2 : 1) : 0);
 export function malteseLookOfOutfit(outfit: PetOutfit | null): MalteseLook {
   if (!outfit) return 'bare';
-  return malteseLookWith(!!outfit.collar, !!outfit.hat, !!outfit.pendant);
+  const set = malteseSetOf(outfit.collar) || malteseSetOf(outfit.hat) || malteseSetOf(outfit.pendant);
+  const on = (id: string | null) => !!id && malteseSetOf(id) === set;
+  return malteseLookWith(on(outfit.collar), on(outfit.hat), on(outfit.pendant), set === 2);
 }
 // From a puppy look alone (the preview's chosen look): what it shows (a cape hides its necklace).
 export function malteseLookOf(look: PuppyLook): MalteseLook {

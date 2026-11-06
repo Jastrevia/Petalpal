@@ -39,7 +39,7 @@
     ['sealed-letter', 'pendant', 'Sealed Letter', '花封信笺'], ['compass-star', 'pendant', 'Compass Star', '罗盘星'], ['crescent-crystal', 'pendant', 'Crescent Crystal', '新月水晶'],
     ['gilded-tome', 'pendant', 'Gilded Tome', '鎏金书册'], ['noble-lantern', 'pendant', 'Noble Lantern', '贵族提灯'], ['hourglass', 'pendant', 'Hourglass', '沙漏'],
     ['crystal-spire', 'pendant', 'Crystal Spire', '水晶尖坠'], ['gilded-feather', 'pendant', 'Gilded Feather', '金羽坠']];
-  const petOpened = new Set([...petPieces.filter(([, row]) => row === 'hat').map(([id]) => id), 'petal-capelet', 'lilac-cape', 'crystal-drop', 'glow-lantern', 'compass-star', 'crescent-crystal']);
+  const petOpened = new Set([...petPieces.filter(([, row]) => row === 'hat').map(([id]) => id), 'petal-capelet', 'lilac-cape', 'crystal-drop', 'glow-lantern', 'compass-star', 'crescent-crystal', 'midnight-cape', 'crystal-spire']);
   const petFoods = [['berry-tart', 'Berry Tart', '莓果挞', 3], ['flower-cookies', 'Flower Cookies', '小花饼干', 2], ['fish-biscuit', 'Fish Biscuit', '小鱼饼', 1], ['honey-seeds', 'Honey Seeds', '蜂蜜谷粒', 0]];
   const petOutfits = { puppy: { hat: 'lilac-beret', collar: null, pendant: null } };
 
@@ -275,8 +275,8 @@
         for (const slot of ['hat', 'collar', 'pendant']) {
           const piece = petPieces.find(([id]) => id === outfit[slot]);
           if (outfit[slot] && (!piece || piece[1] !== slot)) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
-          // The Maltese wears only its own three pieces (lib/garden-pets.js PET_OWN_PIECES).
-          if (outfit[slot] && dressing[1] === 'maltese' && ({ hat: 'flower-sprig', collar: 'petal-capelet', pendant: 'crystal-drop' })[slot] !== outfit[slot]) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
+          // The Maltese wears only its own pieces, light and Noble (lib/garden-pets.js PET_OWN_PIECES).
+          if (outfit[slot] && dressing[1] === 'maltese' && !({ hat: ['flower-sprig', 'golden-circlet'], collar: ['petal-capelet', 'midnight-cape'], pendant: ['crystal-drop', 'crystal-spire'] })[slot].includes(outfit[slot])) return json({ error: 'UNKNOWN_ACCESSORY' }, 400);
           if (outfit[slot] && !petOpened.has(outfit[slot])) return json({ error: 'ACCESSORY_LOCKED' }, 409);
         }
         petOutfits[dressing[1]] = outfit;

@@ -22,7 +22,11 @@ const PREVIEW_IDS: CritterId[] = [...CRITTER_IDS, 'maltese', 'silktail'];
 
 // The puppy beside the Maltese wears the look the Maltese matches (malteseLookOf).
 const MATE_LOOK: Record<MalteseLook, PuppyLook> = { bare: 'bare', hat: 'hat', necklace: 'necklace', 'hat-necklace': 'hat-necklace',
-  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat', noble: 'cape-hat' };
+  cape: 'cape', 'cape-hat': 'cape-hat', 'cape-necklace': 'cape', petal: 'cape2-hat',
+  'noble-hat': 'hat', 'noble-necklace': 'necklace', 'noble-hat-necklace': 'hat-necklace', 'noble-cape': 'cape', noble: 'cape-hat' };
+
+const LOOK_LABEL: Partial<Record<MalteseLook, string>> = { petal: 'petal 花仙装', 'noble-hat': 'noble 头饰', 'noble-necklace': 'noble 水晶扣',
+  'noble-hat-necklace': 'noble 头饰+水晶扣', 'noble-cape': 'noble 披肩', noble: 'noble 披肩+头饰' };
 
 export default function CrittersTestScreen() {
   const [id, setId] = useState<CritterId>('puppy');
@@ -124,7 +128,7 @@ export default function CrittersTestScreen() {
     {!otter && !pair && id === 'puppy' ? <View style={styles.row}>{(Object.keys(PUPPY_LOOKS) as PuppyLook[]).map(item => <Pressable key={item} onPress={() => setLook(item)}
       style={[styles.button, look === item && styles.selected]}><Text style={styles.label}>{item}</Text></Pressable>)}</View> : null}
     {!otter && !pair && id === 'maltese' ? <View style={styles.row}>{(Object.keys(MATE_LOOK) as MalteseLook[]).map(item => <Pressable key={item} onPress={() => setMalteseLook(item)}
-      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{item === 'petal' ? 'petal 花仙装' : item}</Text></Pressable>)}
+      style={[styles.button, malteseLook === item && styles.selected]}><Text style={styles.label}>{LOOK_LABEL[item] ?? item}</Text></Pressable>)}
       <Pressable onPress={() => { setTogether(value => !value); setRound(value => value + 1); }} style={[styles.button, together && styles.selected]}><Text style={styles.label}>with puppy 和小金毛一起</Text></Pressable></View> : null}
     {!otter && !pair && (id === 'puppy' || id === 'maltese') ? <View style={styles.row}>{(id === 'puppy' ? ['walk', 'run', 'sit', 'eat', 'pat'] as const : ['walk', 'run', 'sit'] as const).map(item => <Pressable key={item}
       onPress={() => { setMove(item); setRound(value => value + 1); }}
