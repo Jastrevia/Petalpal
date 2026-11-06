@@ -58,11 +58,14 @@ assert.equal(format.MOMENTS_COPY[zh].title('小花仙'), '小花仙的朋友圈'
 const calls = [];
 let reply = async () => ({});
 const api = { apiRequest: async (...args) => { calls.push(args); return reply(...args); } };
-const runtime = load('services/fairyRuntime.ts', { './api': api, react: { useEffect() {}, useState: value => [value, () => {}] },
+const noted = [];
+const runtime = load('services/fairyRuntime.ts', { './api': api, './fairyName': { noteFairyName: name => noted.push(name) },
+  react: { useEffect() {}, useState: value => [value, () => {}] },
   'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } } });
-reply = async () => ({ currentState: 'TEA_TIME', nextTransitionAt: null, gardenSchedule: true, moments: { unread: true } });
+reply = async () => ({ currentState: 'TEA_TIME', nextTransitionAt: null, gardenSchedule: true, moments: { unread: true }, fairy: { name: 'Mimi' } });
 const [first, second] = await Promise.all([runtime.refreshFairyRuntime(), runtime.refreshFairyRuntime()]);
 same(first, second); same(calls, [['/api/fairy/runtime']]);
+same(noted, ['Mimi'], 'her runtime answer passes on the name the owner gave her');
 reply = async () => { throw Object.assign(new Error('Complete onboarding'), { status: 409 }); };
 assert.equal(await runtime.refreshFairyRuntime(), null);
 same(runtime.peekFairyRuntime().currentState, 'TEA_TIME', 'a failed refresh keeps her last known day');
@@ -70,6 +73,28 @@ same(runtime.fairyRuntimeBlock(), 'onboarding', 'a 409 means no first flower yet
 runtime.markFairyMomentsRead();
 same(runtime.peekFairyRuntime().moments, { unread: false });
 same(calls.length, 2);
+
+// Her name (services/fairyName.ts): the owner's choice from /api/fairies, PPL until known, filled
+// into copy tables, and forgotten on sign-out even if an answer for the old account lands late.
+const nameCalls = [];
+let nameReply = async () => ({ fairies: [{ id: 'a', name: 'Old' }, { id: 'b', name: 'Mimi' }], activeFairyId: 'b' });
+const fairyName = load('services/fairyName.ts', { './api': { apiRequest: async (...args) => { nameCalls.push(args); return nameReply(); } },
+  react: { useEffect: effect => effect(), useState: value => [value, () => {}] } });
+same(fairyName.peekFairyName(), 'PPL');
+assert.equal(fairyName.useFairyName(), 'PPL', 'the starter name shows until hers arrives');
+await fairyName.refreshFairyName();
+same(nameCalls[0], ['/api/fairies']); same(fairyName.peekFairyName(), 'Mimi');
+same(fairyName.withFairyName({ a: 'From {fairy}', b: { c: '{fairy} 和 {fairy}' }, n: 3 }, 'Mimi'), { a: 'From Mimi', b: { c: 'Mimi 和 Mimi' }, n: 3 });
+const line = n => `${n} days`;
+assert.equal(fairyName.withFairyName({ line }, 'Mimi').line, line, 'functions pass through untouched');
+let release;
+nameReply = () => new Promise(resolve => { release = () => resolve({ fairies: [{ id: 'x', name: 'Stale' }], activeFairyId: 'x' }); });
+fairyName.forgetFairyName();
+const late = fairyName.refreshFairyName();
+fairyName.forgetFairyName();
+release(); await late;
+same(fairyName.peekFairyName(), 'PPL', 'a late answer for the signed-out account is dropped');
+fairyName.noteFairyName('Bloom'); same(fairyName.peekFairyName(), 'Bloom');
 const service = load('services/fairyMoments.ts', { './api': api });
 reply = async () => ({ posts: [] });
 await service.loadFairyMoments();

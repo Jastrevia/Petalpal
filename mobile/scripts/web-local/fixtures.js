@@ -6,6 +6,7 @@
   const nativeFetch = window.fetch.bind(window);
   const uid = 'local-preview-owner', email = 'preview@example.invalid';
   let password = 'preview-only'; // (a new preview account sets its own)
+  let fairyName = 'PPL'; // (and names its Garden Fairy)
   const preferredLocale = new URLSearchParams(location.search).get('lang') === 'zh-Hans' ? 'zh-Hans' : 'en';
   const user = { id: uid, accountId: 'PP12345678', name: 'Local Preview', avatar: '🦋', email, timezone: 'America/Vancouver', preferredLocale, aiConsent: true };
   // People to find and friend requests, so every state of Friends → Requests can be tried.
@@ -239,6 +240,7 @@
         user.name = request.name; user.avatar = request.avatar; accountEmail = null; emailVerified = false; emailChecks = 0; linked = false;
         // The sign-up page sets the password and picks an original portrait (so no avatar welcome after).
         hasPassword = typeof request.password === 'string'; if (hasPassword) password = request.password;
+        fairyName = request.fairyName || 'PPL';
         if (avatars) { Object.assign(avatars, { welcomed: true, selected: request.avatar }); saveAvatars(); }
         return json({ signInToken: 'local-preview-pass' }, 201);
       }
@@ -424,8 +426,9 @@
         return json(people.filter(person => `${person.name} ${person.accountId}`.toLowerCase().includes(q)), 200, 400); }
       if (p === '/users/me/blocks') return json({ users: blocked ? [{ id: friend, name: 'Friend Preview', avatar: '🌼', accountId: 'PP12345678' }] : [], nextCursor: null });
       if (p === `/users/${uid}/ai-consent`) return json(consent);
-      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true, moments: { unread: momentsUnread } });
-      if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'PPL', name: 'PPL', avatar: null, cover: null }, locale: 'en', nextBefore: null,
+      if (p === '/api/fairy/runtime') return json({ currentState: 'IDLE', nextTransitionAt: null, gardenSchedule: true, moments: { unread: momentsUnread }, fairy: { id: 'local-fairy', type: 'BLOOM', name: fairyName } });
+      if (p === '/api/fairies') return json({ fairies: [{ id: 'local-fairy', type: 'BLOOM', name: fairyName, isActive: true }], activeFairyId: 'local-fairy' });
+      if (p === '/api/fairy/moments') { momentsUnread = false; return json({ fairy: { id: 'local-fairy', type: 'BLOOM', name: fairyName, avatar: null, cover: null }, locale: 'en', nextBefore: null,
         posts: [{ id: 'mo2', postedAt: ago(0), state: 'TEA_TIME', location: 'TEA_TIME', mood: null, photoKey: 'TEA_TIME/3', caption: 'Tea in the sun this morning.', liked: false },
           { id: 'mo1', postedAt: ago(2), state: 'IN_TREEHOUSE', location: 'IN_TREEHOUSE', mood: null, photoKey: null, caption: 'I found a tiny blue feather.', liked: false }] }); }
       if (p === '/api/fairy/closeness') return json({ locale: 'en', localDate, level: bondLevel, title: 'New friends', total: 30, pointsIntoLevel: 10, pointsForNextLevel: 40,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { apiRequest } from './api';
+import { noteFairyName } from './fairyName';
 
 // The Fairy's server-side day (GET /api/fairy/runtime), shared by the Garden and the Moments
 // dot so both read one request. It refreshes when the Garden opens, when the app returns to the
@@ -10,6 +11,7 @@ export interface FairyRuntime {
   nextTransitionAt: string | null;
   gardenSchedule?: boolean;
   moments?: { unread?: boolean };
+  fairy?: { name?: string };
 }
 
 let current: FairyRuntime | null = null;
@@ -26,7 +28,7 @@ const publish = () => listeners.forEach(listener => listener(current));
 // Any failure (offline, onboarding unfinished) keeps the last answer and reports null.
 export function refreshFairyRuntime(): Promise<FairyRuntime | null> {
   inflight ??= apiRequest<FairyRuntime>('/api/fairy/runtime').then(runtime => {
-    current = runtime; blocked = null; fetchedAt = Date.now(); publish(); return runtime;
+    current = runtime; blocked = null; fetchedAt = Date.now(); noteFairyName(runtime.fairy?.name); publish(); return runtime;
   }).catch(error => {
     blocked = (error as { status?: unknown } | null)?.status === 409 ? 'onboarding' : 'unavailable';
     publish(); return null;

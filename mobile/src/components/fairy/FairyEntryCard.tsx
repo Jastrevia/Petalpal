@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import type { ClosenessSummary } from '../../services/fairyCloseness';
 import { fairyRuntimeBlock, refreshFairyRuntime } from '../../services/fairyRuntime';
+import { useFairyName, withFairyName } from '../../services/fairyName';
 
 const HEART = require('@/assets/fairy-entry/bond-heart.webp');
 const BOOK = require('@/assets/fairy-entry/moments-book.webp');
@@ -11,7 +12,7 @@ const COPY = {
     moments: 'Fairy Moments', newMoments: ', new posts',
     bondSoon: (s: ClosenessSummary | null) => s ? `Lv ${s.level} · ${s.title}. The full Our Bond page is coming soon.` : 'Our Bond is coming soon.',
     locked: 'Fairy Moments are still locked',
-    onboarding: 'Fairy Moments open with your first flower: plant one and PPL starts sharing her days here. Raising Our Bond to Lv 3 adds posts written just for you (coming soon).',
+    onboarding: 'Fairy Moments open with your first flower: plant one and {fairy} starts sharing her days here. Raising Our Bond to Lv 3 adds posts written just for you (coming soon).',
     unavailable: 'Her Moments couldn’t open just now. Please try again in a moment.',
     bondLine: (s: ClosenessSummary) => `Our Bond Lv ${s.level} · ${s.title}${s.level < 3 ? '. At Lv 3 she’ll also write posts just for you (coming soon).' : '.'}`,
     retry: 'Try again', back: 'Back' },
@@ -33,7 +34,7 @@ export function FairyEntryCard({ visible, locale, closeness, closenessOn, moment
   closeness: ClosenessSummary | null; closenessOn: boolean; momentsOn: boolean; momentsUnread: boolean;
   onOpenMoments: () => void; onOpenBond?: () => void; onClose: () => void;
 }) {
-  const copy = COPY[locale];
+  const copy = withFairyName(COPY[locale], useFairyName());
   const [note, setNote] = useState('');
   // Fairy Moments always has a tile. Until the server serves them (no first flower yet, or the
   // request failed) the tile opens this locked view instead of her feed.

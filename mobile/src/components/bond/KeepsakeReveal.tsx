@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CheckInResult } from '../../services/fairyCloseness';
 import { holdBondCelebration } from '../../services/avatars';
-import { BOND, BOND_COPY, type BondLocale } from './bondCopy';
+import { BOND, bondCopy, type BondLocale } from './bondCopy';
+import { useFairyName } from '../../services/fairyName';
 import { keepsakeArt } from './keepsakeArt';
 
 // After a check-in: PPL's keepsakes one by one (design screen 4), her note on paper, the
@@ -10,7 +11,8 @@ import { keepsakeArt } from './keepsakeArt';
 export function KeepsakeReveal({ result, locale, onDone }: {
   result: CheckInResult | null; locale: BondLocale; onDone: () => void;
 }) {
-  const copy = BOND_COPY[locale];
+  const fairyName = useFairyName();
+  const copy = bondCopy(locale, fairyName);
   const [index, setIndex] = useState(0);
   const grow = useRef(new Animated.Value(0)).current;
   useEffect(() => { setIndex(0); }, [result]);
@@ -39,7 +41,7 @@ export function KeepsakeReveal({ result, locale, onDone }: {
         <Text style={styles.rarity}>{copy.rarity[keepsake.rarity]}</Text>
         {keepsake.note ? <View style={styles.paper}>
           <Text style={styles.note}>{keepsake.note}</Text>
-          <Text style={styles.sign}>— PPL ♡</Text>
+          <Text style={styles.sign}>— {fairyName} ♡</Text>
         </View> : null}
         {last && result.awarded ? <Text style={styles.points}>{copy.points(result.awarded)}</Text> : null}
         {last && result.levelUp ? <Text style={styles.levelUp}>{copy.levelUp(result.levelUp.level, result.levelUp.title)}</Text> : null}

@@ -8,7 +8,8 @@ import { AVATAR_ART } from '../avatars/avatarArt';
 import { avatarCopy } from '../avatars/avatarCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { pickTapLine, RECENT_TAP_LINES } from '../garden/fairy/tapLines';
-import { BOND_COPY, BOND_TIERS, type BondLocale } from './bondCopy';
+import { bondCopy, BOND_TIERS, type BondLocale } from './bondCopy';
+import { useFairyName } from '../../services/fairyName';
 import { KeepsakeBook } from './KeepsakeBook';
 import { keepsakeArt } from './keepsakeArt';
 
@@ -40,7 +41,8 @@ const MEDALLION = '#EAE8D7';
 export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   visible: boolean; locale: BondLocale; summary: ClosenessSummary | null; loading: boolean; onClose: () => void;
 }) {
-  const copy = BOND_COPY[locale];
+  const fairyName = useFairyName();
+  const copy = bondCopy(locale, fairyName);
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const reducedMotion = useReducedMotion();

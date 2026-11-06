@@ -1,4 +1,5 @@
 import type { ClosenessSource } from '../../services/fairyCloseness';
+import { withFairyName } from '../../services/fairyName';
 
 // Words for Our Bond, the calendar check-in and the keepsake book. English by default;
 // Simplified Chinese only for owners who chose it (same rule as the rest of the app).
@@ -15,10 +16,11 @@ export const BOND_TIERS = [
   { level: 20, en: 'Eternal Bloom', zh: '一生花伴' },
 ] as const;
 
+// {fairy} is her name (services/fairyName.ts): read it through bondCopy(locale, name).
 export const BOND_COPY = {
   en: {
     title: 'Our Bond', close: 'Close', loading: 'Loading…', error: "Couldn't load. Try again.", retry: 'Try again',
-    withPpl: 'With PPL', tapHint: 'Tap PPL to hear more', tapPpl: 'PPL', reached: 'Reached', levelLocked: 'Locked',
+    withPpl: 'With {fairy}', tapHint: 'Tap {fairy} to hear more', tapPpl: '{fairy}', reached: 'Reached', levelLocked: 'Locked',
     toNext: (points: number, level: number) => `${points} more to Lv ${level}`, maxed: 'Highest level reached',
     daysTogether: 'Days together', keepsakes: 'Keepsakes',
     chipDays: (n: number) => `${n} ${n === 1 ? 'day' : 'days'} together`, chipKeepsakes: (n: number) => `${n} ${n === 1 ? 'keepsake' : 'keepsakes'}`,
@@ -26,7 +28,7 @@ export const BOND_COPY = {
     today: "Today's progress", done: 'Done', points: (n: number) => `+${n} closeness`,
     sources: {
       CHECK_IN: 'Daily check-in', STREAK_7: '7th-day streak bonus', EVENT: 'Write a mood',
-      MOMENT_LIKE: "Like PPL's Moments", FAIRY_TAP: 'Spend time with PPL in the Garden', WEEKLY_READ: 'Open your weekly report',
+      MOMENT_LIKE: "Like {fairy}'s Moments", FAIRY_TAP: 'Spend time with {fairy} in the Garden', WEEKLY_READ: 'Open your weekly report',
     } as Record<ClosenessSource, string>,
     rewards: 'Check-in rewards', thisRound: 'This round', days: (n: number, of: number) => `${n} / ${of} days`,
     day: (n: number) => `Day ${n}`, seventh: 'Day 7: a rare keepsake', thisMonth: 'This month',
@@ -42,8 +44,8 @@ export const BOND_COPY = {
     filters: { ALL: 'All', COMMON: 'Common', RARE: 'Rare', MONTHLY: 'Limited' },
     rarity: { COMMON: 'Common', RARE: 'Rare', MONTHLY: 'Limited' },
     receivedOn: 'Received', times: (n: number) => `×${n}`, locked: 'Not found yet',
-    reveal: 'A keepsake from PPL', keep: 'Keep it', next: 'Next', isNew: 'New',
-    levelUp: (level: number, title: string) => `Level up! Lv ${level} · ${title}`, grace: 'PPL kept your streak for you',
+    reveal: 'A keepsake from {fairy}', keep: 'Keep it', next: 'Next', isNew: 'New',
+    levelUp: (level: number, title: string) => `Level up! Lv ${level} · ${title}`, grace: '{fairy} kept your streak for you',
     checkIn: 'Daily check-in', checkInButton: "Check in for today's keepsake", checkingIn: 'Checking in…',
     streak: (n: number) => (n ? `${n}-day streak` : 'Start a streak today'),
     rareSoon: (n: number) => (n === 1 ? 'Check in today for a rare keepsake' : `${n} more check-ins to a rare keepsake`),
@@ -55,7 +57,7 @@ export const BOND_COPY = {
   },
   'zh-Hans': {
     title: '亲密度', close: '关闭', loading: '正在加载…', error: '没加载出来，再试一次。', retry: '再试一次',
-    withPpl: '与小花仙 PPL', tapHint: '轻点 PPL，听她多说几句', tapPpl: '小花仙 PPL', reached: '已达成', levelLocked: '未解锁',
+    withPpl: '与小花仙 {fairy}', tapHint: '轻点 {fairy}，听她多说几句', tapPpl: '小花仙 {fairy}', reached: '已达成', levelLocked: '未解锁',
     toNext: (points: number, level: number) => `还差 ${points} 点升到 Lv ${level}`, maxed: '已经是最高等级',
     daysTogether: '陪伴天数', keepsakes: '信物数量',
     chipDays: (n: number) => `陪伴 ${n} 天`, chipKeepsakes: (n: number) => `信物 ${n} 个`,
@@ -79,8 +81,8 @@ export const BOND_COPY = {
     filters: { ALL: '全部', COMMON: '普通', RARE: '稀有', MONTHLY: '限定' },
     rarity: { COMMON: '普通', RARE: '稀有', MONTHLY: '限定' },
     receivedOn: '获得时间', times: (n: number) => `×${n}`, locked: '还没有遇到',
-    reveal: 'PPL 送你的今日信物', keep: '收下信物', next: '下一个', isNew: '新收集',
-    levelUp: (level: number, title: string) => `升级啦！Lv ${level} · ${title}`, grace: 'PPL 帮你把连签留住了',
+    reveal: '{fairy} 送你的今日信物', keep: '收下信物', next: '下一个', isNew: '新收集',
+    levelUp: (level: number, title: string) => `升级啦！Lv ${level} · ${title}`, grace: '{fairy} 帮你把连签留住了',
     checkIn: '每日签到', checkInButton: '签到，领取今日信物', checkingIn: '正在签到…',
     streak: (n: number) => (n ? `已连签 ${n} 天` : '今天开始连签吧'),
     rareSoon: (n: number) => (n === 1 ? '今天签到必得稀有信物' : `再签 ${n} 天得稀有信物`),
@@ -91,6 +93,8 @@ export const BOND_COPY = {
     dayPetal: (name: string) => `花语卡 · ${name}`,
   },
 };
+
+export const bondCopy = (locale: BondLocale, fairy: string) => withFairyName(BOND_COPY[locale], fairy);
 
 // The cream-and-gold paper the calendar and the design's bond screens use.
 export const BOND = {

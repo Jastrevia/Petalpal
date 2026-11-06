@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { EmailAuthProvider, linkWithCredential, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail,
   signInWithCustomToken, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { apiBaseUrl, apiRequest, configureApi, publicApiRequest } from './api';
+import { forgetFairyName } from './fairyName';
 import { firebaseAuth } from './firebase';
 import { loadSessionExperience, type SessionExperience, type SessionUser } from './sessionExperience';
 import { authErrorMessage, connectEmailError, PASSWORD_RESET_SENT, profileError, type ProfileInput } from './auth/registrationValidation';
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function clearAccount(phase: AuthPhase = 'initializing', error = '') {
     version.current++;
     configureApi(null);
+    forgetFairyName();
     const cleanup = scopeFlowerPlacements(null);
     setState(emptyState(phase, error));
     return cleanup;

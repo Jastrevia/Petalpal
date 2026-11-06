@@ -6,12 +6,13 @@ import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { AVATAR_ART, AVATAR_TIERS } from './avatarArt';
 import { avatarCopy } from './avatarCopy';
+import { useFairyName, withFairyName } from '../../services/fairyName';
 
 // A new account's first avatar: the whole Level 1 collection to choose from, then PPL's gift of
 // three more at random. The server gives the gift once per account; accounts from before the
 // collection were marked as done, so they never see this.
 export function AvatarWelcome({ locale, enabled }: { locale: BondLocale; enabled: boolean }) {
-  const copy = avatarCopy(locale);
+  const copy = withFairyName(avatarCopy(locale), useFairyName());
   const { theme, light } = usePanelTheme();
   const styles = useMemo(() => makeStyles(theme, light), [theme, light]);
   const { rememberAvatar } = useAuth();
