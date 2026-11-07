@@ -9,6 +9,7 @@ import { KeepsakeBook } from '../bond/KeepsakeBook';
 import { keepsakeArt } from '../bond/keepsakeArt';
 import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
+import { PET_IMAGES, PetWardrobeCollection, usePetsSummary, WARDROBE_COPY, wardrobeCount } from './PetWardrobeCollection';
 
 // Collection (收藏), opened from the Garden dock under Letters: the keepsakes her check-ins give
 // and the avatar collection, moved here from Our Bond (owner, 2026-11-06). Today's new keepsakes
@@ -32,6 +33,9 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
   const styles = useMemo(() => makeStyles(theme), [theme, light]);
   const [bookOpen, setBookOpen] = useState(false);
   const [avatarsOpen, setAvatarsOpen] = useState(false);
+  const [wardrobeOpen, setWardrobeOpen] = useState(false);
+  const { pets } = usePetsSummary(visible);
+  const wardrobe = wardrobeCount(pets, locale), wardrobeWords = WARDROBE_COPY[locale];
   const { summary } = useClosenessSummary(visible);
   const { collection: avatars } = useAvatarCollection(visible);
   const keepsakesOn = Boolean(summary);
@@ -74,6 +78,21 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
             : <Text style={styles.chevron}>›</Text>}
         </Pressable>
 
+        {/* Pet dress-up: the golden puppy's and Xiaobai's wardrobes by part (only while pets are open). */}
+        {pets ? <Pressable testID="collection-wardrobe" accessibilityRole="button"
+          accessibilityLabel={`${wardrobeWords.title}${wardrobe ? `, ${copy.count(wardrobe.owned, wardrobe.total)}` : ''}`}
+          onPress={() => setWardrobeOpen(true)} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
+          <View style={styles.thumbs}>
+            {(['puppy', 'maltese'] as const).map((id, index) => <Image key={id} source={PET_IMAGES[id]}
+              style={[styles.thumb, styles.petThumb, index > 0 && styles.overlap]} resizeMode="contain" accessible={false} />)}
+          </View>
+          <View style={styles.tileText}>
+            <Text style={styles.tileTitle}>{wardrobeWords.title}</Text>
+            <Text style={styles.small}>{wardrobe ? copy.count(wardrobe.owned, wardrobe.total) : ''}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable> : null}
+
         <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
           <Text style={styles.closeText}>×</Text>
         </Pressable>
@@ -81,6 +100,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
     </View>
     <KeepsakeBook visible={bookOpen} locale={locale} newIds={alerts.keepsakes ? alerts.newKeepsakes : []}
       onClose={() => { setBookOpen(false); markKeepsakesSeen(); }} />
+    <PetWardrobeCollection visible={wardrobeOpen} locale={locale} onClose={() => setWardrobeOpen(false)} />
     <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
   </Modal>;
 }
@@ -98,6 +118,7 @@ function makeStyles(theme: PanelTheme) {
     thumbs: { flexDirection: 'row', width: 86 },
     thumb: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: theme.gold, backgroundColor: MEDALLION },
     overlap: { marginLeft: -11 },
+    petThumb: { padding: 2 },
     tileText: { flex: 1 },
     tileTitle: { fontFamily: 'serif', fontSize: 18, color: theme.text },
     small: { fontSize: 12, color: theme.muted, marginTop: 2 },

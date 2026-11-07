@@ -92,5 +92,7 @@ const styles = StyleSheet.create({
   item: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: .7, transform: [{ scale: .94 }] },
   dot: { position: 'absolute', top: -1, right: -3, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: '#FBE3D6', backgroundColor: '#E5735F' },
-  label: { fontFamily: 'serif', fontSize: 10, lineHeight: 13, color: '#FFF8E4', textShadowColor: '#0B241FE6', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  // A dark pill behind each name, so the white serif stays sharp even inside the bright newcomer halo.
+  label: { marginTop: 3, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, overflow: 'hidden', backgroundColor: 'rgba(11, 36, 31, 0.78)',
+    fontFamily: 'serif', fontSize: 10, lineHeight: 13, color: '#FFF8E4', textShadowColor: '#0B241FE6', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 });
