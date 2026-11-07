@@ -31,6 +31,7 @@
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
+  const petNames = {}; // (renamed in this preview session)
   const petPieces = [['lilac-beret', 'hat', 'Lilac Beret', '紫藤贝雷帽'], ['straw-sun-hat', 'hat', 'Straw Sun Hat', '草编遮阳帽'], ['sage-bonnet', 'hat', 'Sage Bonnet', '鼠尾草小帽'],
     ['blossom-wreath', 'hat', 'Blossom Wreath', '花环'], ['flower-sprig', 'hat', 'Flower Sprig', '鬓边花枝'], ['starlit-plume-cap', 'hat', 'Starlit Plume Cap', '星羽军帽'],
     ['midnight-hood', 'hat', 'Midnight Hood', '午夜兜帽'], ['golden-circlet', 'hat', 'Golden Circlet', '金叶头环'], ['voyager-goggles', 'hat', 'Voyager Goggles', '旅人风镜帽'],
@@ -333,6 +334,15 @@
         reactions[id] = before.mine ? before : { likes: before.likes + (request.kind === 'LIKE' ? 1 : 0), mine: request.kind };
         return json(reactions[id]);
       }
+      // Renaming, as the server: once per pet every 7 days, 1–12 characters.
+      if (/^\/api\/fairy\/pets\/(puppy|maltese)\/name$/.test(p) && method === 'PUT') {
+        const id = p.split('/')[4], name = String(request.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim(), now = Date.now();
+        if (!name || [...name].length > 12) return json({ error: 'PET_NAME_INVALID' }, 400);
+        const next = petNames[id]?.nextRenameAt;
+        if (next && Date.parse(next) > now) return json({ error: 'RENAME_TOO_SOON', nextRenameAt: next }, 429);
+        petNames[id] = { name, nextRenameAt: new Date(now + 7 * 86400e3).toISOString() };
+        return json({ petId: id, name, nextRenameAt: petNames[id].nextRenameAt });
+      }
       if (p === '/api/fairy/check-in' && method === 'POST') {
         const created = !checkedInToday; checkedInToday = true;
         return json({ created, locale: 'en', checkIn: { localDate: day(0), streak: 4, graceUsed: false }, awarded: created ? 2 : 0, levelUp: null,
@@ -462,7 +472,8 @@
         accessories: petPieces.map(([id, row, en, zh]) => { const own = ['flower-sprig', 'golden-circlet', 'crystal-drop', 'crystal-spire', 'petal-capelet', 'midnight-cape'].includes(id);
           return { id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: own, unlockedAtLevel: own ? 4 : null }; }),
         petPieces: { puppy: { 'flower-sprig': 4, 'golden-circlet': 9, 'crystal-drop': 5, 'crystal-spire': 11, 'petal-capelet': 14, 'midnight-cape': null },
-          maltese: { 'flower-sprig': 7, 'golden-circlet': null, 'crystal-drop': 6, 'crystal-spire': 13, 'petal-capelet': 10, 'midnight-cape': 15 } } });
+          maltese: { 'flower-sprig': 7, 'golden-circlet': null, 'crystal-drop': 6, 'crystal-spire': 13, 'petal-capelet': 10, 'midnight-cape': 15 } },
+        petNames: Object.fromEntries(['puppy', 'maltese'].map(id => [id, petNames[id] || { name: null, nextRenameAt: null }])) });
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });

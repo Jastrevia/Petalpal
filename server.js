@@ -62,6 +62,7 @@ import {
   checkInWithFairy,
   closenessSummary,
   dressGardenPet,
+  renameGardenPet,
   fairyClosenessEnabledFor,
   fairyMomentsLockedByBond,
   feedGardenPet,
@@ -2203,13 +2204,13 @@ app.post("/api/avatars/claim", allowBodyFields(["level", "avatar"]), avatarRoute
 // The Garden pets' wardrobe and food (lib/garden-pets.js), behind the same switch as closeness.
 const validPet = (req, res, next) => (fairyClosenessEnabledFor(req.auth.userId) && GARDEN_PETS.includes(req.params.petId)
   ? next() : res.status(404).json({ error: "Not found" }));
-const PET_ERRORS = { UNKNOWN_ACCESSORY: 400, ACCESSORY_LOCKED: 409, NO_FOOD: 409 };
+const PET_ERRORS = { UNKNOWN_ACCESSORY: 400, ACCESSORY_LOCKED: 409, NO_FOOD: 409, UNKNOWN_PET: 404, PET_NAME_INVALID: 400, RENAME_TOO_SOON: 429 };
 const petRoute = (label, handler) => async (req, res) => {
   if (!fairyClosenessEnabledFor(req.auth.userId)) return res.status(404).json({ error: "Not found" });
   try {
     const result = await handler(req);
     if (!result) return res.status(404).json({ error: "Not found" });
-    if (result.error) return res.status(PET_ERRORS[result.error]).json({ error: result.error });
+    if (result.error) return res.status(PET_ERRORS[result.error]).json({ error: result.error, ...(result.nextRenameAt ? { nextRenameAt: result.nextRenameAt } : {}) });
     res.json(result);
   } catch (error) {
     logServerError(`${label} error`, error);
@@ -2228,6 +2229,19 @@ app.put("/api/fairy/pets/:petId/outfit", validPet, allowBodyFields(ACCESSORY_ROW
   next();
 }, petRoute("PUT /api/fairy/pets/:petId/outfit", req => dressGardenPet(prisma, {
   userId: req.auth.userId, petId: req.params.petId, outfit: req.body, now: new Date()
+})));
+
+// Renames the golden puppy or Xiaobai: once per pet every 7 days (429 RENAME_TOO_SOON with when), a
+// short name that passes the community content check.
+app.put("/api/fairy/pets/:petId/name", validPet, allowBodyFields(["name"]), (req, res, next) => {
+  if (typeof req.body?.name !== "string" || req.body.name.length > 64) return res.status(400).json({ error: "PET_NAME_INVALID" });
+  try { assertSocialContent(req.body.name); } catch (error) {
+    if (error?.code === "CONTENT_REJECTED" || error?.status === 422) return res.status(422).json({ error: "Please choose a name that follows the Community Guidelines.", code: "CONTENT_REJECTED" });
+    throw error;
+  }
+  next();
+}, petRoute("PUT /api/fairy/pets/:petId/name", req => renameGardenPet(prisma, {
+  userId: req.auth.userId, petId: req.params.petId, name: req.body.name, now: new Date()
 })));
 
 app.post("/api/fairy/pets/:petId/feed", validPet, allowBodyFields(["foodId"]), (req, res, next) => {

@@ -9,7 +9,7 @@ import { vector } from "@electric-sql/pglite/vector";
 import prisma from "../../lib/prisma.js";
 import { setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
 import { FAIRY_KEEPSAKES, KEEPSAKES_BY_ID, keepsakesOf } from "../../lib/fairy-keepsakes.js";
-import {
+import { renameGardenPet,
   CLOSENESS_SOURCES, MAX_LEVEL, awardCloseness, awardFairyTap, checkInWithFairy, closenessLevel, closenessSummary,
   dressGardenPet, fairyClosenessEnabledFor, fairyMomentsLockedByBond, feedGardenPet, gardenPets, listCheckIns, listKeepsakes, nextStreak, planKeepsakes,
   pointsToNextLevel, rewardFirstWeekPlanting
@@ -348,6 +348,27 @@ test("outfits: only opened pieces of the right row, and a list that shows the lo
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "the puppy's outfit is its own");
 });
 
+test("pet names: the puppy and Xiaobai can be renamed, once per pet every 7 days, 1–12 characters", async () => {
+  const db = fakeDatabase(OWNER);
+  const now = at("2026-10-22");
+  const before = await gardenPets(db, { userId: "owner-1", now });
+  assert.deepEqual(plain(before.petNames), { puppy: { name: null, nextRenameAt: null }, maltese: { name: null, nextRenameAt: null } });
+  assert.deepEqual(plain(await renameGardenPet(db, { userId: "owner-1", petId: "rabbit", name: "Bun", now })), { error: "UNKNOWN_PET" });
+  for (const name of ["", "   ", "一二三四五六七八九十一二三", "a\u0000b"]) assert.deepEqual(plain(await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name, now })), { error: "PET_NAME_INVALID" }, JSON.stringify(name));
+  const first = await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "  Honey   Bun ", now });
+  assert.equal(first.name, "Honey Bun");
+  const soon = await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "Biscuit", now: new Date(now.getTime() + 6 * 86400e3) });
+  assert.equal(soon.error, "RENAME_TOO_SOON");
+  assert.equal(soon.nextRenameAt, new Date(now.getTime() + 7 * 86400e3).toISOString());
+  assert.equal((await renameGardenPet(db, { userId: "owner-1", petId: "maltese", name: "小白白", now })).name, "小白白", "each pet on its own clock");
+  const later = new Date(now.getTime() + 7 * 86400e3);
+  assert.equal((await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "Biscuit", now: later })).name, "Biscuit");
+  const after = await gardenPets(db, { userId: "owner-1", now: later });
+  assert.equal(after.petNames.puppy.name, "Biscuit");
+  assert.equal(after.petNames.maltese.name, "小白白");
+  assert.deepEqual(plain(after.outfits.puppy), { hat: null, collar: null, pendant: null }, "a name leaves the outfit alone");
+});
+
 test("Fairy Moments open at Lv 3; feeds that already have posts stay open; owners outside the switch keep the old rule", async () => {
   const db = fakeDatabase(OWNER);
   const on = { FAIRY_CLOSENESS_OWNER_IDS: "*" }, off = {};
@@ -450,5 +471,14 @@ test("closeness routes", async (t) => {
     assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food })).status, 409);
     assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: "flower-sprig" })).status, 409, "still locked");
     assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: 7 })).status, 400);
+    // Renaming: the dressing pets only, a string name, once per 7 days.
+    const named = await call("/api/fairy/pets/puppy/name", "PUT", { name: "Honey" });
+    assert.equal(named.status, 200); assert.equal(named.body.name, "Honey");
+    const again = await call("/api/fairy/pets/puppy/name", "PUT", { name: "Bun" });
+    assert.equal(again.status, 429); assert.equal(again.body.error, "RENAME_TOO_SOON"); assert.ok(again.body.nextRenameAt);
+    assert.equal((await call("/api/fairy/pets/maltese/name", "PUT", { name: 7 })).status, 400);
+    assert.equal((await call("/api/fairy/pets/maltese/name", "PUT", { name: "Snow", extra: 1 })).status, 400);
+    assert.equal((await call("/api/fairy/pets/rabbit/name", "PUT", { name: "Bun" })).status, 404);
+    assert.equal((await call("/api/fairy/pets")).body.petNames.puppy.name, "Honey");
   });
 });

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { loadPets, onPetsChanged, type PetId, type PetsSummary } from '../../services/gardenPets';
+import { SymbolView } from 'expo-symbols';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ApiError } from '../../services/api';
+import { loadPets, onPetsChanged, renamePet, type PetId, type PetsSummary } from '../../services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from '../garden/critters/accessoryIcons';
 import { forPet, isWorn, petShelf, SHELVES, type Piece, type Shelf } from '../garden/critters/petRing';
 import { CREAM, GOLD, RING_ICONS, TONES } from '../garden/critters/PetRingMenu';
@@ -20,12 +22,18 @@ export const WARDROBE_COPY = {
     off: 'Pets are not open for this account yet.', pets: { puppy: 'Golden Puppy', maltese: 'Xiaobai' } as Record<PetId, string>,
     shelves: { hat: 'Hats', collar: 'Capes', pendant: 'Pendants' } as Record<Shelf, string>,
     worn: 'Wearing', owned: 'Yours', locked: 'Locked',
-    hint: 'Tap a pet in the Garden, then Dress up, to change what it wears.', count: (owned: number, total: number) => `${owned} / ${total}` },
+    hint: 'Tap a pet in the Garden, then Dress up, to change what it wears.', count: (owned: number, total: number) => `${owned} / ${total}`,
+    rename: (name: string) => `Rename ${name}`, renameRule: 'Up to 12 characters. Each pet can be renamed once every 7 days.',
+    renameAgain: (name: string, date: string) => `${name} can be renamed again on ${date}.`, save: 'Save', saving: 'Saving…', cancel: 'Cancel',
+    nameInvalid: 'Use 1–12 characters.', nameRejected: 'Please choose a name that follows the Community Guidelines.', renameFailed: "That didn't save. Try again." },
   'zh-Hans': { title: '宠物换装', close: '关闭', loading: '正在打开衣柜…', failed: '衣柜没打开，再试一次。', retry: '再试一次',
     off: '这个账号还没有开放宠物。', pets: { puppy: '小金毛', maltese: '小白' } as Record<PetId, string>,
     shelves: { hat: '帽子', collar: '披肩', pendant: '挂饰' } as Record<Shelf, string>,
     worn: '穿着', owned: '已拥有', locked: '未解锁',
-    hint: '在花园里点一下宠物，选「换装」就能换衣服。', count: (owned: number, total: number) => `${owned} / ${total}` },
+    hint: '在花园里点一下宠物，选「换装」就能换衣服。', count: (owned: number, total: number) => `${owned} / ${total}`,
+    rename: (name: string) => `给${name}改名`, renameRule: '最多 12 个字。每只宠物 7 天只能改一次名。',
+    renameAgain: (name: string, date: string) => `${date} 之后才能再给${name}改名。`, save: '保存', saving: '正在保存…', cancel: '取消',
+    nameInvalid: '名字需要 1–12 个字。', nameRejected: '请换一个符合社区准则的名字。', renameFailed: '没有保存成功，再试一次。' },
 };
 
 // Each pet's pieces, shelf by shelf, as its closet shows them (Xiaobai: its own six, renamed).
@@ -69,6 +77,26 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
   const outfit = pets?.outfits[pet] ?? null;
   const pieces = pets ? petShelf(forPet(pets, pet), shelf, pet, locale) : [];
   const icon = (piece: Piece) => OWN_PIECE_ICONS[pet]?.[piece.id] ?? ACCESSORY_ICONS[piece.id];
+  // Names: the owner's (Collection → pencil), else the pet's own. A pet renamed in the last 7 days waits.
+  const nameOf = (id: 'puppy' | 'maltese') => pets?.petNames?.[id]?.name || copy.pets[id];
+  const nextRename = pets?.petNames?.[pet]?.nextRenameAt ? new Date(pets.petNames[pet]!.nextRenameAt!) : null;
+  const renameLocked = Boolean(nextRename && nextRename.getTime() > Date.now());
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState('');
+  useEffect(() => { setRenaming(false); setProblem(''); }, [pet, visible]);
+  const openRename = () => { setDraft(pets?.petNames?.[pet]?.name ?? ''); setProblem(''); setRenaming(true); };
+  const saveName = async () => {
+    const clean = draft.normalize('NFKC').replace(/\s+/g, ' ').trim();
+    if (!clean || [...clean].length > 12) { setProblem(copy.nameInvalid); return; }
+    setSaving(true); setProblem('');
+    try { await renamePet(pet, clean); setRenaming(false); }
+    catch (error) {
+      const status = error instanceof ApiError ? error.status : 0;
+      setProblem(status === 422 ? copy.nameRejected : status === 400 ? copy.nameInvalid : status === 429 ? copy.renameAgain(nameOf(pet), nextRename?.toLocaleDateString(locale === 'zh-Hans' ? 'zh-CN' : 'en') ?? '') : copy.renameFailed);
+    } finally { setSaving(false); }
+  };
   const plate = Math.min(400, width - 24);
   const circle = Math.max(76, Math.min(104, (plate - 96) / 2.6));
 
@@ -93,14 +121,19 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
             const own = pets ? wardrobeOf(pets, id, locale).flatMap(row => row.pieces) : [];
             const on = pet === id, petTone = id === 'maltese' ? TONES.forest : TONES.mauve;
             return <Pressable key={id} testID={`wardrobe-pet-${id}`} accessibilityRole="tab" accessibilityState={{ selected: on }}
-              accessibilityLabel={`${copy.pets[id]}${pets ? `, ${copy.count(own.filter(piece => piece.unlocked).length, own.length)}` : ''}`}
+              accessibilityLabel={`${nameOf(id)}${pets ? `, ${copy.count(own.filter(piece => piece.unlocked).length, own.length)}` : ''}`}
               onPress={() => { setPet(id); setShelf('hat'); }}
               style={({ pressed }) => [styles.petPill, { backgroundColor: on ? petTone.on : petTone.shade }, on && styles.petPillOn, pressed && styles.pressed]}>
               <Image source={PET_IMAGES[id]} style={styles.petImage} resizeMode="contain" accessible={false} />
               <View style={styles.petText}>
-                <Text numberOfLines={1} style={[styles.petName, !on && styles.dimText]}>{copy.pets[id]}</Text>
+                <Text numberOfLines={1} style={[styles.petName, !on && styles.dimText]}>{nameOf(id)}</Text>
                 {pets ? <Text style={styles.petCount}>{copy.count(own.filter(piece => piece.unlocked).length, own.length)}</Text> : null}
               </View>
+              {/* A small pencil on the chosen pet: rename it (once every 7 days). */}
+              {on && pets?.petNames ? <Pressable testID={`wardrobe-rename-${id}`} accessibilityRole="button" accessibilityLabel={copy.rename(nameOf(id))}
+                onPress={openRename} hitSlop={10} style={({ pressed }) => [styles.pencil, { backgroundColor: petTone.shade }, pressed && styles.pressed]}>
+                <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor={CREAM} />
+              </Pressable> : null}
             </Pressable>;
           })}
         </View>
@@ -135,6 +168,30 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
         </View>
 
         <Text style={[styles.sub, { backgroundColor: tone.shade }]}>{copy.hint}</Text>
+
+        {renaming ? <View style={styles.renameLayer}>
+          <View accessibilityViewIsModal style={[styles.renameCard, { backgroundColor: ground }]} testID="wardrobe-rename">
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.renameTint, { backgroundColor: tone.on }]} />
+            <Image source={PET_IMAGES[pet]} style={styles.renameImage} resizeMode="contain" accessible={false} />
+            <Text accessibilityRole="header" style={styles.renameTitle}>{copy.rename(nameOf(pet))}</Text>
+            {renameLocked ? <Text style={styles.renameNote}>{copy.renameAgain(nameOf(pet), nextRename!.toLocaleDateString(locale === 'zh-Hans' ? 'zh-CN' : 'en'))}</Text> : <>
+              <TextInput testID="wardrobe-rename-input" value={draft} onChangeText={setDraft} maxLength={24} autoFocus editable={!saving}
+                placeholder={copy.pets[pet]} placeholderTextColor="rgba(255, 243, 214, 0.45)" accessibilityLabel={copy.rename(nameOf(pet))}
+                onSubmitEditing={() => void saveName()} style={styles.renameInput} />
+              <Text style={styles.renameNote}>{copy.renameRule}</Text>
+            </>}
+            {problem ? <Text accessibilityRole="alert" style={styles.renameProblem}>{problem}</Text> : null}
+            <View style={styles.renameButtons}>
+              <Pressable accessibilityRole="button" onPress={() => setRenaming(false)} style={({ pressed }) => [styles.renameButton, { backgroundColor: tone.shade }, pressed && styles.pressed]}>
+                <Text style={styles.renameButtonText}>{copy.cancel}</Text>
+              </Pressable>
+              {!renameLocked ? <Pressable testID="wardrobe-rename-save" accessibilityRole="button" disabled={saving || !draft.trim()} onPress={() => void saveName()}
+                style={({ pressed }) => [styles.renameButton, styles.renameSave, (saving || !draft.trim()) && styles.dimText, pressed && styles.pressed]}>
+                <Text style={[styles.renameButtonText, styles.renameSaveText]}>{saving ? copy.saving : copy.save}</Text>
+              </Pressable> : null}
+            </View>
+          </View>
+        </View> : null}
       </View>
     </View>
   </Modal>;
@@ -155,6 +212,21 @@ const styles = StyleSheet.create({
   pets: { alignSelf: 'stretch', flexDirection: 'row', gap: 8, marginTop: 14 },
   petPill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: 8, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(233, 201, 121, 0.45)' },
   petPillOn: { borderColor: GOLD, borderWidth: 1.5 },
+  pencil: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GOLD, marginLeft: 'auto' },
+  renameLayer: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(11, 20, 18, 0.55)' },
+  renameCard: { width: '100%', maxWidth: 320, alignItems: 'center', gap: 10, padding: 18, borderRadius: 22, borderWidth: 1.5, borderColor: GOLD, overflow: 'hidden' },
+  renameTint: { opacity: 0.6 },
+  renameImage: { width: 64, height: 64 },
+  renameTitle: { ...text, fontSize: 18, textAlign: 'center' },
+  renameInput: { alignSelf: 'stretch', minHeight: 44, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: GOLD,
+    backgroundColor: 'rgba(255, 244, 224, 0.12)', color: CREAM, fontFamily: 'serif', fontSize: 16 },
+  renameNote: { ...text, fontSize: 12, opacity: 0.85, textAlign: 'center' },
+  renameProblem: { ...text, fontSize: 12, textAlign: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(120, 50, 70, 0.9)' },
+  renameButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  renameButton: { minWidth: 100, minHeight: 44, paddingHorizontal: 16, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GOLD },
+  renameSave: { backgroundColor: GOLD },
+  renameButtonText: { ...text, fontSize: 14 },
+  renameSaveText: { color: '#3B2410' },
   petImage: { width: 38, height: 38 },
   petText: { flexShrink: 1 },
   petName: { ...text, fontSize: 14 },
