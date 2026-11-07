@@ -91,7 +91,18 @@ export const shelfOf = (accessories: readonly Piece[], shelf: Shelf) => accessor
 // its lilac capelet with a gold clasp, its pink bow; the Noble headpiece, violet capelet and
 // crystal clasp (puppyLooks.ts MALTESE_NOBLE).
 export type OwnPiece = { id: string; name: { en: string; 'zh-Hans': string } };
+// The golden puppy (owner, 2026-11-06): the same two pieces per shelf, its set 2 then set 1, named
+// and painted as its design sheets show them (Refined: flower sprig, petal capelet, crystal drop;
+// Noble: golden circlet, midnight cape, crystal spire).
 export const PET_OWN_PIECES: Partial<Record<PetId, Record<Shelf, readonly OwnPiece[]>>> = {
+  puppy: {
+    hat: [{ id: 'flower-sprig', name: { en: 'Flower Sprig', 'zh-Hans': '鬓边花枝' } },
+      { id: 'golden-circlet', name: { en: 'Golden Circlet', 'zh-Hans': '金叶头环' } }],
+    collar: [{ id: 'petal-capelet', name: { en: 'Petal Capelet', 'zh-Hans': '花瓣小披肩' } },
+      { id: 'midnight-cape', name: { en: 'Midnight Cape', 'zh-Hans': '午夜披风' } }],
+    pendant: [{ id: 'crystal-drop', name: { en: 'Crystal Drop', 'zh-Hans': '水晶坠' } },
+      { id: 'crystal-spire', name: { en: 'Crystal Spire', 'zh-Hans': '水晶尖坠' } }],
+  },
   maltese: {
     hat: [{ id: 'flower-sprig', name: { en: 'Flower Clip', 'zh-Hans': '小花夹' } },
       { id: 'golden-circlet', name: { en: 'Noble Headpiece', 'zh-Hans': '紫藤金叶头饰' } }],
@@ -101,6 +112,15 @@ export const PET_OWN_PIECES: Partial<Record<PetId, Record<Shelf, readonly OwnPie
       { id: 'crystal-spire', name: { en: 'Noble Clasp', 'zh-Hans': '紫晶扣链' } }],
   },
 };
+// The catalog as `petId` has it: each pet's pieces open on their own (lib/garden-pets.js
+// unlockedPetPieces: from Lv 4 one random piece per level over both pets' twelve), so a piece the
+// other pet has is still locked here. A server from before that says only `unlocked` for both.
+export function forPet(pets: Pick<PetsSummary, 'accessories' | 'petPieces'>, petId: PetId): Piece[] {
+  const mine = pets.petPieces?.[petId];
+  if (!mine) return [...pets.accessories];
+  return pets.accessories.map(piece => (piece.id in mine
+    ? { ...piece, unlocked: mine[piece.id] !== null, unlockedAtLevel: mine[piece.id] } : { ...piece, unlocked: false, unlockedAtLevel: null }));
+}
 // The shelf as `petId` sees it: its own pieces (renamed) when it has its own, else the whole row.
 export function petShelf(accessories: readonly Piece[], shelf: Shelf, petId: PetId, locale: 'en' | 'zh-Hans'): Piece[] {
   const own = PET_OWN_PIECES[petId]?.[shelf];

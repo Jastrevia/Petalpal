@@ -458,7 +458,11 @@
       // and four pendants, so locks, both puppy sets and the cape-hides-the-pendant rule can be tried.
       if (p === '/api/fairy/pets') return json({ locale: user.preferredLocale, level: 17, foods: petFoods.map(([id, en, zh, count]) => ({ id, name: user.preferredLocale === 'zh-Hans' ? zh : en, count })),
         outfits: Object.fromEntries(['puppy', 'hedgehog', 'butterfly', 'rabbit', 'bluebird', 'maltese'].map(id => [id, petOutfits[id] || { hat: null, collar: null, pendant: null }])),
-        accessories: petPieces.map(([id, row, en, zh]) => ({ id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: petOpened.has(id), unlockedAtLevel: petOpened.has(id) ? 4 : null })) });
+        // As the server (lib/garden-pets.js unlockedPetPieces): each pet's six pieces open one per level from Lv 4; a fixed sample here.
+        accessories: petPieces.map(([id, row, en, zh]) => { const own = ['flower-sprig', 'golden-circlet', 'crystal-drop', 'crystal-spire', 'petal-capelet', 'midnight-cape'].includes(id);
+          return { id, row, collection: 'light', name: user.preferredLocale === 'zh-Hans' ? zh : en, unlocked: own, unlockedAtLevel: own ? 4 : null }; }),
+        petPieces: { puppy: { 'flower-sprig': 4, 'golden-circlet': 9, 'crystal-drop': 5, 'crystal-spire': 11, 'petal-capelet': 14, 'midnight-cape': null },
+          maltese: { 'flower-sprig': 7, 'golden-circlet': null, 'crystal-drop': 6, 'crystal-spire': 13, 'petal-capelet': 10, 'midnight-cape': 15 } } });
       if (p === '/api/petal-cards/today') return json({ locale: 'en', localDate, deckSize: url.searchParams.get('deck') === 'full' ? 78 : 69, back: 'lilac', topics: petalTopics, drawn: petalDrawn });
       if (p === `/users/${friend}/garden-access`) return json({ canVisit: true });
       if (p === `/users/${friend}/garden`) return json({ owner: { id: friend }, flowers: [friendFlower] });

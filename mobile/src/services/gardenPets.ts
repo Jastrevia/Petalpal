@@ -10,6 +10,9 @@ export interface PetsSummary {
   accessories: { id: string; row: 'hat' | 'collar' | 'pendant'; collection: string; name: string; unlocked: boolean; unlockedAtLevel: number | null }[];
   // A server from before the Maltese (2026-11-05) has no `maltese` outfit.
   outfits: Partial<Record<PetId, PetOutfit>>;
+  // Each dressing pet's own pieces: accessory id → the level that opened it for that pet, or null
+  // (a server from before per-pet unlocks has none: `accessories[].unlocked` then counts for both).
+  petPieces?: Partial<Record<PetId, Record<string, number | null>>>;
   foods: { id: string; name: string; count: number }[];
 }
 

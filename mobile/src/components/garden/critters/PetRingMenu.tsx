@@ -6,7 +6,7 @@ import { ApiError } from '@/services/api';
 import { dressPet, feedPet, loadPets, petsChanged, type PetId, type PetsSummary } from '@/services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from './accessoryIcons';
 import {
-  arcOffset, isWorn, malteseHiddenPieces, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
+  arcOffset, forPet, isWorn, malteseHiddenPieces, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
   type Piece, type PetSpot, type RingAction, type RingLayout, type Shelf, type Viewport,
 } from './petRing';
 
@@ -43,7 +43,7 @@ const FOOD_ICONS: Record<string, string> = { 'berry-tart': '🥧', 'flower-cooki
 // The ring's painted icons (the owner's friend's designs, 2026-11-06; cut out in
 // ~/dev/petalpal-motion/icons-ring): a bowl of kibble for Feed, a capelet on a hanger for Dress up,
 // and for Pat the pet itself being patted (the golden's from the design; Xiaobai's painted to match).
-const RING_ICONS = {
+export const RING_ICONS = {
   feed: require('@/assets/garden/pets/ring/feed.webp') as number,
   dress: require('@/assets/garden/pets/ring/dress.webp') as number,
 };
@@ -53,11 +53,11 @@ const PAT_ICONS: Partial<Record<PetId, number>> = {
 };
 const iconOf = (petId: PetId, action: RingAction): string | number => (action === 'pat' ? PAT_ICONS[petId] ?? '✋' : RING_ICONS[action]);
 
-const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
+export const GOLD = '#E9C979', CREAM = '#FFF3D6', MAUVE = 'rgba(84, 56, 104, 0.8)';
 // Each pet's plate: the puppy's translucent mauve, Xiaobai's the Garden's forest green (the theme's
 // forest #183530, raised #21443D, #2B524A), both with the same gold rim and cream text.
-type Tone = { fill: string; top: string; bottom: string; shade: string; on: string; shadow: string; badge: string };
-const TONES: Record<'mauve' | 'forest', Tone> = {
+export type Tone = { fill: string; top: string; bottom: string; shade: string; on: string; shadow: string; badge: string };
+export const TONES: Record<'mauve' | 'forest', Tone> = {
   mauve: { fill: MAUVE, top: 'rgba(112, 78, 128, 0.82)', bottom: 'rgba(70, 46, 92, 0.8)', shade: 'rgba(60, 38, 78, 0.72)',
     on: 'rgba(124, 88, 140, 0.92)', shadow: '#2A1638', badge: '#6B3F7E' },
   forest: { fill: 'rgba(24, 53, 48, 0.88)', top: 'rgba(43, 82, 74, 0.86)', bottom: 'rgba(24, 53, 48, 0.84)', shade: 'rgba(24, 53, 48, 0.8)',
@@ -271,7 +271,7 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
   const cards: CardSpec[] = !pets ? [] : mode === 'feed'
     ? pets.foods.map(food => ({ key: food.id, label: food.name, icon: FOOD_ICONS[food.id] ?? '🍽️', badge: `×${food.count}`, dim: food.count === 0,
       a11y: `${food.name} ×${food.count}`, onPress: food.count > 0 && known ? () => onFeed(food.id) : undefined }))
-    : petShelf(pets.accessories, shelf, petId, locale).map(piece => {
+    : petShelf(forPet(pets, petId), shelf, petId, locale).map(piece => {
       const worn = isWorn(outfit, piece);
       return { key: piece.id, label: piece.name, icon: OWN_PIECE_ICONS[petId]?.[piece.id] ?? ACCESSORY_ICONS[piece.id], locked: !piece.unlocked, worn,
         sub: worn && hidden.has(piece.id) ? copy.hidden : undefined, dim: !piece.unlocked,
@@ -294,7 +294,7 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
       </View>
       {mode === 'dress' ? <View style={styles.tabs}>
         {SHELVES.map(row => {
-          const all = pets ? petShelf(pets.accessories, row, petId, locale) : [];
+          const all = pets ? petShelf(forPet(pets, petId), row, petId, locale) : [];
           return <Pressable key={row} onPress={() => setShelf(row)} accessibilityRole="tab" accessibilityState={{ selected: shelf === row }}
             testID={`pet-shelf-${row}`} style={[styles.tab, { backgroundColor: tone.shade }, shelf === row && [styles.tabOn, { backgroundColor: tone.on }]]}>
             <Text style={[styles.tabText, shelf === row && styles.tabTextOn]}>{copy.shelves[row]} {all.filter(p => p.unlocked).length}/{all.length}</Text>

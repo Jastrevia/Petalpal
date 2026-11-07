@@ -551,11 +551,20 @@ test('Xiaobai\'s closet holds its own pieces (light and Noble), named as its own
   assert.deepEqual(ring.petShelf(accessories, 'hat', 'maltese', 'zh-Hans').map(p => [p.id, p.name, p.unlocked]), [['flower-sprig', '小花夹', true]]);
   assert.deepEqual(ring.petShelf(accessories, 'collar', 'maltese', 'en').map(p => [p.id, p.name, p.unlocked]), [['petal-capelet', 'Lilac Capelet', false]], 'still locked until it opens');
   assert.deepEqual(ring.petShelf(accessories, 'pendant', 'maltese', 'en').map(p => p.name), ['Pink Bow']);
-  assert.deepEqual(ring.petShelf(accessories, 'hat', 'puppy', 'en').map(p => p.id), ['flower-sprig', 'lilac-beret']);
+  // The golden puppy too has only its own two per shelf now (its set 2, then set 1), never the rest of the catalog.
+  assert.deepEqual(ring.petShelf(accessories, 'hat', 'puppy', 'en').map(p => p.id), ['flower-sprig']);
+  assert.deepEqual(ring.petShelf([...accessories, { id: 'golden-circlet', row: 'hat', collection: 'noble', name: 'Golden Circlet', unlocked: true, unlockedAtLevel: 16 }], 'hat', 'puppy', 'zh-Hans').map(p => [p.id, p.name]),
+    [['flower-sprig', '鬓边花枝'], ['golden-circlet', '金叶头环']]);
   // Its pieces are the ones the server lets it wear (lib/garden-pets.js PET_OWN_PIECES), light then Noble.
   const { PET_OWN_PIECES: server } = await import('../../lib/garden-pets.js');
-  assert.deepEqual(plain(Object.fromEntries(Object.entries(ring.PET_OWN_PIECES.maltese).map(([slot, pieces]) => [slot, pieces.map(piece => piece.id)]))),
-    plain(server.maltese));
+  // Each pet's pieces open on their own (the server's petPieces): one the other pet has stays locked here.
+  const both = { accessories: [{ id: 'flower-sprig', row: 'hat', collection: 'light', name: 'Flower Sprig', unlocked: true, unlockedAtLevel: 4 }],
+    petPieces: { puppy: { 'flower-sprig': null }, maltese: { 'flower-sprig': 4 } } };
+  assert.deepEqual(plain(ring.forPet(both, 'puppy').map(p => [p.id, p.unlocked])), [['flower-sprig', false]]);
+  assert.deepEqual(plain(ring.forPet(both, 'maltese').map(p => [p.id, p.unlocked, p.unlockedAtLevel])), [['flower-sprig', true, 4]]);
+  assert.deepEqual(plain(ring.forPet({ accessories: both.accessories }, 'puppy').map(p => p.unlocked)), [true], 'an older server: one flag for both');
+  for (const pet of ['puppy', 'maltese']) assert.deepEqual(plain(Object.fromEntries(Object.entries(ring.PET_OWN_PIECES[pet]).map(([slot, pieces]) => [slot, pieces.map(piece => piece.id)]))),
+    plain(server[pet]), `${pet}: the closet shows exactly what the server lets it wear`);
   const withNoble = [...accessories, { id: 'golden-circlet', row: 'hat', collection: 'noble', name: 'Golden Circlet', unlocked: false, unlockedAtLevel: null }];
   assert.deepEqual(ring.petShelf(withNoble, 'hat', 'maltese', 'zh-Hans').map(p => [p.id, p.name]), [['flower-sprig', '小花夹'], ['golden-circlet', '紫藤金叶头饰']]);
   // Worn but not shown: the other set's pieces, and a pendant under the Noble capelet (it has its own clasp).
