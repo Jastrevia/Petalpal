@@ -15,6 +15,7 @@ const routes = [
   ["POST /api/fairy/closeness/tap", "owner is req.auth.userId; empty body only; capped per local day"],
   ["POST /api/avatars/welcome", "owner is req.auth.userId; avatar body field only, Tier 1 ids; once per account (avatarWelcomeAt) under an advisory lock"],
   ["POST /api/avatars/claim", "owner is req.auth.userId; level and avatar body fields only; level and tier checked against the server's Fairy Bond sum; one avatar per level under an advisory lock"],
+  ["PUT /api/fairy/pets/:petId/name", "owner is req.auth.userId; name body field only, 1-12 characters, community content check; the puppy and Xiaobai only; once per pet every 7 days under the owner lock"],
   ["POST /api/petal-cards/draw", "owner is req.auth.userId; position and topic allowlists; one draw per local day under an advisory lock"],
   ["POST /api/petal-cards/reading", "owner is req.auth.userId; no body fields; today's own draw only; Premium or listed owner; at most two model attempts per draw under an advisory lock and the AI cost gate"],
   ["POST /api/redeem", "owner is req.auth.userId; code allowlist; hash-only lookup; failed guesses rate-limited; one claim per code and per account and batch under an advisory lock"],
@@ -49,7 +50,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 35);
+  assert.equal(routes.length, 36);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

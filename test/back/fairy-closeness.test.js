@@ -9,12 +9,12 @@ import { vector } from "@electric-sql/pglite/vector";
 import prisma from "../../lib/prisma.js";
 import { setFirebaseTokenVerifierForTests } from "../../lib/auth.js";
 import { FAIRY_KEEPSAKES, KEEPSAKES_BY_ID, keepsakesOf } from "../../lib/fairy-keepsakes.js";
-import {
+import { renameGardenPet,
   CLOSENESS_SOURCES, MAX_LEVEL, awardCloseness, awardFairyTap, checkInWithFairy, closenessLevel, closenessSummary,
   dressGardenPet, fairyClosenessEnabledFor, fairyMomentsLockedByBond, feedGardenPet, gardenPets, listCheckIns, listKeepsakes, nextStreak, planKeepsakes,
   pointsToNextLevel, rewardFirstWeekPlanting
 } from "../../lib/fairy-closeness.js";
-import { ACCESSORY_BANDS, PET_ACCESSORIES, PET_FOODS, unlockedAccessories } from "../../lib/garden-pets.js";
+import { DRESS_PIECES, PET_ACCESSORIES, PET_FOODS, unlockedPetPieces } from "../../lib/garden-pets.js";
 import { app } from "../../server.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -255,30 +255,27 @@ test("summary and keepsake book", async () => {
   assert.ok(book.keepsakes.filter(keepsake => !keepsake.owned).every(keepsake => !("note" in keepsake) && keepsake.count === 0));
 });
 
-test("bond rewards: Lv 4-8 hats, 9-15 pendants, 16-20 collars, in pairs, never repeated, every row emptied", () => {
-  const rows = row => PET_ACCESSORIES.filter(item => item.row === row);
-  assert.deepEqual(["hat", "collar", "pendant"].map(row => rows(row).length), [10, 9, 13]);
+test("bond rewards: from Lv 4 one new dress-up piece per level, at random over both pets' twelve, never repeated, all by Lv 15", () => {
   assert.equal(new Set(PET_ACCESSORIES.map(item => item.id)).size, 32);
-  for (const userId of Array.from({ length: 200 }, (_, i) => `user_${i}`)) {
-    assert.equal(unlockedAccessories(userId, 3).size, 0, "nothing before Lv 4");
+  assert.equal(DRESS_PIECES.length, 12);
+  assert.deepEqual(new Set(DRESS_PIECES.map(piece => piece.petId)), new Set(["puppy", "maltese"]));
+  for (const userId of Array.from({ length: 300 }, (_, i) => `user_${i}`)) {
+    assert.equal(unlockedPetPieces(userId, 3).size, 0, "nothing before Lv 4");
     let previous = new Map();
     for (let level = 4; level <= 20; level++) {
-      const now = unlockedAccessories(userId, level);
-      for (const [id, at] of previous) assert.equal(now.get(id), at, "a piece stays, from the level that opened it");
-      const fresh = [...now.keys()].filter(id => !previous.has(id)).map(id => PET_ACCESSORIES.find(item => item.id === id));
-      const band = ACCESSORY_BANDS.find(item => level >= item.from && level <= item.to);
-      assert.ok(fresh.every(item => item.row === band.row), `Lv ${level} only opens its own row`);
-      assert.ok(fresh.length <= band.maxPairs * 2);
+      const now = unlockedPetPieces(userId, level);
+      for (const [key, at] of previous) assert.equal(now.get(key), at, "a piece stays, from the level that opened it");
+      assert.equal(now.size - previous.size, level <= 15 ? 1 : 0, `Lv ${level} opens exactly one new piece while any is left`);
       previous = now;
     }
-    for (const band of ACCESSORY_BANDS) {
-      const open = [...unlockedAccessories(userId, band.to).keys()].filter(id => PET_ACCESSORIES.find(item => item.id === id).row === band.row);
-      assert.equal(open.length, rows(band.row).length, `${band.row} is empty by Lv ${band.to}`);
-    }
-    assert.equal(unlockedAccessories(userId, 20).size, 32);
+    assert.equal(previous.size, 12, "every piece of both pets by Lv 15 (so by Lv 16)");
   }
-  assert.deepEqual([...unlockedAccessories("user_1", 9)], [...unlockedAccessories("user_1", 9)], "fixed per owner");
-  assert.notDeepEqual([...unlockedAccessories("user_1", 20).keys()], [...unlockedAccessories("user_2", 20).keys()], "different per owner");
+  assert.deepEqual([...unlockedPetPieces("user_1", 12)], [...unlockedPetPieces("user_1", 12)], "fixed per owner");
+  assert.notDeepEqual([...unlockedPetPieces("user_1", 15).keys()], [...unlockedPetPieces("user_2", 15).keys()], "different per owner");
+  // The first draw, over many owners: a hat about 40%, a necklace about 50%, a cape about 10%.
+  const first = { hat: 0, pendant: 0, collar: 0 };
+  for (let i = 0; i < 4000; i++) first[DRESS_PIECES.find(piece => piece.key === [...unlockedPetPieces(`owner_${i}`, 4).keys()][0]).row]++;
+  assert.ok(Math.abs(first.hat / 4000 - 0.4) < 0.03 && Math.abs(first.pendant / 4000 - 0.5) < 0.03 && Math.abs(first.collar / 4000 - 0.1) < 0.02, JSON.stringify(first));
 });
 
 const stockOf = pets => Object.fromEntries(pets.foods.map(food => [food.id, food.count]));
@@ -325,15 +322,19 @@ test("outfits: only opened pieces of the right row, and a list that shows the lo
   assert.equal(before.accessories.length, 32);
   assert.ok(before.accessories.every(item => !item.unlocked && item.unlockedAtLevel === null && item.name));
   assert.equal(before.accessories.find(item => item.id === "lilac-beret").name, "紫藤贝雷帽");
-  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { pendant: "hourglass" }, now })), { error: "ACCESSORY_LOCKED" });
+  // The golden puppy wears only its own pieces (owner, 2026-11-06): its set 2 and set 1, two per slot.
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { pendant: "crystal-spire" }, now })), { error: "ACCESSORY_LOCKED" });
   seedPoints(db, 3230); // Lv 20
-  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "hourglass" }, now })), { error: "UNKNOWN_ACCESSORY" }, "a pendant is not a hat");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "crystal-drop" }, now })), { error: "UNKNOWN_ACCESSORY" }, "a pendant is not a hat");
   assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "no-such-hat" }, now })), { error: "UNKNOWN_ACCESSORY" });
-  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "lilac-beret", pendant: "hourglass" }, now })), { outfit: { hat: "lilac-beret", collar: null, pendant: "hourglass" } });
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "lilac-beret" }, now })), { error: "UNKNOWN_ACCESSORY" }, "not its piece");
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: "flower-sprig", pendant: "crystal-spire" }, now })), { outfit: { hat: "flower-sprig", collar: null, pendant: "crystal-spire" } });
   const after = await gardenPets(db, { userId: "owner-1", now });
-  assert.deepEqual(plain(after.outfits.puppy), { hat: "lilac-beret", collar: null, pendant: "hourglass" });
+  assert.deepEqual(plain(after.outfits.puppy), { hat: "flower-sprig", collar: null, pendant: "crystal-spire" });
   assert.deepEqual(plain(after.outfits.rabbit), { hat: null, collar: null, pendant: null }, "each pet has its own outfit");
-  assert.ok(after.accessories.every(item => item.unlocked));
+  assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "rabbit", outfit: { hat: "flower-sprig" }, now })), { error: "UNKNOWN_ACCESSORY" }, "only the puppy and Xiaobai dress");
+  assert.deepEqual(after.accessories.filter(item => item.unlocked).map(item => item.id).sort(), ["crystal-drop", "crystal-spire", "flower-sprig", "golden-circlet", "midnight-cape", "petal-capelet"], "at Lv 20 the six pieces, and only those");
+  for (const pet of ["puppy", "maltese"]) assert.ok(Object.values(after.petPieces[pet]).every(at => at >= 4 && at <= 15), `${pet}: all six, each opened at Lv 4–15`);
   await dressGardenPet(db, { userId: "owner-1", petId: "puppy", outfit: { hat: null }, now });
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "taking it off");
   // The Maltese wears only its own pieces: its light set's three and its Noble set's three.
@@ -345,6 +346,27 @@ test("outfits: only opened pieces of the right row, and a list that shows the lo
     { outfit: { hat: "golden-circlet", collar: "midnight-cape", pendant: "crystal-spire" } }, "its Noble set");
   assert.deepEqual(plain(await dressGardenPet(db, { userId: "owner-1", petId: "maltese", outfit: { collar: "star-mantle" }, now })), { error: "UNKNOWN_ACCESSORY" }, "a Noble piece that is not its own");
   assert.equal((await gardenPets(db, { userId: "owner-1", now })).outfits.puppy.hat, null, "the puppy's outfit is its own");
+});
+
+test("pet names: the puppy and Xiaobai can be renamed, once per pet every 7 days, 1–12 characters", async () => {
+  const db = fakeDatabase(OWNER);
+  const now = at("2026-10-22");
+  const before = await gardenPets(db, { userId: "owner-1", now });
+  assert.deepEqual(plain(before.petNames), { puppy: { name: null, nextRenameAt: null }, maltese: { name: null, nextRenameAt: null } });
+  assert.deepEqual(plain(await renameGardenPet(db, { userId: "owner-1", petId: "rabbit", name: "Bun", now })), { error: "UNKNOWN_PET" });
+  for (const name of ["", "   ", "一二三四五六七八九十一二三", "a\u0000b"]) assert.deepEqual(plain(await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name, now })), { error: "PET_NAME_INVALID" }, JSON.stringify(name));
+  const first = await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "  Honey   Bun ", now });
+  assert.equal(first.name, "Honey Bun");
+  const soon = await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "Biscuit", now: new Date(now.getTime() + 6 * 86400e3) });
+  assert.equal(soon.error, "RENAME_TOO_SOON");
+  assert.equal(soon.nextRenameAt, new Date(now.getTime() + 7 * 86400e3).toISOString());
+  assert.equal((await renameGardenPet(db, { userId: "owner-1", petId: "maltese", name: "小白白", now })).name, "小白白", "each pet on its own clock");
+  const later = new Date(now.getTime() + 7 * 86400e3);
+  assert.equal((await renameGardenPet(db, { userId: "owner-1", petId: "puppy", name: "Biscuit", now: later })).name, "Biscuit");
+  const after = await gardenPets(db, { userId: "owner-1", now: later });
+  assert.equal(after.petNames.puppy.name, "Biscuit");
+  assert.equal(after.petNames.maltese.name, "小白白");
+  assert.deepEqual(plain(after.outfits.puppy), { hat: null, collar: null, pendant: null }, "a name leaves the outfit alone");
 });
 
 test("Fairy Moments open at Lv 3; feeds that already have posts stay open; owners outside the switch keep the old rule", async () => {
@@ -437,7 +459,7 @@ test("closeness routes", async (t) => {
     assert.equal(book.body.owned, 1);
     assert.deepEqual(plain((await call("/api/fairy/closeness/tap", "POST")).body), { awarded: 1, levelUp: null });
     assert.deepEqual(summary.body.bondRewards.accessories.map(band => [band.row, band.from, band.to, band.owned, band.total]),
-      [["hat", 4, 8, 0, 10], ["pendant", 9, 15, 0, 13], ["collar", 16, 20, 0, 9]]);
+      [["hat", 4, 15, 0, 4], ["pendant", 4, 15, 0, 4], ["collar", 4, 15, 0, 4]]);
     const pets = await call("/api/fairy/pets");
     assert.equal(pets.status, 200);
     assert.equal(pets.body.foods.reduce((sum, food) => sum + food.count, 0), 1, "today's check-in brought one food");
@@ -447,7 +469,16 @@ test("closeness routes", async (t) => {
     assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food, extra: 1 })).status, 400);
     assert.deepEqual((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food })).body, { foodId: food, count: 0 });
     assert.equal((await call("/api/fairy/pets/puppy/feed", "POST", { foodId: food })).status, 409);
-    assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: "lilac-beret" })).status, 409, "still locked");
+    assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: "flower-sprig" })).status, 409, "still locked");
     assert.equal((await call("/api/fairy/pets/puppy/outfit", "PUT", { hat: 7 })).status, 400);
+    // Renaming: the dressing pets only, a string name, once per 7 days.
+    const named = await call("/api/fairy/pets/puppy/name", "PUT", { name: "Honey" });
+    assert.equal(named.status, 200); assert.equal(named.body.name, "Honey");
+    const again = await call("/api/fairy/pets/puppy/name", "PUT", { name: "Bun" });
+    assert.equal(again.status, 429); assert.equal(again.body.error, "RENAME_TOO_SOON"); assert.ok(again.body.nextRenameAt);
+    assert.equal((await call("/api/fairy/pets/maltese/name", "PUT", { name: 7 })).status, 400);
+    assert.equal((await call("/api/fairy/pets/maltese/name", "PUT", { name: "Snow", extra: 1 })).status, 400);
+    assert.equal((await call("/api/fairy/pets/rabbit/name", "PUT", { name: "Bun" })).status, 404);
+    assert.equal((await call("/api/fairy/pets")).body.petNames.puppy.name, "Honey");
   });
 });

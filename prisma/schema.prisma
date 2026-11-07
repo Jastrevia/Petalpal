@@ -448,6 +448,9 @@ model GardenPetOutfit {
   hat       String?  @db.VarChar(48)
   collar    String?  @db.VarChar(48)
   pendant   String?  @db.VarChar(48)
+  // The owner's name for the pet (null: its own name) and when it last changed (once per 7 days).
+  name          String?   @db.VarChar(24)
+  nameChangedAt DateTime?
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

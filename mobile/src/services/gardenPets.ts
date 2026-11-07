@@ -10,12 +10,24 @@ export interface PetsSummary {
   accessories: { id: string; row: 'hat' | 'collar' | 'pendant'; collection: string; name: string; unlocked: boolean; unlockedAtLevel: number | null }[];
   // A server from before the Maltese (2026-11-05) has no `maltese` outfit.
   outfits: Partial<Record<PetId, PetOutfit>>;
+  // Each dressing pet's own pieces: accessory id → the level that opened it for that pet, or null
+  // (a server from before per-pet unlocks has none: `accessories[].unlocked` then counts for both).
+  petPieces?: Partial<Record<PetId, Record<string, number | null>>>;
+  // The owner's names for the golden puppy and Xiaobai (null: their own) and when each may be renamed again.
+  petNames?: Partial<Record<PetId, { name: string | null; nextRenameAt: string | null }>>;
   foods: { id: string; name: string; count: number }[];
 }
 
 export async function loadPets() {
   try { return await apiRequest<PetsSummary>('/api/fairy/pets'); }
   catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
+}
+
+// Renames the golden puppy or Xiaobai (once per pet every 7 days: 429 RENAME_TOO_SOON says when).
+export async function renamePet(petId: PetId, name: string) {
+  const result = await apiRequest<{ petId: PetId; name: string; nextRenameAt: string }>(`/api/fairy/pets/${petId}/name`, 'PUT', { name });
+  petsChanged();
+  return result;
 }
 
 // Feeds `petId` one of `foodId` (409 NO_FOOD when none are left): the count left comes back.

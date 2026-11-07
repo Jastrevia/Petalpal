@@ -185,11 +185,9 @@
 | 等级 | 奖励 |
 |---|---|
 | Lv3 | 小花仙朋友圈开放。已经有帖子的账号不受影响；不在亲密度开关里的账号照旧 |
-| Lv4–8 | 每升一级解锁 1 对第一行配饰（帽子，10 件） |
-| Lv9–15 | 每升一级随机解锁 1–3 对第三行配饰（挂饰，13 件），拿完为止 |
-| Lv16–20 | 每升一级随机解锁 1–2 对第二行配饰（披肩，9 件），拿完为止 |
+| Lv4–15 | 每升一级解锁 1 件换装部件，从小金毛和小白共 12 件里还没拿到的随机抽，不重复；Lv15 拿齐，最晚 Lv16 一定全部拿到 |
 
-一对 = 同一行里随机搭的 2 件，两张配饰图的件混在一起，不重复。解锁只由账号和等级算出来，数据库里不存，所以老用户打开时已经拥有当前等级该有的全部配饰。顺序是帽子、挂饰、披肩：披肩对宠物外形改变最大，放在最后。数量算过：10 件 = 5 级 × 2 件，13 件 ≤ 7 级 × 至少 2 件，9 件 ≤ 5 级 × 至少 2 件，每行到该段最后一级一定发完。
+2026-11-06 起只有小金毛和小白能换装，每只每个部件（头饰 / 披肩 / 挂饰）2 件，各 6 件，共 12 件，两只分开解锁（同一个配饰 id，各自的名字和画，图标从设计图上抠出：`mobile/assets/garden/pets/wardrobe/`）。抽取按部件加权：每件头饰权重 4、挂饰 5、披肩 1，所以一开始抽到头饰约 40%、挂饰约 50%、披肩约 10%（披肩对宠物外观改变最大，放在后面），抽走的件不再参与，剩下的按同样权重重新算。结果只由账号和等级算出（`lib/garden-pets.js` `unlockedPetPieces`），数据库里不存，同一个账号同一级永远是同一件；老用户打开时已经拥有当前等级该有的件。`GET /api/fairy/pets` 的 `petPieces` 给出每只宠物每件是哪一级解锁的（`null` 是还没解锁）；其余 26 件目录配饰保留在列表里但不会解锁。
 
 旧的 `unlocks` 列表保留给还没更新的 App。新版读 `GET /api/fairy/closeness` 的 `bondRewards`。Lv5 稀有信物概率和 Lv16 月度信物 16 天这两条效果还在，只是不再列出来。
 
@@ -207,7 +205,7 @@
 - `PUT /api/fairy/pets/:petId/outfit`，请求体 `{ hat, collar, pendant }`，传 `null` 是脱下。没解锁返回 409 `ACCESSORY_LOCKED`，不是这一行的件返回 400。
 - `POST /api/fairy/pets/:petId/feed`，请求体 `{ foodId }`，返回 `{ foodId, count }`。没有库存返回 409 `NO_FOOD`。
 - `petId`：`puppy` `hedgehog` `butterfly` `rabbit` `bluebird` `maltese`。喂食和摸头不加亲密度。
-- 小白（`maltese`）只能穿自己的两套，每格两件：浅色款是头饰 `flower-sprig`（小花夹）、披风 `petal-capelet`（紫色小披肩）、挂饰 `crystal-drop`（粉色蝴蝶结）；Noble 款是头饰 `golden-circlet`（紫藤金叶头饰）、披风 `midnight-cape`（星夜紫披肩）、挂饰 `crystal-spire`（紫晶扣链）。别的件返回 400 `UNKNOWN_ACCESSORY`（`lib/garden-pets.js` 的 `PET_OWN_PIECES`）。解锁规则和其他件一样。花园里一次只显示一套：有披风就以披风那套为准，没有就看头饰，再看挂饰；Noble 披风自带水晶扣，同时戴的 Noble 挂饰不显示。
+- 小金毛（`puppy`）和小白（`maltese`）都只能穿自己的六件（`PET_OWN_PIECES`），别的件返回 400 `UNKNOWN_ACCESSORY`。小白的两套，每格两件：浅色款是头饰 `flower-sprig`（小花夹）、披风 `petal-capelet`（紫色小披肩）、挂饰 `crystal-drop`（粉色蝴蝶结）；Noble 款是头饰 `golden-circlet`（紫藤金叶头饰）、披风 `midnight-cape`（星夜紫披肩）、挂饰 `crystal-spire`（紫晶扣链）。别的件返回 400 `UNKNOWN_ACCESSORY`（`lib/garden-pets.js` 的 `PET_OWN_PIECES`）。解锁规则和其他件一样。花园里一次只显示一套：有披风就以披风那套为准，没有就看头饰，再看挂饰；Noble 披风自带水晶扣，同时戴的 Noble 挂饰不显示。
 
 **花园里怎么显示（App，[puppyLooks.ts](../../mobile/src/components/garden/critters/puppyLooks.ts)）**
 
