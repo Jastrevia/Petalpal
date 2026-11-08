@@ -184,7 +184,9 @@ test('Registration errors are readable and create no session', async () => {
     await state.register({ name: 'Bloom' });
     const result = await s.hooks.flush();
     assert.equal(result.phase, 'signedOut');
-    assert.equal(result.error, 'We couldn’t connect to your account. Please try again.');
+    // The server already made the account: the owner is told to sign in, never to register again.
+    assert.match(result.error, /^Your account was created, but signing in didn’t finish\. Don’t create it again/);
+    assert.match(result.error, /account name and password\.$/);
     assert.doesNotMatch(result.error, /private@example.test|provider diagnostic/);
     assert.equal(result.identity, null); assert.equal(result.session, null); assert.equal(s.auth.currentUser, null);
   }
@@ -214,7 +216,7 @@ test('A wrong password shows the one failure message and signs nobody in', async
   const s = setup(); let state = await s.ready();
   s.setHandler(async () => response({ error: 'Check your name or PP number and password, then try again.', code: 'LOGIN_FAILED' }, 400));
   await state.login('Bloom', 'wrong password'); state = await s.hooks.flush();
-  assert.equal(state.phase, 'signedOut'); assert.match(state.error, /Check your name/); assert.equal(s.auth.currentUser, null);
+  assert.equal(state.phase, 'signedOut'); assert.match(state.error, /account name or PP number and password don’t match/); assert.equal(s.auth.currentUser, null);
 });
 test('An identity without a verified email goes straight in, and the app never waits on verification', async () => {
   const s = setup(user('new', false)); const state = await s.ready();
@@ -358,17 +360,18 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   assert.match(nodes(tree).find((n) => n.type === 'Message').props.text, /match/);
   field(tree, 'Confirm Password').props.onChangeText('petals2026'); tree = hooks.render();
   byId(tree, 'create-account').props.onPress(); tree = hooks.render();
-  // "Welcome to your garden": the same account name, shown, not typed again; the fairy's name; an avatar.
+  // "Welcome to your garden": the same account name, shown, not typed again; an avatar. The fairy is
+  // named in the first-time tour (components/onboarding), so the page no longer asks for her name.
   assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Welcome to your garden');
   assert.equal(field(tree, 'Account Name').props.fixedValue, 'Bloom_22');
-  assert.ok(field(tree, 'Your Garden Fairy’s Name')); assert.ok(nodes(tree).find((n) => n.type === 'AvatarChoice'));
+  assert.equal(nodes(tree).some((n) => n.type === 'Field' && n.props.label === 'Your Garden Fairy’s Name'), false, 'no fairy name at sign-up');
+  assert.ok(nodes(tree).find((n) => n.type === 'AvatarChoice'));
   assert.equal(byId(tree, 'enter-garden').props.disabled, true, 'the Community Guidelines first');
   nodes(tree).find((n) => n.type === 'Check').props.onLink(); tree = hooks.render();
   const guidelines = nodes(tree).find((n) => n.type?.name === 'Guidelines');
   assert.ok(guidelines, 'the guidelines open'); guidelines.props.onClose(); tree = hooks.render();
   assert.equal(nodes(tree).some((n) => n.type?.name === 'Guidelines'), false);
   nodes(tree).find((n) => n.type === 'Check').props.onPress(); tree = hooks.render();
-  field(tree, 'Your Garden Fairy’s Name').props.onChangeText('Lumi'); tree = hooks.render();
   // Connecting an email takes the address only: the password is the account's own.
   corner(tree).props.onPress(); tree = hooks.render();
   const connect = nodes(tree).find((n) => n.type === 'ConnectEmailScreen');
@@ -379,7 +382,7 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   byId(tree, 'enter-garden').props.onPress(); await hooks.flush();
   assert.equal(registered.length, 1);
   const [details, connected] = registered[0];
-  assert.equal(details.name, 'Bloom_22'); assert.equal(details.password, 'petals2026'); assert.equal(details.fairyName, 'Lumi');
+  assert.equal(details.name, 'Bloom_22'); assert.equal(details.password, 'petals2026'); assert.equal(details.fairyName, undefined);
   assert.equal(details.avatar, 'fairy-1'); assert.ok(details.communityTermsVersion); assert.equal(connected.email, 'me@example.test');
   tree = hooks.render();
   // Back to the first page, then the forgot pages: both go through the verified email only.
@@ -503,12 +506,12 @@ test('Forgot password sends a Firebase reset email with the same reply for every
   await state.resetPassword('known@example.test'); state = await s.hooks.flush();
   assert.equal(state.error, 'Too many attempts. Please wait before trying again.'); assert.equal(state.message, '');
 });
-test('PetalPal refusals show their reason; server failures keep the general message', async () => {
+test('PetalPal refusals show their reason; a sleeping or failing server says to wait and retry', async () => {
   for (const [status, body, expected] of [
-    [403, { error: 'Account deletion is pending or complete', code: 'ACCOUNT_DELETED' }, 'Account deletion is pending or complete'],
+    [403, { error: 'Account deletion is pending or complete', code: 'ACCOUNT_DELETED' }, 'This account has been deleted, or its deletion is in progress.'],
     [429, { error: 'Too many requests. Try again later.' }, 'Too many requests. Try again later.'],
-    [500, { error: 'Unable to create PetalPal session' }, 'We couldn’t connect to your account. Please try again.'],
-    [503, { error: 'synthetic outage' }, 'We couldn’t connect to your account. Please try again.'],
+    [500, { error: 'Unable to create PetalPal session' }, 'The PetalPal server is starting up or busy. Wait about 30 seconds, then try again.'],
+    [503, { error: 'synthetic outage' }, 'The PetalPal server is starting up or busy. Wait about 30 seconds, then try again.'],
   ]) {
     const s = setup(user());
     s.setHandler(async (path) => path === '/auth/session' ? response(body, status) : response({ ok: true }));

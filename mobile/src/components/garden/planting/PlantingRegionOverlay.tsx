@@ -117,6 +117,7 @@ function CalibratedMonthRegion({
   showErasures = false,
   showFinalMask = true,
   screenScale,
+  gardenTone = false,
 }: {
   month: number;
   isCalibrating: boolean;
@@ -135,6 +136,8 @@ function CalibratedMonthRegion({
   showErasures?: boolean;
   showFinalMask?: boolean;
   screenScale?: SharedValue<number>;
+  /** The owner's planting bed: a soft gold wash with a painted gold edge instead of the cyan editor tint. */
+  gardenTone?: boolean;
 }) {
   const cal = isCalibrating ? requestedCalibration : APPROVED_MASK_CALIBRATION[month];
   const imgSrc =
@@ -147,26 +150,26 @@ function CalibratedMonthRegion({
   const fillPaint = useMemo(() => {
     const paint = Skia.Paint();
     paint.setColorFilter(Skia.ColorFilter.MakeBlend(
-      Skia.Color(isThisMonthPainting ? '#00DDEB' : '#06B6D4'), BlendMode.SrcIn
+      Skia.Color(gardenTone ? '#F6E3A6' : isThisMonthPainting ? '#00DDEB' : '#06B6D4'), BlendMode.SrcIn
     ));
     // Keep the original baseline overlay strength outside the manual editor.
-    paint.setAlphaf(isThisMonthPainting ? opacity : opacity * 0.9 * (160 / 255));
+    paint.setAlphaf(gardenTone ? 0.3 : isThisMonthPainting ? opacity : opacity * 0.9 * (160 / 255));
     return paint;
-  }, [isThisMonthPainting, opacity]);
+  }, [isThisMonthPainting, opacity, gardenTone]);
   const outlinePaint = useDerivedValue(() => {
     const paint = Skia.Paint();
     // Subtract an eroded COPY from the completed coverage to get an inner ring.
     // Erosion affects the outline only, never the mask or planting rules.
-    const radius = 2.5 / Math.max(screenScale?.value ?? 1, 0.001);
+    const radius = (gardenTone ? 3.5 : 2.5) / Math.max(screenScale?.value ?? 1, 0.001);
     paint.setImageFilter(Skia.ImageFilter.MakeBlend(
       BlendMode.DstOut,
       Skia.ImageFilter.MakeOffset(0, 0),
       Skia.ImageFilter.MakeErode(radius, radius)
     ));
-    paint.setColorFilter(Skia.ColorFilter.MakeBlend(Skia.Color('#006B78'), BlendMode.SrcIn));
-    paint.setAlphaf(0.95);
+    paint.setColorFilter(Skia.ColorFilter.MakeBlend(Skia.Color(gardenTone ? '#F0D687' : '#006B78'), BlendMode.SrcIn));
+    paint.setAlphaf(gardenTone ? 0.9 : 0.95);
     return paint;
-  }, [screenScale]);
+  }, [screenScale, gardenTone]);
   if (!image || !meta) return null;
 
   const land = getParentLand(cal.parentLandAsset, layout);
@@ -228,7 +231,7 @@ function CalibratedMonthRegion({
         {showFinalMask && (
           <Group>
             <Group layer={fillPaint}>{finalCoverage}</Group>
-            {isThisMonthPainting && (
+            {(isThisMonthPainting || gardenTone) && (
               <Group layer={outlinePaint}>{finalCoverage}</Group>
             )}
           </Group>
@@ -473,6 +476,8 @@ export default function PlantingRegionOverlay({
           layout={layout}
           opacity={0.8}
           showLandBounds={false}
+          screenScale={screenScale}
+          gardenTone
         />
       </Group>
     );

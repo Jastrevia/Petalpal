@@ -83,6 +83,7 @@ import {
   withOnboardingGuideFairy,
   nextUnlockableFairy
 } from "./lib/fairy-config.js";
+import { OnboardingTutorialError, onboardingTutorialState, updateOnboardingTutorial } from "./lib/onboarding-tutorial.js";
 import { monthFromLocalDate, normalizeProgress } from "./lib/fairy-progress.js";
 import { resolveDailyFlowerEmotion } from "./lib/daily-flower-input.js";
 import {
@@ -1069,7 +1070,9 @@ async function createProfile({ firebaseUid, name, body, email = null, signUp = n
           timezone: normalizeTimezone(body?.timezone) || "UTC",
           preferredLocale: body?.preferredLocale === undefined ? "en" : normalizeLocale(body.preferredLocale),
           garden: { create: { year: new Date().getFullYear() } },
-          fairyState: { create: { lastEvent: fairyEvent.code } },
+          // A new account starts the first-time tour; a fairy named on an older sign-up page counts as named.
+          fairyState: { create: { lastEvent: fairyEvent.code, tutorialStep: "intro.name",
+            ...(signUp?.fairyName ? { fairyNamedAt: new Date() } : {}) } },
           aiConsent: { create: { termsVersion: AI_TERMS_VERSION, aiProcessing: false, grantedAt: null } },
           subscriptionEntitlement: { create: {} },
           ...(signUp ? {
@@ -1907,6 +1910,29 @@ app.get("/api/fairies", async (req, res) => {
     })),
     activeFairyId: fairies.find(({ isActive }) => isActive)?.id || null
   });
+});
+
+// First-time guided tour: the server owns each owner's step, so the tour resumes on any device
+// and a finished tour never plays again (lib/onboarding-tutorial.js).
+function sendOnboardingError(res, label, error) {
+  if (error instanceof OnboardingTutorialError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(label, error);
+  return res.status(500).json({ error: "Failed to update onboarding status" });
+}
+app.get("/api/onboarding", async (req, res) => {
+  try {
+    return res.json(await onboardingTutorialState(prisma, { userId: req.auth.userId }));
+  } catch (error) {
+    return sendOnboardingError(res, "GET /api/onboarding error", error);
+  }
+});
+
+app.patch("/api/onboarding", allowBodyFields(["step", "fairyName", "firstEventId", "firstFlowerId", "flowerPlanted", "complete"]), async (req, res) => {
+  try {
+    return res.json(await updateOnboardingTutorial(prisma, { userId: req.auth.userId, body: req.body || {}, lock: lockTransaction }));
+  } catch (error) {
+    return sendOnboardingError(res, "PATCH /api/onboarding error", error);
+  }
 });
 
 app.put("/api/fairies/:fairyId/active", async (req, res) => {

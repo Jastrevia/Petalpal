@@ -86,11 +86,19 @@ const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
 
+// Below this width the wide layout is drawn at PHONE_DESK_WIDTH and scaled to fit.
+const PHONE_DESK_MIN = 640, PHONE_DESK_WIDTH = 640;
+// Up to 25 pages of 20 (about nine years of Weekly and Monthly reflections).
+const MAX_REPORT_PAGES = 25;
 export default function Reflection() {
   const router = useRouter();
   const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
-  const { width, height } = useWindowDimensions();
+  // A phone shows the same pavilion as a wide screen (the painting, the shelf, the book flying to the
+  // desk and opening as a spread), laid out at a wide size and scaled down to the phone's width.
+  const screen = useWindowDimensions();
+  const phoneScale = screen.width < PHONE_DESK_MIN ? screen.width / PHONE_DESK_WIDTH : 1;
+  const width = screen.width / phoneScale, height = screen.height / phoneScale;
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
   const night = (__DEV__ ? nightOverride : null) ?? worldNight;
@@ -230,6 +238,15 @@ export default function Reflection() {
       if (controller.signal.aborted) return;
       setReports(previous => older ? [...previous, ...result.reports] : result.reports);
       setCursor(result.nextCursor);
+      // Every earlier reflection belongs in the books too (the server pages 20 at a time, newest
+      // first): the first page shows at once, the rest follow in the background.
+      let next = result.nextCursor;
+      for (let page = 0; next && page < MAX_REPORT_PAGES; page++) {
+        const more = await listReflections(next, controller.signal);
+        if (controller.signal.aborted) return;
+        setReports(previous => [...previous, ...more.reports.filter(report => !previous.some(seen => seen.id === report.id))]);
+        next = more.nextCursor; setCursor(next);
+      }
     } catch (error) {
       if (!controller.signal.aborted) setListError(lang === 'en' && error instanceof Error ? error.message : t.loadFailed);
     } finally { if (!controller.signal.aborted) setLoading(false); }
@@ -486,8 +503,8 @@ export default function Reflection() {
   const leafSize = { left: compact ? 0 : leaves.right.x - readingRect.x, width: pageWidth, height: contentHeight };
 
 
-  return <View style={{ flex: 1, backgroundColor: '#34251A' }}>
-    <View style={{ width, height, overflow: 'hidden' }} testID="reflection-scene">
+  return <View style={{ flex: 1, backgroundColor: '#34251A', overflow: 'hidden' }}>
+    <View style={{ width, height, overflow: 'hidden', ...(phoneScale !== 1 ? { transform: [{ scale: phoneScale }], transformOrigin: 'top left' } : null) }} testID="reflection-scene">
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height }} />
         {/* Both paintings share the original pixel geometry. Lighting lives below

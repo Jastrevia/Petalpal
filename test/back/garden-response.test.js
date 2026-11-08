@@ -15,6 +15,8 @@ const privateFlower = {
   left: 12,
   top: 34,
   regionId: null,
+  worldX: 812,
+  worldY: 640,
   slotId: null,
   scale: 1,
   rotation: 0,
@@ -111,4 +113,15 @@ test("social garden preserves viewer Support state while stripping private conte
   assert.deepEqual(flower.supportState, { supportedToday: true, canSupport: false });
   assert.equal(Object.hasOwn(flower, "event"), false);
   assert.equal(Object.hasOwn(flower, "dailyCheckIn"), false);
+});
+
+test("social garden never shows an Event's flower its owner has not planted yet", () => {
+  const unplanted = { ...privateFlower, id: "flower-2", worldX: null, worldY: null };
+  const legacy = { ...privateFlower, id: "flower-3", sourceEventId: null, worldX: null, worldY: null };
+  const garden = { flowers: [privateFlower, unplanted, legacy], visitRecords: [] };
+  const social = serializeGardenResponse({ owner: { id: "owner-1" }, garden, includePrivate: false });
+  assert.deepEqual(social.flowers.map(flower => flower.id), ["flower-1", "flower-3"],
+    "an unplanted Event flower is left out; planted and older flowers stay");
+  const owner = serializeGardenResponse({ owner: { id: "owner-1" }, garden, includePrivate: true });
+  assert.equal(owner.flowers.length, 3, "the owner still gets it, to plant it");
 });

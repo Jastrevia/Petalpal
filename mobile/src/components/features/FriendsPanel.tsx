@@ -1,3 +1,4 @@
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { SafetyActions } from './SafetyActions';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -271,8 +272,8 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   </View>;
 
   const friendsTab = <>
-    {heading(copy.myFriends, friends.length, pill(copy.add, copy.add, () => setTab('requests'), { disabled: !!busy, icon: null }))}
-    <View style={styles.search}>
+    {heading(copy.myFriends, friends.length, <View {...onboardingTarget('friends.add')}>{pill(copy.add, copy.add, () => setTab('requests'), { disabled: !!busy, icon: null })}</View>)}
+    <View {...onboardingTarget('friends.list')} style={styles.search}>
       <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={20} tintColor={theme.muted} />
       <TextInput accessibilityLabel={copy.filterLabel} placeholder={copy.filter} placeholderTextColor={theme.muted}
         value={filter} onChangeText={setFilter} style={styles.searchInput} />

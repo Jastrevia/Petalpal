@@ -1,3 +1,4 @@
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Reanimated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
@@ -166,12 +167,16 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
       {slots.map(slot => {
         const key = monthKey(year, slot.month);
         const count = counts.get(key) || 0;
+        const isCurrentMonth = slot.month === Number(today.slice(5, 7)) && year === Number(today.slice(0, 4));
+        const currentBookTarget = isCurrentMonth && !deskTouch ? onboardingTarget('bookhouse.currentBook') : undefined;
         return <Book key={slot.month} month={slot.month} year={year} count={count} locked={monthLocked(year, slot.month, today, count)} drawn={drawn}
           left={slot.left} top={slot.top} width={slot.width} height={slot.height} hidden={isHidden(key)}
+          onLayout={currentBookTarget?.onLayout}
           hitSlop={deskTouch ? { left: slot.column === 0 ? 8 : layout.gap / 2, right: slot.column === 2 ? 8 : layout.gap / 2, top: Math.max(4, 3 * scale), bottom: 6 } : undefined}
           register={node => {
             if (node) bookNodes.current?.set(key, { node, camera: { dx: camera.cx - slot.left, dy: camera.cy - slot.top, d: camera.d } });
             else bookNodes.current?.delete(key);
+            if (currentBookTarget?.ref) currentBookTarget.ref(node);
           }}
           onPressIn={() => setPressed(slot.month)} onPressOut={() => setPressed(month => month === slot.month ? null : month)}
           onPress={() => void measureBook(bookNodes.current?.get(key)).then(rect => onOpenMonth(year, slot.month, rect))}
@@ -182,14 +187,15 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
   </Reanimated.View>;
 }
 
-function Book({ month, year, count, locked, drawn, left, top, width, height, hidden, hitSlop, register, onPress, onPressIn, onPressOut, onLocked }: {
+function Book({ month, year, count, locked, drawn, left, top, width, height, hidden, hitSlop, register, onLayout, onPress, onPressIn, onPressOut, onLocked }: {
+  onLayout?: (event: any) => void;
   month: number; year: number; count: number; locked: boolean; drawn: boolean; left: number; top: number; width: number; height: number;
   hitSlop?: { left: number; right: number; top: number; bottom: number };
   hidden: boolean; register: (node: View | null) => void; onPress: () => void; onPressIn: () => void; onPressOut: () => void; onLocked: () => void;
 }) {
   const name = monthYear(year, month);
   const lock = Math.max(14, Math.min(19, width * .44));
-  return <Pressable ref={register} testID={`book-${monthKey(year, month)}`} accessibilityRole="button"
+  return <Pressable ref={register} testID={`book-${monthKey(year, month)}`} onLayout={onLayout} accessibilityRole="button"
     accessibilityLabel={`${name}${treehouseZh() ? '，' : ', '}${locked ? tt('locked') : count ? journalCount(count) : tt('no journals yet')}`}
     accessibilityHint={locked ? tt('This month has not arrived yet.') : undefined} accessibilityState={{ disabled: locked }}
     onPress={locked ? onLocked : onPress} onPressIn={locked ? undefined : onPressIn} onPressOut={onPressOut} hitSlop={hitSlop || { left: 2, right: 2, top: 4, bottom: 4 }}

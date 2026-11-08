@@ -4,3 +4,13 @@ declare module "*.module.css" {
 }
 
 declare module "*.css";
+
+declare module "*.webm" {
+  const src: any;
+  export default src;
+}
+
+declare module "*.webp" {
+  const src: any;
+  export default src;
+}

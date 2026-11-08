@@ -150,7 +150,7 @@ test('the ✓ appears only under a tapped ghost, follows it, and is the only way
   let view = controls({ ...base, previewCoords: null, validationResult: null });
   assert.equal(view.check, null);
   const texts = nodes(view.tree).filter(n => n.type === 'Text').flatMap(n => [n.props.children].flat()).join(' ');
-  assert.match(texts, /Tap the spot in the September garden/);
+  assert.match(texts, /Tap the spot in the glowing September bed/);
   assert.doesNotMatch(texts, /Plant Here/);
 
   view = controls({ ...base, previewCoords: { worldX: 1000, worldY: 600 },

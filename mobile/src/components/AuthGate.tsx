@@ -35,7 +35,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [fairyName, setFairyName] = useState('');
   const [problem, setProblem] = useState('');
   const [email, setEmail] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
@@ -58,7 +57,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // A new identity starts clean: no password or other account's details stay in memory.
-    setName(''); setPassword(''); setConfirm(''); setFairyName(''); setProblem(''); setEmailPassword('');
+    setName(''); setPassword(''); setConfirm(''); setProblem(''); setEmailPassword('');
     setConnect(null); setConnecting(false); setAvatar(LEGACY_AVATAR_IDS[0]); setCommunityAccepted(false);
     setMode(current => (current === 'forgotName' ? current : 'register'));
   }, [auth.identity?.uid]);
@@ -155,7 +154,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   // The account's details, for the welcome page's button (and the profile step of an existing identity, which has no password here).
-  const details = { name, avatar, fairyName, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
+  const details = { name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
     ...(profile ? {} : { password }) };
   if (mode === 'welcome' || profile) {
     const corner = profile || auth.identity?.email ? null : <CornerButton label={connect ? `✓ ${connect.email}` : copy.connect} icon="envelope"
@@ -165,8 +164,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       {profile ? <Field label={copy.accountName} icon="person" narrow value={name} onChangeText={setName} editable={!working} maxLength={20}
         autoComplete="username-new" placeholder={copy.namePlaceholder} note={copy.nameNote} />
         : <Field label={copy.accountName} icon="person" narrow fixedValue={name} note={copy.nameNote} />}
-      <Field label={copy.fairyName} narrow value={fairyName} onChangeText={setFairyName} editable={!working} maxLength={20}
-        autoCapitalize="words" placeholder={copy.fairyPlaceholder} />
       <AvatarChoice label={copy.avatar} value={avatar} onChange={setAvatar} disabled={working} />
       <Check checked={communityAccepted} label={copy.accept} onPress={() => setCommunityAccepted(!communityAccepted)}
         link={copy.guidelines} onLink={() => setGuidelinesOpen(true)} />
@@ -226,7 +223,7 @@ const COPY = {
     nameNote: 'This is your sign-in name. Nobody else can have it.',
     password: 'Password', passwordPlaceholder: 'Password', passwordRule: '8–16 characters. Include letters and numbers.',
     confirm: 'Confirm Password', confirmPlaceholder: 'Once more', mismatch: 'The two passwords don’t match.',
-    fairyName: 'Your Garden Fairy’s Name', fairyPlaceholder: 'Give your fairy a name…', avatar: 'Choose Your Avatar',
+    avatar: 'Choose Your Avatar',
     accept: 'I accept the', guidelines: 'Community Guidelines', close: 'Close',
     create: 'Create Account', enter: 'Enter My Garden', saving: 'Saving…', creating: 'Creating your account…', opening: 'Opening PetalPal…',
     retry: 'Try again', other: 'Use another account', back: 'Back', backToGarden: 'Back to the Garden',
@@ -247,7 +244,7 @@ const COPY = {
     nameNote: '这是你的登录名，只属于你。',
     password: '密码', passwordPlaceholder: '输入密码', passwordRule: '8–16 位，同时包含字母和数字。',
     confirm: '确认密码', confirmPlaceholder: '再输入一次密码', mismatch: '两次输入的密码不一样。',
-    fairyName: '你的小花仙的名字', fairyPlaceholder: '给小花仙起个名字…', avatar: '选择你的头像',
+    avatar: '选择你的头像',
     accept: '我接受', guidelines: '社区准则', close: '关闭',
     create: '创建账号', enter: '进入我的花园', saving: '正在保存…', creating: '正在创建你的账号…', opening: '正在打开 PetalPal…',
     retry: '重试', other: '换一个账号', back: '返回', backToGarden: '返回花园',

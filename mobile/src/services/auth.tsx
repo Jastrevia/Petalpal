@@ -6,7 +6,7 @@ import { forgetFairyName } from './fairyName';
 import { noteSignUpGift } from './avatars';
 import { firebaseAuth } from './firebase';
 import { loadSessionExperience, type SessionExperience, type SessionUser } from './sessionExperience';
-import { authErrorMessage, connectEmailError, PASSWORD_RESET_SENT, profileError, type ProfileInput } from './auth/registrationValidation';
+import { accountCreatedSignInFailed, authErrorMessage, connectEmailError, PASSWORD_RESET_SENT, profileError, type ProfileInput } from './auth/registrationValidation';
 import { scopeFlowerPlacements, setNativeSecurityExpectedOwner } from '../components/garden/planting/plantingPersistence';
 import { recordNativeLogoutWitness } from './nativeSecurityLogoutWitness';
 import type { FlowerSession } from '../components/garden/planting/flowerDetailApi';
@@ -70,6 +70,23 @@ const profileBody = (profile: ProfileInput) => ({
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   preferredLocale: profile.preferredLocale || 'en', communityTermsVersion: profile.communityTermsVersion,
 });
+/** DEV-only: a signed-in synthetic owner for local previews. No Firebase, no Render, no real account. */
+export function PreviewAuthProvider({ user, children }: { user: SessionUser; children: ReactNode }) {
+  const [avatar, setAvatar] = useState(user.avatar);
+  if (!__DEV__) throw new Error('Preview accounts are development-only');
+  const owner = { ...user, avatar };
+  const idle = async () => {};
+  const value: AuthState = {
+    phase: 'signedIn', session: { user: owner }, identity: { uid: owner.id, email: owner.email || '' }, error: '', message: '',
+    experience: { user: owner, fairyState: null, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true, gardenOwnerId: owner.id },
+    loading: false, needsProfile: false, login: idle, register: idle, resetPassword: idle, completeProfile: idle,
+    connectEmail: idle, connectedEmail: () => null, resendEmailVerification: idle, checkEmailVerified: async () => false,
+    loadRecovery: async () => ({ name: owner.name || '', accountId: owner.id, email: null, hasPassword: true }),
+    setPassword: idle, clearMessage: () => {},
+    updateAvatar: async next => setAvatar(next), rememberAvatar: next => setAvatar(next), updateLocale: idle, logout: idle, deleteAccount: idle, retry: idle,
+  };
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthSnapshot>(() => emptyState());
   useEffect(() => { setNativeSecurityExpectedOwner(state.session?.user.id || null); }, [state.session?.user.id]);
@@ -238,7 +255,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { signInToken } = await publicApiRequest<{ signInToken: string }>('/auth/register', profileBody(profile));
       noteSignUpGift();
       connectAfterSignIn(connect);
-      await signInWithCustomToken(firebaseAuth(), signInToken);
+      // The account exists from here on: if Firebase's sign-in cannot finish (e.g. Google blocked),
+      // the owner must sign in with the new name and password, never make the account again.
+      try { await signInWithCustomToken(firebaseAuth(), signInToken); }
+      catch (error) { throw accountCreatedSignInFailed(error); }
       if (generation === version.current) await sync();
     } catch (error) { afterSignIn.current = null; if (generation === version.current) setState(emptyState('signedOut', authErrorMessage(error))); }
   }

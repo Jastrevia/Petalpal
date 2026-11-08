@@ -102,6 +102,9 @@ test("an account name and a password make an account, with its fairy, avatar, no
   assert.ok(!JSON.stringify(created).includes("garden123"));
   assert.equal(await verifyPassword("garden123", created.accountPassword.create.hash), true);
   assert.equal(created.fairies.create.name, "Mimi");
+  // A new account starts the first-time tour; a name given here (an older sign-up page) counts as named.
+  assert.equal(created.fairyState.create.tutorialStep, "intro.name");
+  assert.ok(created.fairyState.create.fairyNamedAt instanceof Date);
   assert.equal(created.avatar, "fairy-2");
   // It owns the one portrait chosen on the page plus three other random Level 1 avatars (its welcome
   // gift, New in Collection), and skips the Garden's avatar welcome.
@@ -112,9 +115,11 @@ test("an account name and a password make an account, with its fairy, avatar, no
   const gifts = rows.slice(1);
   assert.ok(gifts.every(row => row.source === "WELCOME_GIFT" && avatarTier(row.avatarId) === 1 && row.avatarId !== "fairy-2"));
   assert.equal(new Set(gifts.map(row => row.avatarId)).size, 3);
-  // No fairy name: the fairy keeps its own.
+  // No fairy name (the sign-up page no longer asks): she keeps PPL until the tour names her.
   await send(url, "/auth/register", "POST", profile({ name: "Bloom_2", fairyName: undefined }));
   assert.equal(created.fairies.create.name, "PPL");
+  assert.equal(created.fairyState.create.tutorialStep, "intro.name");
+  assert.equal(created.fairyState.create.fairyNamedAt, undefined, "the tour still asks for her name");
 });
 
 test("a taken name gets a clear refusal, and an id collision just draws again", async t => {

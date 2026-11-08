@@ -1,3 +1,4 @@
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -29,7 +30,9 @@ import { onOpenGardenPanel } from './gardenPanelBus';
 
 const MOMENTS_CHECK_MS = 5 * 60_000;
 // One navigation model; only its sizing changes with the viewport.
-export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) {
+// `paused`: the first-time tour is loading or running; the first-visit cards (avatar gift, AI
+// question, level-up) wait until it has finished so they never open over it.
+export function GardenHud({ onFocusFairy, paused = false }: { onFocusFairy?: () => void; paused?: boolean } = {}) {
   const insets = useSafeAreaInsets();
   const { theme, light } = usePanelTheme();
   const { width, height } = useWindowDimensions();
@@ -98,7 +101,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     // For 'profile' (Me), use the brighter hover/selected visual appearance permanently as default
     const isVisuallyActive = selected || isHovered || isProfile;
 
-    return <Pressable key={feature.id} accessibilityRole="button"
+    return <Pressable key={feature.id} {...onboardingTarget(`nav.${feature.id}`)} accessibilityRole="button"
       accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
       onFocus={() => setHighlightedFeature(feature.id)} onBlur={() => setHighlightedFeature(undefined)}
@@ -137,7 +140,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
       {gardenError ? <><Text accessibilityRole="alert" style={styles.label}>{gardenError}</Text>
         <Pressable accessibilityRole="button" onPress={() => void refreshGarden()}><Text style={styles.label}>{chinese ? '再试一次' : 'Try again'}</Text></Pressable></> : null}
     </View>
-    <AiConsentPrompt onOpenChange={setAiPromptOpen} />
+    {paused ? null : <AiConsentPrompt onOpenChange={setAiPromptOpen} />}
     <GardenDock chinese={chinese} ownerId={ownerId} />
     {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left}
       maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}
@@ -148,9 +151,9 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     <OurBondPanel visible={bondOpen} locale={locale} summary={closeness.summary} loading={closeness.on === null}
       onClose={() => setBondOpen(false)} />
     {/* A new account's first avatar, then the level-up celebration once no panel is open. */}
-    {ownerId ? <AvatarWelcome locale={locale} enabled /> : null}
+    {ownerId ? <AvatarWelcome locale={locale} enabled={!paused} /> : null}
     {ownerId ? <BondLevelUp userId={ownerId} locale={locale} summary={closeness.on ? closeness.summary : null}
-      paused={entryOpen || bondOpen || momentsOpen || avatarsOpen || aiPromptOpen || Boolean(openFeature)} onChoose={() => setAvatarsOpen(true)} /> : null}
+      paused={paused || entryOpen || bondOpen || momentsOpen || avatarsOpen || aiPromptOpen || Boolean(openFeature)} onChoose={() => setAvatarsOpen(true)} /> : null}
     <AvatarCollection visible={avatarsOpen} locale={locale} onClose={() => setAvatarsOpen(false)} />
     <FairyMomentsPanel visible={momentsOpen} highlightNewest={momentsHighlight} onClose={leaveMoments}
       onFindFairy={() => { leaveMoments(); onFocusFairy?.(); }} />

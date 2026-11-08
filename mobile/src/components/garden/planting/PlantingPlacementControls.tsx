@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import { onboardingTarget } from '../../onboarding/onboardingTargets';
 import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { clusterFootprintRadius } from './flowerClusters';
@@ -60,6 +61,7 @@ function PlantCheck({ camera, worldX, worldY, month, enabled, saving, label, onP
   return (
     <Animated.View pointerEvents="box-none" style={[styles.checkAnchor, position]}>
       <Pressable
+        testID="planting-confirm-button"
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: !enabled || saving, busy: saving }}
@@ -97,14 +99,14 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   const isValid = validationResult?.isValid ?? false;
   // Nothing is planted until ✓: first a tap on the lawn shows the ghost there.
   const feedback = !previewCoords || !validationResult?.userFeedback
-    ? (zh ? `点一下${monthName}花园里你想种的地方。` : `Tap the spot in the ${monthName} garden where it should grow.`)
+    ? (zh ? `点一下${monthName}花园里发着柔光的花床，选你想种的地方。` : `Tap the spot in the glowing ${monthName} bed where it should grow.`)
     : isValid ? (zh ? '点 ✓ 就种在这里。' : 'Tap ✓ to plant it here.')
     : zh ? zhFeedback(validationResult.userFeedback) : validationResult.userFeedback;
 
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
       {/* Top Guidance Banner */}
-      <View style={styles.topBanner}>
+      <View {...onboardingTarget('planting.banner')} style={styles.topBanner}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {zh ? '🌱 正在种花' : '🌱 PLANTING FLOWER'}
@@ -130,7 +132,10 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
           </Text>
         </View>
         <Text style={styles.foreverText}>
-          {zh ? '种下以后，位置就不能再改了。' : 'Once planted, it stays in this spot for good.'}
+          {previewCoords && !isValid
+            // A tap outside the bed never drops the flower: it waits, with its Event, until it is planted.
+            ? (zh ? '只能种在发着柔光的花床里。你的 Event 和这朵花都还在，选好位置再点 ✓。' : 'Only the glowing bed can take it. Your Event and flower are kept; pick a spot there, then tap ✓.')
+            : (zh ? '种下以后，位置就不能再改了。' : 'Once planted, it stays in this spot for good.')}
         </Text>
 
         {showPlacementDebug && previewCoords && (
@@ -157,8 +162,12 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         <Pressable
+          testID="planting-cancel-button"
           accessibilityRole="button"
+          accessibilityLabel={zh ? '取消' : 'Cancel'}
           onPress={cancelPlacement}
+          // While the spot is being saved the server may already hold it: cancelling then would leave
+          // this device and the server disagreeing, so Cancel waits for the answer.
           disabled={isSaving}
           style={({ pressed }) => [
             styles.cancelButton,
