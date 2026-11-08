@@ -92,6 +92,7 @@ import {
 } from "./lib/ai-jobs.js";
 import {
   localDateForInstant,
+  normalizeIanaTimezone,
   monthlyPeriodFor,
   previousMonthlyPeriod,
   reportPeriodStatus,
@@ -517,18 +518,11 @@ for (const parameter of ["userId", "id", "fairyId", "requestId", "flowerId", "ev
     return next();
   });
 }
+// Missing or over-long input means UTC; an unknown zone name is null. Validation and
+// formatting reuse the cached helpers in lib/ai-periods.js.
 function normalizeTimezone(value) {
-  const timezone =
-    typeof value === "string" && value.trim() && value.trim().length <= 64
-      ? value.trim()
-      : "UTC";
-
-  try {
-    new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format();
-    return timezone;
-  } catch {
-    return null;
-  }
+  const usable = typeof value === "string" && value.trim() && value.trim().length <= 64;
+  return normalizeIanaTimezone(usable ? value : "UTC");
 }
 
 function normalizeLocale(value) {
@@ -543,18 +537,7 @@ function normalizeLocale(value) {
 }
 
 function getLocalDate(timezone) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-
-  const values = Object.fromEntries(
-    parts.map(({ type, value }) => [type, value])
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
+  return localDateForInstant(new Date(), timezone);
 }
 
 function hashAiInput(text) {
