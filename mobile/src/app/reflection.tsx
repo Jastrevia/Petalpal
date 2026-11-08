@@ -348,6 +348,34 @@ export default function Reflection() {
   // A phone frames the painting to fill its screen (scene.compact crops toward the shelf), and the
   // book opens on the desk as the same two-page spread a wide screen shows (owner, 2026-11-08).
   const compact = false, wide = false;
+  // A phone crops the painting to fill its screen, framed on the shelf first. A sideways drag moves
+  // it to see the rest (window, lake, lantern); opening a book glides back to that first frame,
+  // where the book lands on the desk, and the painting stays still while a book is out.
+  const panMin = scene.compact ? Math.min(0, width - (scene.art.x + scene.art.width)) : 0;
+  const panMax = scene.compact ? Math.max(0, -scene.art.x) : 0;
+  const pan = useRef(new Animated.Value(0)).current;
+  const panAt = useRef(0);
+  const panning = useRef({ allowed: false, min: 0, max: 0 });
+  panning.current = { allowed: scene.compact && !open && !flying, min: panMin, max: panMax };
+  const clampPan = (value: number) => Math.min(panning.current.max, Math.max(panning.current.min, value));
+  useEffect(() => {
+    if (panning.current.allowed && panAt.current === clampPan(panAt.current)) return;
+    const to = panning.current.allowed ? clampPan(panAt.current) : 0;
+    panAt.current = to;
+    Animated.timing(pan, { toValue: to, duration: reducedMotion ? 0 : 320, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start();
+  }, [open, flying, width, height, panMin, panMax]);
+  const lookAround = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, g) => panning.current.allowed && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderGrant: () => pan.stopAnimation(value => { panAt.current = value; }),
+    onPanResponderMove: (_event, g) => pan.setValue(clampPan(panAt.current + g.dx)),
+    onPanResponderRelease: (_event, g) => {
+      // A flick carries on a little, as a hand-moved picture would.
+      const to = clampPan(panAt.current + g.dx + g.vx * 160);
+      panAt.current = to;
+      Animated.timing(pan, { toValue: to, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: (_event, g) => { panAt.current = clampPan(panAt.current + g.dx); pan.setValue(panAt.current); },
+  })).current;
   const sceneWidth = width, artHeight = scene.art.height;
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
   const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
@@ -512,7 +540,9 @@ export default function Reflection() {
   return <View style={{ flex: 1, backgroundColor: '#34251A' }}>
     {/* clip, not hidden, on the web: a phone's scaled-down pages keep their wide layout box, and a
         focused button there must not scroll the scene sideways (a hidden box can still scroll). */}
-    <View style={{ width, height, overflow: (Platform.OS === 'web' ? 'clip' : 'hidden') as 'hidden' }} testID="reflection-scene">
+    <View style={{ width, height, overflow: (Platform.OS === 'web' ? 'clip' : 'hidden') as 'hidden' }} testID="reflection-scene" {...lookAround.panHandlers}>
+    {/* A phone sees part of the painting: a finger moves it to look around (window, lake, shelf). */}
+    <Animated.View testID="reflection-look" pointerEvents="box-none" style={[StyleSheet.absoluteFill, { transform: [{ translateX: pan }] }]}>
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height }} />
         {/* Both paintings share the original pixel geometry. Lighting lives below
@@ -591,6 +621,7 @@ export default function Reflection() {
         accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)}
         style={{ position: 'absolute', left: scene.lantern.x, top: scene.lantern.y,
           width: scene.lantern.width, height: scene.lantern.height }} />}
+    </Animated.View>
     </View>
     {/* While a phone reads a book, the book's own ✕ is the only close button. */}
     {!(compact && open) && <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
