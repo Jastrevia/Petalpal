@@ -86,19 +86,15 @@ const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
 
-// Below this width the wide layout is drawn at PHONE_DESK_WIDTH and scaled to fit.
-const PHONE_DESK_MIN = 640, PHONE_DESK_WIDTH = 640;
+// The narrowest spread whose pages keep a wide screen's layout (a phone scales it down).
+const PHONE_SPREAD_WIDTH = 540;
 // Up to 25 pages of 20 (about nine years of Weekly and Monthly reflections).
 const MAX_REPORT_PAGES = 25;
 export default function Reflection() {
   const router = useRouter();
   const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
-  // A phone shows the same pavilion as a wide screen (the painting, the shelf, the book flying to the
-  // desk and opening as a spread), laid out at a wide size and scaled down to the phone's width.
-  const screen = useWindowDimensions();
-  const phoneScale = screen.width < PHONE_DESK_MIN ? screen.width / PHONE_DESK_WIDTH : 1;
-  const width = screen.width / phoneScale, height = screen.height / phoneScale;
+  const { width, height } = useWindowDimensions();
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
   const night = (__DEV__ ? nightOverride : null) ?? worldNight;
@@ -349,7 +345,9 @@ export default function Reflection() {
   const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
   const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
   const instructionTop = scene.art.y + scene.art.height * .63 - 22;
-  const compact = scene.compact, wide = false;
+  // A phone frames the painting to fill its screen (scene.compact crops toward the shelf), and the
+  // book opens on the desk as the same two-page spread a wide screen shows (owner, 2026-11-08).
+  const compact = false, wide = false;
   const sceneWidth = width, artHeight = scene.art.height;
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
   const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
@@ -371,6 +369,14 @@ export default function Reflection() {
     width: leaves.right.x + leaves.right.width - leaves.left.x,
     height: Math.max(leaves.left.height, leaves.right.height),
   };
+  // On a phone the spread is narrower than any wide screen's: its pages are laid out at a wide
+  // spread's width and scaled down onto the book, so they read exactly as they do there.
+  const pageScale = scene.compact ? Math.min(1, readingRect.width / PHONE_SPREAD_WIDTH) : 1;
+  const unscale = (r: { x: number; y: number; width: number; height: number }) => pageScale === 1 ? r : {
+    x: readingRect.x + (r.x - readingRect.x) / pageScale, y: readingRect.y + (r.y - readingRect.y) / pageScale,
+    width: r.width / pageScale, height: r.height / pageScale };
+  const pageRect = unscale(readingRect);
+  const pageLeaves = pageScale === 1 ? leaves : { left: unscale(leaves.left), right: unscale(leaves.right) };
   const area = { left: 0, top: 0, width: readingRect.width, height: readingRect.height };
   const pageWidth = leaves.right.width;
   const backwards = !!turning && turning.to < turning.from;
@@ -503,8 +509,10 @@ export default function Reflection() {
   const leafSize = { left: compact ? 0 : leaves.right.x - readingRect.x, width: pageWidth, height: contentHeight };
 
 
-  return <View style={{ flex: 1, backgroundColor: '#34251A', overflow: 'hidden' }}>
-    <View style={{ width, height, overflow: 'hidden', ...(phoneScale !== 1 ? { transform: [{ scale: phoneScale }], transformOrigin: 'top left' } : null) }} testID="reflection-scene">
+  return <View style={{ flex: 1, backgroundColor: '#34251A' }}>
+    {/* clip, not hidden, on the web: a phone's scaled-down pages keep their wide layout box, and a
+        focused button there must not scroll the scene sideways (a hidden box can still scroll). */}
+    <View style={{ width, height, overflow: (Platform.OS === 'web' ? 'clip' : 'hidden') as 'hidden' }} testID="reflection-scene">
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height }} />
         {/* Both paintings share the original pixel geometry. Lighting lives below
@@ -558,15 +566,16 @@ export default function Reflection() {
           position: 'absolute',
           left: readingRect.x,
           top: readingRect.y,
-          width: readingRect.width,
-          height: readingRect.height,
+          width: pageRect.width,
+          height: pageRect.height,
           opacity: contentFade,
+          ...(pageScale !== 1 ? { transform: [{ scale: pageScale }], transformOrigin: 'top left' } : null),
         }}>
         <PavilionBookReader
           bookId={open}
           locale={lang}
-          leaves={leaves}
-          readingRect={readingRect}
+          leaves={pageLeaves}
+          readingRect={pageRect}
           compact={compact}
           reports={pages}
           details={details}
