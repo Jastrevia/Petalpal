@@ -82,6 +82,7 @@ import {
   withOnboardingGuideFairy,
   nextUnlockableFairy
 } from "./lib/fairy-config.js";
+import { normalizeFairyName } from "./lib/onboarding-tutorial.js";
 import { monthFromLocalDate, normalizeProgress } from "./lib/fairy-progress.js";
 import { resolveDailyFlowerEmotion } from "./lib/daily-flower-input.js";
 import {
@@ -1806,6 +1807,124 @@ app.get("/api/fairies", async (req, res) => {
     })),
     activeFairyId: fairies.find(({ isActive }) => isActive)?.id || null
   });
+});
+
+app.get("/api/onboarding", async (req, res) => {
+  try {
+    const fairyState = await prisma.fairyState.findUnique({
+      where: { userId: req.auth.userId },
+      select: { onboardingCompleted: true, onboardingStep: true }
+    });
+
+    if (fairyState?.onboardingCompleted) {
+      const starter = await prisma.userFairy.findUnique({
+        where: { userId_fairyType: { userId: req.auth.userId, fairyType: STARTER_FAIRY.type } },
+        select: { name: true }
+      });
+      return res.json({
+        status: "completed",
+        step: "done",
+        fairyName: starter?.name || null,
+        fairyNamed: Boolean(starter?.name),
+        firstEventId: null,
+        firstFlowerId: null,
+        flowerPlanted: true
+      });
+    }
+
+    return res.status(404).json({
+      error: "Onboarding in progress",
+      status: "active",
+      step: "intro.name"
+    });
+  } catch (error) {
+    logServerError("GET /api/onboarding error", error);
+    return res.status(500).json({ error: "Failed to load onboarding status" });
+  }
+});
+
+app.patch("/api/onboarding", async (req, res) => {
+  try {
+    const { complete, fairyName, step, firstEventId, firstFlowerId, flowerPlanted } = req.body;
+
+    let normalizedName = null;
+    if (fairyName !== undefined) {
+      try {
+        normalizedName = normalizeFairyName(fairyName);
+      } catch (err) {
+        return res.status(err.status || 400).json({ error: err.message, code: err.code });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await lockTransaction(tx, "fairy-owner", req.auth.userId);
+
+      if (normalizedName) {
+        const existingStarter = await tx.userFairy.findUnique({
+          where: { userId_fairyType: { userId: req.auth.userId, fairyType: STARTER_FAIRY.type } }
+        });
+        if (existingStarter) {
+          await tx.userFairy.update({ where: { id: existingStarter.id }, data: { name: normalizedName } });
+        } else {
+          const active = await tx.userFairy.findFirst({ where: { userId: req.auth.userId, isActive: true } });
+          await tx.userFairy.create({
+            data: {
+              userId: req.auth.userId,
+              fairyType: STARTER_FAIRY.type,
+              name: normalizedName,
+              unlockSource: STARTER_FAIRY.unlockSource,
+              isActive: !active,
+              runtime: { create: {} }
+            }
+          });
+        }
+      }
+
+      if (complete === true) {
+        await tx.fairyState.upsert({
+          where: { userId: req.auth.userId },
+          update: {
+            onboardingCompleted: true,
+            onboardingStep: "GARDEN_UNLOCKED"
+          },
+          create: {
+            userId: req.auth.userId,
+            onboardingCompleted: true,
+            onboardingStep: "GARDEN_UNLOCKED"
+          }
+        });
+        await ensureStarterFairyInTransaction(tx, req.auth.userId);
+      }
+
+      const [currentState, starter] = await Promise.all([
+        tx.fairyState.findUnique({
+          where: { userId: req.auth.userId },
+          select: { onboardingCompleted: true, onboardingStep: true }
+        }),
+        tx.userFairy.findUnique({
+          where: { userId_fairyType: { userId: req.auth.userId, fairyType: STARTER_FAIRY.type } },
+          select: { name: true }
+        })
+      ]);
+
+      const isCompleted = Boolean(currentState?.onboardingCompleted);
+
+      return {
+        status: isCompleted ? "completed" : "active",
+        step: isCompleted ? "done" : (step || (normalizedName ? "intro.celebrate" : "intro.name")),
+        fairyName: starter?.name || normalizedName || null,
+        fairyNamed: Boolean(starter?.name || normalizedName),
+        firstEventId: firstEventId || null,
+        firstFlowerId: firstFlowerId || null,
+        flowerPlanted: Boolean(flowerPlanted || isCompleted)
+      };
+    });
+
+    return res.json(result);
+  } catch (error) {
+    logServerError("PATCH /api/onboarding error", error);
+    return res.status(500).json({ error: "Failed to update onboarding status" });
+  }
 });
 
 app.put("/api/fairies/:fairyId/active", async (req, res) => {

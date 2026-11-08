@@ -602,11 +602,47 @@ test('per-user onboarding persistence: new accounts start at intro, returning co
     removeItem: async (key) => { storeMap.delete(key); },
   };
 
+  let serverAvailable = false;
+  let activeUser = 'user-alice-123';
+  const completedUsers = new Set();
+
   const mockApi = {
-    apiRequest: async () => {
-      const err = new Error('Not Found');
-      err.status = 404;
-      throw err;
+    apiRequest: async (path, method, body) => {
+      if (path === '/api/onboarding') {
+        if (!serverAvailable) {
+          const err = new Error('Service Unavailable');
+          err.status = 503;
+          throw err;
+        }
+        if (method === 'PATCH') {
+          if (body?.complete) completedUsers.add(activeUser);
+          const isDone = completedUsers.has(activeUser);
+          return {
+            status: isDone ? 'completed' : 'active',
+            step: isDone ? 'done' : (body?.step || 'intro.name'),
+            fairyName: 'Lumi',
+            fairyNamed: true,
+            firstEventId: null,
+            firstFlowerId: null,
+            flowerPlanted: true,
+          };
+        }
+        if (completedUsers.has(activeUser)) {
+          return {
+            status: 'completed',
+            step: 'done',
+            fairyName: 'Lumi',
+            fairyNamed: true,
+            firstEventId: null,
+            firstFlowerId: null,
+            flowerPlanted: true,
+          };
+        }
+        const err = new Error('Onboarding in progress');
+        err.status = 404;
+        throw err;
+      }
+      throw new Error(`Unexpected path ${path}`);
     },
   };
 
@@ -655,7 +691,7 @@ test('per-user onboarding persistence: new accounts start at intro, returning co
   assert.equal(store.onboardingState().fairyName, 'Lumi');
   assert.equal(store.onboardingState().fairyNamed, true);
 
-  // Advance Alice to completion
+  // Advance Alice to Finale
   store.dispatchOnboarding({ type: 'featureOpened', feature: 'events' });
   store.dispatchOnboarding({ type: 'draftChanged', hasText: true });
   store.dispatchOnboarding({ type: 'moodSelected' });
@@ -683,19 +719,35 @@ test('per-user onboarding persistence: new accounts start at intro, returning co
   store.dispatchOnboarding({ type: 'next' }); // me.space -> me.privacy
   store.dispatchOnboarding({ type: 'next' }); // me.privacy -> finale
   assert.equal(store.onboardingState().step, 'finale');
+
+  // Scenario F: Finale completes while backend is temporarily unavailable
   store.dispatchOnboarding({ type: 'finaleDone' });
   await store.retryOnboardingSync();
   assert.equal(store.onboardingState().step, 'done');
-  assert.equal(store.onboardingState().phase, 'completed');
+  assert.equal(store.onboardingState().syncFailed, true);
+  // Local completion is preserved in AsyncStorage
+  const localAlice = JSON.parse(storeMap.get('petalpal_onboarding_progress_v1:user-alice-123'));
+  assert.equal(localAlice.status, 'completed');
+  assert.equal(localAlice.step, 'done');
 
-  // Next session: Alice stays completed
+  // Backend becomes available again and retry succeeds
+  serverAvailable = true;
+  await store.retryOnboardingSync();
+  assert.equal(store.onboardingState().step, 'done');
+  assert.equal(store.onboardingState().phase, 'completed');
+  assert.equal(store.onboardingState().syncFailed, false);
+  assert.equal(completedUsers.has('user-alice-123'), true, 'server must acknowledge database completion');
+
+  // Next session (or fresh login on another device): Alice stays completed
   store.endOnboardingSession();
+  activeUser = 'user-alice-123';
   await store.beginOnboarding('user-alice-123');
   assert.equal(store.onboardingState().phase, 'completed');
   assert.equal(store.onboardingState().step, 'done');
   store.endOnboardingSession();
 
   // Scenario D: Multi-user isolation on the same device - user Charlie is untouched and fresh
+  activeUser = 'user-charlie-fresh';
   await store.beginOnboarding('user-charlie-fresh');
   assert.equal(store.onboardingState().phase, 'active');
   assert.equal(store.onboardingState().step, 'intro.name');

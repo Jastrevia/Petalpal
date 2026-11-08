@@ -119,6 +119,10 @@ export async function updateOnboarding(update: OnboardingUpdate, userId?: string
     try {
       await AsyncStorage.setItem(userStorageKey(ownerId), JSON.stringify(next));
     } catch {}
+
+    if (serverErr && update.complete) {
+      throw serverErr;
+    }
     return serverProgress || next;
   }
 
