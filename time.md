@@ -233,9 +233,23 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   **TESTED BEHAVIOR:** [test/back/vancouver-timezone.test.js](test/back/vancouver-timezone.test.js)
   fails on stale tzdata; `.github/workflows/runtime-tzdata-verification.yml`
   checks the runtime.
-- **Daily Grow** computes its local date with a separate helper
-  (`getLocalDate`/`normalizeTimezone` in [server.js](server.js)), also from
-  `User.timezone`.
+- **Daily Grow** computes its local date from `User.timezone` with
+  `getLocalDate`/`normalizeTimezone` in [server.js](server.js); since 2026-11-07
+  these delegate to `localDateForInstant`/`normalizeIanaTimezone` in
+  [lib/ai-periods.js](lib/ai-periods.js), as does the Flower Support day
+  (`getSupportCalendarDay` in [lib/flower-support.js](lib/flower-support.js)).
+  Missing or over-long input still means `UTC`; an unknown zone name is still
+  `null` (Daily Grow) or falls back to `UTC` (Flower Support).
+- **Cached zone validation and formatters.** `normalizeIanaTimezone` remembers
+  valid zone names and `localDateForInstant` reuses one `Intl.DateTimeFormat`
+  per zone, because building a formatter per call was a CPU hotspot in a local
+  load test ([docs/testing/LOCAL_LOAD_TEST.md](docs/testing/LOCAL_LOAD_TEST.md)).
+  Unknown zones are never cached, and each cache resets at
+  1,000 entries so client-supplied strings cannot grow memory without bound.
+  Results are unchanged. **TESTED BEHAVIOR:**
+  [test/back/timezone-cache.test.js](test/back/timezone-cache.test.js) compares
+  cached results with a fresh formatter across zones, midnights and DST changes,
+  and checks that unknown zones are not cached and the caches stay bounded.
 - **Treehouse future-month lock** (client display only): the Treehouse bookshelf locks months after the
   owner's current month and years after the current year, comparing `year * 12 + month` with today's date in
   `User.timezone` (`todayLocalDate`, `monthLocked`, `yearLocked` in
