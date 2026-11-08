@@ -6,6 +6,7 @@ import GardenStaticPicture from './GardenStaticPicture';
 import type { GardenLoadStore } from './loading/gardenReadiness';
 import { GARDEN_LANDS, type GardenLand, type GardenLandLayout } from './gardenMapLayout';
 import GardenShoreContact, { makeShoreCoverage } from './water/GardenShoreContact';
+import { protectGardenHandle } from './webNativeHandles';
 
 // The shore and opaque passes share the same decoded artwork and GPU texture.
 // Keep loading in this owning scene root, outside cached static recordings.
@@ -23,7 +24,12 @@ export function GardenLandResources({ children, loadStore }: { children: ReactNo
     [land.source, [central, upper, june, july, august, september, autumn][index]])),
   [central, upper, june, july, august, september, autumn]);
   const loaded = [central, upper, june, july, august, september, autumn].filter(Boolean).length;
-  useEffect(() => { loadStore.publishLandsLoaded(loaded, 7); }, [loadStore, loaded]);
+  useEffect(() => {
+    [central, upper, june, july, august, september, autumn].forEach(img => {
+      if (img) protectGardenHandle(img);
+    });
+    loadStore.publishLandsLoaded(loaded, 7);
+  }, [loadStore, loaded, central, upper, june, july, august, september, autumn]);
   useEffect(() => () => loadStore.publishLandsLoaded(0, 7), [loadStore]);
   return <LandImages.Provider value={images}>{children}</LandImages.Provider>;
 }
@@ -31,7 +37,9 @@ export function GardenLandResources({ children, loadStore }: { children: ReactNo
 function Land({ land, selected, renderPass }: { land: GardenLand; selected: boolean; renderPass: 'shore' | 'land' }) {
   const shared = useContext(LandImages);
   const fallback = useImage(shared?.has(land.source) ? null : land.source);
-  const image = shared?.has(land.source) ? shared.get(land.source) : fallback;
+  const rawImage = shared?.has(land.source) ? shared.get(land.source) : fallback;
+  const isAlive = rawImage && !(typeof (rawImage as any).isDeleted === 'function' && (rawImage as any).isDeleted()) && !((rawImage as any).ref && typeof (rawImage as any).ref.isDeleted === 'function' && (rawImage as any).ref.isDeleted());
+  const image = isAlive ? rawImage : null;
   const coverage = useMemo(() => renderPass === 'shore' && Platform.OS === 'web' && image ? makeShoreCoverage(image,land.width) : null, [image,land.width,renderPass]);
   const images = useMemo(() => image ? coverage ? [image,coverage] : [image] : [], [image,coverage]);
   const drawing = useMemo(() => {

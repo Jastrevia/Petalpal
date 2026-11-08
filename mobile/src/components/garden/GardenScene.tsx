@@ -1,9 +1,14 @@
+import { runOnJS } from 'react-native-reanimated';
+import type { GardenCameraApi } from '../onboarding/gardenCamera';
+import { dispatchOnboarding } from '../onboarding/onboardingSignals';
+import { onboardingActive } from '../onboarding/onboardingStore';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import FireflyLayer from './fireflies/FireflyLayer';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
 import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
 import ExistingWindowLights from './lanterns/ExistingWindowLights';
 import { useNightLighting } from './lanterns/nightLighting';
-import { usePathname } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
 import LanternLayer from './lanterns/LanternLayer';
 import LanternPlacementEditor from './lanterns/LanternPlacementEditor';
 import { useLanternPlacements } from './lanterns/useLanternPlacements';
@@ -26,8 +31,7 @@ import { forwardRef, useImperativeHandle, type Ref, useCallback, useEffect, useM
 import { isGardenGroundBlocked, isOnMonthLawn, monthLawnBounds } from './fairy/gardenGround';
 import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel';
 import {DEFAULT_ISOLATION,type GardenIsolation,runtimeAudit} from './performance/runtimeAudit';
-import {productionQARecords} from './planting/productionGrowthQAData';
-import { useFocusEffect } from 'expo-router';
+import { productionQARecords } from './planting/productionGrowthQAData';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -91,7 +95,6 @@ import { getFlowerPlacementDefinition } from './planting/flowerFootprintConfig';
 import { MONTH_CENTROIDS, MONTH_REGION_METAS } from './planting/plantingRegionData';
 import { getApprovedMonthCentroid } from './planting/approvedPlantingMasks';
 import { FlowerPlacementRecord, awaitsPlanting } from './planting/plantingPersistence';
-import { useLocalSearchParams } from 'expo-router';
 import GardenReferenceLayer from './GardenReferenceLayer';
 import NativeLandCalibrationEditor from './NativeLandCalibrationEditor';
 import SwingCalibrationEditor, { type SwingMapPlacement } from './SwingCalibrationEditor';
@@ -269,6 +272,8 @@ export type GardenSceneProps = {
   locale?: string | null;
   /** Partner preview alias: 'player' hides the same DEV controls as showDevControls={false}. */
   mode?: 'development' | 'player';
+  /** First-time tour layer, drawn above the Garden with eased access to the existing camera. */
+  renderOverlay?: (camera: GardenCameraApi) => import('react').ReactNode;
 };
 
 // Whether a tap is on (or within a finger's reach of) a month's lawn.
@@ -293,7 +298,7 @@ function monthLawnAt(x: number, y: number) {
 }
 const LAWN_NOTE_MS = 2800;
 
-function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenEvents, monthLawnOpensEvents = false, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development' }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
+function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true, initialWaterfallVersion = 'legacy', showDevControls = true, readOnly = false, onOpenBookhouse, onOpenEvents, monthLawnOpensEvents = false, onOpenReflection, showCalendar = false, locale, children, onTreehouseEntered, onTreehouseExited, onMailboxOpened, onMailboxPhaseChange, interactionRef, mode = 'development', renderOverlay }: GardenSceneProps & {interactionRef?:Ref<GardenSceneHandle>} = {}) {
   const isDev = showDevControls && mode === 'development';
   runtimeAudit.render('GardenScene');
   const planting = usePlanting();
@@ -624,6 +629,58 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     cameraY.value = withTiming(next.y, timing);
     cameraZoom.value = withTiming(next.zoom, timing);
   }, [viewport.width, viewport.height, fit, baseX, baseY, cameraX, cameraY, cameraZoom, reducedCameraMotion]);
+  // Eased camera moves for the first-time tour. One progress value drives zoom (geometric) and
+  // the world point at the screen centre (linear), and every frame is clamped by the same
+  // camera contract as gestures, so a move never fights the clamp or leaves the Garden.
+  const cameraTween = useSharedValue({ active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 });
+  const cameraProgress = useSharedValue(0);
+  useAnimatedReaction(() => cameraProgress.value, t => {
+    const a = cameraTween.value;
+    if (!a.active || fit <= 0) return;
+    const z = a.fromZ * Math.pow(a.toZ / a.fromZ, t);
+    const cx = a.fromX + (a.toX - a.fromX) * t, cy = a.fromY + (a.toY - a.fromY) * t;
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(z) || z <= 0) return;
+    const next = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY,
+      viewport.width / 2 - baseX - cx * fit * z, viewport.height / 2 - baseY - cy * fit * z, z);
+    if (Number.isFinite(next.x) && Number.isFinite(next.y) && Number.isFinite(next.zoom)) {
+      cameraX.value = next.x; cameraY.value = next.y; cameraZoom.value = next.zoom;
+    }
+  }, [viewport.width, viewport.height, fit, baseX, baseY]);
+  const cameraApi = useMemo<GardenCameraApi>(() => {
+    const minimum = fit > 0 ? constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom : 1;
+    const centre = (x: number, y: number, zoom: number) => {
+      const denom = fit * zoom;
+      if (denom <= 0 || !Number.isFinite(denom)) return { x: 0, y: 0 };
+      return {
+        x: (viewport.width / 2 - baseX - x) / denom,
+        y: (viewport.height / 2 - baseY - y) / denom,
+      };
+    };
+    return {
+      x: cameraX, y: cameraY, zoom: cameraZoom, fit, baseX, baseY, viewport,
+      limits: { min: minimum, max: Math.max(3, minimum * 3) },
+      animateTo: (frame, durationMs) => new Promise<boolean>(resolve => {
+        if (fit <= 0 || viewport.width <= 0 || viewport.height <= 0 || !Number.isFinite(frame.x) || !Number.isFinite(frame.y) || !Number.isFinite(frame.zoom)) {
+          resolve(false);
+          return;
+        }
+        const target = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, frame.x, frame.y, frame.zoom);
+        const from = centre(cameraX.value, cameraY.value, cameraZoom.value), to = centre(target.x, target.y, target.zoom);
+        if (!Number.isFinite(from.x) || !Number.isFinite(from.y) || !Number.isFinite(to.x) || !Number.isFinite(to.y)) {
+          resolve(false);
+          return;
+        }
+        cancelAnimation(cameraX); cancelAnimation(cameraY); cancelAnimation(cameraZoom);
+        cameraTween.value = { active: 1, fromX: from.x, fromY: from.y, fromZ: cameraZoom.value, toX: to.x, toY: to.y, toZ: target.zoom };
+        cameraProgress.value = 0;
+        cameraProgress.value = withTiming(1, { duration: reducedCameraMotion ? 0 : durationMs, easing: Easing.inOut(Easing.cubic) },
+          finished => {
+            cameraTween.value = { active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 };
+            runOnJS(resolve)(Boolean(finished));
+          });
+      }),
+    };
+  }, [fit, baseX, baseY, viewport, cameraX, cameraY, cameraZoom, cameraTween, cameraProgress, reducedCameraMotion]);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const element = sceneElement.current as unknown as HTMLElement | null;
@@ -758,15 +815,26 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     };
     if (plantingMonth !== null) {
       if (!plantingCamera.current) plantingCamera.current = { x: cameraX.value, y: cameraY.value, zoom: cameraZoom.value };
-      const b = monthLawnBounds(plantingMonth);
-      const zoom = Math.max(1.2, Math.min(3, 0.72 * Math.min(viewport.width / ((b.maxX - b.minX) * fit), viewport.height / ((b.maxY - b.minY) * fit))));
-      glide(viewport.width / 2 - baseX - (b.minX + b.maxX) / 2 * fit * zoom, viewport.height / 2 - baseY - (b.minY + b.maxY) / 2 * fit * zoom, zoom);
+      if (!onboardingActive()) {
+        const b = monthLawnBounds(plantingMonth);
+        const zoom = Math.max(1.2, Math.min(3, 0.72 * Math.min(viewport.width / ((b.maxX - b.minX) * fit), viewport.height / ((b.maxY - b.minY) * fit))));
+        glide(viewport.width / 2 - baseX - (b.minX + b.maxX) / 2 * fit * zoom, viewport.height / 2 - baseY - (b.minY + b.maxY) / 2 * fit * zoom, zoom);
+      }
     } else if (plantingCamera.current) {
       const back = plantingCamera.current;
       plantingCamera.current = null;
-      glide(back.x, back.y, back.zoom);
+      if (!onboardingActive()) glide(back.x, back.y, back.zoom);
     }
   }, [plantingMonth, viewport.width, viewport.height, fit, baseX, baseY, calendarReducedMotion, cameraX, cameraY, cameraZoom]);
+
+  const prevActiveModeRef = useRef(activeMode);
+  useEffect(() => {
+    const wasPlanting = prevActiveModeRef.current === 'planting';
+    prevActiveModeRef.current = activeMode;
+    if (wasPlanting && activeMode === 'normal' && searchParams.mode === 'plant') {
+      router.setParams({ mode: undefined, flowerId: undefined });
+    }
+  }, [activeMode, searchParams.mode]);
   // A lawn with flowers was tapped: it glows where the finger touched, the camera leans towards
   // it, and Events opens as the lean finishes.
   const openLawnEvents = useCallback((month: number, worldX: number, worldY: number) => {
@@ -796,7 +864,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   }, [fit, plantingCalibrationMap, calibrationLayout, focusCoords]);
 
   useEffect(() => {
-    if (readOnly || (!searchParams.mode && !searchParams.calMode)) return;
+    if (readOnly || (!searchParams.mode && !searchParams.calMode)) {
+      handledParamRef.current = null;
+      return;
+    }
     const paramKey = `${searchParams.mode || ''}-${searchParams.flowerId || ''}-${searchParams.calMode || ''}`;
     if (handledParamRef.current === paramKey) return;
     handledParamRef.current = paramKey;
@@ -821,8 +892,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         speciesCode: searchParams.speciesCode,
         mood: searchParams.mood,
       });
-      const c = getApprovedMonthCentroid(monthNum);
-      focusCoords(c.x, c.y);
+      if (!onboardingActive()) {
+        const c = getApprovedMonthCentroid(monthNum);
+        focusCoords(c.x, c.y);
+      }
       setPreviewMode(true);
     } else if (searchParams.mode === 'focus') {
       // A planted flower never moves; this only brings it into view.
@@ -1079,7 +1152,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (readOnly) return;
       // Planting zooms in on the month's lawn: a tap well away from it leaves planting.
       const month = plantingMonthRef.current;
-      if (month !== null && !nearLawn(month, worldX, worldY)) { cancelPlacement(); return; }
+      if (month !== null && !(typeof onboardingActive === 'function' && onboardingActive()) && !nearLawn(month, worldX, worldY)) { cancelPlacement(); return; }
       updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;
@@ -1338,7 +1411,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         cameraY.value = next.y;
       });
     const tap = Gesture.Tap()
-      .enabled(!((enableFairyWalk || readOnly) && Platform.OS === 'web'))
+      .enabled(!((enableFairyWalk || readOnly || activeMode !== 'normal') && Platform.OS === 'web'))
       .maxDuration(250)
       .runOnJS(true)
       .onEnd((event) => {
@@ -1359,7 +1432,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     }
     return Gesture.Simultaneous(effectivePan, pinch, tap);
   }, [baseX, baseY, fit, cameraX, cameraY, cameraZoom, focalWorldX, focalWorldY,
-    viewport.width, viewport.height, startX, startY, startZoom, handleGardenTap, enableFairyWalk, readOnly, previewMode, calibrationMode, calSubMode, calDragMode, paintInteractionMode, maskPan, paintPan, moveMaskPan]);
+    viewport.width, viewport.height, startX, startY, startZoom, handleGardenTap, enableFairyWalk, readOnly, activeMode, previewMode, calibrationMode, calSubMode, calDragMode, paintInteractionMode, maskPan, paintPan, moveMaskPan]);
   const resetView = useCallback(() => {
     const minimum = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom;
     cameraZoom.value = minimum;
@@ -1430,8 +1503,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       // Web Fairy taps should not expire with the shared camera gesture's
       // 250ms timer. Only canvas presses qualify; controls, drags and pinches do not.
       onPointerDown={(event) => {
-        // A friend's Garden (readOnly) uses the same path for opening flowers.
-        if (!(enableFairyWalk || readOnly) || Platform.OS !== 'web') return;
+        // A friend's Garden (readOnly) and active planting mode use the same path on web.
+        if (!(enableFairyWalk || readOnly || (typeof activeModeRef !== 'undefined' && activeModeRef.current !== 'normal')) || Platform.OS !== 'web') return;
         const e = event.nativeEvent;
         fairyPress.current = e.isPrimary && e.button === 0 &&
           (event.target as unknown as { tagName?: string }).tagName === 'CANVAS'
@@ -1703,10 +1776,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         }} />}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      <View style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => zoomAt(1 / 1.25)}
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => zoomAt(1.25)}
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>+</Text></Pressable>
       </View>
       {isDev && __DEV__ && <GardenRuntimePanel flags={perfFlags} onFlags={setPerfFlags} count={perfCount} onCount={setPerfCount}
@@ -2302,6 +2375,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           />
         )
       )}
+      {renderOverlay && !readOnly ? renderOverlay(cameraApi) : null}
     </View>
   );
 }

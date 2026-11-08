@@ -1,3 +1,5 @@
+import { dispatchOnboarding } from '../onboarding/onboardingSignals';
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { EmotionalSafetyNote } from './EmotionalSafetyNote';
 import { AiOutputReport } from './AiPrivacySettings';
 import { usePanelTheme, type PanelTheme } from './PanelTheme';
@@ -24,6 +26,7 @@ const COPY = {
   en: {
     intro: 'What is an Event?', introText: 'Write down a small moment from today and pick the mood it left you with. PetalPal saves it, AI reads the feelings in it, and a flower grows from it for your Garden.',
     what: 'What happened? (Optional)', placeholder: 'A small moment from today…', choose: 'Choose your mood', required: 'Required',
+    moodHint: 'Choose a mood above to enable Save & Analyze.',
     save: 'Save & Analyze', saving: 'Saving and analyzing…', saved: 'Saved ✓', another: 'Write another Event',
     left: (n: number, of: number) => `${n} of ${of} flowers left to grow today.`, none: (of: number) => `You've grown today's ${of} flowers. Events still save; new flowers tomorrow.`,
     limit: (of: number) => `Today's ${of} flowers are already growing, so this Event didn't add one. Come back tomorrow for new flowers.`,
@@ -42,6 +45,7 @@ const COPY = {
   'zh-Hans': {
     intro: '什么是事件？', introText: '写下今天的一件小事，选一个它带给你的心情。PetalPal 会保存它，AI 会读一读里面的情绪，然后为你的花园长出一朵花。',
     what: '发生了什么？（选填）', placeholder: '今天的一件小事…', choose: '选择你的心情', required: '必填',
+    moodHint: '请先在上方选择一个心情，即可保存并分析。',
     save: '保存并分析', saving: '正在保存并分析…', saved: '已保存 ✓', another: '再写一件事',
     left: (n: number, of: number) => `今天还能长 ${n} 朵花（共 ${of} 朵）。`, none: (of: number) => `今天的 ${of} 朵花都长出来了。事件照样会保存，明天再长新花。`,
     limit: (of: number) => `今天的 ${of} 朵花已经在长了，这件事没有再长出新花。明天再来吧。`,
@@ -96,7 +100,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
       </Pressable>
     </View> : null}
     <Text style={styles.sectionTitle}>{copy.what}</Text>
-    <View style={styles.inputWrap}>
+    <View {...onboardingTarget('events.input')} style={styles.inputWrap}>
       <TextInput accessibilityLabel={copy.what} placeholder={copy.placeholder} placeholderTextColor="#84998E"
         multiline maxLength={4000} value={saved ? saved.event.content : journal.content} editable={!locked}
         onChangeText={journal.setContent} style={saved ? [styles.input, styles.inputSaved] : styles.input} />
@@ -120,12 +124,12 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
     {voice.overflow ? <Text selectable style={styles.text}>{voice.overflow}</Text> : null}
 
     <Text style={styles.sectionTitle}>{copy.choose} <Text accessibilityLabel={copy.required} style={styles.required}>*</Text></Text>
-    <View accessibilityRole="radiogroup" accessibilityLabel={copy.choose} style={styles.moods}>
+    <View {...onboardingTarget('events.moods')} accessibilityRole="radiogroup" accessibilityLabel={copy.choose} style={styles.moods}>
       {PRIMARY_MOODS.map((item, index) => {
         const selected = mood === item;
         return <Pressable key={item} accessibilityRole="radio" accessibilityLabel={moodLabel(item)}
           accessibilityState={{ checked: selected, selected, disabled: locked }} disabled={locked}
-          onPress={() => journal.setMood(item)} style={({ pressed }) => [styles.mood, pressed && ui.pressed, locked && !selected && ui.disabled]}>
+          onPress={() => { journal.setMood(item); dispatchOnboarding({ type: 'moodSelected' }); }} style={({ pressed }) => [styles.mood, pressed && ui.pressed, locked && !selected && ui.disabled]}>
           <View style={[styles.moodCircle, selected && styles.moodCircleSelected]}><EventIllustration index={index + 1} size={34} /></View>
           <Text numberOfLines={1} style={[styles.moodText, selected && styles.selectedText]}>{moodLabel(item)}</Text>
         </Pressable>;
@@ -135,8 +139,9 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
     {/* Write another sits right under Saved, ready for the next one: Plant is what ends the page. */}
     {saved ? <><EventAction secondary title={copy.saved} onPress={() => {}} disabled />
       <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} /></>
-      : <EventAction title={journal.busy ? copy.saving : copy.save} onPress={() => safety.guard(() => void journal.saveEvent())}
-        disabled={journal.busy || voice.active || !journal.mood} />}
+      : <View {...onboardingTarget('events.save')}><EventAction title={journal.busy ? copy.saving : copy.save} onPress={() => safety.guard(() => void journal.saveEvent())}
+        disabled={journal.busy || voice.active || !journal.mood} /></View>}
+    {!saved && !journal.mood ? <Text style={styles.caption}>{copy.moodHint}</Text> : null}
     {!saved && journal.flowersToday?.limit != null ? <Text style={styles.caption}>{journal.flowersLeft
       ? copy.left(journal.flowersLeft, journal.flowersToday.limit) : copy.none(journal.flowersToday.limit)}</Text> : null}
     {journal.error ? <View style={styles.notice}><Text accessibilityRole="alert" style={styles.text}>{journal.error}</Text></View> : null}
@@ -179,7 +184,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         </View>
         <Text style={styles.satisfied}>{copy.satisfied}</Text>
         {/* Two equal choices side by side; one ? under both explains the difference. */}
-        <View style={styles.plantRow}>
+        <View {...onboardingTarget('events.plant')} style={styles.plantRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={copy.plant} onPress={() => void plant(false)}
             style={({ pressed }) => [styles.choice, styles.choicePrimary, pressed && ui.pressed]}>
             <Text style={styles.choiceTitle}>🌱 {copy.plant}</Text>

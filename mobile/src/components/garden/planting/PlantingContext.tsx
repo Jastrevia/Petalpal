@@ -1,3 +1,4 @@
+import { dispatchOnboarding } from '../../onboarding/onboardingSignals';
 import { readEvent } from '../../../services/events';
 import { loadGarden, plantFlowerSpot } from '../../../services/garden';
 import { gardenPlantingRecord, loadGardenPlacements } from './gardenHydration';
@@ -115,6 +116,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const [gardenError, setGardenError] = useState('');
   const gardenVersion = useRef(0);
   const gardenRequest = useRef(0);
+  const plantingOpRef = useRef(0);
   const [activeMode, setActiveMode] = useState<PlantingMode>('normal');
   const [targetFlower, setTargetFlower] = useState<FlowerPlacementRecord | null>(null);
   const [previewCoords, setPreviewCoords] = useState<{ worldX: number; worldY: number } | null>(null);
@@ -242,22 +244,30 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const startPlanting = useCallback(
     async (flower: Partial<FlowerPlacementRecord> & { flowerId: string; month: number; flowerName: string }) => {
       if (gardenOwnerUserId && gardenOwnerUserId !== session?.user.id) return;
+      const op = ++plantingOpRef.current;
+      setDetailError('');
       if (backendMode) {
         if (!session) return;
         try {
           const version = gardenVersion.current;
           const source = (await loadGarden(session.user.id, session.user.id)).find(item => item.id === flower.flowerId);
+          if (op !== plantingOpRef.current || version !== gardenVersion.current) return;
           if (!source) throw new Error('Choose one of your saved flowers.');
           const record = gardenPlantingRecord(source, session.user.timezone);
           if (source.sourceEventId) {
             const event = await readEvent(source.sourceEventId);
+            if (op !== plantingOpRef.current || version !== gardenVersion.current) return;
             record.month = Number(event.localDate.slice(5, 7));
             record.secondaryEmotions = event.secondaryEmotions;
           }
-          if (version !== gardenVersion.current) return;
+          if (op !== plantingOpRef.current || version !== gardenVersion.current) return;
           flower = { ...flower, ...record };
-        } catch (error) { setDetailError((error as Error).message); return; }
+        } catch (error) {
+          if (op === plantingOpRef.current) setDetailError((error as Error).message);
+          return;
+        }
       }
+      if (op !== plantingOpRef.current) return;
       const journal = backendMode ? undefined : findJournalEntry(flower.flowerId, flower.journalEntryId);
       // The record starts at the month centroid; there is no preview until the owner taps the lawn.
       const centroid = getApprovedMonthCentroid(flower.month);
@@ -316,6 +326,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
 
     const cacheSession = capturePlacementSession();
     const version = gardenVersion.current;
+    const op = plantingOpRef.current;
     setIsSaving(true);
     try {
       // Revalidate against the approved mask and every planted footprint before writing.
@@ -324,7 +335,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       const confirmed = validateAt(previewCoords.worldX, previewCoords.worldY, targetFlower.month,
         targetFlower.flowerName, targetFlower.speciesCode);
       if (!confirmed.isValid) {
-        setValidationResult(confirmed);
+        if (op === plantingOpRef.current) setValidationResult(confirmed);
         return false;
       }
       const committed: FlowerPlacementRecord = {
@@ -339,9 +350,9 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       // The server keeps the spot for good and refuses any later move.
       if (backendMode && session) await plantFlowerSpot(session.user.id, committed.flowerId,
         { worldX: committed.worldX, worldY: committed.worldY, landId: committed.landId! });
-      if (version !== gardenVersion.current) return false;
+      if (op !== plantingOpRef.current || version !== gardenVersion.current) return false;
       const updated = await addOrUpdateFlowerPlacement(committed, cacheSession);
-      if (version !== gardenVersion.current) return false;
+      if (op !== plantingOpRef.current || version !== gardenVersion.current) return false;
       if (backendMode) setPlacements(current => current.some(p => p.flowerId === committed.flowerId)
         ? current.map(p => p.flowerId === committed.flowerId ? committed : p) : [...current, committed]);
       else setPlacements(updated);
@@ -349,21 +360,27 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
       setTargetFlower(null);
       setPreviewCoords(null);
       setValidationResult(null);
+      setDetailError('');
+      if (activeMode === 'planting') dispatchOnboarding({ type: 'planted', flowerId: committed.flowerId });
       return true;
     } catch (err) {
+      if (op !== plantingOpRef.current || version !== gardenVersion.current) return false;
       console.error('[PlantingContext] Unable to save placement.');
       setValidationResult({ isValid: false, userFeedback: err instanceof Error && err.message ? err.message : 'Unable to plant here. Try again.' });
       return false;
     } finally {
-      setIsSaving(false);
+      if (op === plantingOpRef.current) setIsSaving(false);
     }
-  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode]);
+  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode, activeMode]);
 
   const cancelPlacement = useCallback(() => {
+    plantingOpRef.current++;
+    setIsSaving(false);
     setActiveMode('normal');
     setTargetFlower(null);
     setPreviewCoords(null);
     setValidationResult(null);
+    setDetailError('');
   }, []);
 
   const openFlowerDetail = useCallback((flower: FlowerPlacementRecord) => {

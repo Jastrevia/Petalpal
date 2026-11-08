@@ -53,8 +53,16 @@ function invalidCredential(error: unknown) {
   return ['auth/user-disabled', 'auth/user-not-found', 'auth/user-token-expired',
     'auth/invalid-user-token'].includes(code || '');
 }
+// DEV-only local previews (/onboarding-preview): requests are answered on the device by
+// an in-memory adapter and never reach Render, Firebase or any database.
+type PreviewTransport = (path: string, method: string, body?: object) => Promise<unknown>;
+let previewTransport: PreviewTransport | null = null;
+export function setPreviewApiTransport(next: PreviewTransport | null) {
+  if (__DEV__) previewTransport = next;
+}
 export async function apiRequest<T>(path: string, method = 'GET', body?: object,
   options: { headers?: Record<string, string>; signal?: AbortSignal } = {}): Promise<T> {
+  if (__DEV__ && previewTransport) return previewTransport(path, method, body) as Promise<T>;
   const current = connection;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (connection !== current) throw new ApiError('Your session changed. Please try again.', 401);

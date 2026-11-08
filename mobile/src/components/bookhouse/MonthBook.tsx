@@ -1,3 +1,4 @@
+import { bumpOnboardingLayout, onboardingTarget } from '../onboarding/onboardingTargets';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,9 +76,9 @@ const afterFrames = (frames: number, fn: () => void) => { if (frames <= 0) fn();
 /** One month's journal as a physical book: it slides out of its shelf slot while the camera pulls back to the writing
  *  desk, floats down onto the desk and opens to the day's spread — left: what the day recorded (flower, Event, mood);
  *  right: the private journal, written in place. Bookmarks turn to other days; either page can be brought close. */
-export function MonthBook({ year, month, shelfRect, days, userId, today, reducedMotion, closeSignal, returnTo, waiting = false, scene, drafts, onShown, onClosed, onMode, onHomeward, onSaved, onActions }: {
+export function MonthBook({ year, month, shelfRect, days, userId, today, reducedMotion, closeSignal, returnTo, waiting = false, scene, drafts, onboardingStep, onBackToGarden, onShown, onClosed, onMode, onHomeward, onSaved, onActions }: {
   year: number; month: number; shelfRect: ShelfRect; days: JournalDay[]; userId: string; today: string; reducedMotion: boolean; night?: boolean;
-  closeSignal: number; scene: SceneLink; drafts: Map<string, Draft>;
+  closeSignal: number; scene: SceneLink; drafts: Map<string, Draft>; onboardingStep?: string | null; onBackToGarden?: () => void;
   /** Close into this slot of the desk-view bookcase without moving the camera (another month was chosen there); a new
    *  `run` asks once. A null rect: the slot where the bookshelf's own slot lands once pulled back. */
   returnTo?: { run: number; rect: ShelfRect | null } | null;
@@ -270,7 +271,7 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
     leanSide.value = toSide;
     const end = () => {
       if (id !== generation.current) return;
-      setView({ mode: 'focused' });
+      setView({ mode: 'focused' }); bumpOnboardingLayout();
       live.value = withTiming(1, { duration: reducedMotion ? 0 : FADE_MS, easing: Easing.out(Easing.quad) });
     };
     setView({ mode: 'leaning-in', side: toSide });
@@ -288,7 +289,31 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
   const inTextBox = useRef(false);
   const finishPan = useCallback((id: number, to: 1 | -1) => {
     if (id !== generation.current) return;
-    setView({ mode: 'focused', side: to });
+    setView({ mode: 'focused', side: to }); bumpOnboardingLayout();
+  }, [setView]);
+  const panToSide = useCallback((toSide: 1 | -1) => {
+    const v = viewRef.current;
+    if (v.mode === 'idle') { leanIn(toSide); return; }
+    if (v.mode !== 'focused' && v.mode !== 'panning' && v.mode !== 'leaning-in') return;
+    if (v.mode === 'focused' && v.side === toSide) return;
+    const id = ++generation.current;
+    setView({ mode: 'panning', side: toSide });
+    live.value = withTiming(1, { duration: reducedMotion ? 0 : FADE_MS, easing: Easing.out(Easing.quad) });
+    if (reducedMotion) { lean.value = 1; leanSide.value = toSide; finishPan(id, toSide); return; }
+    if (lean.value < 1) lean.value = withTiming(1, { duration: LEAN_MS, easing: Easing.linear });
+    const rest = Math.max(0.2, Math.abs(toSide - leanSide.value) / 2);
+    leanSide.value = withTiming(toSide, { duration: Math.max(180, PAN_MS * rest), easing: Easing.out(Easing.cubic) },
+      done => { if (done) runOnJS(finishPan)(id, toSide); });
+  }, [leanIn, setView, live, reducedMotion, lean, leanSide, finishPan]);
+  useEffect(() => {
+    if (onboardingStep === 'treehouse.archive') {
+      if (mode === 'idle' || (mode === 'focused' && side !== -1)) panToSide(-1);
+    } else if (onboardingStep === 'treehouse.journal') {
+      if (mode === 'idle' || ((mode === 'focused' || mode === 'leaning-in') && side !== 1)) panToSide(1);
+    }
+  }, [onboardingStep, mode, side, panToSide]);
+  const _unusedDeps = useMemo(() => { if (true) {
+    }
   }, [setView]);
   const settlePan = useCallback((dx: number, vx: number) => {
     const from = panFrom.current, to = (-from) as 1 | -1;
@@ -477,6 +502,8 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
     {tex && <View pointerEvents="none" style={StyleSheet.absoluteFill}><Canvas pointerEvents="none" style={StyleSheet.absoluteFill}><Picture picture={picture} /></Canvas></View>}
 
     {/* The whole spread on the desk: tap a page to bring it close; bookmarks stand out of the fore-edge. */}
+    <View pointerEvents="none" {...onboardingTarget('bookhouse.leftPage')} style={{ position: 'absolute', left: L.page.x, top: L.page.y, width: L.page.width, height: Math.min(L.page.height, Math.max(240, height - insets.bottom - L.page.y - 210)) }} />
+    <View pointerEvents="none" {...onboardingTarget('bookhouse.rightPage')} style={{ position: 'absolute', left: L.page.x, top: L.page.y, width: L.page.width, height: Math.min(L.page.height, Math.max(240, height - insets.bottom - L.page.y - 210)) }} />
     {spread && <>
       {day && mode === 'idle' && <View {...swipe.panHandlers} style={{ position: 'absolute', left: lx0, top: ry0, width: rx1 - lx0, height: ry1 - ry0, flexDirection: 'row' }}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Records for ${formatLocalDate(day.localDate)}`} accessibilityHint="Brings the left page close: the day's flower, Event and mood"
@@ -526,10 +553,10 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
     </View>}
 
     {/* Controls sit around the book, never on it. */}
-    {settled && <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+    {(settled || onboardingStep === 'treehouse.back') && <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {/* Top buttons stay where the Treehouse's own are (the window's column), even when the book's column is narrower. */}
       <View style={{ position: 'absolute', top: insets.top + 3, left: (width - Math.min(width, 560)) / 2 + 12 }}>
-        {closeUp ? <RoundButton label="Back to both pages" icon={ICONS.back} disabled={mode !== 'focused'} onPress={() => leanOut()} />
+        {onboardingStep === 'treehouse.back' && onBackToGarden ? <View {...onboardingTarget('bookhouse.back')}><RoundButton label="Back to Garden" icon={ICONS.back} onPress={onBackToGarden} /></View> : closeUp ? <RoundButton label="Back to both pages" icon={ICONS.back} disabled={mode !== 'focused'} onPress={() => leanOut()} />
           : <RoundButton label="Back to bookshelf" icon={ICONS.back} disabled={mode !== 'idle'} onPress={close} />}
       </View>
       {/* (No close button: a tap anywhere off the open book — the desk, the bookcase behind it — closes it; see the

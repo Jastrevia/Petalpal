@@ -1,3 +1,5 @@
+import { dispatchOnboarding } from '../onboarding/onboardingSignals';
+import { onboardingScrollHandler, onboardingTarget, registerOnboardingScroller } from '../onboarding/onboardingTargets';
 import { devVariant } from '../../services/deviceReset';
 import { DeviceResetButton } from './DeviceReset';
 import { PrivacyAndSupport } from './PrivacyAndSupport';
@@ -67,6 +69,14 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const locale = useAppLocale();
   const closeLabel = OVERLAY_COPY[locale].close;
   useEffect(() => { setAddingFriend(false); setEventsIntro(false); contentHeight.current = 0; }, [feature?.id]);
+  // The first-time tour follows the Events and Friends panels opening and closing.
+  useEffect(() => {
+    const id = feature?.id;
+    if (id !== 'events' && id !== 'friends') return;
+    dispatchOnboarding({ type: 'featureOpened', feature: id });
+    const unregister = registerOnboardingScroller('panel', scroller);
+    return () => { unregister(); dispatchOnboarding({ type: 'featureClosed', feature: id }); };
+  }, [feature?.id]);
   if (!feature) return null;
   const title = FEATURE_LABELS[locale][feature.id] ?? feature.label;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -95,7 +105,7 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
           </Pressable>
         </View>
         </> : null}
-        <ScrollView ref={scroller} onContentSizeChange={(_width, height) => {
+        <ScrollView ref={scroller} onScroll={onboardingScrollHandler('panel')} scrollEventThrottle={32} onContentSizeChange={(_width, height) => {
           // A saved Event's flower appears below the fold: bring it, its share switch and Plant into view.
           if (feature.id === 'events' && contentHeight.current && height - contentHeight.current > 120) scroller.current?.scrollToEnd({ animated: true });
           contentHeight.current = height;
@@ -103,12 +113,13 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
           <FeatureContent key={feature.id} feature={feature} onClose={onClose} onGardenChanged={onGardenChanged} onOpenSettings={onOpenSettings} eventsIntro={eventsIntro}
             addingFriend={addingFriend} onAddFriend={() => setAddingFriend(true)} onCloseAddFriend={() => setAddingFriend(false)} />
         </ScrollView>
-        {feature.id === 'friends' ? <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
-          style={({ pressed }) => [styles.close, styles.floatingClose, pressed && ui.pressed]}>
+        {feature.id === 'friends' ? <View {...onboardingTarget('friends.return')} style={styles.floatingClose}><Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose}
+          style={({ pressed }) => [styles.close, styles.floatingCloseButton, pressed && ui.pressed]}>
           <Text style={styles.closeText}>×</Text>
-        </Pressable> : null}
+        </Pressable></View> : null}
       </View>
     </KeyboardAvoidingView>
+    {feature.id === 'events' || feature.id === 'friends' ? <TourPanelLayer surface={feature.id} /> : null}
   </Modal>;
 }
 
@@ -224,7 +235,8 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   eventsContent: { padding: 16, paddingTop: 4 },
   friendsLightPanel: { borderRadius: 32, borderColor: theme.gold, boxShadow: `inset 0 0 0 2px ${theme.inset}, 0 12px 30px #163D4050` },
   friendsPanel: { backgroundColor: theme.background, borderColor: '#C6A164', borderWidth: 2, borderRadius: 24, boxShadow: 'inset 0 0 0 4px #244E45, 0 14px 48px #001F2860' },
-  floatingClose: { position: 'absolute', top: 12, right: 12, zIndex: 2, borderWidth: 1, borderColor: theme.gold },
+  floatingClose: { position: 'absolute', top: 12, right: 12, zIndex: 2 },
+  floatingCloseButton: { borderWidth: 1, borderColor: theme.gold },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 12 },
   backdrop: { backgroundColor: '#00000045' },
   panel: { flexShrink: 1, borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: '#5AA4AB70',
@@ -256,3 +268,9 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
     justifyContent: 'center', backgroundColor: colors.tealWash, borderWidth: 1, borderColor: colors.line },
   presenceDot: { position: 'absolute', right: 2, top: 2, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: theme.background },
 });
+
+// The first-time tour's layer for this panel, drawn inside the panel's own modal (loaded on use).
+function TourPanelLayer({ surface }: { surface: 'events' | 'friends' }) {
+  const { OnboardingPanelLayer } = require('../onboarding/OnboardingStepView') as typeof import('../onboarding/OnboardingStepView');
+  return <OnboardingPanelLayer surface={surface} />;
+}

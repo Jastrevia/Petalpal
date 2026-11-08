@@ -74,6 +74,11 @@ type WebViewApi = {
 };
 const retiredGardenViews = new WeakMap<WebViewApi, Set<string>>();
 const ownedGardenViews = new WeakMap<WebViewApi, Set<string>>();
+const ownedGardenRoots = new WeakMap<WebViewApi, Set<string>>();
+
+export function isOwnedGardenRoot(value: unknown, nativeId: number) {
+  return ownedGardenRoots.get(value as WebViewApi)?.has(String(nativeId)) ?? false;
+}
 
 export function isOwnedGardenWebView(value: unknown, nativeId: number) {
   return ownedGardenViews.get(value as WebViewApi)?.has(String(nativeId)) ?? false;
@@ -103,7 +108,7 @@ function gardenRetirementGate(api: WebViewApi) {
 
 // Skia 2.6.2 Web retains registered views and replaces pictures without
 // disposing them. Own only this Garden's view; other canvases stay untouched.
-export function ownGardenWebView(value: unknown, nativeId: number, retire: (picture: WebPicture) => void = picture => picture.dispose()) {
+export function ownGardenWebView(value: unknown, nativeId: number, retire: (picture: WebPicture) => void = picture => picture.dispose(), isRoot: boolean = true) {
   const api = value as WebViewApi | undefined;
   const id = String(nativeId);
   const view = api?.views?.[id];
@@ -112,6 +117,11 @@ export function ownGardenWebView(value: unknown, nativeId: number, retire: (pict
   let owned = ownedGardenViews.get(api);
   if (!owned) { owned = new Set(); ownedGardenViews.set(api, owned); }
   owned.add(id);
+  if (isRoot) {
+    let roots = ownedGardenRoots.get(api);
+    if (!roots) { roots = new Set(); ownedGardenRoots.set(api, roots); }
+    roots.add(id);
+  }
   retired.delete(id);
   const setPicture = view.setPicture;
   let current: WebPicture | undefined = api.deferedPictures[id];
@@ -136,5 +146,6 @@ export function ownGardenWebView(value: unknown, nativeId: number, retire: (pict
     if (deferred && deferred !== last) deferred.dispose();
     delete api.deferedPictures[id];
     delete api.deferedOnSize[id];
+    ownedGardenRoots.get(api)?.delete(id);
   };
 }

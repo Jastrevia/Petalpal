@@ -1,3 +1,4 @@
+import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -96,7 +97,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     // For 'profile' (Me), use the brighter hover/selected visual appearance permanently as default
     const isVisuallyActive = selected || isHovered || isProfile;
 
-    return <Pressable key={feature.id} accessibilityRole="button"
+    return <Pressable key={feature.id} {...onboardingTarget(`nav.${feature.id}`)} accessibilityRole="button"
       accessibilityLabel={`${FEATURE_LABELS[locale][feature.id] ?? feature.label}${(feature.id === 'fairy' && fairyDot) || (feature.id === 'friends' && friendsDot) ? (chinese ? '，有新内容' : ', something new') : ''}`} accessibilityState={{ selected }} testID={`hud-${feature.id}`}
       onHoverIn={() => setHighlightedFeature(feature.id)} onHoverOut={() => setHighlightedFeature(undefined)}
       onFocus={() => setHighlightedFeature(feature.id)} onBlur={() => setHighlightedFeature(undefined)}

@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import { onboardingTarget } from '../../onboarding/onboardingTargets';
 import { usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { clusterFootprintRadius } from './flowerClusters';
@@ -60,6 +61,7 @@ function PlantCheck({ camera, worldX, worldY, month, enabled, saving, label, onP
   return (
     <Animated.View pointerEvents="box-none" style={[styles.checkAnchor, position]}>
       <Pressable
+        testID="planting-confirm-button"
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: !enabled || saving, busy: saving }}
@@ -104,7 +106,7 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
       {/* Top Guidance Banner */}
-      <View style={styles.topBanner}>
+      <View {...onboardingTarget('planting.banner')} style={styles.topBanner}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {zh ? '🌱 正在种花' : '🌱 PLANTING FLOWER'}
@@ -157,9 +159,10 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
       {/* Bottom Action Bar */}
       <View style={styles.bottomBar}>
         <Pressable
+          testID="planting-cancel-button"
           accessibilityRole="button"
+          accessibilityLabel={zh ? '取消' : 'Cancel'}
           onPress={cancelPlacement}
-          disabled={isSaving}
           style={({ pressed }) => [
             styles.cancelButton,
             pressed && styles.buttonPressed,

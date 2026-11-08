@@ -1,7 +1,7 @@
 // Must run before any Skia module defines its classes (see the polyfill).
 import './src/polyfills/symbolDispose';
 import { LoadSkiaWeb } from '@shopify/react-native-skia/lib/module/web/LoadSkiaWeb';
-import { configureGardenWebCanvasCache, isOwnedGardenWebView } from './src/components/garden/webCanvasCache';
+import { configureGardenWebCanvasCache, isOwnedGardenRoot, isOwnedGardenWebView } from './src/components/garden/webCanvasCache';
 import { configureGardenWebDeletedImageGuard, configureGardenWebDispose, configureGardenWebNativeOwnership, configureGardenWebRootCleanup } from './src/components/garden/webNativeHandles';
 
 LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
@@ -38,7 +38,7 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     configureGardenWebDeletedImageGuard(JsiSkCanvas.prototype, JsiSkImage.prototype,
       () => Skia.Shader.MakeColor(Skia.Color('transparent')));
     const { SkiaSGRoot } = require('@shopify/react-native-skia/lib/module/sksg/Reconciler');
-    configureGardenWebRootCleanup(SkiaSGRoot.prototype, nativeId => isOwnedGardenWebView(globalThis.SkiaViewApi, nativeId));
+    configureGardenWebRootCleanup(SkiaSGRoot.prototype, nativeId => isOwnedGardenRoot(globalThis.SkiaViewApi, nativeId));
     return require('expo-router/entry');
   })
   .catch(error => console.error('Garden graphics initialization failed', error));

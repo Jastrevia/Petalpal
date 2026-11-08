@@ -42,7 +42,10 @@ const COVERED = Platform.OS === 'web' ? Skia.RuntimeEffect.Make(SHORE_SOURCE
 // still use the original shader and original source sampling. Tiny RGBA cells
 // bound all 17 taps (including cubic support and mapping/filtering margins).
 export function makeShoreCoverage(image: SkImage, worldWidth: number): SkImage | null {
-  const pixels = image.readPixels(), width = image.width(), height = image.height();
+  if (!image || (typeof (image as any).isDeleted === 'function' && (image as any).isDeleted()) || ((image as any).ref && typeof (image as any).ref.isDeleted === 'function' && (image as any).ref.isDeleted())) return null;
+  const pixels = image.readPixels();
+  if (!pixels) return null;
+  const width = image.width(), height = image.height();
   if (!(pixels instanceof Uint8Array) || pixels.length !== width * height * 4) return null;
   // Eight source pixels per classification cell; the source artwork is untouched.
   const cell = 8, columns = Math.ceil(width / cell), rows = Math.ceil(height / cell), stride = columns + 1;
@@ -82,7 +85,8 @@ export function makeShoreCoverage(image: SkImage, worldWidth: number): SkImage |
 }
 
 export default function GardenShoreContact({image,x,y,width,height,coverage}:{image:SkImage;x:number;y:number;width:number;height:number;coverage?:SkImage|null}){
-  if(!SHORE)return null;
+  if(!SHORE || !image) return null;
+  if ((typeof (image as any).isDeleted === 'function' && (image as any).isDeleted()) || ((image as any).ref && typeof (image as any).ref.isDeleted === 'function' && (image as any).ref.isDeleted())) return null;
   const covered = Boolean(coverage && COVERED);
   return <Rect x={x-20} y={y-20} width={width+40} height={height+40}>
     <Shader source={covered ? COVERED! : SHORE}>

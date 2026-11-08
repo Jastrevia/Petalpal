@@ -33,7 +33,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       snapshot: (picture: SkPicture, camera: { x: number; y: number; zoom: number }) => snapshotter.current?.snapshot(picture, camera) ?? null,
       register: (id: number, onPicture: (picture: SkPicture) => void) => {
         viewApi().registerView(String(id), { setPicture: onPicture, getSize: () => ({ width: 0, height: 0 }), redraw() {}, makeImageSnapshot() { throw new Error('A static run has no canvas'); } });
-        return ownGardenWebView(viewApi(), id, picture => afterNextFrames(() => picture.dispose()));
+        return ownGardenWebView(viewApi(), id, picture => afterNextFrames(() => picture.dispose()), false);
       },
     } };
   });

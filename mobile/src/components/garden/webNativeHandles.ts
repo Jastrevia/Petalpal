@@ -8,6 +8,17 @@ type RegistryFactory = (release: (handle: NativeHandle) => void) => HandleRegist
 type Method = (this: NativeOwner, ...args: unknown[]) => unknown;
 const configured = new WeakSet<object>();
 const rootsConfigured = new WeakSet<object>();
+export const protectedGardenHandles = new WeakSet<object>();
+
+export function protectGardenHandle(handle: unknown) {
+  if (handle && typeof handle === 'object') {
+    protectedGardenHandles.add(handle);
+    const ref = (handle as any).ref;
+    if (ref && typeof ref === 'object') {
+      protectedGardenHandles.add(ref);
+    }
+  }
+}
 
 type ImageNode = { props?: { image?: unknown; gardenImageReferences?: readonly unknown[] }; children?: ImageNode[] };
 type GardenRoot = { container: {
@@ -47,8 +58,16 @@ export function configureGardenWebRootCleanup(
     // Stop it now so no scheduled animation replay can use retired image refs.
     if (this.container.unmounted && 'mapperId' in this.container) this.container.redraw?.();
     return result.then(result => {
-      for (const handle of handles) if (!handle.isDeleted()) handle.delete();
+      for (const handle of handles) {
+        if (!protectedGardenHandles.has(handle) && !handle.isDeleted()) {
+          handle.delete();
+        }
+      }
       handles.clear();
+      try {
+        const { assetDataCache } = require('@shopify/react-native-skia/lib/module/skia/core/Data');
+        assetDataCache?.clear();
+      } catch {}
       return result;
     });
   };
@@ -138,7 +157,10 @@ export function configureGardenWebDeletedImageGuard(canvasPrototype: object, ima
   if (configured.has(canvasPrototype)) return;
   configured.add(canvasPrototype);
   const released = (value: unknown) => {
-    const ref = (value as NativeOwner | null | undefined)?.ref;
+    if (!value || typeof value !== 'object') return false;
+    const v = value as { ref?: NativeHandle; isDeleted?: () => boolean };
+    if (typeof v.isDeleted === 'function') return v.isDeleted();
+    const ref = v.ref;
     return !!ref && typeof ref.isDeleted === 'function' && ref.isDeleted();
   };
   const skipped = () => {
@@ -147,12 +169,19 @@ export function configureGardenWebDeletedImageGuard(canvasPrototype: object, ima
   };
   const canvas = canvasPrototype as CanvasLike;
   for (const name of ['drawImage', 'drawImageRect', 'drawImageCubic', 'drawImageOptions', 'drawImageNine',
-    'drawImageRectCubic', 'drawImageRectOptions', 'drawAtlas']) {
+    'drawImageRectCubic', 'drawImageRectOptions', 'drawAtlas', 'drawPicture']) {
     const original = canvas[name];
     if (typeof original !== 'function') continue;
     canvas[name] = function (this: NativeOwner, ...args) {
       if (released(args[0])) { skipped(); return undefined; }
       return original.apply(this, args);
+    };
+  }
+  const originalDrawPath = canvas['drawPath'];
+  if (typeof originalDrawPath === 'function') {
+    canvas['drawPath'] = function (this: NativeOwner, path: unknown, paint: unknown) {
+      if (released(path) || released(paint)) { skipped(); return undefined; }
+      return originalDrawPath.call(this, path, paint);
     };
   }
   const image = imagePrototype as CanvasLike;
@@ -163,6 +192,22 @@ export function configureGardenWebDeletedImageGuard(canvasPrototype: object, ima
     if (typeof original !== 'function') continue;
     image[name] = function (this: NativeOwner, ...args) {
       if (released(this)) { skipped(); return 1; }
+      return original.apply(this, args);
+    };
+  }
+  for (const name of ['readPixels']) {
+    const original = image[name];
+    if (typeof original !== 'function') continue;
+    image[name] = function (this: NativeOwner, ...args) {
+      if (released(this)) { skipped(); return null; }
+      return original.apply(this, args);
+    };
+  }
+  for (const name of ['getImageInfo']) {
+    const original = image[name];
+    if (typeof original !== 'function') continue;
+    image[name] = function (this: NativeOwner, ...args) {
+      if (released(this)) { skipped(); return { width: 1, height: 1, colorType: 0, alphaType: 0 }; }
       return original.apply(this, args);
     };
   }
