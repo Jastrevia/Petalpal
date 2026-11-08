@@ -1,4 +1,4 @@
-import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, pavilionReadingCamera, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, pavilionReadingCamera, PAVILION, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
 import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
 import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
 import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -86,19 +86,20 @@ const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
 
-// Below this width the wide layout is drawn at PHONE_DESK_WIDTH and scaled to fit.
-const PHONE_DESK_MIN = 640, PHONE_DESK_WIDTH = 640;
+// Below this width the screen shows part of the wide layout and a finger moves across it.
+const PHONE_MAX_WIDTH = 640;
 // Up to 25 pages of 20 (about nine years of Weekly and Monthly reflections).
 const MAX_REPORT_PAGES = 25;
 export default function Reflection() {
   const router = useRouter();
   const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
-  // A phone shows the same pavilion as a wide screen (the painting, the shelf, the book flying to the
-  // desk and opening as a spread), laid out at a wide size and scaled down to the phone's width.
+  // A phone lays the pavilion out as a wide screen does, the painting as tall as the screen and so
+  // wider than it, the books and the open book at their own size; a finger moves the view across.
   const screen = useWindowDimensions();
-  const phoneScale = screen.width < PHONE_DESK_MIN ? screen.width / PHONE_DESK_WIDTH : 1;
-  const width = screen.width / phoneScale, height = screen.height / phoneScale;
+  const phone = screen.width < PHONE_MAX_WIDTH;
+  const height = screen.height;
+  const width = phone ? Math.max(PHONE_MAX_WIDTH, screen.height * PAVILION.width / PAVILION.height) : screen.width;
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
   const night = (__DEV__ ? nightOverride : null) ?? worldNight;
@@ -349,7 +350,45 @@ export default function Reflection() {
   const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
   const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
   const instructionTop = scene.art.y + scene.art.height * .63 - 22;
-  const compact = scene.compact, wide = false;
+  // A phone frames the painting to fill its screen (scene.compact crops toward the shelf), and the
+  // book opens on the desk as the same two-page spread a wide screen shows (owner, 2026-11-08).
+  const compact = false, wide = false;
+  // The first view frames the shelf; opening a book glides to its left page (the right one is a drag
+  // away), and putting it back glides to the shelf again. A sideways drag looks anywhere in between.
+  const panMin = phone ? Math.min(0, screen.width - width) : 0;
+  const pan = useRef(new Animated.Value(0)).current;
+  const panAt = useRef<number | null>(null);
+  const panning = useRef({ min: 0, max: 0 });
+  // The tap a browser may still send when a drag ends must not open or put back a book.
+  const draggedAt = useRef(0);
+  const justDragged = () => Date.now() - draggedAt.current < 300;
+  panning.current = { min: panMin, max: 0 };
+  const clampPan = (value: number) => Math.min(panning.current.max, Math.max(panning.current.min, value));
+  const shelf = { left: scene.slot('weekly').x, right: scene.slot('collection').x + scene.slot('collection').width };
+  const shelfFrame = clampPan(screen.width / 2 - (shelf.left + shelf.right) / 2);
+  const bookFrame = clampPan(12 - scene.table.x);
+  const framing = phone ? (open ? bookFrame : shelfFrame) : 0;
+  useEffect(() => {
+    const first = panAt.current === null;
+    panAt.current = framing;
+    if (first) { pan.setValue(framing); return; }
+    Animated.timing(pan, { toValue: framing, duration: reducedMotion ? 0 : 520, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start();
+  }, [framing]);
+  const lookAround = useRef(PanResponder.create({
+    // Capture: a sideways drag that starts on a book or on the desk is a look-around, never a tap.
+    onMoveShouldSetPanResponderCapture: (_event, g) => panning.current.min < 0 && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => pan.stopAnimation(value => { panAt.current = value; }),
+    onPanResponderMove: (_event, g) => { draggedAt.current = Date.now(); pan.setValue(clampPan((panAt.current ?? 0) + g.dx)); },
+    onPanResponderRelease: (_event, g) => {
+      draggedAt.current = Date.now();
+      // A flick carries on a little, as a hand-moved picture would.
+      const to = clampPan((panAt.current ?? 0) + g.dx + g.vx * 160);
+      panAt.current = to;
+      Animated.timing(pan, { toValue: to, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: (_event, g) => { panAt.current = clampPan((panAt.current ?? 0) + g.dx); pan.setValue(panAt.current); },
+  })).current;
   const sceneWidth = width, artHeight = scene.art.height;
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
   const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
@@ -503,8 +542,12 @@ export default function Reflection() {
   const leafSize = { left: compact ? 0 : leaves.right.x - readingRect.x, width: pageWidth, height: contentHeight };
 
 
-  return <View style={{ flex: 1, backgroundColor: '#34251A', overflow: 'hidden' }}>
-    <View style={{ width, height, overflow: 'hidden', ...(phoneScale !== 1 ? { transform: [{ scale: phoneScale }], transformOrigin: 'top left' } : null) }} testID="reflection-scene">
+  return <View style={{ flex: 1, backgroundColor: '#34251A' }}>
+    {/* clip, not hidden, on the web: a phone's scaled-down pages keep their wide layout box, and a
+        focused button there must not scroll the scene sideways (a hidden box can still scroll). */}
+    <View style={{ width: screen.width, height, overflow: (Platform.OS === 'web' ? 'clip' : 'hidden') as 'hidden' }} testID="reflection-scene" {...lookAround.panHandlers}>
+    {/* A phone sees part of the painting: a finger moves it to look around (window, lake, shelf). */}
+    <Animated.View testID="reflection-look" pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, width, height, transform: [{ translateX: pan }] }}>
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={pavilionEmpty} resizeMode="stretch" style={{ position: 'absolute', left: scene.art.x, top: scene.art.y, width: scene.art.width, height: scene.art.height }} />
         {/* Both paintings share the original pixel geometry. Lighting lives below
@@ -519,13 +562,13 @@ export default function Reflection() {
         <PavilionEngraving locale={lang} width={instructionWidth} height={44} left={instructionLeft} top={instructionTop}
           art={scene.art} size={Math.max(17, Math.min(25, scene.art.width * .021))} />
       </Animated.View>
-      {open && <Pressable testID="reflection-desk" accessibilityRole="button" accessibilityLabel={t.putBack} onPress={closeBook} style={StyleSheet.absoluteFill} />}
+      {open && <Pressable testID="reflection-desk" accessibilityRole="button" accessibilityLabel={t.putBack} onPress={() => { if (!justDragged()) closeBook(); }} style={StyleSheet.absoluteFill} />}
       {BOOKS.map(item => {
         const rect = scene.slot(item), out = onBook(item) && bookDrawn;
         return <Pressable key={item} testID={`reflection-shelf-${item}`} accessibilityRole="button"
           accessibilityState={{ selected: onBook(item), disabled: !!turning || !!flying }}
           accessibilityLabel={pavilionText.titles[item]} accessibilityHint={lang === 'en' ? 'Take this book to the reading desk' : '把这本书取到阅读桌前'}
-          disabled={!!turning || !!flying} onPress={() => openBook(item)} pointerEvents={compact && open ? 'none' : 'auto'}
+          disabled={!!turning || !!flying} onPress={() => { if (!justDragged()) openBook(item); }} pointerEvents={compact && open ? 'none' : 'auto'}
           style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden' }}>
           {!out && (spines ? <Image source={{ uri: spines[item].uri }} accessible={false} resizeMode="stretch" style={StyleSheet.absoluteFill} />
             : <Image source={pavilionReference} accessible={false} resizeMode="stretch" style={{ position: 'absolute',
@@ -582,6 +625,7 @@ export default function Reflection() {
         accessibilityHint={t.lanternHint} onPress={() => setNightOverride(!night)}
         style={{ position: 'absolute', left: scene.lantern.x, top: scene.lantern.y,
           width: scene.lantern.width, height: scene.lantern.height }} />}
+    </Animated.View>
     </View>
     {/* While a phone reads a book, the book's own ✕ is the only close button. */}
     {!(compact && open) && <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
