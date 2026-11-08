@@ -31,6 +31,21 @@
   };
   const day = offset => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
   let petalDrawn = null;
+  // The first-time tour's server record (lib/onboarding-tutorial.js, simplified). The preview owner
+  // is an existing account (finished); a new preview account starts the tour. Kept for this tab, so a
+  // reload resumes it like another device would; ?tour=new starts it again.
+  const TOUR_KEY = 'petalpal-preview-tour';
+  const TOUR_ORDER = ['intro.name', 'intro.celebrate', 'garden.zoom', 'event.nav', 'event.write', 'event.mood', 'event.save', 'event.flower',
+    'plant.place', 'plant.growth', 'plant.months', 'treehouse.enter', 'treehouse.shelf', 'treehouse.books', 'treehouse.archive', 'treehouse.journal',
+    'treehouse.back', 'mailbox', 'friends.nav', 'friends.search', 'friends.house', 'friends.visit', 'friends.return', 'fairy.feed', 'fairy.bond',
+    'fairy.keepsakes', 'me.space', 'me.privacy', 'finale', 'done'];
+  const freshTour = () => ({ status: 'active', step: 'intro.name', fairyNamed: false, firstEventId: null, firstFlowerId: null, flowerPlanted: false });
+  let tour = (() => { try { return JSON.parse(sessionStorage.getItem(TOUR_KEY)); } catch { return null; } })()
+    || { status: 'completed', step: 'done', fairyNamed: true, firstEventId: null, firstFlowerId: null, flowerPlanted: true };
+  if (new URLSearchParams(location.search).get('tour') === 'new') tour = freshTour();
+  if (tour.fairyName) fairyName = tour.fairyName;
+  const saveTour = () => { try { sessionStorage.setItem(TOUR_KEY, JSON.stringify({ ...tour, fairyName })); } catch {} };
+  const tourView = () => ({ ...tour, fairyName });
   const petNames = {}; // (renamed in this preview session)
   const petPieces = [['lilac-beret', 'hat', 'Lilac Beret', '紫藤贝雷帽'], ['straw-sun-hat', 'hat', 'Straw Sun Hat', '草编遮阳帽'], ['sage-bonnet', 'hat', 'Sage Bonnet', '鼠尾草小帽'],
     ['blossom-wreath', 'hat', 'Blossom Wreath', '花环'], ['flower-sprig', 'hat', 'Flower Sprig', '鬓边花枝'], ['starlit-plume-cap', 'hat', 'Starlit Plume Cap', '星羽军帽'],
@@ -242,6 +257,7 @@
         // The sign-up page sets the password and picks an original portrait (so no avatar welcome after).
         hasPassword = typeof request.password === 'string'; if (hasPassword) password = request.password;
         fairyName = request.fairyName || 'PPL';
+        tour = freshTour(); saveTour(); // a new account starts the first-time tour
         // Like the server: the chosen portrait plus three random Level 1 avatars as the welcome gift.
         if (avatars) {
           const pool = avatarTiers[0].filter(id => id !== request.avatar);
@@ -423,6 +439,22 @@
         if (!food[3]) return json({ error: 'NO_FOOD' }, 409);
         food[3] -= 1;
         return json({ foodId: food[0], count: food[3] }, 200, 250);
+      }
+      if (p === '/api/onboarding' && method === 'GET') { saveTour(); return json(tourView(), 200, 150); }
+      if (p === '/api/onboarding' && method === 'PATCH') {
+        if (tour.status !== 'completed') {
+          if (request.fairyName !== undefined) {
+            if (!String(request.fairyName).trim()) return json({ error: 'Give your fairy a name.', code: 'FAIRY_NAME_REQUIRED' }, 400);
+            fairyName = String(request.fairyName).trim(); tour.fairyNamed = true;
+          }
+          if (request.firstEventId) tour.firstEventId = request.firstEventId;
+          if (request.firstFlowerId) tour.firstFlowerId = request.firstFlowerId;
+          if (request.flowerPlanted) tour.flowerPlanted = true;
+          if (request.step && TOUR_ORDER.indexOf(request.step) > TOUR_ORDER.indexOf(tour.step)) tour.step = request.step;
+          if (request.complete) tour = { ...tour, status: 'completed', step: 'done' };
+          saveTour();
+        }
+        return json(tourView(), 200, 150);
       }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });

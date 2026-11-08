@@ -63,8 +63,16 @@ export async function publicApiRequest<T>(path: string, body: object): Promise<T
   if (!data) throw new ApiError('The backend did not return JSON data.', response.status);
   return data as T;
 }
+// DEV-only local previews (/onboarding-preview): requests are answered on the device by
+// an in-memory adapter and never reach Render, Firebase or any database.
+type PreviewTransport = (path: string, method: string, body?: object) => Promise<unknown>;
+let previewTransport: PreviewTransport | null = null;
+export function setPreviewApiTransport(next: PreviewTransport | null) {
+  if (__DEV__) previewTransport = next;
+}
 export async function apiRequest<T>(path: string, method = 'GET', body?: object,
   options: { headers?: Record<string, string>; signal?: AbortSignal } = {}): Promise<T> {
+  if (__DEV__ && previewTransport) return previewTransport(path, method, body) as Promise<T>;
   const current = connection;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (connection !== current) throw new ApiError('Your session changed. Please try again.', 401);

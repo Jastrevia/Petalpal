@@ -288,6 +288,13 @@ model FairyState {
   userId              String    @unique
   onboardingStep      String    @default("EMPTY_GARDEN") @db.VarChar(64)
   onboardingCompleted Boolean   @default(false)
+  /// First-time guided tour (lib/onboarding-tutorial.js): the server copy of each owner's step.
+  tutorialStep            String?   @db.VarChar(32)
+  tutorialCompletedAt     DateTime?
+  fairyNamedAt            DateTime?
+  tutorialFirstEventId    String?   @db.VarChar(128)
+  tutorialFirstFlowerId   String?   @db.VarChar(128)
+  tutorialFlowerPlantedAt DateTime?
   lastEvent           String?   @db.VarChar(64)
   unlockedFeatures    Json      @default("[]")
   /// Deprecated runtime columns retained temporarily for a safe production migration.

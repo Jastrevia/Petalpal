@@ -158,7 +158,7 @@ test('Event panel controller requires a user-selected Primary and retries a fail
     'react-native': { ActivityIndicator: 'ActivityIndicator', Button: 'Button', Image: 'Image', Pressable: 'Pressable',
       ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: (styles) => styles } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
-    'expo-router': { router: { push() {}, navigate() {}, dismissTo() {} }, useFocusEffect() {} },
+    'expo-router': { router: { push() {}, navigate() {}, dismissTo() {} }, useFocusEffect() {}, usePathname: () => '/' },
     '../services/auth': { useAuth: () => ({ session: eventSession }) },
     '../services/events': {
       eventFlowers: async () => [],

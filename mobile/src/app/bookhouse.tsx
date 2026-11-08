@@ -1,3 +1,7 @@
+import { tourRunning, useOnboarding } from '../components/onboarding/onboardingStore';
+import { OnboardingPanelLayer } from '../components/onboarding/OnboardingStepView';
+import { dispatchOnboarding } from '../components/onboarding/onboardingSignals';
+import { onboardingScrollHandler, onboardingTarget, registerOnboardingScroller } from '../components/onboarding/onboardingTargets';
 import { useWorldTime } from '../components/garden/world-time';
 import type { PanelTheme } from '../components/features/PanelTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,6 +59,7 @@ const SHELF_FOOTER_GAP = 8;
 const GUTTER = 12;
 
 export default function Bookhouse() {
+
   const { session } = useAuth();
   // One language for the whole Treehouse, set before its shelves, books and pages are drawn.
   setTreehouseLocale(useAppLocale());
@@ -70,6 +75,17 @@ export default function Bookhouse() {
   const column = Math.min(width, 560);
   const inner = column - GUTTER * 2;
   const sceneScroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    dispatchOnboarding({ type: 'bookhouseOpened' });
+    return registerOnboardingScroller('bookhouse', sceneScroll);
+  }, []);
+  // Onboarding targets:
+  const _bhTargets = {
+    years: onboardingTarget('bookhouse.years'),
+    books: onboardingTarget('bookhouse.books'),
+    shelf: onboardingTarget('bookhouse.shelf'),
+    back: onboardingTarget('bookhouse.back'),
+  };
   const bookNodes = useRef(new Map<string, ShelfSlot>());
   // The desk-view bookcase (portrait layout): its books open their months from the desk (switching books).
   const deskShelfNodes = useRef(new Map<string, ShelfSlot>());
@@ -89,7 +105,13 @@ export default function Bookhouse() {
   // The open book's state (MonthBook): the desk-view bookcase takes taps only while the whole spread rests on the desk.
   const [bookMode, setBookModeState] = useState<BookMode | null>(null);
   const bookModeRef = useRef<BookMode | null>(null);
-  const onBookMode = useCallback((mode: BookMode | null) => { bookModeRef.current = mode; setBookModeState(mode); }, []);
+  const onBookMode = useCallback((mode: BookMode | null) => {
+    bookModeRef.current = mode;
+    setBookModeState(mode);
+    if (mode === 'idle') {
+      dispatchOnboarding({ type: 'bookOpened' });
+    }
+  }, []);
   // Switching months at the desk: one switch at a time. `switching` is set the moment a book is chosen (so a second tap
   // never starts another) and cleared once the chosen book is on its way; the open book closes into its slot first.
   const switching = useRef<MonthChoice | null>(null);
@@ -146,7 +168,7 @@ export default function Bookhouse() {
   // Unsaved writing is never dropped silently: drafts survive turning pages and closing the book, and leaving the
   // Treehouse with one asks first (and, on the web, so does closing or reloading the tab).
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const leave = () => { if (drafts.size > 0) setConfirmLeave(true); else exit(); };
+  const tour = useOnboarding(); const leave = () => { if (tourRunning(tour)) { exit(); return; } if (drafts.size > 0) setConfirmLeave(true); else exit(); };
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
     const warn = (event: BeforeUnloadEvent) => { if (drafts.size > 0) { event.preventDefault(); event.returnValue = ''; } };
@@ -189,6 +211,23 @@ export default function Bookhouse() {
     setShelfYear(y); setShownMonths([]); setBook({ year: y, month: m, rect, geometry, scrollY: sceneY.current });
     loadMonthEvents(y, m);
   };
+  // tour already read above
+  useEffect(() => {
+    if (!tourRunning(tour)) return;
+    if ((tour.step === 'treehouse.archive' || tour.step === 'treehouse.journal' || tour.step === 'treehouse.back') && !book && bookNodes.current) {
+      const curMonth = Number(today.slice(5, 7));
+      const curYear = Number(today.slice(0, 4));
+      const key = monthKey(curYear, curMonth);
+      const slot = bookNodes.current.get(key);
+      if (slot) {
+        void measureBook(slot).then(rect => openMonth(curYear, curMonth, rect));
+      }
+    } else if ((tour.step === 'treehouse.shelf' || (tour.step === 'treehouse.books' && bookMode === 'focused')) && book) {
+      if (true) { setBook(null); setNextBook(null); setShownMonths([]); onBookMode(null); pull.value = 0;
+      }
+    }
+  }, [tour, book, bookMode, today, pull, onBookMode]);
+
   // The book's left pages: that month's Events (by their stored local date), read again each time it is opened.
   const loadMonthEvents = (y: number, m: number) => {
     const key = `${y}-${m}`;
@@ -338,7 +377,7 @@ export default function Bookhouse() {
     },
   };
   const closeFromOutside = (nextYear: number | null = null) => {
-    if (!book || nextBook || switching.current || pendingYear.current !== null || bookModeRef.current !== 'idle') return;
+    if (tourRunning(tour) || !book || nextBook || switching.current || pendingYear.current !== null || bookModeRef.current !== 'idle') return;
     if ([...drafts.keys()].some(key => key.startsWith(monthPrefix(book.year, book.month)))) { setConfirmClose({ year: nextYear }); return; }
     pendingYear.current = nextYear;
     setCloseSignal(n => n + 1);
@@ -371,7 +410,7 @@ export default function Bookhouse() {
           onSelectYear={setShelfYear} onOpenMonth={openMonth} onLocked={setNotice}
           hiddenMonth={book ? shownMonths : null} bookNodes={bookNodes}
           pull={pull} pullGeometry={book?.geometry || null}
-          targets={{ years: {}, books: {}, shelf: {} }}
+          targets={{ years: onboardingTarget('bookhouse.years'), books: onboardingTarget('bookhouse.books'), shelf: onboardingTarget('bookhouse.shelf') }}
           footer={() => null} />
         </View>
         {/* Portrait: the bookcase as seen from the writing desk, taking over from the receding shelf as the camera settles. */}
@@ -389,7 +428,7 @@ export default function Bookhouse() {
         </Reanimated.View>}
         <View pointerEvents={book ? 'none' : 'box-none'} importantForAccessibility={book ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={!!book}
           style={{ position: 'absolute', left: 0, right: 0, top: insets.top }}>
-          <View style={s.topBar}><RoundButton label={tt('Back to Garden')} icon={ICONS.back} onPress={leave} /></View>
+          <View style={s.topBar}><View {...(!book ? onboardingTarget('bookhouse.back') : {})}><RoundButton label={tt('Back to Garden')} icon={ICONS.back} onPress={leave} /></View></View>
           <Reanimated.View style={plaqueStyle}><TitlePlaque title={tt('My Journals')} width={plaqueWidth} onLongPress={__DEV__ ? () => setDevNight(value => !(value ?? worldNight)) : undefined} /></Reanimated.View>
         </View>
         {!!error && <Text accessibilityRole="alert" onPress={() => void reload()} style={[s.inlineError, { position: 'absolute', top: cabinetTop + 8, left: 90, right: 12 }]}>{error} {tt('Tap to retry.')}</Text>}
@@ -411,6 +450,7 @@ export default function Bookhouse() {
         as the open book once the other is home). */}
     {session && [book, nextBook].map(b => b && <MonthBook key={`${b.year}-${b.month}`} year={b.year} month={b.month} shelfRect={b.rect} days={daysOf(b)}
       userId={session.user.id} today={today} reducedMotion={reducedMotion} night={lit} closeSignal={closeSignal} drafts={drafts}
+      onboardingStep={tourRunning(tour) ? tour.step : null} onBackToGarden={leave}
       returnTo={b === book ? returnTo : null} waiting={b === nextBook && nextWaiting}
       scene={{ pull, geometry: b.geometry, rootX: (width - shelfLayout(column, cabinetTop, cabinetBottom, shelfFills).width) / 2, scrollY: b.scrollY, column: deskColumn, footer: deskFooter,
         held: b.held, deskRect: b.deskRect }}
@@ -451,6 +491,7 @@ export default function Bookhouse() {
         <ParchmentButton secondary label={tt('Leave without saving')} onPress={() => { drafts.clear(); setConfirmLeave(false); exit(); }} />
       </View>
     </Sheet>}
+    {!(tour.step === 'treehouse.books' && book) && !((tour.step === 'treehouse.archive' || tour.step === 'treehouse.journal') && (!book || !bookMode || bookMode === 'opening' || bookMode === 'leaning-in')) && <OnboardingPanelLayer surface="bookhouse" scroller="bookhouse" />}
   </Animated.View>;
 }
 

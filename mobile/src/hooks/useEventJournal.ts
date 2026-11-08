@@ -1,5 +1,6 @@
+import { dispatchOnboarding } from '../components/onboarding/onboardingSignals';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../services/auth';
 import { createEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
@@ -24,6 +25,9 @@ export function useEventJournal(onGardenChanged?: () => void) {
   const pending = useRef<{ content: string; mood: PrimaryMood; key: string } | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    dispatchOnboarding({ type: 'draftChanged', hasText: Boolean(content.trim()) });
+  }, [content]);
   const refresh = useCallback(async () => {
     if (!session) return;
     setLoading(true); setError('');
@@ -54,6 +58,8 @@ export function useEventJournal(onGardenChanged?: () => void) {
       // POST can omit sourceEvent. Read the owner Garden projection before showing
       // the new Flower, including already-completed emotion enrichment.
       await refresh();
+      // The first-time tour links its first Event (and the Flower it grew) to the real records.
+      dispatchOnboarding({ type: 'eventSaved', eventId: created.event.id, flowerId: created.flower?.id ?? null });
       if (!mounted.current) return;
       onGardenChanged?.();
     } catch (err) { if (mounted.current) setError((err as Error).message); }
@@ -87,9 +93,12 @@ export function useEventJournal(onGardenChanged?: () => void) {
       .then(c => { if (active) setAiProcessingOn(c.aiProcessing === true); }).catch(() => undefined);
     return () => { active = false; };
   }, [skipped, session]);
+  const pathname = usePathname();
   function plant(flower: BackendFlower) {
+    dispatchOnboarding({ type: 'plantRequested', flowerId: flower.id });
     const record = plantingRecord(flower, session?.user.timezone, result?.flower?.id === flower.id ? result.event.localDate : undefined);
-    router.navigate({ pathname: '/', params: { mode: 'plant', flowerId: record.flowerId,
+    const targetPath = pathname === '/onboarding-preview' ? '/onboarding-preview' : '/';
+    router.navigate({ pathname: targetPath, params: { mode: 'plant', flowerId: record.flowerId,
       journalEntryId: '', plantedDate: record.plantedDate, month: String(record.month),
       flowerName: record.flowerName, speciesCode: record.speciesCode, mood: record.mood } });
   }
@@ -102,8 +111,9 @@ export function useEventJournal(onGardenChanged?: () => void) {
   }
   // A planted flower never moves: if it already has its spot, just show it in the Garden.
   function placeFlower(flower: BackendFlower) {
+    const targetPath = pathname === '/onboarding-preview' ? '/onboarding-preview' : '/';
     if (flower.worldX != null || placements.some(item => item.flowerId === flower.id)) {
-      router.navigate({ pathname: '/', params: { mode: 'focus', flowerId: flower.id } });
+      router.navigate({ pathname: targetPath, params: { mode: 'focus', flowerId: flower.id } });
     } else plant(flower);
   }
   // Back to an empty Event after one was saved (the saved one stays in the Garden).

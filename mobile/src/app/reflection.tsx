@@ -86,6 +86,8 @@ const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
 
+// Up to 25 pages of 20 (about nine years of Weekly and Monthly reflections).
+const MAX_REPORT_PAGES = 25;
 export default function Reflection() {
   const router = useRouter();
   const auth = useAuth();
@@ -230,6 +232,15 @@ export default function Reflection() {
       if (controller.signal.aborted) return;
       setReports(previous => older ? [...previous, ...result.reports] : result.reports);
       setCursor(result.nextCursor);
+      // Every earlier reflection belongs in the books too (the server pages 20 at a time, newest
+      // first): the first page shows at once, the rest follow in the background.
+      let next = result.nextCursor;
+      for (let page = 0; next && page < MAX_REPORT_PAGES; page++) {
+        const more = await listReflections(next, controller.signal);
+        if (controller.signal.aborted) return;
+        setReports(previous => [...previous, ...more.reports.filter(report => !previous.some(seen => seen.id === report.id))]);
+        next = more.nextCursor; setCursor(next);
+      }
     } catch (error) {
       if (!controller.signal.aborted) setListError(lang === 'en' && error instanceof Error ? error.message : t.loadFailed);
     } finally { if (!controller.signal.aborted) setLoading(false); }
