@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FlowerThumb } from '../garden/planting/FlowerThumb';
 import { factAt, FLOWER_FACTS, WAKING_COPY, type FactLocale } from './flowerFacts';
 import { peekFairyName } from '../../services/fairyName';
@@ -48,12 +48,8 @@ export function WakingFlowerFacts({ delayMs = 2500, showNote = true }: { delayMs
   </View>;
 }
 
-const KEEPSAKE_ART: Record<string, number> = {
-  CROCUS: require('@/assets/keepsakes/crocus-brooch.webp'),
-  SAFFRON: require('@/assets/keepsakes/crocus-seed-pouch.webp'),
-};
+// Every card is a flower an Event grows, drawn with its Garden artwork.
 function FactArt({ species, name }: { species: string; name: string }) {
-  if (KEEPSAKE_ART[species]) return <Image accessible={false} source={KEEPSAKE_ART[species]} style={styles.art} resizeMode="contain" />;
   return <FlowerThumb speciesCode={species} name={name} image="" size={44} style={styles.art} />;
 }
 
