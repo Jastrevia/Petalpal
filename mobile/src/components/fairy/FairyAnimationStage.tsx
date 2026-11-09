@@ -4,6 +4,9 @@ import { Image } from 'expo-image';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationStageProps } from './fairyAnimationAssets';
 
+/** This stage cannot tell when an action's last frame has shown, so the controller's clock ends it. */
+export const STAGE_REPORTS_END = false;
+
 // iOS / Android. Only what is needed is decoded: idle (one still painting, kept mounted so
 // returning to her rest is instant) and the action being played. An action is mounted fresh for
 // every request, so it starts on its first frame; it is drawn invisibly until that frame is on

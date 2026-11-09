@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Asset } from 'expo-asset';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationStageProps } from './fairyAnimationAssets';
 
+/** This stage cannot tell when an action's last frame has shown, so the controller's clock ends it. */
+export const STAGE_REPORTS_END = false;
+
 // Web. Actions play as VP9-alpha WebM <video> (preloaded, restarted from frame 0 each request).
 // WebKit (Safari, and every iOS browser) does not draw WebM alpha, so there — and for any action a
 // video fails to play — actions play as the animated WebP instead. An <img> of a URL the page has

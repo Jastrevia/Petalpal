@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
-import { FairyAnimationStage } from './FairyAnimationStage';
+import { FairyAnimationStage, STAGE_REPORTS_END } from './FairyAnimationStage';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyPlay } from './fairyAnimationAssets';
 
 // The first-time tour's Fairy: the approved onboarding suite (transparent animated WebP, and
@@ -16,6 +16,9 @@ export const FAIRY_CHARACTER_CANVAS_RATIO = 636 / 834; // 0.7626 (character Y: 9
 /** If playback never reports that it began (a slow first load, a decode error), a one-shot still
  *  finishes this long after its natural length, so the tour can never stall on her. */
 const START_GRACE_MS = 1500;
+/** Where the stage reports her last frame (iOS video), the clock only steps in this long after her
+ *  natural length, as a safety net; elsewhere the clock ends her action. */
+const END_GRACE_MS = 2000;
 
 export interface FairyAnimationControllerProps {
   /** Desired animation state. Actions (greet, celebrate, fly) play once then return to idle unless loop is true. */
@@ -54,6 +57,8 @@ export function FairyAnimationController({
   const reported = useRef(-1);
   const started = useRef<{ id: number; at: number } | null>(null);
   const begin = useRef<((id: number) => void) | null>(null);
+  const ended = useRef<((id: number) => void) | null>(null);
+  const handleEnd = useCallback((id: number) => { ended.current?.(id); }, []);
   const handleStart = useCallback((id: number) => {
     if (started.current?.id === id) return;
     started.current = { id, at: Date.now() };
@@ -70,16 +75,17 @@ export function FairyAnimationController({
       done.current?.(played);
     };
     if (reduced) { finish(); return; }
-    const duration = FAIRY_ANIMATION_ASSETS[played].durationMs;
+    const duration = FAIRY_ANIMATION_ASSETS[played].durationMs + (STAGE_REPORTS_END ? END_GRACE_MS : 0);
     // Count her length from the moment the animation is actually on screen, not from the request.
     const from = (at: number) => setTimeout(finish, Math.max(0, duration - (Date.now() - at)));
     let timer = started.current?.id === id ? from(started.current.at) : setTimeout(finish, START_GRACE_MS + duration);
+    ended.current = endedId => { if (endedId === id) { clearTimeout(timer); finish(); } };
     begin.current = startedId => {
       if (startedId !== id || !started.current) return;
       clearTimeout(timer);
       timer = from(started.current.at);
     };
-    return () => { clearTimeout(timer); begin.current = null; };
+    return () => { clearTimeout(timer); begin.current = null; ended.current = null; };
   }, [request, oneShot, reduced]);
 
   // Sizing: Canvas preserves exact 1112:834 aspect ratio so character is never stretched
@@ -93,6 +99,7 @@ export function FairyAnimationController({
         loop={!oneShot}
         reduced={reduced}
         onStart={handleStart}
+        onEnd={handleEnd}
         height={canvasHeight}
       />
     </View>

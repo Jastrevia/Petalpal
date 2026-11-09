@@ -1,5 +1,6 @@
 // The approved onboarding suite (1112x834 transparent animated WebP). WebM copies are required
-// only by FairyAnimationStage.web.tsx, so iOS builds do not carry them.
+// only by FairyAnimationStage.web.tsx, so iOS builds do not carry them. The .mov copies (HEVC with
+// alpha, from the same WebM frames) live in FairyAnimationStage.ios.tsx, so only iOS carries them.
 export type FairyAnimationState = 'idle' | 'greet' | 'celebrate' | 'fly';
 
 // Canonical mapping
@@ -40,6 +41,8 @@ export type FairyAnimationStageProps = {
   reduced: boolean;
   /** Called once when an action's first frame is on screen, with `play.id`. */
   onStart: (id: number) => void;
+  /** Called when a one-shot action has played to its last frame, with `play.id` (stages that can tell). */
+  onEnd?: (id: number) => void;
   /** The stage's height in points, so native can use a copy made at exactly the pixels shown. */
   height: number;
 };
