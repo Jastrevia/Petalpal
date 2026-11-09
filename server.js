@@ -1189,7 +1189,11 @@ app.post("/auth/register", newAccountRateLimit,
     const problem = newProfileProblem(name, body);
     if (problem) return res.status(problem.status).json({ error: problem.error, ...(problem.code ? { code: problem.code } : {}) });
     if (fairyName) assertSocialContent(fairyName);
-    const passwordHash = await hashPassword(req.body.password);
+    // The name is looked up while the password hashes: the hash is CPU time, the lookup waits on the
+    // database (after a quiet spell, on opening a connection), so the wait hides behind the hash.
+    // The unique index still has the final word (createProfile).
+    const [passwordHash, nameHolder] = await Promise.all([hashPassword(req.body.password), findUserByName(prisma, name)]);
+    if (nameHolder) return res.status(409).json(USERNAME_TAKEN);
     const firebaseUid = `pp_${randomUUID().replaceAll("-", "")}`;
     await createProfile({ firebaseUid, name, body, signUp: { passwordHash, fairyName } });
     // The token only once the account exists: a refused name never leaves a way into an empty sign-in.
