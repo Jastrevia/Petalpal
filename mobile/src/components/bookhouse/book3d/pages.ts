@@ -27,9 +27,13 @@ function paint(width: number, height: number, density: number, draw: (canvas: Sk
 }
 
 type TextOptions = { size: number; italic?: boolean; color?: string; align?: TextAlign; maxLines?: number; spacing?: number; line?: number; weight?: FontWeight };
+// Native Skia reads every key that is present and throws on an undefined value ("Value is undefined, expected a
+// String"), which stops the app; the web build ignores it. So an unset option is left out, never passed as undefined.
+const clipped = (maxLines: number | undefined) => maxLines ? { maxLines, ellipsis: '…' } : {};
 function paragraph(fonts: SkTypefaceFontProvider, text: string, width: number, o: TextOptions) {
-  const builder = Skia.ParagraphBuilder.Make({ textAlign: o.align ?? TextAlign.Left, maxLines: o.maxLines, ellipsis: o.maxLines ? '…' : undefined }, fonts);
-  builder.pushStyle({ fontFamilies: FAMILY, fontSize: o.size, color: Skia.Color(o.color ?? INK), letterSpacing: o.spacing ?? 0, heightMultiplier: o.line,
+  const builder = Skia.ParagraphBuilder.Make({ textAlign: o.align ?? TextAlign.Left, ...clipped(o.maxLines) }, fonts);
+  builder.pushStyle({ fontFamilies: FAMILY, fontSize: o.size, color: Skia.Color(o.color ?? INK), letterSpacing: o.spacing ?? 0,
+    ...(o.line === undefined ? {} : { heightMultiplier: o.line }),
     fontStyle: { slant: o.italic ? FontSlant.Italic : FontSlant.Upright, weight: o.weight ?? (o.italic ? FontWeight.Medium : FontWeight.Normal) } });
   builder.addText(text);
   const p = builder.build();
@@ -362,7 +366,7 @@ export function readingBackground(parchment: SkImage, pixelWidth: number) {
 function lines(fonts: SkTypefaceFontProvider, value: string, width: number, size: number, line: number,
   o: { italic?: boolean; color?: string; spacing?: number; maxLines?: number; align?: TextAlign } = {}) {
   const builder = Skia.ParagraphBuilder.Make({
-    textAlign: o.align ?? TextAlign.Left, maxLines: o.maxLines, ellipsis: o.maxLines ? '…' : undefined,
+    textAlign: o.align ?? TextAlign.Left, ...clipped(o.maxLines),
     strutStyle: { strutEnabled: true, forceStrutHeight: true, fontFamilies: FAMILY, fontSize: size, heightMultiplier: line / size, halfLeading: true },
   }, fonts);
   builder.pushStyle({ fontFamilies: FAMILY, fontSize: size, color: Skia.Color(o.color ?? INK), letterSpacing: o.spacing ?? 0,
