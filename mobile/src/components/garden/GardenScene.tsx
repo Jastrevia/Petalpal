@@ -1,4 +1,5 @@
 import { runOnJS } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
 import { onboardingActive } from '../onboarding/onboardingStore';
@@ -414,6 +415,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
   const lanterns = useLanternPlacements(lanternEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  // The zoom buttons sit above the bottom dock (GardenHud: insets.bottom + 8 on phones, + 24 on tablets,
+  // about 66 / 80 pt tall), never under it; 90 pt stays the floor where there is no inset (web).
+  const safeArea = useSafeAreaInsets();
+  const dockPhone = viewport.width < 600 || (viewport.width < 900 && viewport.height < 500);
+  const zoomBottom = Math.max(90, safeArea.bottom + (dockPhone ? 84 : 114));
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
   const [showLandmarks, setShowLandmarks] = useState(true);
@@ -1791,7 +1797,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
