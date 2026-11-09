@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { PixelRatio, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationStageProps } from './fairyAnimationAssets';
@@ -11,7 +11,14 @@ import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationSt
 // empty or wrapped-around frame. The hover matches the web's idle float (4 pt, 2.6 s).
 const HOVER_PT = 4, HOVER_HALF_PERIOD_MS = 1300;
 
-export function FairyAnimationStage({ play, reduced, onStart }: FairyAnimationStageProps) {
+// The smaller copy is used only when it has at least the pixels the stage shows.
+function source(state: FairyAnimationState, height: number) {
+  const asset = FAIRY_ANIMATION_ASSETS[state];
+  const compact = 'compact' in asset ? asset.compact : null;
+  return compact && height * PixelRatio.get() <= compact.pixelHeight ? compact.webp : asset.webp;
+}
+
+export function FairyAnimationStage({ play, reduced, onStart, height }: FairyAnimationStageProps) {
   const wanted = play.state === 'idle' ? 'idle' : `${play.state}:${play.id}`;
   // What is fully on screen: 'idle', an action key, or nothing yet (first action still decoding).
   const [onScreen, setOnScreen] = useState<string | null>(wanted === 'idle' ? 'idle' : null);
@@ -38,7 +45,7 @@ export function FairyAnimationStage({ play, reduced, onStart }: FairyAnimationSt
     return <Image
       key={key}
       ref={image => { if (image) refs.current.set(key, image); else refs.current.delete(key); }}
-      source={FAIRY_ANIMATION_ASSETS[state].webp}
+      source={source(state, height)}
       style={[StyleSheet.absoluteFill, { opacity: visible ? 1 : 0 }]}
       contentFit="contain"
       autoplay

@@ -21,6 +21,10 @@ export const FAIRY_ANIMATION_ASSETS = {
   },
   fly: {
     webp: require('@/assets/garden/fairy/onboarding-suite/fairy-fly.webp'),
+    // The tour's guide is drawn 123 pt tall, 370 px on a 3x phone: this copy has exactly those
+    // pixels (Lanczos from the same frames), so the phone decodes a fifth of the pixels and never
+    // rescales a frame, and the picture on screen is the same.
+    compact: { webp: require('@/assets/garden/fairy/onboarding-suite/fairy-fly-guide.webp'), pixelHeight: 370 },
     durationMs: 5040, // 121 frames @ 24fps = 5.04s
     loops: false,
   },
@@ -36,4 +40,6 @@ export type FairyAnimationStageProps = {
   reduced: boolean;
   /** Called once when an action's first frame is on screen, with `play.id`. */
   onStart: (id: number) => void;
+  /** The stage's height in points, so native can use a copy made at exactly the pixels shown. */
+  height: number;
 };

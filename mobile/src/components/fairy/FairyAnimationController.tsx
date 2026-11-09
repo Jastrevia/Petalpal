@@ -93,6 +93,7 @@ export function FairyAnimationController({
         loop={!oneShot}
         reduced={reduced}
         onStart={handleStart}
+        height={canvasHeight}
       />
     </View>
   );
