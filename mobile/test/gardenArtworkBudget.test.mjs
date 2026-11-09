@@ -143,3 +143,26 @@ test('CanvasKit preserves original pixels in cropped and clipped static-picture 
     }
   } finally { paint.delete(); surface.delete(); }
 });
+
+// Native draws a padded crop instead of the 2400x1800 canvas (16.5 MB decoded each): the box plus a
+// one-pixel ring, all taken from the original (transparent where the ring leaves the canvas), so
+// linear sampling at the clip edge reads exactly what the full canvas gave it.
+test('native copies are the original pixels of the box plus a one-pixel ring', () => {
+  const map = fs.readFileSync(new URL('../src/components/garden/nativeRegisteredArtwork.ts', import.meta.url), 'utf8');
+  for (const { original, web, bounds: [x, y, width, height] } of pairs) {
+    const native = web.replace('@/assets/garden/runtime/', '@/assets/garden/runtime-native/');
+    assert.ok(map.includes(`[require('${web}'), require('${native}')]`), native + ' is mapped');
+    const source = read(original), copy = read(native);
+    assert.equal(copy.width, width + 2); assert.equal(copy.height, height + 2);
+    for (let row = 0; row < copy.height; row++) {
+      for (let col = 0; col < copy.width; col++) {
+        const sx = x - 1 + col, sy = y - 1 + row, target = (row * copy.width + col) * 4;
+        const inside = sx >= 0 && sy >= 0 && sx < source.width && sy < source.height;
+        for (let channel = 0; channel < 4; channel++) {
+          const expected = inside ? source.data[(sy * source.width + sx) * 4 + channel] : 0;
+          if (copy.data[target + channel] !== expected) assert.fail(`${native}: pixel ${col},${row} differs`);
+        }
+      }
+    }
+  }
+});

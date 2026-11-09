@@ -10,7 +10,7 @@ type Snapshot = { picture: SkPicture; image: SkImage; camera: GardenCamera };
 // A snapshot reaches this far past each edge of the screen (a share of its size), so a drag only slides
 // it along and repaints nothing. Past that, or at a new zoom, the layers are drawn as usual until the
 // camera rests again. Slides land on whole device pixels, so the art stays exactly as sharp.
-const MARGIN = .4;
+const MARGIN = .2;
 type Props = { cameraTransform: DerivedValue<Transforms3d>; width: number; height: number; order: number; children: ReactNode };
 const cameraOf = (transform: Transforms3d): GardenCamera => {
   'worklet';
@@ -32,10 +32,12 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
   const [{ root, empty }] = useState(() => ({ root: new SkiaSGRoot(Skia as unknown as ConstructorParameters<typeof SkiaSGRoot>[0]), empty: makeEmpty() }));
   const world = useSharedValue<SkPicture | null>(null), snapshot = useSharedValue<Snapshot | null>(null);
   const still = useSharedValue<GardenCamera | null>(null), since = useSharedValue(0);
+  // Set from the JS thread when the layers change; the UI thread, which made the snapshot, frees it.
+  const stale = useSharedValue(false);
   const marginX = Math.round(width * MARGIN), marginY = Math.round(height * MARGIN);
   const showing = useDerivedValue(() => {
     const held = snapshot.value;
-    if (!held) return null;
+    if (!held || stale.value) return null;
     const camera = cameraOf(cameraTransform.value);
     return held.camera.zoom === camera.zoom && Math.abs(camera.x - held.camera.x) <= marginX && Math.abs(camera.y - held.camera.y) <= marginY ? held : null;
   });
@@ -51,6 +53,12 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
   const pixelWidth = (width + 2 * marginX) * density, pixelHeight = (height + 2 * marginY) * density;
   const exact = pixelWidth > 0 && pixelHeight > 0 && Number.isInteger(pixelWidth) && Number.isInteger(pixelHeight);
   useFrameCallback(frame => {
+    if (stale.value) {
+      stale.value = false;
+      const dropped = snapshot.value;
+      snapshot.value = null;
+      if (dropped) requestAnimationFrame(() => requestAnimationFrame(() => { dropped.picture.dispose(); dropped.image.dispose(); }));
+    }
     if (!exact) return;
     const camera = cameraOf(cameraTransform.value);
     if (!sameCamera(still.value, camera)) { still.value = camera; since.value = frame.timestamp; return; }
@@ -83,11 +91,11 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
     let alive = true;
     container.redraw = function (this: unknown) {
       redraw.call(this);
-      if (alive) { world.value = root.getPicture(); snapshot.value = null; }
+      if (alive) { world.value = root.getPicture(); stale.value = true; }
     };
     return () => { alive = false; void root.unmount(); };
-  }, [root, snapshot, world]);
-  useEffect(() => { snapshot.value = null; }, [snapshot, width, height]);
+  }, [root, stale, world]);
+  useEffect(() => { stale.value = true; }, [stale, width, height]);
   useEffect(() => { void root.render(<LandImages.Provider value={landImages}>{children}</LandImages.Provider>); }, [root, landImages, children]);
   return <Group transform={transform}><Picture picture={picture} /></Group>;
 }
