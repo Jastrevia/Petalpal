@@ -45,12 +45,9 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
     veil.value = withTiming(1, { duration: reduced ? 0 : 700, easing: EASE });
     if (step === 'intro.name') {
       // Full flight duration matching the 5.04s Fly V1 master choreography
-      flight.value = withTiming(1, { duration: reduced ? 0 : 5040, easing: Easing.out(Easing.cubic) },
-        finished => {
-          if (finished) {
-            runOnJS(setFairyState)('greet');
-          }
-        });
+      // She greets when her fly has played to its last frame (handleAnimationComplete), not when
+      // this path's clock runs out: the first frame can reach the screen a moment after mount.
+      flight.value = withTiming(1, { duration: reduced ? 0 : 5040, easing: Easing.out(Easing.cubic) });
     }
   }, []);
 
