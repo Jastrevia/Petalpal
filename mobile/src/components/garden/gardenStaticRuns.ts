@@ -17,7 +17,10 @@ type Tracked = { still: GardenCamera; since: number };
 export const SETTLE_MS = 250;
 // A frame being recorded may still name the old picture or image: let the next one replace it first.
 export const afterNextFrames = (action: () => void) => { requestAnimationFrame(() => requestAnimationFrame(action)); };
-export const sameCamera = (a: GardenCamera | null, b: GardenCamera | null) => !!a && !!b && a.x === b.x && a.y === b.y && a.zoom === b.zoom;
+export function sameCamera(a: GardenCamera | null, b: GardenCamera | null) {
+  'worklet';
+  return !!a && !!b && a.x === b.x && a.y === b.y && a.zoom === b.zoom;
+}
 
 export function createStaticRunHost<Picture>() {
   const runs = new Map<StaticRun<Picture>, Tracked | null>();

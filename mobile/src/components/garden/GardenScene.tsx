@@ -1,4 +1,5 @@
 import { runOnJS } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
 import { onboardingActive } from '../onboarding/onboardingStore';
@@ -112,6 +113,7 @@ import {
 import TreehouseCalibrationEditor, { type TreehousePlacement } from './TreehouseCalibrationEditor';
 import LandLayer, { GardenLandResources } from './LandLayer';
 import GardenStaticRun from './GardenStaticRun';
+import { noteGardenMotion } from './gardenNativeFrames';
 import Letterwing from './Letterwing';
 import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
@@ -413,6 +415,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
   const lanterns = useLanternPlacements(lanternEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  // The zoom buttons sit above the bottom dock (GardenHud: insets.bottom + 8 on phones, + 24 on tablets,
+  // about 66 / 80 pt tall), never under it; 90 pt stays the floor where there is no inset (web).
+  const safeArea = useSafeAreaInsets();
+  const dockPhone = viewport.width < 600 || (viewport.width < 900 && viewport.height < 500);
+  const zoomBottom = Math.max(90, safeArea.bottom + (dockPhone ? 84 : 114));
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
   const [showLandmarks, setShowLandmarks] = useState(true);
@@ -701,21 +708,22 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     { translateY: baseY + cameraY.value },
     { scale: fit * cameraZoom.value },
   ]);
+  useAnimatedReaction(() => cameraTransform.value, () => { noteGardenMotion(); });
   // The layers that never move, each between things that do. See gardenStaticRuns.ts.
   const staticLayout = __DEV__ ? calibrationLayout : undefined;
-  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout]);
-  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform]);
+  const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={0}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout, viewport.width, viewport.height]);
+  const outerBasinRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={1}><GardenOuterBasin /></GardenStaticRun>, [cameraTransform, viewport.width, viewport.height]);
   const selectedStaticLand = __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'land' ? selectedLandId : null;
-  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
-    [cameraTransform, perf.Land, staticLayout, selectedStaticLand]);
-  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform}>
+  const landRun = useMemo(() => <GardenProfile name="Land" enabled={perf.Land}><GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={2}><LandLayer layout={staticLayout} selectedLandId={selectedStaticLand} /></GardenStaticRun></GardenProfile>,
+    [cameraTransform, perf.Land, staticLayout, selectedStaticLand, viewport.width, viewport.height]);
+  const infrastructureRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={3}>
     {environmentEnabled && <GardenEnvironmentLayer />}
     {/* Approved world-aligned artwork is shared by development and production. */}
     {infrastructureEnabled && <GardenLand09InterfaceLayer />}
     <GardenConnectionLayer />
     {infrastructureEnabled && <GardenInfrastructureLayer />}
     {__DEV__ && !infrastructureEnabled && <GardenBridge placement={bridgePlacement} />}
-  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement]);
+  </GardenStaticRun>, [cameraTransform, environmentEnabled, infrastructureEnabled, bridgePlacement, viewport.width, viewport.height]);
   // Hit area follows the existing landmark and camera; the painted scene is unchanged.
   const [pavilionSelected, setPavilionSelected] = useState(false);
   const pavilionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1789,7 +1797,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:90,flexDirection:'row',gap:6,zIndex:30}}>
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}

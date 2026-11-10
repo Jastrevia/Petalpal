@@ -16,3 +16,21 @@ index dd79e2a..e613e9b 100644
 +  const uint64_t floorBytes = 512ull * 1024 * 1024, ceilingBytes = 1536ull * 1024 * 1024;
 +  _directContext->setResourceCacheLimit((size_t)MIN(ceilingBytes, MAX(floorBytes, quarter)));
  }
+diff --git a/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts b/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
+--- a/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
++++ b/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
+@@ -61,7 +61,13 @@
+       this.mapperId = Rea.startMapper(() => {
+         "worklet";
+         sharedRecorder.applyUpdates(sharedValues);
+-        nativeDrawOnscreen(nativeId, sharedRecorder, picture);
++        // PetalPal: the Garden may hold a frame back while it rests (gardenNativeFrames.ts).
++        const paint = () => {
++          "worklet";
++          nativeDrawOnscreen(nativeId, sharedRecorder, picture);
++        };
++        const gate = (globalThis as any).__skiaFrameGate;
++        if (!gate || !gate.hold(nativeId, paint)) paint();
+       }, sharedValues);
+     }
+   }

@@ -86,6 +86,7 @@ test("an account name and a password make an account, with its fairy, avatar, no
   const url = await withServer(t);
   let created;
   mock(t, prisma.user, "create", async ({ data }) => { created = data; return { id: data.id }; });
+  mock(t, prisma, "$queryRawUnsafe", async () => []);
 
   const response = await send(url, "/auth/register", "POST", profile());
   assert.equal(response.status, 201);
@@ -127,7 +128,8 @@ test("a taken name gets a clear refusal, and an id collision just draws again", 
   const url = await withServer(t);
   const duplicate = () => Object.assign(new Error("duplicate"), { code: "P2002" });
 
-  mock(t, prisma.user, "create", async () => { throw duplicate(); });
+  // Found while the password hashes: refused before anything is written.
+  mock(t, prisma.user, "create", async () => assert.fail("nothing is created for a taken name"));
   mock(t, prisma, "$queryRawUnsafe", async () => [{ id: "someone" }]);
   setFirebaseSignInTokenIssuerForTests(async () => assert.fail("no sign-in for a refused name"));
   const taken = await send(url, "/auth/register", "POST", profile());

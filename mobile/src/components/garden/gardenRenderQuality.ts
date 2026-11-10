@@ -23,6 +23,7 @@ export function backingSize(tier: GardenQuality, signals: QualitySignals) {
 // 30 frames a second; while it is touched, and for a moment after, it runs at full speed.
 const AWAKE_MS = 6000, RESTING_FRAME_MS = 30;
 export function restingFrameSkipped(now: number, lastTouch: number, lastPaint: number, touching: boolean) {
+  'worklet';
   return !touching && now - lastTouch > AWAKE_MS && now - lastPaint < RESTING_FRAME_MS;
 }
 export type FrameSample = { p90FrameMs: number; p90DrawMs: number; count: number };

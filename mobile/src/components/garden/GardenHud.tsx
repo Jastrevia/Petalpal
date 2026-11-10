@@ -27,6 +27,7 @@ import { AiConsentPrompt } from '../features/AiConsentPrompt';
 
 import { zhHans } from './fairy/tapLines';
 import { onOpenGardenPanel } from './gardenPanelBus';
+import { usePauseGardenWhile } from './gardenOverlayPause';
 
 const MOMENTS_CHECK_MS = 5 * 60_000;
 // One navigation model; only its sizing changes with the viewport.
@@ -61,6 +62,9 @@ export function GardenHud({ onFocusFairy, paused = false }: { onFocusFairy?: () 
   const [bondOpen, setBondOpen] = useState(false);
   // The avatar collection opened from the Fairy Bond level-up celebration.
   const [avatarsOpen, setAvatarsOpen] = useState(false);
+  // A panel over the Garden (Events, Friends, Fairy, Me, Our Bond, Moments, avatars) pauses its drawing
+  // and clocks, as the petal ring does: the Garden is behind a scrim, and the panel gets the frame budget.
+  usePauseGardenWhile(Boolean(openFeature) || bondOpen || momentsOpen || avatarsOpen);
   // Main's one-tap AI question comes first; the level-up waits until it is answered.
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const closeness = useClosenessSummary(entryOpens);
