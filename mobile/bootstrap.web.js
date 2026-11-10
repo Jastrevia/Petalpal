@@ -41,4 +41,16 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     configureGardenWebRootCleanup(SkiaSGRoot.prototype, nativeId => isOwnedGardenWebView(globalThis.SkiaViewApi, nativeId));
     return require('expo-router/entry');
   })
-  .catch(error => console.error('Garden graphics initialization failed', error));
+  .catch(error => {
+    console.error('Garden graphics initialization failed', error);
+    // The boot loading screen (public/index.html) is still up: say so and offer a reload
+    // instead of leaving the bar sweeping forever.
+    const message = typeof document !== 'undefined' && document.getElementById('pp-boot-message');
+    if (message) {
+      message.textContent = 'PetalPal couldn\u2019t start. ';
+      const retry = document.createElement('a');
+      retry.href = ''; retry.textContent = 'Reload';
+      retry.onclick = event => { event.preventDefault(); window.location.reload(); };
+      message.appendChild(retry);
+    }
+  });

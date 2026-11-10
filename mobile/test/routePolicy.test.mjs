@@ -7,6 +7,8 @@ function runtime(path, development = false, signedIn = true) {
   const effects = [], stateWrites = [];
   // Context reads whatever the nearest Provider above set: render() below calls a parent before its children.
   const react = { useEffect: fn => { effects.push(fn); }, useState: value => [typeof value === 'function' ? value() : value, next => stateWrites.push(next)], useRef: current => ({ current }),
+    // services/appReload: the navigator's reload key (a snapshot read; nothing reloads in these tests).
+    useSyncExternalStore: (subscribe, get) => get(),
     createContext: value => { const context = { value, Provider: ({ value: next, children }) => { context.value = next; return children; } }; return context; },
     useContext: context => context.value };
   const Pass = ({ children }) => children;

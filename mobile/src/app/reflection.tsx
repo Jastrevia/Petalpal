@@ -8,7 +8,8 @@ import { AiOutputReport } from '../components/features/AiPrivacySettings';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { pavilionAutoOpen, pavilionMonth, pavilionPages as monthEntrancePages } from '../services/pavilionMonth';
 import { useAuth } from '../services/auth';
 import { useWorldTime } from '../components/garden/world-time';
 import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, monthly2, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
@@ -92,6 +93,9 @@ const PHONE_MAX_WIDTH = 640;
 const MAX_REPORT_PAGES = 25;
 export default function Reflection() {
   const router = useRouter();
+  // A Garden month sign opens the pavilion at its month (/reflection?month=1…12); anything else is no month.
+  const { month: requestedMonth } = useLocalSearchParams<{ month?: string }>();
+  const monthNumber = pavilionMonth(requestedMonth);
   const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
   // A phone lays the pavilion out as a wide screen does, the painting as tall as the screen and so
@@ -115,7 +119,7 @@ export default function Reflection() {
     const animation = Animated.timing(lighting, { toValue: night ? 1 : 0, duration: reducedMotion ? 0 : 1800, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
     animation.start(); return () => animation.stop();
   }, [night, reducedMotion, lighting]);
-  const [type, setType] = useState<ReportType>('weekly');
+  const [type, setType] = useState<ReportType>(monthNumber === null ? 'weekly' : 'monthly');
   // The pavilion opens with every book on the shelf. Tapping one pulls it out, carries it to the desk and opens it
   // (the green book is Weekly, the blue Monthly, the purple one the notes about them).
   const [open, setOpen] = useState<Book | null>(null);
@@ -257,11 +261,27 @@ export default function Reflection() {
   // Back to the Garden already underneath; replacing would mount a second Garden each visit.
   const leave = () => router.canGoBack() ? router.back() : router.dismissTo('/');
   const insets = useSafeAreaInsets();
-  const pages = reports.filter(report => report.type === type).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+  // A month entrance shows only that month's Monthly reports, never a different month's.
+  const pages = monthEntrancePages(reports, type, monthNumber);
   const found = pages.findIndex(report => report.id === pageId[type]);
   const index = found >= 0 ? found : pages.length - 1;
   const selected = pages[index] ?? null;
   const show = (report: SavedReport) => setPageId(previous => ({ ...previous, [report.type]: report.id }));
+
+  // A month entrance (a Garden sign) opens that month's book by itself: once per requested month, and only once the
+  // shared spine textures exist. Opening earlier mounted the moving book mid-load on a cold start (the startup crash).
+  // Later spine rebuilds, re-renders or closing the book never open it again.
+  const autoOpened = useRef<number | null>(null);
+  useEffect(() => {
+    if (!pavilionAutoOpen(monthNumber, !!spines, autoOpened.current)) return;
+    autoOpened.current = monthNumber;
+    setPageId(previous => ({ ...previous, monthly: null }));
+    openBook('monthly');
+  }, [monthNumber, spines]);
+  // That month's report may be on an older page of the list: keep loading pages until it appears or the list ends.
+  useEffect(() => {
+    if (monthNumber !== null && type === 'monthly' && !loading && !listError && cursor && pages.length === 0) void load(cursor);
+  }, [monthNumber, type, loading, listError, cursor, pages.length]);
 
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
@@ -289,10 +309,12 @@ export default function Reflection() {
   const autoCreated = useRef<Record<ReportType, boolean>>({ weekly: false, monthly: false });
   useEffect(() => {
     if (loading || listError || creating || autoCreated.current[type]) return;
+    // A month entrance only reads that month's saved reports; it never writes last month's.
+    if (type === 'monthly' && monthNumber !== null) return;
     const lastKey = type === 'weekly' ? lastClosedWeekKey() : lastClosedMonthKey();
     if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
     autoCreated.current[type] = true; void createLast(type);
-  }, [type, loading, listError, reports, creating]);
+  }, [type, loading, listError, reports, creating, monthNumber]);
   // A finished reflection opens on its own book's page, but never switches books: the owner may
   // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {

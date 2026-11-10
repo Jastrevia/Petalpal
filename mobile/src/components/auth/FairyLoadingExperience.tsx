@@ -23,6 +23,14 @@ import {
   TAP_CONTACT_POINT,
 } from './fairyLoadingTimeline';
 
+import {
+  LoginAnimalExperience,
+  type LoginAnimal,
+  type LoginAnimalProps,
+} from './LoginAnimalExperience';
+
+export { LoginAnimalExperience, type LoginAnimal, type LoginAnimalProps };
+
 const POSE01_LAYER_CACHE_VERSION = 'pose01_clean_v9';
 
 function withWebAssetVersion(asset: any, version: string) {
@@ -55,6 +63,7 @@ const FAIRY_SPRITE_02 = require('../../../assets/auth/fairy-loading/fairy_pose02
 const FAIRY_SPRITE_03 = require('../../../assets/auth/fairy-loading/fairy_pose03_tapping.png');
 
 export interface FairyLoadingProps {
+  character?: 'pigeon' | 'squirrel' | 'fairy' | 'random';
   isLoading?: boolean;
   onComplete?: () => void;
   // Dev / Preview lab controls
@@ -152,7 +161,21 @@ function ContactSparkle({
   );
 }
 
-export const FairyLoadingExperience = memo(function FairyLoadingExperience({
+export const FairyLoadingExperience = memo(function FairyLoadingExperience(props: FairyLoadingProps) {
+  const { character = 'random' } = props;
+  const [randomAnimal] = useState<'pigeon' | 'squirrel'>(() => (Math.random() < 0.5 ? 'pigeon' : 'squirrel'));
+
+  if (character === 'pigeon' || character === 'squirrel') {
+    return <LoginAnimalExperience animal={character} {...props} />;
+  }
+  if (character === 'fairy') {
+    return <OriginalFairyLoadingExperience {...props} />;
+  }
+
+  return <LoginAnimalExperience animal={randomAnimal} {...props} />;
+});
+
+const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperience({
   isLoading = true,
   onComplete,
   isPaused = false,
