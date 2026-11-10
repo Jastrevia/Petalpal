@@ -12,6 +12,9 @@ export const PAVILION_SLOTS: Record<PavilionBookId, Rect> = {
   collection: { x: 1078, y: 0, width: 106, height: 267 },
 };
 export const PAVILION_LANTERN: Rect = { x: 1208, y: 12, width: 90, height: 238 };
+/** Phones: where the book lies on the wooden board, in painting pixels (its width; the height follows the open book's
+ *  proportions). Fixed in the painting, so the book stays attached to the board on every phone width. */
+export const PAVILION_PHONE_BOOK = { x: 714.8, y: 346.2, width: 500.4 };
 export const PAVILION_CLOTH: Record<PavilionBookId, string> = {
   weekly: '#3E5742', monthly: '#244B70', notes: '#6C4772', collection: '#D9C49D',
 };
@@ -28,10 +31,11 @@ export function pavilionScene(width: number, height: number) {
     const r = PAVILION_SLOTS[id];
     return { x: x + r.x * k, y: y + r.y * k, width: r.width * k, height: r.height * k };
   };
-  const bookWidth = Math.min(compact ? width - 24 : artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H);
+  const bookWidth = compact ? PAVILION_PHONE_BOOK.width * k : Math.min(artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H);
   const bookHeight = bookWidth * SPEC.H / (2 * SPEC.W);
-  const bookX = compact ? (width - bookWidth) / 2 : x + artWidth * .56 - bookWidth / 2;
-  const bookY = Math.max(slot('weekly').y + slot('weekly').height + 18, Math.min(y + artHeight * .30, height - bookHeight - 42));
+  const bookX = compact ? x + PAVILION_PHONE_BOOK.x * k : x + artWidth * .56 - bookWidth / 2;
+  const bookY = compact ? y + PAVILION_PHONE_BOOK.y * k
+    : Math.max(slot('weekly').y + slot('weekly').height + 18, Math.min(y + artHeight * .30, height - bookHeight - 42));
   const col = slot('collection');
   const rawLanternLeft = x + PAVILION_LANTERN.x * k;
   const rawLanternRight = x + (PAVILION_LANTERN.x + PAVILION_LANTERN.width) * k;
@@ -116,4 +120,63 @@ export function pavilionPages(L: BookLayout, focused = false) {
     return { x, y: Math.min(...ys), width: Math.max(...xs) - x, height: Math.max(...ys) - Math.min(...ys) };
   };
   return { left: page(true), right: page(false) };
+}
+
+/** Every page is laid out once at this paper size (CSS px) and only ever scaled onto the book: it never reflows, so a
+ *  page that fits here fits at any size. It is the paper of the 1280 × 800 desktop spread. */
+export const PAVILION_PAGE = { width: 336, height: 491 };
+/** Below this scale of the reference page (body text 13.5 px → 12.5 px) two pages are too small to read comfortably. */
+export const PAVILION_READABLE = .926;
+const READING_MAX = 1.25, READING_GUTTER = 12;
+
+/** Close reading of one page: the camera zooms about (ox, oy) by `scale`, which brings that page to `window`. */
+export type PavilionReadingSide = { scale: number; ox: number; oy: number; window: Rect };
+export type PavilionReading =
+  | { fit: true; sigma: number }
+  | { fit: false; sigma: number; magnification: number; left: PavilionReadingSide; right: PavilionReadingSide; chrome: 'side' | 'above';
+      /** The camera brings the whole spread close (a short, wide screen): both pages show, so they read as two. */
+      spread: boolean };
+
+/** Whether the spread is read as two pages, or one page at a time through the reading camera. Only the book layer is
+ *  magnified; the painting, the shelf and the book's anchor never move. `leaves` are the anchored paper rectangles. */
+export function pavilionReading(width: number, height: number, leaves: { left: Rect; right: Rect },
+  safe: { top: number; bottom: number; closeAtBottom: boolean }): PavilionReading {
+  const sigma = leaves.right.width / PAVILION_PAGE.width;
+  if (sigma >= PAVILION_READABLE) return { fit: true, sigma };
+  const g = READING_GUTTER, minTop = safe.top + 8, maxBottom = height - safe.bottom - (safe.closeAtBottom ? 60 : 8);
+  const pageTop = Math.min(leaves.left.y, leaves.right.y);
+  // Height of a page per unit of width (the leaves' own projected proportions, a hair off the reference page's).
+  const aspect = Math.max(leaves.left.height / leaves.left.width, leaves.right.height / leaves.right.width);
+  const fitScale = (top: number) => Math.min((width - 2 * g) / PAVILION_PAGE.width, (maxBottom - top) / (PAVILION_PAGE.width * aspect), READING_MAX);
+  // The page grows down from its own top edge, so the shelf stays in view; if that leaves it too small to read, the
+  // page may rise over the shelf instead (a short landscape screen). It always shows whole: no scrolling.
+  let top = Math.max(minTop, pageTop), m = fitScale(top);
+  if (m < PAVILION_READABLE) { top = minTop; m = fitScale(top); }
+  if (m <= sigma * 1.001) return { fit: true, sigma };
+  const scale = m * PAVILION_PAGE.width / Math.max(leaves.left.width, leaves.right.width);
+  const side = (p: Rect): PavilionReadingSide => {
+    // Zooming about o maps an edge e to o + (e − o)·scale. Prefer o at the page's centre (x) and top (y), moved
+    // only as far as needed to keep the whole page inside [lo, hi].
+    const about = (e0: number, e1: number, lo: number, hi: number, prefer: number) =>
+      Math.min((e0 * scale - lo) / (scale - 1), Math.max((e1 * scale - hi) / (scale - 1), prefer));
+    const ox = about(p.x, p.x + p.width, g, width - g, p.x + p.width / 2);
+    const oy = about(p.y, p.y + p.height, top, maxBottom, p.y);
+    return { scale, ox, oy, window: { x: ox + (p.x - ox) * scale, y: oy + (p.y - oy) * scale, width: p.width * scale, height: p.height * scale } };
+  };
+  const spreadRect: Rect = { x: leaves.left.x, y: pageTop, width: leaves.right.x + leaves.right.width - leaves.left.x,
+    height: Math.max(leaves.left.height, leaves.right.height) };
+  const spread = spreadRect.width * scale <= width - 2 * g;
+  const left = side(spread ? spreadRect : leaves.left), right = spread ? left : side(leaves.right);
+  const room = Math.min(width - left.window.x - left.window.width, width - right.window.x - right.window.width);
+  return { fit: false, sigma, magnification: m, left, right, chrome: room >= 84 ? 'side' : 'above', spread };
+}
+
+/** The reading camera at `zoom` (0 the anchored book … 1 one page close up) and `side` (−1 left page … 1 right page):
+ *  a uniform zoom by s about (ox, oy). At zoom 0 it is the identity, so the book lies exactly at its anchor. */
+export function readingCamera(r: PavilionReading, zoom: number, side: number) {
+  'worklet';
+  if (r.fit || zoom <= 0) return { s: 1, ox: 0, oy: 0 };
+  const u = Math.min(1, Math.max(0, (side + 1) / 2));
+  const scale = r.left.scale + (r.right.scale - r.left.scale) * u;
+  return { s: Math.pow(scale, Math.min(1, zoom)), ox: r.left.ox + (r.right.ox - r.left.ox) * u, oy: r.left.oy + (r.right.oy - r.left.oy) * u };
 }

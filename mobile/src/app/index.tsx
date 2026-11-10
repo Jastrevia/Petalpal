@@ -57,7 +57,7 @@ export default function HomeScreen() {
   </GestureHandlerRootView>;
   if (!session) return null;
   return <GestureHandlerRootView style={{ flex: 1 }}>
-    <GardenScene ref={gardenRef} enableFairyWalk={!tourHoldsFairy} renderOverlay={renderOnboarding} key={session.user.id} initialWaterfallVersion="v2" monthLawnOpensEvents session={session} gardenOwnerUserId={session.user.id} backendMode showCalendar locale={experience?.user.preferredLocale} onOpenBookhouse={() => router.push('/bookhouse')} onOpenEvents={openEvents} onOpenReflection={() => router.push('/reflection')} onMailboxOpened={openMailbox} showDevControls={false}>
+    <GardenScene ref={gardenRef} enableFairyWalk={!tourHoldsFairy} renderOverlay={renderOnboarding} key={session.user.id} initialWaterfallVersion="v2" monthLawnOpensEvents session={session} gardenOwnerUserId={session.user.id} backendMode showCalendar locale={experience?.user.preferredLocale} onOpenBookhouse={() => router.push('/bookhouse')} onOpenEvents={openEvents} onOpenReflection={month => router.push(month ? { pathname: '/reflection', params: { month: String(month) } } : '/reflection')} onMailboxOpened={openMailbox} showDevControls={false}>
       <GardenHud onFocusFairy={focusFairy} />
     </GardenScene>
   </GestureHandlerRootView>;

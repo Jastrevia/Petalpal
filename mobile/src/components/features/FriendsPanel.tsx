@@ -30,9 +30,9 @@ const COPY = {
   en: {
     title: 'Friends', tagline: 'GOOD FRIENDS\nBRIGHTER GARDENS', selfOnline: 'You’re online', selfOffline: 'You’re offline',
     tabs: { friends: 'My friends', requests: 'Requests', visitors: 'Visitors' },
-    myFriends: 'My friends', add: 'Add friend', filter: 'Search friends by name or ID…', filterLabel: 'Search friends',
+    myFriends: 'My friends', add: 'Add friend',
     online: 'Online', offline: 'Offline', noUsername: 'No username set', someone: 'PetalPal user',
-    none: 'You have not added any friends yet.', noMatch: 'No friends match that search.',
+    none: 'You have not added any friends yet.',
     manage: 'Delete friends', done: 'Done', removeAsk: (name: string) => `Remove ${name} from your friends?`,
     cancelRemoval: 'Cancel removal', confirmRemoval: 'Confirm removal',
     remove: (name: string) => `Remove ${name}`, report: (name: string) => `Report or block ${name}`,
@@ -53,9 +53,9 @@ const COPY = {
   'zh-Hans': {
     title: '好友', tagline: '好朋友\n让花园更美', selfOnline: '你在线', selfOffline: '你离线',
     tabs: { friends: '我的好友', requests: '好友申请', visitors: '访客记录' },
-    myFriends: '我的好友', add: '添加好友', filter: '搜索好友的名字或 ID…', filterLabel: '搜索好友',
+    myFriends: '我的好友', add: '添加好友',
     online: '在线', offline: '离线', noUsername: '还没有设置用户名', someone: 'PetalPal 用户',
-    none: '你还没有添加好友。', noMatch: '没有找到匹配的好友。',
+    none: '你还没有添加好友。',
     manage: '删除好友', done: '完成', removeAsk: (name: string) => `把 ${name} 从好友里删除吗？`,
     cancelRemoval: '取消', confirmRemoval: '确认删除',
     remove: (name: string) => `删除 ${name}`, report: (name: string) => `举报或屏蔽 ${name}`,
@@ -96,7 +96,6 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [removing, setRemoving] = useState<FriendUser | null>(null);
-  const [filter, setFilter] = useState('');
   // The list shows Home buttons; "Delete friends" swaps them for remove and report circles.
   const [managing, setManaging] = useState(false);
   const [tab, setTab] = useState<Tab>(addingFriend ? 'requests' : 'friends');
@@ -147,7 +146,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     mounted.current = true; locked.current = false;
     setFriends([]); setRequests({ incoming: [], outgoing: [] }); setResults([]);
     setSearch(''); setSearched(false); setRemoving(null); setError(''); setMessage('');
-    setFilter(''); setManaging(false); setSentTo(null);
+    setManaging(false); setSentTo(null);
     void refresh();
     return () => { mounted.current = false; };
   // A language switch only relabels; it must not reload or reset the list.
@@ -248,8 +247,6 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   if (!ownerId) return <Text style={styles.caption}>{copy.signIn}</Text>;
   const inSearch = tab === 'requests' && searched;
   const typing = tab === 'requests' && !searched && search.trim().length > 0;
-  const shown = friends.filter(friend => `${friend.displayName || ''} ${friend.name} ${friend.accountId || ''} ${friend.id}`
-    .toLowerCase().includes(filter.trim().toLowerCase()));
 
   const status = <>
     {busy ? <View style={ui.row}><ActivityIndicator accessibilityLabel={busy} color={colors.primary} />
@@ -273,46 +270,42 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
 
   const friendsTab = <>
     {heading(copy.myFriends, friends.length, <View {...onboardingTarget('friends.add')}>{pill(copy.add, copy.add, () => setTab('requests'), { disabled: !!busy, icon: null })}</View>)}
-    <View {...onboardingTarget('friends.list')} style={styles.search}>
-      <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={20} tintColor={theme.muted} />
-      <TextInput accessibilityLabel={copy.filterLabel} placeholder={copy.filter} placeholderTextColor={theme.muted}
-        value={filter} onChangeText={setFilter} style={styles.searchInput} />
-    </View>
-    {!busy && !friends.length ? <Text style={styles.caption}>{copy.none}</Text> : null}
-    {friends.length && !shown.length ? <Text style={styles.caption}>{copy.noMatch}</Text> : null}
-    {shown.map(friend => {
-      const allowed = friend.allowGardenVisits === true, name = nameOf(friend);
-      return <View key={friend.id}>
-        <View testID={`friend-${friend.id}`} style={[styles.listRow, newFriends.includes(friend.id) && styles.listRowNew]}>
-          {identity(friend, undefined, true)}
-          {managing ? <>
-            <Pressable accessibilityRole="button" accessibilityLabel={copy.remove(friend.name)} disabled={!!busy} onPress={() => setRemoving(friend)}
-              style={({ pressed }) => [styles.circle, styles.removeCircle, !!busy && ui.disabled, pressed && ui.pressed]}>
-              <Text style={[styles.circleText, { color: '#E0897D' }]}>−</Text>
-            </Pressable>
-            <SafetyActions userId={friend.id} onBlocked={() => void refresh()} trigger={(open, reporting) =>
-              <Pressable accessibilityRole="button" accessibilityLabel={copy.report(name)} disabled={reporting} onPress={open}
-                style={({ pressed }) => [styles.circle, styles.reportCircle, pressed && ui.pressed]}>
-                <SymbolView name={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }} size={20} tintColor="#D8B45E" />
-              </Pressable>} />
-          </> : <Pressable accessibilityRole="button" accessibilityLabel={copy.visit(friend.name)}
-            accessibilityHint={allowed ? copy.visitOpen : friend.allowGardenVisits === false ? copy.visitPrivate : copy.visitUnknown}
-            accessibilityState={{ disabled: !allowed || !!busy }} disabled={!allowed || !!busy} testID={`visit-${friend.id}`}
-            onPress={allowed && !busy ? () => visit(friend) : undefined}
-            style={({ pressed }) => [styles.home, !allowed && styles.homeDisabled, allowed && pressed && styles.homeActive]}>
-            <Image source={light ? require('../../../assets/friends/visitor-home-transparent.png') : require('../../../assets/friends/garden-house.png')} style={styles.houseImage} resizeMode="contain" accessible={false} />
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>}
-        </View>
-        {removing?.id === friend.id ? <View style={styles.notice}>
-          <Text style={[styles.caption, { color: theme.text }]}>{copy.removeAsk(name)}</Text>
-          <View style={styles.noticeActions}>
-            {pill(copy.cancelRemoval, copy.cancelRemoval, () => setRemoving(null), { disabled: !!busy })}
-            {pill(copy.confirmRemoval, copy.confirmRemoval, () => void confirmRemove(), { disabled: !!busy, tone: 'danger' })}
+    <View {...onboardingTarget('friends.list')} style={styles.list}>
+      {!busy && !friends.length ? <Text style={styles.caption}>{copy.none}</Text> : null}
+      {friends.map(friend => {
+        const allowed = friend.allowGardenVisits === true, name = nameOf(friend);
+        return <View key={friend.id}>
+          <View testID={`friend-${friend.id}`} style={[styles.listRow, newFriends.includes(friend.id) && styles.listRowNew]}>
+            {identity(friend, undefined, true)}
+            {managing ? <>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.remove(friend.name)} disabled={!!busy} onPress={() => setRemoving(friend)}
+                style={({ pressed }) => [styles.circle, styles.removeCircle, !!busy && ui.disabled, pressed && ui.pressed]}>
+                <Text style={[styles.circleText, { color: '#E0897D' }]}>−</Text>
+              </Pressable>
+              <SafetyActions userId={friend.id} onBlocked={() => void refresh()} trigger={(open, reporting) =>
+                <Pressable accessibilityRole="button" accessibilityLabel={copy.report(name)} disabled={reporting} onPress={open}
+                  style={({ pressed }) => [styles.circle, styles.reportCircle, pressed && ui.pressed]}>
+                  <SymbolView name={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }} size={20} tintColor="#D8B45E" />
+                </Pressable>} />
+            </> : <Pressable accessibilityRole="button" accessibilityLabel={copy.visit(friend.name)}
+              accessibilityHint={allowed ? copy.visitOpen : friend.allowGardenVisits === false ? copy.visitPrivate : copy.visitUnknown}
+              accessibilityState={{ disabled: !allowed || !!busy }} disabled={!allowed || !!busy} testID={`visit-${friend.id}`}
+              onPress={allowed && !busy ? () => visit(friend) : undefined}
+              style={({ pressed }) => [styles.home, !allowed && styles.homeDisabled, allowed && pressed && styles.homeActive]}>
+              <Image source={light ? require('../../../assets/friends/visitor-home-transparent.png') : require('../../../assets/friends/garden-house.png')} style={styles.houseImage} resizeMode="contain" accessible={false} />
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>}
           </View>
-        </View> : null}
-      </View>;
-    })}
+          {removing?.id === friend.id ? <View style={styles.notice}>
+            <Text style={[styles.caption, { color: theme.text }]}>{copy.removeAsk(name)}</Text>
+            <View style={styles.noticeActions}>
+              {pill(copy.cancelRemoval, copy.cancelRemoval, () => setRemoving(null), { disabled: !!busy })}
+              {pill(copy.confirmRemoval, copy.confirmRemoval, () => void confirmRemove(), { disabled: !!busy, tone: 'danger' })}
+            </View>
+          </View> : null}
+        </View>;
+      })}
+    </View>
     <View style={styles.rule} />
     <View style={styles.footer}>
       {pill(managing ? copy.done : copy.manage, managing ? copy.done : copy.manage, () => { setManaging(on => !on); setRemoving(null); }, {
@@ -470,6 +463,7 @@ const createStyles = (theme: PanelTheme, light: boolean) => StyleSheet.create({
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: theme.text },
   clear: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.muted },
   clearText: { fontSize: 16, lineHeight: 18, color: theme.muted },
+  list: { gap: 12 },
   caption: { fontSize: 12, lineHeight: 18, color: theme.muted },
   presenceDot: { position: 'absolute', right: 0, bottom: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 10,

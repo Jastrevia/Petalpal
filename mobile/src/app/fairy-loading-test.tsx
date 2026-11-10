@@ -257,6 +257,7 @@ export default function FairyLoadingTestRoute() {
 
             {/* REAL FAIRY LOADING ANIMATION SYSTEM */}
             <FairyLoadingExperience
+              character="fairy"
               isLoading={isLoadingActive}
               onComplete={() => {
                 setCompletionNotice('Fairy departure complete! Garden ready.');

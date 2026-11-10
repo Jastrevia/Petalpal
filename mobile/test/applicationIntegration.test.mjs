@@ -503,10 +503,9 @@ test('confirmed Friends retain visible Home icons and use persisted privacy meta
   const disabledHome = reopened.nodes().find(node => node.props?.testID === 'visit-alex');
   assert.equal(disabledHome.props.disabled, true); assert.equal(disabledHome.props.onPress, undefined);
   assert.ok(calls.every(url => !url.includes('/garden')), 'The list makes no Garden content or per-friend access probes');
-  const filter = panel.nodes().find(node => node.props?.accessibilityLabel === 'Search friends');
-  filter.props.onChangeText('jenny'); await panel.flush();
+  assert.equal(panel.nodes().find(node => node.props?.accessibilityLabel === 'Search friends'), undefined);
   assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-jenny'));
-  assert.equal(panel.nodes().find(node => node.props?.testID === 'friend-alex'), undefined);
+  assert.ok(panel.nodes().find(node => node.props?.testID === 'friend-alex'));
 });
 
 test('Friends: Delete friends swaps Homes for remove and report, and Visitors shows the Garden visit log', async () => {
@@ -535,12 +534,14 @@ test('Friends: Delete friends swaps Homes for remove and report, and Visitors sh
 test('Garden visit route rechecks access, uses the existing visitor contract and returns to My Garden', async () => {
   const hooks = hookHarness(); let ownerId = 'alex', allow = true;
   const calls = [], navigation = [];
-  const native = { ActivityIndicator: 'Spinner', Image: 'Image', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: styles => styles } };
+  const native = { ActivityIndicator: 'Spinner', Image: 'Image', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: styles => styles },
+    useWindowDimensions: () => ({ width: 390, height: 844 }) };
   const { api, load } = setup(async (url, options) => {
     calls.push({ url, method: options.method, body: options.body ? JSON.parse(options.body) : null });
     if (url === '/users/alex/garden-access') return allow ? response({ canVisit: true }) : response({ error: 'Private' }, 403);
     if (url === '/users/jenny/garden-access') return response({ error: 'Private' }, 403);
     if (url === '/visit' || url === '/leave') return response({ success: true });
+    if (url === '/users/owner/friends') return response([{ id: 'luna', name: 'Luna' }, { id: 'alex', name: 'alex', displayName: 'Alexis' }]);
     throw Error(`Unexpected visit call: ${url}`);
   }, {
     'react-native': native, 'react-native-gesture-handler': { GestureHandlerRootView: 'Root' },
@@ -562,7 +563,12 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
   const home = featureNodes(tree).find(node => node.props?.testID === 'visitor-return-home');
   assert.equal(home.props.accessibilityLabel, 'Return to My Garden');
   assert.ok(featureNodes(home).some(node => node.type === 'Image' && node.props.source.endsWith('visitor-home-transparent.png')));
+  assert.equal(featureText(home), 'Return', 'The Return label sits inside the same tappable control as the house');
   assert.doesNotMatch(featureText(tree), /Visiting a friend|Read only/);
+  // The owner's name is read from the visitor's friends list only after the visit has started.
+  const title = featureNodes(tree).find(node => node.props?.testID === 'visit-garden-title');
+  assert.ok(title); assert.equal(title.props.accessibilityLabel, 'Alexis’ Garden'); assert.equal(featureText(title), 'Alexis’ Garden');
+  assert.equal(title.props.pointerEvents, 'none', 'The title never takes taps from the Garden');
   home.props.onPress();
   assert.deepEqual(navigation, ['/']);
   ownerId = 'jenny'; tree = hooks.render(); tree = await hooks.flush();
@@ -570,6 +576,7 @@ test('Garden visit route rechecks access, uses the existing visitor contract and
   assert.equal(featureNodes(tree).find(node => node.type === 'GardenScene'), undefined);
   assert.match(featureText(tree), /private or unavailable/);
   assert.equal(featureNodes(tree).find(node => node.props?.testID === 'visitor-return-home'), undefined);
+  assert.equal(featureNodes(tree).find(node => node.props?.testID === 'visit-garden-title'), undefined, 'No owner title without a visit');
   assert.equal(calls.filter(call => call.url === '/visit').length, 1, 'Denied route never starts a visit');
   ownerId = 'alex'; allow = false; hooks.render(); tree = await hooks.flush();
   assert.equal(featureNodes(tree).find(node => node.type === 'GardenScene'), undefined);

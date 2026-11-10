@@ -1,8 +1,9 @@
 import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Reanimated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { MONTH_NAMES, MONTHS, monthKey, monthLocked, yearLocked } from '../../services/bookhouse';
+import { archiveKey } from '../../services/monthlyArchive';
 import { BookhouseArt } from './BookhouseArt';
 import { ArtWindow, Icon, LOCK_ICON, palette, serif } from './TreehouseArt';
 import { useShelfImages } from './book3d/assets';
@@ -85,6 +86,15 @@ function bookSlots(layout: Layout, cabinetTop: number): Slot[] {
       left: start + column * (bookWidth + gap), top: base - bookHeight, width: bookWidth, height: bookHeight }));
   });
 }
+/** The year's Monthly Report archive: one more book on the last shelf, immediately to the right of December, the same
+ *  size and on the same plank, at the same spacing. The twelve journals keep their slots exactly (nothing is re-centred);
+ *  the archive stands in front of the inner part of the right-hand décor, as the journals do when space is short. */
+function archiveSlot(slots: Slot[], gap: number) {
+  const december = slots[slots.length - 1];
+  return { row: december.row, column: december.column + 1, left: december.left + december.width + gap, top: december.top, width: december.width, height: december.height };
+}
+const ARCHIVE_SPINE = require('../../../assets/bookhouse/journal/monthly-report-spine.webp');
+
 /** The shelf is seen from the middle column, level with the second shelf's books, from 3.5 cabinets away:
  *  books show a sliver of their covers toward the centre and the lower rows show the tops of their page blocks. */
 function shelfCamera(layout: Layout, cabinetTop: number, cabinetBottom: number): Camera {
@@ -93,12 +103,14 @@ function shelfCamera(layout: Layout, cabinetTop: number, cabinetBottom: number):
 }
 
 export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, railBottom, years, year, today, counts, reducedMotion,
-  onSelectYear, onOpenMonth, onLocked, targets, footer, hiddenMonth, bookNodes, pull, pullGeometry, fill = false, deskTouch = false }: {
+  onSelectYear, onOpenMonth, onOpenArchive, onLocked, targets, footer, hiddenMonth, bookNodes, pull, pullGeometry, fill = false, deskTouch = false }: {
   column: number; height: number; cabinetTop: number; cabinetBottom: number; railBottom: number;
   years: number[]; year: number; today: string; counts: Map<string, number>; reducedMotion: boolean;
   onSelectYear: (year: number) => void; onOpenMonth: (year: number, month: number, rect: ShelfRect | null) => void; onLocked: (message: string) => void;
+  /** The year's Monthly Report archive (the book after December) was tapped. */
+  onOpenArchive: (year: number, rect: ShelfRect | null) => void;
   targets: { years: Target; books: Target; shelf: Target }; footer: (left: number, right: number) => ReactNode;
-  /** Months whose books are out of the shelf (drawn by their open books instead), by monthKey. */
+  /** Books out of the shelf (drawn by their open books instead), by monthKey (or archiveKey for the archive). */
   hiddenMonth?: string | string[] | null; bookNodes: RefObject<Map<string, ShelfSlot>>;
   /** Camera pull-back toward the writing desk (0 at rest), and where it ends (null while no book is open). */
   pull?: SharedValue<number>; pullGeometry?: PullGeometry | null;
@@ -111,16 +123,21 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
   const layout = shelfLayout(column, cabinetTop, cabinetBottom, fill);
   const isHidden = (key: string) => Array.isArray(hiddenMonth) ? hiddenMonth.includes(key) : hiddenMonth === key;
   const slots = bookSlots(layout, cabinetTop);
+  const archive = archiveSlot(slots, layout.gap);
+  const archiveId = archiveKey(year);
   const camera = shelfCamera(layout, cabinetTop, cabinetBottom);
   const images = useShelfImages();
   const drawn = !!(images.atlas && images.grain && images.edges);
-  const [pressed, setPressed] = useState<number | null>(null);
+  // The pressed book, by its slot key (monthKey, or archiveKey for the archive).
+  const [pressed, setPressed] = useState<string | null>(null);
   // Re-record the 3D shelf only when what it shows changes (not on every parent render).
   const drawnBooks: ShelfBookSpec[] = slots.map(slot => {
-    const count = counts.get(monthKey(year, slot.month)) || 0;
-    return { month: slot.month, x: slot.left + slot.width / 2, bottom: slot.top + slot.height, height: slot.height,
-      locked: monthLocked(year, slot.month, today, count), hidden: isHidden(monthKey(year, slot.month)), lifted: pressed === slot.month };
+    const key = monthKey(year, slot.month), count = counts.get(key) || 0;
+    return { kind: 'month' as const, month: slot.month, x: slot.left + slot.width / 2, bottom: slot.top + slot.height, height: slot.height,
+      locked: monthLocked(year, slot.month, today, count), hidden: isHidden(key), lifted: pressed === key };
   });
+  drawnBooks.push({ kind: 'archive', x: archive.left + archive.width / 2, bottom: archive.top + archive.height, height: archive.height,
+    locked: false, hidden: isHidden(archiveId), lifted: pressed === archiveId });
   const sceneKey = JSON.stringify([camera, drawnBooks]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const scene = useMemo(() => ({ camera, books: drawnBooks }), [sceneKey]);
@@ -135,6 +152,9 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
     Animated.timing(fade, { toValue: 1, duration: reducedMotion ? 0 : 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [year, fade, reducedMotion]);
   const booksLeft = layout.interior[0] - layout.overlap;
+  // The books' area reaches just past the archive (and its shadow) on the right; its left edge, and so every journal's
+  // position, is unchanged. The archive always ends inside the right-hand post.
+  const booksWidth = Math.max(layout.interior[1] - layout.interior[0] + layout.overlap * 2, archive.left + archive.width + 14);
   // ---------- the camera pulling back to the desk ----------
   // The whole shelf (painting, books, year rail) is one rigid picture: a single uniform scale about its top centre,
   // then a translation (book3d/scene.ts, shelfTransform).
@@ -160,8 +180,8 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
     <YearRail layout={layout} cabinetTop={cabinetTop} railBottom={railBottom} years={years} year={year} today={today} counts={counts}
       onSelectYear={onSelectYear} onLocked={onLocked} target={targets.years} />
     <Animated.View {...targets.books} accessibilityLabel={`${year} bookshelf`}
-      style={{ position: 'absolute', left: booksLeft, top: cabinetTop, width: layout.interior[1] - layout.interior[0] + layout.overlap * 2, height: cabinetBottom - cabinetTop, opacity: fade }}>
-      {drawn && <ShelfBooks width={layout.interior[1] - layout.interior[0] + layout.overlap * 2} height={cabinetBottom - cabinetTop}
+      style={{ position: 'absolute', left: booksLeft, top: cabinetTop, width: booksWidth, height: cabinetBottom - cabinetTop, opacity: fade }}>
+      {drawn && <ShelfBooks width={booksWidth} height={cabinetBottom - cabinetTop}
         camera={scene.camera} books={scene.books} images={images} />}
       {slots.map(slot => {
         const key = monthKey(year, slot.month);
@@ -171,16 +191,25 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
         return <Book key={slot.month} month={slot.month} year={year} count={count} locked={monthLocked(year, slot.month, today, count)} drawn={drawn}
           left={slot.left} top={slot.top} width={slot.width} height={slot.height} hidden={isHidden(key)}
           onLayout={currentBookTarget?.onLayout}
-          hitSlop={deskTouch ? { left: slot.column === 0 ? 8 : layout.gap / 2, right: slot.column === 2 ? 8 : layout.gap / 2, top: Math.max(4, 3 * scale), bottom: 6 } : undefined}
+          hitSlop={deskTouch ? { left: slot.column === 0 ? 8 : layout.gap / 2, right: slot.column === 2 && slot.month !== 12 ? 8 : layout.gap / 2, top: Math.max(4, 3 * scale), bottom: 6 } : undefined}
           register={node => {
             if (node) bookNodes.current?.set(key, { node, camera: { dx: camera.cx - slot.left, dy: camera.cy - slot.top, d: camera.d } });
             else bookNodes.current?.delete(key);
             if (currentBookTarget?.ref) currentBookTarget.ref(node);
           }}
-          onPressIn={() => setPressed(slot.month)} onPressOut={() => setPressed(month => month === slot.month ? null : month)}
+          onPressIn={() => setPressed(key)} onPressOut={() => setPressed(current => current === key ? null : current)}
           onPress={() => void measureBook(bookNodes.current?.get(key)).then(rect => onOpenMonth(year, slot.month, rect))}
           onLocked={() => onLocked('This month has not arrived yet.')} />;
       })}
+      <ArchiveBook year={year} drawn={drawn && !!images.archive} left={archive.left} top={archive.top} width={archive.width} height={archive.height}
+        hidden={isHidden(archiveId)}
+        hitSlop={deskTouch ? { left: layout.gap / 2, right: 8, top: Math.max(4, 3 * scale), bottom: 6 } : undefined}
+        register={node => {
+          if (node) bookNodes.current?.set(archiveId, { node, camera: { dx: camera.cx - archive.left, dy: camera.cy - archive.top, d: camera.d } });
+          else bookNodes.current?.delete(archiveId);
+        }}
+        onPressIn={() => setPressed(archiveId)} onPressOut={() => setPressed(current => current === archiveId ? null : current)}
+        onPress={() => void measureBook(bookNodes.current?.get(archiveId)).then(rect => onOpenArchive(year, rect))} />
     </Animated.View>
     <Reanimated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, footerStyle]}>{footer(layout.rail[1] + 6, 8)}</Reanimated.View>
   </Reanimated.View>;
@@ -218,6 +247,25 @@ function Book({ month, year, count, locked, drawn, left, top, width, height, hid
     </View>
     {locked && <View pointerEvents="none" style={[styles.lock, { top: height * .045, right: -lock * .32 }]}><Icon source={LOCK_ICON} size={lock} /></View>}
     {!!count && <View pointerEvents="none" style={[styles.ribbon, { right: width * .16 }]}><View style={styles.ribbonNotch} /></View>}
+  </Pressable>;
+}
+
+/** The year's Monthly Report archive on the shelf: always available (a year with no reports opens to its contents,
+ *  every month locked). Its approved spine carries its own title, so no label is laid over it. */
+function ArchiveBook({ year, drawn, left, top, width, height, hidden, hitSlop, register, onPress, onPressIn, onPressOut }: {
+  year: number; drawn: boolean; left: number; top: number; width: number; height: number; hidden: boolean;
+  hitSlop?: { left: number; right: number; top: number; bottom: number };
+  register: (node: View | null) => void; onPress: () => void; onPressIn: () => void; onPressOut: () => void;
+}) {
+  return <Pressable ref={register} testID={`book-${archiveKey(year)}`} accessibilityRole="button" accessibilityLabel={`Monthly Report ${year}`}
+    accessibilityHint="Opens this year's saved Monthly Reports" onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}
+    hitSlop={hitSlop || { left: 2, right: 2, top: 4, bottom: 4 }} disabled={hidden}
+    style={({ pressed }) => [{ position: 'absolute', left, top, width, height, opacity: hidden ? 0 : 1 }, pressed && { transform: [{ translateY: -4 }] }]}>
+    {hitSlop && Platform.OS === 'web' && <View style={{ position: 'absolute', left: -hitSlop.left, right: -hitSlop.right, top: -hitSlop.top, bottom: -hitSlop.bottom }} />}
+    {/* Drawn in 3D by ShelfBooks underneath; until its spine loads, the flat spine stands in. */}
+    {!drawn && <><View pointerEvents="none" style={[styles.backShadow, { borderRadius: width * .18 }]} />
+      <View pointerEvents="none" style={styles.contactShadow} />
+      <Image source={ARCHIVE_SPINE} resizeMode="stretch" accessible={false} style={{ width, height, borderRadius: width * .12 }} /></>}
   </Pressable>;
 }
 

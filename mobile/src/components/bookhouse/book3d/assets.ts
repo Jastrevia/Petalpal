@@ -20,6 +20,10 @@ const SPINES = [
   require('../../../../assets/bookhouse/journal/spine-11.webp'), require('../../../../assets/bookhouse/journal/spine-12.webp'),
 ];
 const SPINE_ATLAS = require('../../../../assets/bookhouse/journal/spine-atlas.webp');
+// The year's Monthly Report archive (the 13th book, after December): the approved green-and-gold spine and its cover,
+// baked by scripts/journal-books/bakeMonthlyReportBook.py.
+const MONTHLY_REPORT_SPINE = require('../../../../assets/bookhouse/journal/monthly-report-spine.webp');
+const MONTHLY_REPORT_COVER = require('../../../../assets/bookhouse/journal/monthly-report-cover.webp');
 const GRAIN = require('../../../../assets/bookhouse/journal/leather-grain.webp');
 const EDGES = require('../../../../assets/bookhouse/journal/page-edges.webp');
 const PARCHMENT = require('../../../../assets/bookhouse/journal/parchment.webp');
@@ -34,6 +38,11 @@ export function clothRgb(month: number): [number, number, number] {
   const k = LIGHT_CLOTH.has(month) ? .95 : .82;
   return [c[0] * k, c[1] * k, c[2] * k];
 }
+/** The Monthly Report archive's leather, sampled from its approved spine (as CLOTH is for the journals). */
+export const MONTHLY_REPORT_CLOTH = '#2F4D2A';
+export function archiveClothRgb(): [number, number, number] {
+  return [1, 3, 5].map(i => parseInt(MONTHLY_REPORT_CLOTH.slice(i, i + 2), 16) / 255 * .82) as [number, number, number];
+}
 /** The month's cell in spine-atlas.webp (6 × 2 cells, January top-left). */
 export function atlasSpineRect(month: number, atlasWidth: number, atlasHeight: number): [number, number, number, number] {
   const w = atlasWidth / 6, h = atlasHeight / 2, i = month - 1;
@@ -46,7 +55,7 @@ export const LATIN = ['Galanthus nivalis', 'Viola odorata', 'Narcissus', 'Wister
 
 export type ShelfImages = ReturnType<typeof useShelfImages>;
 export function useShelfImages() {
-  return { atlas: useImage(SPINE_ATLAS), grain: useImage(GRAIN), edges: useImage(EDGES) };
+  return { atlas: useImage(SPINE_ATLAS), grain: useImage(GRAIN), edges: useImage(EDGES), archive: useImage(MONTHLY_REPORT_SPINE) };
 }
 // The monthly books' pictures, decoded once and shared while the Treehouse (or any monthly book) is open, so opening,
 // closing and switching months never wait for the same files again; released when the last user lets go.
@@ -94,12 +103,22 @@ export function useBookImages(month: number) {
     edges: useBookImage(EDGES), parchment: useBookImage(PARCHMENT),
   };
 }
+/** The Monthly Report archive's pictures (shared and released like the journals'). */
+export function useArchiveBookImages() {
+  useEffect(() => retainBookImages(), []);
+  return {
+    cover: useBookImage(MONTHLY_REPORT_COVER), spine: useBookImage(MONTHLY_REPORT_SPINE), grain: useBookImage(GRAIN),
+    edges: useBookImage(EDGES), parchment: useBookImage(PARCHMENT),
+  };
+}
 /** While nothing moves, decode the fonts, the shared papers' pictures and these months' covers and spines ahead of time
  *  (in the order given), one file at a time, so opening or switching to them starts at once. Returns a cancel function. */
-export function preloadBookImages(months: number[], onShared?: () => void) {
+export function preloadBookImages(months: number[], onShared?: () => void, archive = false) {
   let cancelled = false;
   const shared = [PARCHMENT, GRAIN, EDGES].filter(f => !decoded.has(f)).length;
-  const files = [PARCHMENT, GRAIN, EDGES, ...months.flatMap(m => [COVERS[m - 1], SPINES[m - 1]])].filter(f => !decoded.has(f));
+  // `archive`: the year's Monthly Report book too, after the months.
+  const files = [PARCHMENT, GRAIN, EDGES, ...months.flatMap(m => [COVERS[m - 1], SPINES[m - 1]]), ...(archive ? [MONTHLY_REPORT_COVER, MONTHLY_REPORT_SPINE] : [])]
+    .filter(f => !decoded.has(f));
   const next = (i: number) => {
     if (cancelled || openBooks === 0) return;
     // The fonts and the shared paper are in: the papers every book shares can be painted now (onShared).

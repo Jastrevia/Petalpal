@@ -1,13 +1,14 @@
 import { PrivacyLinks } from './features/PrivacyAndSupport';
 import { COMMUNITY_VERSION, COMMUNITY_TEXT } from './features/CommunityGuidelines';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fonts, Spacing } from '../constants/theme';
 import { useAuth } from '../services/auth';
 import { LoginPreviewPage } from './auth/LoginPreviewPage';
 import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
+import { PigeonLoadingScreen } from './loading/PigeonLoadingExperience';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GuestContext, type Guest } from '../services/guest';
@@ -99,11 +100,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />{backToGarden}</View>);
   }
-  if (auth.loading) return <View style={styles.loading}>
-    <ActivityIndicator color="#365b42" accessibilityLabel="Loading session" />
-    <Text style={styles.body}>{auth.phase === 'registering' ? 'Creating your account…' : 'Opening PetalPal…'}</Text>
+  // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
+  // loading screen takes over in the same place with measured progress once it mounts.
+  if (auth.loading) return <PigeonLoadingScreen testID="session-loading" progress={null}
+    message={auth.phase === 'registering' ? 'Creating your account…' : 'Preparing your garden…'}>
     {auth.phase === 'registering' ? null : <WakingFlowerFacts />}
-  </View>;
+  </PigeonLoadingScreen>;
   const verification = auth.phase === 'verificationPending';
   const profile = auth.phase === 'profileRequired';
   const registering = mode === 'register';
@@ -157,7 +159,6 @@ const styles = StyleSheet.create({
   backToGarden: { position: 'absolute', zIndex: 50, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#FAF5E8E6', borderWidth: 1, borderColor: '#C6A164' },
   backToGardenText: { fontFamily: 'serif', fontSize: 15, color: '#254E46' },
   root: { flex: 1, backgroundColor: '#eff4e9' },
-  loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },
   page: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.four },
   card: { width: '100%', maxWidth: 440, backgroundColor: '#fbfcf6', borderRadius: 24,
     padding: Spacing.four, gap: Spacing.three, borderWidth: 1, borderColor: '#c8d6c1' },

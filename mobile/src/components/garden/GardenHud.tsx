@@ -22,6 +22,7 @@ import { momentLocale } from '../moments/momentFormat';
 import { startUserRealtime, stopUserRealtime } from '../../services/userRealtime';
 import { startFriendAlerts, stopFriendAlerts, useFriendAlerts } from '../../services/friendAlerts';
 import { GardenDock } from './GardenDock';
+import { GardenRefreshButton } from './GardenRefreshButton';
 import { GardenNotices } from './GardenNotices';
 import { AiConsentPrompt } from '../features/AiConsentPrompt';
 
@@ -37,7 +38,7 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
   const phone = width < 600 || (width < 900 && height < 500);
   const short = height < 500;
   const iconSize = phone ? Math.max(28, Math.min(short ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;
-  const { activeMode, selectedFlower, isGardenLoading, gardenError, refreshGarden } = usePlanting();
+  const { activeMode, selectedFlower, isGardenLoading, gardenError, refreshGarden, isSaving } = usePlanting();
   const [highlightedFeature, setHighlightedFeature] = useState<string>();
   const [openFeature, setOpenFeature] = useState<string>();
   const { feature: entryFeature } = useLocalSearchParams<{ feature?: string }>();
@@ -138,6 +139,9 @@ export function GardenHud({ onFocusFairy }: { onFocusFairy?: () => void } = {}) 
     </View>
     <AiConsentPrompt />
     <GardenDock chinese={chinese} />
+    {/* Refresh for a Garden that looks stuck. Like this whole layer it's gone while a flower is open or being
+        planted or moved, and it also steps aside while a panel or card is open, so nothing unsaved is reloaded away. */}
+    {!openFeature && !entryOpen && !bondOpen && !momentsOpen && !avatarsOpen && !isSaving ? <GardenRefreshButton chinese={chinese} /> : null}
     {ownerId ? <GardenNotices ownerId={ownerId} chinese={chinese} visible={phone ? 2 : 3} top={insets.top + (gardenError ? 92 : 10)} left={insets.left}
       maxWidth={Math.min(320, width - insets.left - insets.right - (width < 600 ? 150 : 190))} /> : null}
     <FairyEntryCard visible={entryOpen} locale={locale} closeness={closeness.summary} closenessOn={closeness.on === true}

@@ -30,8 +30,9 @@ export interface WeeklyTriggerResult {
   job: { status: string } | null;
   report: { id: string; periodKey: string; narrativeStatus: string } | null;
 }
-export const listReflections = (cursor?: string, signal?: AbortSignal) =>
-  apiRequest<{ reports: SavedReport[]; nextCursor: string | null }>(`/ai/reports?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, { signal });
+// `limit`: 1–50 per page (the server's range); the Pavilion reads 20 at a time, the Treehouse's report archive 50.
+export const listReflections = (cursor?: string, signal?: AbortSignal, limit = 20) =>
+  apiRequest<{ reports: SavedReport[]; nextCursor: string | null }>(`/ai/reports?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, { signal });
 export const readReflection = (report: SavedReport, signal?: AbortSignal) =>
   apiRequest<ReflectionReport>(`/ai/reports/${report.type}/${encodeURIComponent(report.id)}`, 'GET', undefined, { signal });
 // An empty body lets the server pick the most recent closed week in the owner's timezone,

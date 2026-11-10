@@ -3,6 +3,9 @@ import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
 import { onboardingActive } from '../onboarding/onboardingStore';
 import { onboardingTarget } from '../onboarding/onboardingTargets';
+import MonthlySignLayer from './month-signs/MonthlySignLayer';
+import MonthlySignControls from './month-signs/MonthlySignControls';
+import { useMonthlySigns } from './month-signs/useMonthlySigns';
 import FireflyLayer from './fireflies/FireflyLayer';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
 import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
@@ -266,7 +269,7 @@ export type GardenSceneProps = {
   // The owner's Garden: any tap on this month's lawn opens Events, flowers or not, and another
   // month's lawn says whose land it is instead.
   monthLawnOpensEvents?: boolean;
-  onOpenReflection?: () => void;
+  onOpenReflection?: (month?: number) => void;
   showCalendar?: boolean;
   /** The owner's language ('en' | 'zh-Hans' …) for the Fairy's in-Garden hints. */
   locale?: string | null;
@@ -352,6 +355,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   }, [activeMode, placements]);
 
   const searchParams = useLocalSearchParams<{
+    editSigns?: string;
     mode?: string;
     flowerId?: string;
     journalEntryId?: string;
@@ -418,6 +422,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const fireflies = fireflyPreview ? fireflySettings : DEFAULT_FIREFLIES;
   const lanternEditorEnabled = __DEV__ && lanternPathname === '/lantern-preview' && isDev && !readOnly;
   const lanterns = useLanternPlacements(lanternEditorEnabled);
+  const signEditorEnabled = __DEV__ && lanternPathname === '/monthly-sign-preview' && searchParams.editSigns === '1' && !readOnly;
+  const monthlySigns = useMonthlySigns(signEditorEnabled);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [previewMode, setPreviewMode] = useState(isDev ? initialPreviewMode : true);
   const [treehouseStatus, setTreehouseStatus] = useState('Waiting for TreehouseEntity effect');
@@ -1689,6 +1695,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             {/* Planted flowers & placement preview sit below the walking fairy, so PPL standing on a
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
+            {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
@@ -1759,6 +1766,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
             {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
               <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
+            {monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
           </Group>
           </PlantingProvider>
@@ -1766,6 +1774,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         </Canvas>
         </GestureDetector>
       )}
+      {!readOnly && activeMode === 'normal' && !selectedFlower && onOpenReflection && <MonthlySignControls {...monthlySigns}
+        canEdit={signEditorEnabled} onOpen={onOpenReflection}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
+        focus={(x,y) => { focusCoords(x,y,2.2); cameraX.value -= viewport.width*.35; }} />}
       {lanternEditorEnabled && <LanternPlacementEditor {...lanterns}
         baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
         focus={(x, y) => {

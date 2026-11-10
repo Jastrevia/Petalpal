@@ -1,14 +1,15 @@
-import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { pavilionScene, pavilionGeometry, pavilionFullLeaves, pavilionReading, readingCamera, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
 import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
 import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
-import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
+import { cancelAnimation, runOnJS, useAnimatedReaction, useDerivedValue, useSharedValue, withTiming, Easing as ReEasing } from 'react-native-reanimated';
 import { OPEN_MS, CLOSE_MS, OPEN_STAGES, CLOSE_STAGES, openTiming, closeTiming } from '../components/bookhouse/book3d/motion';
 import { EmotionalSafetyNote } from '../components/features/EmotionalSafetyNote';
 import { AiOutputReport } from '../components/features/AiPrivacySettings';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { pavilionAutoOpen, pavilionMonth, pavilionPages } from '../services/pavilionMonth';
 import { useAuth } from '../services/auth';
 import { useWorldTime } from '../components/garden/world-time';
 import { createLastMonthReflection, createLastWeekReflection, lastClosedMonthKey, lastClosedWeekKey, listReflections, readReflection, monthly2, shortWeekly, weekLabel, weeklyTriggerOutcome, type ReflectionReport, type ReportType, type SavedReport, type ShortLocale } from '../services/reflections';
@@ -84,9 +85,14 @@ const pavilionNight = require('../../assets/reflection/pavilion-night-v1.webp');
 const parchment = require('../../assets/bookhouse/journal/parchment.webp');
 type Section = 'Summary' | 'Topics' | 'Patterns';
 const TURN_MS = 680;
+/** Narrow screens: after the book opens on the board, the reading camera approaches its first page; it backs away
+ *  again before the book closes. */
+const ZOOM_IN_MS = 780, ZOOM_OUT_MS = 620;
 
 export default function Reflection() {
   const router = useRouter();
+  const { month: requestedMonth } = useLocalSearchParams<{ month?: string }>();
+  const monthNumber = pavilionMonth(requestedMonth);
   const auth = useAuth();
   const lang = useAppLocale(), t = CHROME[lang];
   const { width, height } = useWindowDimensions();
@@ -105,7 +111,7 @@ export default function Reflection() {
     const animation = Animated.timing(lighting, { toValue: night ? 1 : 0, duration: reducedMotion ? 0 : 1800, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
     animation.start(); return () => animation.stop();
   }, [night, reducedMotion, lighting]);
-  const [type, setType] = useState<ReportType>('weekly');
+  const [type, setType] = useState<ReportType>(monthNumber === null ? 'weekly' : 'monthly');
   // The pavilion opens with every book on the shelf. Tapping one pulls it out, carries it to the desk and opens it
   // (the green book is Weekly, the blue Monthly, the purple one the notes about them).
   const [open, setOpen] = useState<Book | null>(null);
@@ -121,17 +127,18 @@ export default function Reflection() {
   const notes = open === 'notes' || open === 'collection';
   const onBook = (book: Book) => open === book;
   const [flying, setFlying] = useState<Book | null>(null);
-  const timeline = useSharedValue(0), focus = useSharedValue(0);
+  // timeline: the book's opening (0 on the shelf … 1 open on the board). zoom/side: the reading camera (see pavilionReading).
+  const timeline = useSharedValue(0), zoom = useSharedValue(0), side = useSharedValue(-1);
   const contentFade = useRef(new Animated.Value(0)).current;
   const busy = useRef(false), pendingBook = useRef<Book | null>(null);
   const [bookDrawn, setBookDrawn] = useState(false);
-  const [focused, setFocused] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).__reflectionDebug = {
         get open() { return open; },
         timeline,
-        focus,
+        zoom,
+        side,
         openBook,
         closeBook,
         pauseAt: (t: number) => { cancelAnimation(timeline); timeline.value = t; },
@@ -154,12 +161,20 @@ export default function Reflection() {
         },
       };
     }
-  }, [open, timeline, focus, auth]);
-  useEffect(() => () => { cancelAnimation(timeline); cancelAnimation(focus); contentFade.stopAnimation(); }, [timeline, focus, contentFade]);
+  }, [open, timeline, zoom, side, auth]);
+  useEffect(() => () => { cancelAnimation(timeline); cancelAnimation(zoom); cancelAnimation(side); contentFade.stopAnimation(); }, [timeline, zoom, side, contentFade]);
   function revealContent() {
     Animated.timing(contentFade, { toValue: 1, duration: reducedMotion ? 0 : 180, useNativeDriver: true }).start();
   }
-  function finishOpen() { setFlying(null); busy.current = false; revealContent(); }
+  // The words appear as soon as the pages lie flat on the board, not after the book has finished settling.
+  useAnimatedReaction(() => timeline.value >= .94, (flat, before) => { if (flat && before === false) runOnJS(revealContent)(); }, [reducedMotion]);
+  function finishZoom() { setFlying(null); busy.current = false; }
+  function finishOpen() {
+    revealContent();
+    if (readingRef.current.fit) { finishZoom(); return; }
+    zoom.value = withTiming(1, { duration: reducedMotion ? 0 : ZOOM_IN_MS, easing: ReEasing.inOut(ReEasing.cubic) },
+      done => { if (done) runOnJS(finishZoom)(); });
+  }
   function bookReady() {
     setBookDrawn(true);
     timeline.value = withTiming(1, { duration: reducedMotion ? 0 : OPEN_MS, easing: openTiming(OPEN_STAGES) },
@@ -167,8 +182,8 @@ export default function Reflection() {
   }
   function startBook(book: Book) {
     if (book === 'weekly' || book === 'monthly') setType(book);
-    busy.current = true; setBookDrawn(false); setFocused(false);
-    timeline.value = 0; focus.value = 0; contentFade.setValue(0);
+    busy.current = true; setBookDrawn(false);
+    timeline.value = 0; zoom.value = 0; side.value = -1; contentFade.setValue(0);
     setOpen(book); setFlying(book);
     // Start only once the illustrated spine and paper are decoded. Until then,
     // its shelf copy remains in place, so no book disappears while assets load.
@@ -179,7 +194,7 @@ export default function Reflection() {
     startBook(book);
   }
   function finishReturn() {
-    setOpen(null); setFlying(null); setBookDrawn(false); setFocused(false); busy.current = false;
+    setOpen(null); setFlying(null); setBookDrawn(false); busy.current = false;
     const next = pendingBook.current; pendingBook.current = null;
     if (next) startBook(next);
   }
@@ -190,22 +205,12 @@ export default function Reflection() {
   function closeBook() {
     if (busy.current || !open || turning) return;
     busy.current = true; setFlying(open);
-    Animated.timing(contentFade, { toValue: 0, duration: reducedMotion ? 0 : 100, useNativeDriver: true }).start(({ finished }) => {
-      if (!finished) return;
-      if (focused) {
-        focus.value = withTiming(0, { duration: reducedMotion ? 0 : 300 }, done => { if (done) runOnJS(returnToShelf)(); });
-      } else returnToShelf();
-    });
-  }
-  function finishFocus(next: boolean) { setFocused(next); busy.current = false; setFlying(null); revealContent(); }
-  function toggleFocus() {
-    if (busy.current || turning || !open) return;
-    busy.current = true; setFlying(open);
-    const next = !focused;
-    Animated.timing(contentFade, { toValue: 0, duration: reducedMotion ? 0 : 90, useNativeDriver: true }).start(({ finished }) => {
-      if (finished) focus.value = withTiming(next ? 1 : 0, { duration: reducedMotion ? 0 : 350 },
-        done => { if (done) runOnJS(finishFocus)(next); });
-    });
+    // The reverse of opening: the camera backs away to the book on the board, the words fade, the book closes.
+    const fadeOut = () => Animated.timing(contentFade, { toValue: 0, duration: reducedMotion ? 0 : 100, useNativeDriver: true })
+      .start(({ finished }) => { if (finished) returnToShelf(); });
+    if (zoom.value > 0) zoom.value = withTiming(0, { duration: reducedMotion ? 0 : ZOOM_OUT_MS, easing: ReEasing.inOut(ReEasing.cubic) },
+      done => { if (done) runOnJS(fadeOut)(); });
+    else fadeOut();
   }
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -237,11 +242,25 @@ export default function Reflection() {
   // Back to the Garden already underneath; replacing would mount a second Garden each visit.
   const leave = () => router.canGoBack() ? router.back() : router.dismissTo('/');
   const insets = useSafeAreaInsets();
-  const pages = reports.filter(report => report.type === type).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+  const pages = pavilionPages(reports, type, monthNumber);
   const found = pages.findIndex(report => report.id === pageId[type]);
   const index = found >= 0 ? found : pages.length - 1;
   const selected = pages[index] ?? null;
   const show = (report: SavedReport) => setPageId(previous => ({ ...previous, [report.type]: report.id }));
+
+  // A month entrance (a Garden sign) opens that month's book by itself: once per requested month, and only once the
+  // shared spine textures exist. Opening earlier mounted the moving book mid-load on a cold start (the startup crash).
+  // Later spine rebuilds, re-renders or closing the book never open it again.
+  const autoOpened = useRef<number | null>(null);
+  useEffect(() => {
+    if (!pavilionAutoOpen(monthNumber, !!spines, autoOpened.current)) return;
+    autoOpened.current = monthNumber;
+    setPageId(previous => ({ ...previous, monthly: null }));
+    openBook('monthly');
+  }, [monthNumber, spines]);
+  useEffect(() => {
+    if (monthNumber !== null && type === 'monthly' && !loading && !listError && cursor && pages.length === 0) void load(cursor);
+  }, [monthNumber, type, loading, listError, cursor, pages.length]);
 
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
@@ -269,10 +288,11 @@ export default function Reflection() {
   const autoCreated = useRef<Record<ReportType, boolean>>({ weekly: false, monthly: false });
   useEffect(() => {
     if (loading || listError || creating || autoCreated.current[type]) return;
+    if (type === 'monthly' && monthNumber !== null) return;
     const lastKey = type === 'weekly' ? lastClosedWeekKey() : lastClosedMonthKey();
     if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
     autoCreated.current[type] = true; void createLast(type);
-  }, [type, loading, listError, reports, creating]);
+  }, [type, loading, listError, reports, creating, monthNumber]);
   // A finished reflection opens on its own book's page, but never switches books: the owner may
   // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {
@@ -325,7 +345,6 @@ export default function Reflection() {
     onPanResponderRelease: (_event, g) => { if (Math.abs(g.dx) > 50) void turnRef.current(g.dx < 0 ? 1 : -1); },
   })).current;
 
-  useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
   const scene = useMemo(() => pavilionScene(width, height), [width, height]);
   const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
   const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
@@ -333,18 +352,16 @@ export default function Reflection() {
   const compact = scene.compact, wide = false;
   const sceneWidth = width, artHeight = scene.art.height;
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
-  const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
-  const compactBookTop = Math.min(scene.art.height * .36, height * .32);
-  const compactBookWidth = Math.min(440, width - 24);
-  const compactBookLeft = (width - compactBookWidth) / 2;
-  const compactBookHeight = Math.max(380, height - compactBookTop - 20);
+  // The book's paper, projected from the anchored 3D book: the words are laid on exactly these leaves.
+  const leaves = useMemo(() => pavilionFullLeaves(geometry.layout), [geometry]);
+  const readingMode = useMemo(() => pavilionReading(width, height, leaves, { top: insets.top, bottom: insets.bottom, closeAtBottom: compact }),
+    [width, height, leaves, insets.top, insets.bottom, compact]);
+  const readingRef = useRef(readingMode); readingRef.current = readingMode;
+  const camera = useDerivedValue(() => readingCamera(readingMode, zoom.value, side.value), [readingMode]);
+  // A resize while a book lies open keeps the reading mode the new size calls for.
+  useEffect(() => { if (open && !busy.current) zoom.value = readingMode.fit ? 0 : 1; }, [readingMode.fit, width, height]);
 
-  const readingRect = compact ? {
-    x: compactBookLeft,
-    y: compactBookTop,
-    width: compactBookWidth,
-    height: compactBookHeight,
-  } : {
+  const readingRect = {
     x: leaves.left.x, y: Math.min(leaves.left.y, leaves.right.y),
     width: leaves.right.x + leaves.right.width - leaves.left.x,
     height: Math.max(leaves.left.height, leaves.right.height),
@@ -510,23 +527,20 @@ export default function Reflection() {
               left: scene.art.x - rect.x, top: scene.art.y - rect.y, width: scene.art.width, height: scene.art.height }} />)}
         </Pressable>;
       })}
-      {open && <PavilionBook key={open} id={open} locale={lang} spine={spines?.[open].image ?? null} geometry={geometry} timeline={timeline} focus={focus} onReady={bookReady} />}
+      {open && <PavilionBook key={open} id={open} locale={lang} spine={spines?.[open].image ?? null} geometry={geometry} timeline={timeline} camera={camera} onReady={bookReady} />}
       {open && <Animated.View testID="reflection-book" pointerEvents={flying ? 'none' : 'box-none'}
         accessibilityElementsHidden={!!flying} importantForAccessibility={flying ? 'no-hide-descendants' : 'auto'}
-        style={{
-          position: 'absolute',
-          left: readingRect.x,
-          top: readingRect.y,
-          width: readingRect.width,
-          height: readingRect.height,
-          opacity: contentFade,
-        }}>
+        style={[StyleSheet.absoluteFill, { opacity: contentFade }]}>
         <PavilionBookReader
           bookId={open}
           locale={lang}
           leaves={leaves}
-          readingRect={readingRect}
-          compact={compact}
+          reading={readingMode}
+          camera={camera}
+          zoom={zoom}
+          side={side}
+          screen={{ width, height }}
+          interactive={!flying}
           reports={pages}
           details={details}
           selectedReport={selected}
@@ -540,8 +554,10 @@ export default function Reflection() {
         style={{ position: 'absolute', left: scene.lantern.x, top: scene.lantern.y,
           width: scene.lantern.width, height: scene.lantern.height }} />}
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
-      style={[s.back, { top: compact ? undefined : insets.top + 10, bottom: compact ? insets.bottom + 10 : undefined, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
+    {/* Leaving the Pavilion: always the screen's top-right corner, below the status bar and notch (outside the scene, so
+        no scaling, camera or clipping of the painting can move or hide it). */}
+    <Pressable testID="reflection-leave" accessibilityRole="button" accessibilityLabel={t.close} onPress={leave} hitSlop={6}
+      style={[s.back, { top: insets.top + 10, right: insets.right + 12 }]}><Text style={s.closeText}>✕</Text></Pressable>
   </View>;
 }
 

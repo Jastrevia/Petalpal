@@ -9,10 +9,10 @@ import { SPEC } from './math';
 
 /** Page faces in book units (the top page between the squares and the gutter), painted at 1.25 px per unit. */
 export const PAGE = { width: SPEC.W - SPEC.over - SPEC.gap, height: SPEC.H - 2 * SPEC.over, density: 1 };
-const INK = '#4A3B27', SOFT = '#7A6447', RULE = '#C2A06B', GOLD = '#B98E45', GOLD_LIGHT = '#F1D99A', GOLD_DARK = '#6E4E1E';
-const FAMILY = ['EB Garamond'];
+export const INK = '#4A3B27', SOFT = '#7A6447', RULE = '#C2A06B', GOLD = '#B98E45', GOLD_LIGHT = '#F1D99A', GOLD_DARK = '#6E4E1E';
+export const FAMILY = ['EB Garamond'];
 
-function paint(width: number, height: number, density: number, draw: (canvas: SkCanvas) => void): SkImage | null {
+export function paint(width: number, height: number, density: number, draw: (canvas: SkCanvas) => void): SkImage | null {
   const surface = Skia.Surface.Make(Math.round(width * density), Math.round(height * density));
   if (!surface) return null;
   const canvas = surface.getCanvas();
@@ -24,8 +24,8 @@ function paint(width: number, height: number, density: number, draw: (canvas: Sk
   return image.makeNonTextureImage?.() ?? image;
 }
 
-type TextOptions = { size: number; italic?: boolean; color?: string; align?: TextAlign; maxLines?: number; spacing?: number; line?: number; weight?: FontWeight };
-function paragraph(fonts: SkTypefaceFontProvider, text: string, width: number, o: TextOptions) {
+export type TextOptions = { size: number; italic?: boolean; color?: string; align?: TextAlign; maxLines?: number; spacing?: number; line?: number; weight?: FontWeight };
+export function paragraph(fonts: SkTypefaceFontProvider, text: string, width: number, o: TextOptions) {
   const builder = Skia.ParagraphBuilder.Make({ textAlign: o.align ?? TextAlign.Left, maxLines: o.maxLines, ellipsis: o.maxLines ? '…' : undefined }, fonts);
   builder.pushStyle({ fontFamilies: FAMILY, fontSize: o.size, color: Skia.Color(o.color ?? INK), letterSpacing: o.spacing ?? 0, heightMultiplier: o.line,
     fontStyle: { slant: o.italic ? FontSlant.Italic : FontSlant.Upright, weight: o.weight ?? (o.italic ? FontWeight.Medium : FontWeight.Normal) } });
@@ -35,7 +35,7 @@ function paragraph(fonts: SkTypefaceFontProvider, text: string, width: number, o
   return p;
 }
 /** Draws text and returns its height. Gold text is struck like gilt: a dark bed, a light edge, then the gold face. */
-function text(canvas: SkCanvas, fonts: SkTypefaceFontProvider, value: string, x: number, y: number, width: number, o: TextOptions & { gilt?: boolean }) {
+export function text(canvas: SkCanvas, fonts: SkTypefaceFontProvider, value: string, x: number, y: number, width: number, o: TextOptions & { gilt?: boolean }) {
   if (o.gilt) {
     paragraph(fonts, value, width, { ...o, color: GOLD_DARK }).paint(canvas, x, y + 2.2);
     paragraph(fonts, value, width, { ...o, color: GOLD_LIGHT }).paint(canvas, x, y - .8);
@@ -48,19 +48,19 @@ function text(canvas: SkCanvas, fonts: SkTypefaceFontProvider, value: string, x:
   return p.getHeight();
 }
 
-function stroke(color: string, width: number) {
+export function stroke(color: string, width: number) {
   const p = Skia.Paint();
   p.setAntiAlias(true); p.setStyle(1); p.setStrokeWidth(width); p.setColor(Skia.Color(color));
   return p;
 }
-function fill(color: string) {
+export function fill(color: string) {
   const p = Skia.Paint();
   p.setAntiAlias(true); p.setColor(Skia.Color(color));
   return p;
 }
 
 /** Aged paper: the parchment texture, a warmer rim and a faint printed border. */
-function paper(canvas: SkCanvas, parchment: SkImage, w: number, h: number, mirror: boolean) {
+export function paper(canvas: SkCanvas, parchment: SkImage, w: number, h: number, mirror: boolean) {
   const p = Skia.Paint();
   canvas.save();
   if (mirror) { canvas.translate(w, 0); canvas.scale(-1, 1); }
@@ -72,7 +72,7 @@ function paper(canvas: SkCanvas, parchment: SkImage, w: number, h: number, mirro
     [Skia.Color('#00000000'), Skia.Color('#00000000'), Skia.Color('#8A5A2233')], [0, .62, 1], TileMode.Clamp));
   canvas.drawRect(Skia.XYWHRect(0, 0, w, h), rim);
 }
-function border(canvas: SkCanvas, w: number, h: number, inset: number) {
+export function border(canvas: SkCanvas, w: number, h: number, inset: number) {
   canvas.drawRect(Skia.XYWHRect(inset, inset, w - inset * 2, h - inset * 2), stroke('#B9955E99', 1.6));
   canvas.drawRect(Skia.XYWHRect(inset + 7, inset + 7, w - inset * 2 - 14, h - inset * 2 - 14), stroke('#B9955E66', .9));
 }
@@ -94,11 +94,11 @@ function corner(canvas: SkCanvas, x: number, y: number, sx: number, sy: number, 
     canvas.restore();
   }
 }
-function corners(canvas: SkCanvas, w: number, h: number, inset: number, size: number) {
+export function corners(canvas: SkCanvas, w: number, h: number, inset: number, size: number) {
   corner(canvas, inset, inset, 1, 1, size); corner(canvas, w - inset, inset, -1, 1, size);
   corner(canvas, inset, h - inset, 1, -1, size); corner(canvas, w - inset, h - inset, -1, -1, size);
 }
-function flourish(canvas: SkCanvas, cx: number, y: number, half: number) {
+export function flourish(canvas: SkCanvas, cx: number, y: number, half: number) {
   canvas.drawLine(cx - half, y, cx - 12, y, stroke(RULE, 1.4));
   canvas.drawLine(cx + 12, y, cx + half, y, stroke(RULE, 1.4));
   const d = Skia.PathBuilder.Make();
@@ -124,9 +124,11 @@ function vine(canvas: SkCanvas, x: number, top: number, bottom: number, flip: nu
   }
 }
 /** The month's flower, cut from its own spine painting, inlaid in an arched gilt frame (as on the cover). */
-function plate(canvas: SkCanvas, spine: SkImage, cx: number, top: number, width: number, height: number) {
+export function plate(canvas: SkCanvas, spine: SkImage, cx: number, top: number, width: number, height: number,
+  /** The part of the painting shown (shares of its width and height); the journals show the flower's panel. */
+  part: [number, number, number, number] = [.16, .2, .7, .64]) {
   const iw = spine.width(), ih = spine.height();
-  const src = Skia.XYWHRect(iw * .16, ih * .2, iw * .7, ih * .64);
+  const src = Skia.XYWHRect(iw * part[0], ih * part[1], iw * part[2], ih * part[3]);
   const x = cx - width / 2;
   const arch = Skia.PathBuilder.Make();
   arch.moveTo(x, top + height); arch.lineTo(x, top + width / 2);
@@ -193,7 +195,7 @@ function sectionLabel(canvas: SkCanvas, fonts: SkTypefaceFontProvider, label: st
   return h + 14;
 }
 /** A small gilt sprig: the field journal's mark beside each section. */
-function sprig(canvas: SkCanvas, x: number, y: number, color: string) {
+export function sprig(canvas: SkCanvas, x: number, y: number, color: string) {
   const stem = Skia.PathBuilder.Make();
   stem.moveTo(x, y + 18); stem.quadTo(x + 4, y + 6, x + 12, y);
   canvas.drawPath(stem.build(), stroke(color, 2));
@@ -309,7 +311,7 @@ export function writingPage(o: { parchment: SkImage; fonts: SkTypefaceFontProvid
 
 export type EntryFace = { weekday: string; date: string; title: string; body: string; grown: boolean; folio: string; hint?: string };
 /** A small padlock (centred on x, y; about 22 units tall at k = 1). */
-function lockGlyph(canvas: SkCanvas, x: number, y: number, k: number, color: string) {
+export function lockGlyph(canvas: SkCanvas, x: number, y: number, k: number, color: string) {
   const shackle = Skia.PathBuilder.Make();
   shackle.moveTo(x - 5 * k, y - 1 * k); shackle.lineTo(x - 5 * k, y - 5 * k); shackle.cubicTo(x - 5 * k, y - 12 * k, x + 5 * k, y - 12 * k, x + 5 * k, y - 5 * k); shackle.lineTo(x + 5 * k, y - 1 * k);
   canvas.drawPath(shackle.build(), stroke(color, 2.2 * k));

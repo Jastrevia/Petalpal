@@ -501,10 +501,15 @@ const styles = StyleSheet.create({
   },
 
   // Chapter Bottom Vignette (botanical engraving)
+  // The illustrations take the room the words leave (up to their full size), so a long page never pushes its words
+  // or its picture past the page number.
   chapterVignetteContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 95,
+    flexBasis: 95,
+    maxHeight: 95,
+    minHeight: 0,
+    flexShrink: 1,
     marginTop: 4,
     opacity: 0.82,
   },
@@ -521,7 +526,10 @@ const styles = StyleSheet.create({
   contentFlowerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 90,
+    flexBasis: 90,
+    maxHeight: 90,
+    minHeight: 0,
+    flexShrink: 1,
     marginTop: 4,
     opacity: 0.9,
   },
@@ -530,8 +538,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   contentFlowerArt: {
-    width: 80,
-    height: 80,
+    height: '100%',
+    maxHeight: 80,
+    aspectRatio: 1,
   },
   contentFlowerArtCompact: {
     width: 50,
@@ -611,6 +620,8 @@ const styles = StyleSheet.create({
   fallbackOrnamentContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 30,
+    flexBasis: 30,
+    minHeight: 0,
+    flexShrink: 1,
   },
 });

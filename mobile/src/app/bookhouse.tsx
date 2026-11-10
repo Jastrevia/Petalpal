@@ -22,6 +22,8 @@ import { loadFlowerPlacements, type FlowerPlacementRecord } from '../components/
 import { ICONS, ParchmentButton, RoundButton, TitlePlaque, TreehouseBackdrop } from '../components/bookhouse/TreehouseArt';
 import { measureBook, shelfLayout, TreehouseShelf, type ShelfRect, type ShelfSlot } from '../components/bookhouse/TreehouseShelf';
 import { MonthBook, type BookMode, type ClosedTo } from '../components/bookhouse/MonthBook';
+import { MonthlyReportBook } from '../components/bookhouse/MonthlyReportBook';
+import { archiveKey, type ShelfBookRef } from '../services/monthlyArchive';
 import { pullTarget } from '../components/bookhouse/book3d/desk';
 import { DeskLayer } from '../components/bookhouse/book3d/DeskLayer';
 import { pullTarget as roomPullTarget } from '../components/bookhouse/book3d/roomDesk';
@@ -45,8 +47,13 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 // The bookshelf is always mounted; a month opens as a book that flies out of its slot over it,
 // so the selected year and scroll position are still there when the book flies back.
 // `held`: opened from the bookcase seen from the desk (switching months), from `deskRect`, with the camera already there.
-type OpenBook = { year: number; month: number; rect: ShelfRect; geometry: PullGeometry; scrollY: number; held?: boolean; deskRect?: ShelfRect | null };
-type MonthChoice = { year: number; month: number; rect: ShelfRect };
+// A book is a month's journal or the year's Monthly Report archive (ShelfBookRef: by kind, never by a month number).
+type OpenBook = ShelfBookRef & { rect: ShelfRect; geometry: PullGeometry; scrollY: number; held?: boolean; deskRect?: ShelfRect | null };
+type BookChoice = ShelfBookRef & { rect: ShelfRect };
+/** The book's slot on the shelf (monthKey for a journal, archiveKey for the archive). */
+const slotKey = (b: ShelfBookRef) => b.kind === 'archive' ? archiveKey(b.year) : monthKey(b.year, b.month);
+const bookName = (b: ShelfBookRef) => b.kind === 'archive' ? `the ${b.year} Monthly Report` : MONTH_NAMES[b.month - 1];
+const refOf = (b: ShelfBookRef): ShelfBookRef => b.kind === 'archive' ? { kind: 'archive', year: b.year } : { kind: 'month', year: b.year, month: b.month };
 const TOP_BAR = 52;
 const SHELF_FOOTER = 46;
 /** Pulled back to the desk, the title sign sits this far below the safe area: under the row of top controls (back,
@@ -109,9 +116,9 @@ export default function Bookhouse() {
   }, []);
   // Switching months at the desk: one switch at a time. `switching` is set the moment a book is chosen (so a second tap
   // never starts another) and cleared once the chosen book is on its way; the open book closes into its slot first.
-  const switching = useRef<MonthChoice | null>(null);
+  const switching = useRef<BookChoice | null>(null);
   const [returnTo, setReturnTo] = useState<{ run: number; rect: ShelfRect | null } | null>(null);
-  const [confirmSwitch, setConfirmSwitch] = useState<MonthChoice | null>(null);
+  const [confirmSwitch, setConfirmSwitch] = useState<BookChoice | null>(null);
   // Closing with unsaved writing asks first; `year`: a year chosen at the desk, shown once the book is back on its shelf.
   const [confirmClose, setConfirmClose] = useState<{ year: number | null } | null>(null);
   // A year chosen on the desk-view bookcase while a book is open: the book goes back to its shelf first (the camera
@@ -179,7 +186,9 @@ export default function Bookhouse() {
     });
     return () => subscription.remove();
   }, [book, drafts]));
-  const openMonth = (y: number, m: number, rect: ShelfRect | null) => {
+  const openMonth = (y: number, m: number, rect: ShelfRect | null) => openBook({ kind: 'month', year: y, month: m }, rect);
+  const openArchive = (y: number, rect: ShelfRect | null) => openBook({ kind: 'archive', year: y }, rect);
+  const openBook = (target: ShelfBookRef, rect: ShelfRect | null) => {
     if (!rect || book) return;
     if (!session) { guest?.requestAccount(); return; }
     const rest = shelfLayout(column, cabinetTop, cabinetBottom);
@@ -203,8 +212,8 @@ export default function Bookhouse() {
       const wide = shelfLayout(geometry.variant === 'reference' ? referenceShelfWidth(geometry) : deskColumn, frame.cabinetTop, frame.cabinetBottom, true);
       geometry.deskShelf = { width: wide.width, scale: wide.scale, slices: wide.slices, x: (width - wide.width) / 2, ...frame };
     }
-    setShelfYear(y); setShownMonths([]); setBook({ year: y, month: m, rect, geometry, scrollY: sceneY.current });
-    loadMonthEvents(y, m);
+    setShelfYear(target.year); setShownMonths([]); setBook({ ...target, rect, geometry, scrollY: sceneY.current });
+    if (target.kind === 'month') loadMonthEvents(target.year, target.month);
   };
   // tour already read above
   useEffect(() => {
@@ -234,32 +243,33 @@ export default function Bookhouse() {
   // A book tapped in the bookcase behind the desk: the open book goes back to its slot and that month's comes out —
   // all in the same scene, the camera staying where it is. Unsaved writing in the open book is never dropped: switching
   // with a draft asks first, and the draft stays (unsaved) for when that month is opened again.
-  const chooseAtDesk = (y: number, m: number, rect: ShelfRect | null) => {
+  const hasDraft = (b: ShelfBookRef) => b.kind === 'month' && [...drafts.keys()].some(key => key.startsWith(monthPrefix(b.year, b.month)));
+  const chooseAtDesk = (y: number, m: number, rect: ShelfRect | null) => chooseBookAtDesk({ kind: 'month', year: y, month: m }, rect);
+  const chooseBookAtDesk = (target: ShelfBookRef, rect: ShelfRect | null) => {
     if (!book || !rect || switching.current || nextBook || confirmSwitch || bookModeRef.current !== 'idle') return;
-    if (y === book.year && m === book.month) return;
-    const prefix = monthPrefix(book.year, book.month);
-    if ([...drafts.keys()].some(key => key.startsWith(prefix))) { setConfirmSwitch({ year: y, month: m, rect }); return; }
-    void switchTo({ year: y, month: m, rect });
+    if (slotKey(target) === slotKey(book)) return;
+    if (hasDraft(book)) { setConfirmSwitch({ ...target, rect }); return; }
+    void switchTo({ ...target, rect });
   };
-  const switchTo = async (choice: MonthChoice, keptDraft = false) => {
+  const switchTo = async (choice: BookChoice, keptDraft = false) => {
     if (!book || switching.current || book.geometry.kind !== 'composed') return;
     switching.current = choice;
     // The chosen month's book: its place on the bookshelf itself is the same slot with the pull-back undone, so it can
     // later close all the way back to the shelf. It waits (pages loading) until the open book is nearly home.
     setNextWaiting(true);
-    setNextBook({ year: choice.year, month: choice.month, rect: composedRestRect(choice.rect, book.geometry), geometry: book.geometry, scrollY: book.scrollY, held: true, deskRect: choice.rect });
-    loadMonthEvents(choice.year, choice.month);
+    setNextBook({ ...refOf(choice), rect: composedRestRect(choice.rect, book.geometry), geometry: book.geometry, scrollY: book.scrollY, held: true, deskRect: choice.rect });
+    if (choice.kind === 'month') loadMonthEvents(choice.year, choice.month);
     // The open book's own slot in the desk-view bookcase (its book is hidden there, but laid out).
-    const from = await measureBook(deskShelfNodes.current.get(monthKey(book.year, book.month)));
+    const from = await measureBook(deskShelfNodes.current.get(slotKey(book)));
     setReturnTo({ run: Date.now(), rect: from });
-    if (keptDraft) setNotice(`Your ${MONTH_NAMES[book.month - 1]} draft is kept, not saved yet. Open ${MONTH_NAMES[book.month - 1]} again to finish it.`);
+    if (keptDraft && book.kind === 'month') setNotice(`Your ${MONTH_NAMES[book.month - 1]} draft is kept, not saved yet. Open ${MONTH_NAMES[book.month - 1]} again to finish it.`);
   };
   const bookClosed = (to: ClosedTo) => {
     switching.current = null;
     setReturnTo(null);
     // The switch could not start (the book was busy): the waiting book is put away unseen.
     if (to === 'stayed') { setNextBook(null); setNextWaiting(false); return; }
-    if (book) showMonth(monthKey(book.year, book.month), false);
+    if (book) showMonth(slotKey(book), false);
     if (to === 'desk' && nextBook) {
       // The closed book is back in its slot; the chosen month's book (already on its way) becomes the open one.
       setNextWaiting(false);
@@ -273,7 +283,7 @@ export default function Bookhouse() {
   };
   // Each book's days, rebuilt only when that month's own data changes (a switch never redraws the other book's pages).
   const daysCache = useRef(new Map<string, { inputs: unknown[]; days: ReturnType<typeof monthDays> }>()).current;
-  const daysOf = (b: OpenBook) => {
+  const daysOf = (b: OpenBook & { kind: 'month' }) => {
     const key = `${b.year}-${b.month}`, events = monthEvents[key];
     const inputs = [entries, checkIns, events, today];
     const hit = daysCache.get(key);
@@ -282,7 +292,8 @@ export default function Bookhouse() {
     daysCache.set(key, { inputs, days });
     return days;
   };
-  useEffect(() => { if (recordsFailed && book) setNotice('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.'); }, [recordsFailed, book]);
+  // (A journal's records only: the Monthly Report archive shows none of them.)
+  useEffect(() => { if (recordsFailed && book?.kind === 'month') setNotice('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.'); }, [recordsFailed, book]);
   const removeEntry = async () => {
     if (!session || !actionEntry?.journal) return;
     await deletePrivateJournal(session.user.id, actionEntry.journal.id);
@@ -336,17 +347,18 @@ export default function Bookhouse() {
   // nearest first, one file at a time, so opening or switching to one starts at once.
   useEffect(() => retainJournalAssets(), []);
   const still = book ? bookMode === 'idle' : true;
-  const nearMonth = book?.month ?? (Number(today.slice(0, 4)) === year ? Number(today.slice(5, 7)) : 12);
+  const openMonthNumber = book?.kind === 'month' ? book.month : undefined;
+  const nearMonth = openMonthNumber ?? (Number(today.slice(0, 4)) === year ? Number(today.slice(5, 7)) : 12);
   useEffect(() => {
     if (!still) return;
     const months = Array.from({ length: 12 }, (_, i) => i + 1)
-      .filter(m => m !== book?.month && !monthLocked(year, m, today, counts.get(monthKey(year, m)) || 0))
+      .filter(m => m !== openMonthNumber && !monthLocked(year, m, today, counts.get(monthKey(year, m)) || 0))
       .sort((a, b) => Math.abs(a - nearMonth) - Math.abs(b - nearMonth));
     let cancel = () => {};
-    const timer = setTimeout(() => { cancel = preloadBookImages(months, () => preparePapers(desk.page.width)); }, book ? 250 : 900);
+    const timer = setTimeout(() => { cancel = preloadBookImages(months, () => preparePapers(desk.page.width), true); }, book ? 250 : 900);
     return () => { clearTimeout(timer); cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [still, book?.month, nearMonth, year, today, desk.page.width]);
+  }, [still, openMonthNumber, nearMonth, year, today, desk.page.width]);
   // The desk-view bookcase's books are tappable while the spread rests on the desk and no switch is under way.
   const deskPick = !!book && !nextBook && bookMode === 'idle' && !returnTo && !confirmSwitch && !confirmClose;
 
@@ -368,7 +380,7 @@ export default function Bookhouse() {
   };
   const closeFromOutside = (nextYear: number | null = null) => {
     if (tourRunning(tour) || !book || nextBook || switching.current || pendingYear.current !== null || bookModeRef.current !== 'idle') return;
-    if ([...drafts.keys()].some(key => key.startsWith(monthPrefix(book.year, book.month)))) { setConfirmClose({ year: nextYear }); return; }
+    if (hasDraft(book)) { setConfirmClose({ year: nextYear }); return; }
     pendingYear.current = nextYear;
     setCloseSignal(n => n + 1);
   };
@@ -396,7 +408,7 @@ export default function Bookhouse() {
           style={{ width: column, height: sceneHeight, alignItems: 'center' }}>
         <TreehouseShelf column={column} height={sceneHeight} cabinetTop={cabinetTop} cabinetBottom={cabinetBottom} railBottom={sceneHeight - insets.bottom - 6}
           years={years} year={year} today={today} counts={counts} reducedMotion={reducedMotion}
-          onSelectYear={setShelfYear} onOpenMonth={openMonth} onLocked={setNotice}
+          onSelectYear={setShelfYear} onOpenMonth={openMonth} onOpenArchive={openArchive} onLocked={setNotice}
           hiddenMonth={book ? shownMonths : null} bookNodes={bookNodes}
           pull={pull} pullGeometry={book?.geometry || null}
           targets={{ years: onboardingTarget('bookhouse.years'), books: onboardingTarget('bookhouse.books'), shelf: onboardingTarget('bookhouse.shelf') }}
@@ -411,7 +423,8 @@ export default function Bookhouse() {
           <Pressable accessible={false} focusable={false} {...offBook} style={{ width: column, height, alignItems: 'center', cursor: 'auto' } as never}>
             <TreehouseShelf fill deskTouch column={book.geometry.deskShelf.width} height={height} cabinetTop={book.geometry.deskShelf.cabinetTop} cabinetBottom={book.geometry.deskShelf.cabinetBottom}
               railBottom={book.geometry.deskShelf.railBottom} years={years} year={year} today={today} counts={counts} reducedMotion={reducedMotion}
-              onSelectYear={chooseYearAtDesk} onOpenMonth={chooseAtDesk} onLocked={setNotice} targets={{ years: {}, books: {}, shelf: {} }} footer={() => null}
+              onSelectYear={chooseYearAtDesk} onOpenMonth={chooseAtDesk} onOpenArchive={(y, rect) => chooseBookAtDesk({ kind: 'archive', year: y }, rect)}
+              onLocked={setNotice} targets={{ years: {}, books: {}, shelf: {} }} footer={() => null}
               hiddenMonth={shownMonths} bookNodes={deskShelfNodes} />
           </Pressable>
         </Reanimated.View>}
@@ -437,30 +450,38 @@ export default function Bookhouse() {
     {book && book.geometry.kind === 'room' && <RoomFront pull={pull} geometry={book.geometry} height={height} />}
     {/* The open book, and while switching months at the desk the chosen month's book (keyed by month, so it carries on
         as the open book once the other is home). */}
-    {session && [book, nextBook].map(b => b && <MonthBook key={`${b.year}-${b.month}`} year={b.year} month={b.month} shelfRect={b.rect} days={daysOf(b)}
+    {session && [book, nextBook].map(b => b && (b.kind === 'archive'
+      // The year's Monthly Report archive: the same book, flight, opening, turns and closing; read-only report pages.
+      ? <MonthlyReportBook key={slotKey(b)} year={b.year} shelfRect={b.rect} reducedMotion={reducedMotion} closeSignal={closeSignal}
+        returnTo={b === book ? returnTo : null} waiting={b === nextBook && nextWaiting}
+        scene={{ pull, geometry: b.geometry, rootX: (width - shelfLayout(column, cabinetTop, cabinetBottom).width) / 2, scrollY: b.scrollY, column: deskColumn, footer: deskFooter,
+          held: b.held, deskRect: b.deskRect }}
+        onShown={() => showMonth(slotKey(b), true)} onClosed={b === book ? bookClosed : () => undefined} onMode={onBookMode}
+        onHomeward={b === book ? () => setNextWaiting(false) : undefined} />
+      : <MonthBook key={slotKey(b)} year={b.year} month={b.month} shelfRect={b.rect} days={daysOf(b)}
       userId={session.user.id} today={today} reducedMotion={reducedMotion} night={lit} closeSignal={closeSignal} drafts={drafts}
       onboardingStep={tourRunning(tour) ? tour.step : null} onBackToGarden={leave}
       returnTo={b === book ? returnTo : null} waiting={b === nextBook && nextWaiting}
       scene={{ pull, geometry: b.geometry, rootX: (width - shelfLayout(column, cabinetTop, cabinetBottom).width) / 2, scrollY: b.scrollY, column: deskColumn, footer: deskFooter,
         held: b.held, deskRect: b.deskRect }}
-      onShown={() => showMonth(monthKey(b.year, b.month), true)} onClosed={b === book ? bookClosed : () => undefined} onMode={onBookMode}
+      onShown={() => showMonth(slotKey(b), true)} onClosed={b === book ? bookClosed : () => undefined} onMode={onBookMode}
       onHomeward={b === book ? () => setNextWaiting(false) : undefined}
-      onSaved={async () => { await reload(); }} onActions={setActionEntry} />)}
+      onSaved={async () => { await reload(); }} onActions={setActionEntry} />))}
     {!!notice && <View pointerEvents="none" style={[s.noticeWrap, book ? { top: insets.top + 56 } : { bottom: insets.bottom + SHELF_FOOTER + 20 }]}><Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text></View>}
     {actionEntry && <JournalActions visible locked={journalLocked(actionEntry)} date={formatLocalDate(actionEntry.localDate)} reducedMotion={reducedMotion}
       onClose={() => setActionEntry(null)} onDelete={removeEntry}
       />}
     {history && session && <FlowerHistory userId={session.user.id} timezone={timezone} onClose={() => setHistory(false)} />}
-    {confirmSwitch && book && <Sheet title="Unsaved journal" onClose={() => setConfirmSwitch(null)}>
-      <Text style={s.body}>Your writing in {MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or open {MONTH_NAMES[confirmSwitch.month - 1]} now and
+    {confirmSwitch && book && book.kind === 'month' && <Sheet title="Unsaved journal" onClose={() => setConfirmSwitch(null)}>
+      <Text style={s.body}>Your writing in {MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or open {bookName(confirmSwitch)} now and
         come back to it: the draft stays in {MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.</Text>
       <View style={{ gap: 10, marginTop: 14 }}>
         <ParchmentButton label="Keep writing" onPress={() => setConfirmSwitch(null)} />
-        <ParchmentButton secondary label={`Open ${MONTH_NAMES[confirmSwitch.month - 1]}, keep the draft`}
+        <ParchmentButton secondary label={`Open ${bookName(confirmSwitch)}, keep the draft`}
           onPress={() => { const choice = confirmSwitch; setConfirmSwitch(null); void switchTo(choice, true); }} />
       </View>
     </Sheet>}
-    {confirmClose && book && <Sheet title="Unsaved journal" onClose={keepWriting}>
+    {confirmClose && book && book.kind === 'month' && <Sheet title="Unsaved journal" onClose={keepWriting}>
       <Text style={s.body}>Your writing in {MONTH_NAMES[book.month - 1]} hasn’t been saved yet. You can keep writing, or close the book and come back to it: the
         draft stays in {MONTH_NAMES[book.month - 1]}’s book while you are in the Treehouse. It is only saved to your journal when you tap Save.</Text>
       <View style={{ gap: 10, marginTop: 14 }}>

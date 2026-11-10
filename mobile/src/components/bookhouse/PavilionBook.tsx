@@ -29,7 +29,14 @@ export const PAVILION_LABEL_FONT = require('../../../assets/fonts/PavilionLabels
 export const PAVILION_LABEL_FONT_ZH = require('../../../assets/fonts/PavilionLabels-ZH.ttf');
 type TitledSpine = { image: SkImage; uri: string };
 
-function rasterSnapshot(surface: NonNullable<ReturnType<typeof Skia.Surface.MakeOffscreen>>) {
+// The spine, cover and paper bakes are snapshotted to raster images straight away. On the web every offscreen (GPU)
+// surface is a new WebGL context that disposing the surface never releases (4 books x 2 spine layers at entry, then a
+// cover and a paper per opened book); past the browser's limit it drops the page's oldest live canvas and the page
+// reloads (webPageGuard). On the web they therefore draw on CPU raster surfaces, which use no WebGL context.
+function bakeSurface(width: number, height: number) {
+  return Platform.OS === 'web' ? Skia.Surface.Make(width, height) : Skia.Surface.MakeOffscreen(width, height);
+}
+function rasterSnapshot(surface: NonNullable<ReturnType<typeof bakeSurface>>) {
   surface.flush();
   const snapshot = surface.makeImageSnapshot(), image = snapshot.makeNonTextureImage?.() ?? snapshot;
   if (image !== snapshot) snapshot.dispose();
@@ -221,7 +228,7 @@ export function usePavilionSpines(locale: AppLocale) {
     const result = {} as Record<PavilionBookId, TitledSpine>;
     for (const id of Object.keys(PAVILION_SLOTS) as PavilionBookId[]) {
       const r = PAVILION_SLOTS[id], density = 4;
-      const surface = Skia.Surface.MakeOffscreen(r.width * density, r.height * density);
+      const surface = bakeSurface(r.width * density, r.height * density);
       if (!surface) return null;
       const canvas = surface.getCanvas(), paint = Skia.Paint();
       canvas.scale(density, density);
@@ -232,7 +239,7 @@ export function usePavilionSpines(locale: AppLocale) {
 
       // The foil layer has genuine zero alpha outside the glyphs. It is baked
       // into the same spine texture used at rest and by the moving book mesh.
-      const lettering = Skia.Surface.MakeOffscreen(r.width * density, r.height * density);
+      const lettering = bakeSurface(r.width * density, r.height * density);
       if (!lettering) { paint.dispose(); surface.dispose(); return null; }
       const glyphs = lettering.getCanvas();
       glyphs.clear(Skia.Color('transparent'));
@@ -306,7 +313,7 @@ export function PavilionEngraving({ locale, width, height, left, top, art, size 
 // fits the renderer's W/H ratio without stretching petals or gilded ornaments.
 function coverTexture(image: SkImage, id: PavilionBookId, locale: AppLocale, font: SkFont, _grain: SkImage | null) {
   const w = image.width(), h = Math.min(image.height(), Math.round(w * SPEC.H / SPEC.W));
-  const surface = Skia.Surface.MakeOffscreen(w, h); if (!surface) return null;
+  const surface = bakeSurface(w, h); if (!surface) return null;
   const canvas = surface.getCanvas(), paint = Skia.Paint();
   canvas.drawImageRectOptions(image, Skia.XYWHRect(0, (image.height() - h) / 2, w, h), Skia.XYWHRect(0, 0, w, h), FilterMode.Linear, MipmapMode.Linear, paint);
   const lines = pavilionTitleLines(id, locale, true);
@@ -314,7 +321,7 @@ function coverTexture(image: SkImage, id: PavilionBookId, locale: AppLocale, fon
   paint.dispose(); return rasterSnapshot(surface);
 }
 function paperTexture(image: SkImage) {
-  const surface = Skia.Surface.MakeOffscreen(SPEC.W, SPEC.H); if (!surface) return null;
+  const surface = bakeSurface(SPEC.W, SPEC.H); if (!surface) return null;
   const canvas = surface.getCanvas(), paint = Skia.Paint();
   canvas.drawImageRectOptions(image, Skia.XYWHRect(0, 0, image.width(), image.height()), Skia.XYWHRect(0, 0, SPEC.W, SPEC.H), FilterMode.Linear, MipmapMode.Linear, paint);
 
@@ -322,10 +329,11 @@ function paperTexture(image: SkImage) {
   paint.dispose(); return rasterSnapshot(surface);
 }
 
-/** The Treehouse motion, curved spine, page geometry and timing stay unchanged. */
-export function PavilionBook({ id, locale, spine, geometry, timeline, focus, onReady }: {
+/** The Treehouse motion, curved spine, page geometry and timing stay unchanged. `camera` is the reading camera: a
+ *  uniform zoom by s about (ox, oy) of the book alone (the painting behind it never moves); identity at its anchor. */
+export function PavilionBook({ id, locale, spine, geometry, timeline, camera, onReady }: {
   id: PavilionBookId; locale: AppLocale; spine: SkImage | null; geometry: PavilionGeometry;
-  timeline: SharedValue<number>; focus: SharedValue<number>; onReady: () => void;
+  timeline: SharedValue<number>; camera: SharedValue<{ s: number; ox: number; oy: number }>; onReady: () => void;
 }) {
   const grain = useImage(GRAIN), edges = useImage(EDGES), parchment = useImage(PAPER), hd = useImage(COVERS[id]);
   const fontAsset = locale === 'zh-Hans' ? PAVILION_LABEL_FONT_ZH : PAVILION_LABEL_FONT;
@@ -343,8 +351,9 @@ export function PavilionBook({ id, locale, spine, geometry, timeline, focus, onR
   useEffect(() => { if (textures && !started.current) { started.current = true; ready.current(); } }, [textures]);
   const picture = useDerivedValue(() => createPicture(canvas => {
     if (!textures || !spine) return;
-    const t = timeline.value, f = pavilionFrame(t, geometry, focus.value);
+    const t = timeline.value, f = pavilionFrame(t, geometry), c = camera.value;
     const u = Math.min(1, Math.max(0, t / .13)), solid = u * u * (3 - 2 * u);
+    if (c.s !== 1) { canvas.save(); canvas.translate(c.ox * (1 - c.s), c.oy * (1 - c.s)); canvas.scale(c.s, c.s); }
     drawFloatShadow(canvas, f.cam, f.pose, f.state, f.shadow * .65, f.lift);
     drawBook(canvas, f.cam, f.pose, f.state, textures, { opacity: solid });
     if (solid < 1) {
@@ -357,6 +366,7 @@ export function PavilionBook({ id, locale, spine, geometry, timeline, focus, onR
       canvas.drawImageRectOptions(spine, Skia.XYWHRect(0, 0, spine.width(), spine.height()), Skia.XYWHRect(centre[0] - w / 2, centre[1] - h / 2, w, h), FilterMode.Linear, MipmapMode.Linear, paint);
       paint.dispose();
     }
+    if (c.s !== 1) canvas.restore();
   }), [textures, spine, geometry]);
   return <View pointerEvents="none" style={StyleSheet.absoluteFill}>
     <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}><Picture picture={picture} /></Canvas>

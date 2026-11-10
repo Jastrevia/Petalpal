@@ -8,7 +8,7 @@ export const GuestContext = createContext<Guest | null>(null);
 export const useGuest = () => useContext(GuestContext);
 
 // Routes a guest may open: the Garden and the treehouse (looking only). Everything else needs an account.
-const GUEST_ROUTES = new Set(['/', '/bookhouse', '/fairy-animation-preview']);
+const GUEST_ROUTES = new Set(['/', '/bookhouse', '/fairy-animation-preview', '/loading-test']);
 export function guestRouteAllowed(pathname: string) {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
   return GUEST_ROUTES.has(path);

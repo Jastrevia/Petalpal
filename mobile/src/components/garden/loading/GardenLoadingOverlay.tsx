@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useGardenLoadState, type GardenLoadStore } from './gardenReadiness';
 import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
+import { PigeonLoadingScreen } from '../../loading/PigeonLoadingExperience';
 import { useAppLocale } from '../../../services/locale';
 
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
 // garden. It changes nothing about rendering or quality.
+// The progress bar is measured, not timed: the water base counts as one piece and each island
+// texture as one more, as Skia reports them decoded. Letterwing flies along the bar at that
+// fraction; only when all of them are ready do the bar and the bird reach the end and the screen
+// fade, uncovering the Garden.
 export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore; title?: string }) {
   const zh = useAppLocale() === 'zh-Hans';
   const load = useGardenLoadState(store);
   const ready = load.water === 'ready' && load.landsLoaded >= load.landsTotal;
   const [elapsed, setElapsed] = useState(0);
+  // Ready, and the loading screen has faded: nothing left to cover.
+  const [exited, setExited] = useState(false);
+  useEffect(() => { if (!ready) setExited(false); }, [ready]);
   useEffect(() => {
     if (ready) return;
     const started = Date.now();
@@ -28,27 +36,31 @@ export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore;
     window.addEventListener('unhandledrejection', onRejection);
     return () => window.removeEventListener('unhandledrejection', onRejection);
   }, [ready, store]);
-  if (ready) return null;
+  if (ready && (exited || elapsed >= 30_000)) return null;
   const progress = `${zh ? '水面' : 'Water'} ${load.water === 'ready' ? '✓' : load.water === 'failed' ? '✕' : '…'} · ${zh ? '小岛' : 'Islands'} ${load.landsLoaded}/${load.landsTotal}`;
   const failures = load.failures.length ? `${zh ? '加载失败：' : 'Couldn’t load: '}${load.failures.join(', ')}` : null;
   const reload = Platform.OS === 'web' && typeof window !== 'undefined'
     ? <Pressable accessibilityRole="button" onPress={() => window.location.reload()} style={gardenLoadingStyles.reload}>
         <Text style={gardenLoadingStyles.reloadText}>{zh ? '重新加载' : 'Reload'}</Text></Pressable> : null;
-  if (elapsed >= 30_000) return <View pointerEvents="box-none" style={gardenLoadingStyles.bannerWrap} testID="garden-loading">
+  if (!ready && elapsed >= 30_000) return <View pointerEvents="box-none" style={gardenLoadingStyles.bannerWrap} testID="garden-loading">
     <View style={gardenLoadingStyles.banner}>
       <Text style={gardenLoadingStyles.bannerText}>{zh ? '花园还在加载' : 'Garden still loading'} · {progress}</Text>
       {failures ? <Text style={gardenLoadingStyles.bannerText}>{failures}</Text> : null}
       {reload}
     </View>
   </View>;
-  return <View pointerEvents="box-none" style={gardenLoadingStyles.root} testID="garden-loading">
-    <ActivityIndicator color="#365b42" accessibilityLabel={zh ? '正在加载花园' : 'Loading your garden'} />
-    <Text accessibilityLiveRegion="polite" style={gardenLoadingStyles.title}>{title ?? (zh ? '花园正在生长…' : 'Growing your garden…')}</Text>
-    <Text style={gardenLoadingStyles.hint}>{progress}</Text>
-    {failures ? <Text style={gardenLoadingStyles.hint}>{failures}</Text> : null}
-    {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>{zh ? '网络较慢时，第一次打开可能要一分钟。' : 'The first visit can take up to a minute on a slow connection.'}</Text> : null}
+  const pieces = 1 + load.landsTotal;
+  const loaded = (load.water === 'ready' ? 1 : 0) + Math.min(load.landsLoaded, load.landsTotal);
+  return <PigeonLoadingScreen overlay testID="garden-loading" progress={loaded / pieces} done={ready} onExited={() => setExited(true)}
+    message={title ?? (zh ? '正在准备你的花园…' : 'Preparing your garden…')}
+    hint={<>
+      <Text style={gardenLoadingStyles.hint}>{progress}</Text>
+      {failures ? <Text accessibilityRole="alert" style={gardenLoadingStyles.hint}>{failures}</Text> : null}
+      {failures ? reload : null}
+      {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>{zh ? '网络较慢时，第一次打开可能要一分钟。' : 'The first visit can take up to a minute on a slow connection.'}</Text> : null}
+    </>}>
     <WakingFlowerFacts delayMs={4000} showNote={false} />
-  </View>;
+  </PigeonLoadingScreen>;
 }
 
 export const gardenLoadingStyles = StyleSheet.create({

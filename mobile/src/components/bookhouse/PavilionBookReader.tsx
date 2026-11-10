@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Platform,
-  Image, useWindowDimensions, AccessibilityInfo,
+  Image, AccessibilityInfo, PanResponder,
 } from 'react-native';
+import ReAnimated, { Easing as ReEasing, runOnJS, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
 import type { AppLocale } from '../../services/locale';
-import type { PavilionBookId } from './pavilionMotion';
+import { PAVILION_PAGE, type PavilionBookId, type PavilionReading } from './pavilionMotion';
 import { EmotionalSafetyNote } from '../features/EmotionalSafetyNote';
 import { AiOutputReport } from '../features/AiPrivacySettings';
 import { MoodPetalChart } from '../features/WeeklyBloom';
@@ -30,9 +31,18 @@ const botanical = require('../../../assets/reflection/botanical.png');
 export interface BookReaderProps {
   bookId: PavilionBookId;
   locale: AppLocale;
+  /** The book's two paper leaves at its anchor, in screen coordinates (projected from the 3D book). */
   leaves: { left: Rect; right: Rect };
-  readingRect: Rect;
-  compact: boolean;
+  /** Two pages, or one page at a time through the reading camera (see pavilionReading). */
+  reading: PavilionReading;
+  /** The reading camera shared with the 3D book: zoom by s about (ox, oy). */
+  camera: SharedValue<{ s: number; ox: number; oy: number }>;
+  /** 0 the anchored book … 1 close up (driven by the screen); side −1 left page … 1 right page (driven here). */
+  zoom: SharedValue<number>;
+  side: SharedValue<number>;
+  screen: { width: number; height: number };
+  /** False while the book is moving (opening, zooming, closing). */
+  interactive: boolean;
   reports: SavedReport[];
   details: Record<string, ReflectionReport>;
   selectedReport: SavedReport | null;
@@ -49,9 +59,11 @@ interface PageData {
 }
 
 const TURN_DURATION = 540;
+/** Close up: the camera's pan from one page of a spread to the other. */
+const PAN_DURATION = 420;
 
 export function PavilionBookReader({
-  bookId, locale, leaves, readingRect, compact,
+  bookId, locale, leaves, reading, camera, zoom, side, screen, interactive,
   reports, details, selectedReport, onSelectReport, onClose, onWriteEvent,
 }: BookReaderProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
@@ -59,6 +71,12 @@ export function PavilionBookReader({
   const turnProgress = useRef(new Animated.Value(0)).current;
   const isTurningLocked = useRef(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  // Close reading (the spread is too small for two pages): which page the reading camera shows. When the camera
+  // brings the whole spread close instead (a short, wide screen), both pages show and read as two.
+  const closeUp = !reading.fit && !reading.spread;
+  const screenChrome = !reading.fit;
+  const [focusSide, setFocusSide] = useState<'left' | 'right'>('left');
+  const [panning, setPanning] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -71,25 +89,28 @@ export function PavilionBookReader({
   useEffect(() => {
     setSpreadIndex(0);
     setTurning(null);
+    setFocusSide('left');
     isTurningLocked.current = false;
   }, [bookId]);
 
-  // Dimensions
-  const leftPageWidth = leaves.left.width;
-  const rightPageWidth = leaves.right.width;
-  const rightPageOffset = compact ? 0 : leaves.right.x - readingRect.x;
-  const pageHeight = Math.max(100, readingRect.height);
-  const pageWidth = compact ? readingRect.width : rightPageWidth;
+  // Every page is laid out once at the reference paper size and scaled onto its anchored leaf; the reading camera then
+  // magnifies the whole book layer. Pages never reflow, so nothing is clipped at any size.
+  const PW = PAVILION_PAGE.width, PH = PAVILION_PAGE.height;
+  const onLeaf = (rect: Rect) => ({
+    position: 'absolute' as const, width: PW, height: PH,
+    left: rect.x + rect.width / 2 - PW / 2, top: rect.y + rect.height / 2 - PH / 2,
+    transform: [{ scale: rect.width / PW }],
+  });
 
   // Build the Flower Language Collection pages (Tomus I - 8 categories, 26 flowers, 34 physical pages)
   const flowerCollection = useMemo(() => {
-    return buildFlowerLanguageCollectionPages(locale, compact);
-  }, [locale, compact]);
+    return buildFlowerLanguageCollectionPages(locale, false);
+  }, [locale]);
 
   // Build the Instruction pages (7 chapters, 24 pages)
   const instructionCollection = useMemo(() => {
-    return buildInstructionPages(locale, compact);
-  }, [locale, compact]);
+    return buildInstructionPages(locale, false);
+  }, [locale]);
 
   // Build pages for the active book
   const pages: PageData[] = useMemo(() => {
@@ -107,15 +128,8 @@ export function PavilionBookReader({
     }
   }, [bookId, locale, flowerCollection, instructionCollection, selectedReport, details, onWriteEvent]);
 
-  // Group pages into spreads
+  // Group pages into spreads: always two pages, on every screen, so a leaf always has a page on each face.
   const spreads = useMemo(() => {
-    if (compact) {
-      return pages.map((page, i) => ({
-        spreadNumber: i,
-        left: null,
-        right: page,
-      }));
-    }
     const result: Array<{ spreadNumber: number; left: PageData | null; right: PageData | null }> = [];
     for (let i = 0; i < pages.length; i += 2) {
       result.push({
@@ -128,15 +142,30 @@ export function PavilionBookReader({
       result.push({ spreadNumber: 0, left: null, right: null });
     }
     return result;
-  }, [pages, compact]);
+  }, [pages]);
 
   const maxSpread = Math.max(0, spreads.length - 1);
   const currentSpread = Math.min(spreadIndex, maxSpread);
 
+  // The reading camera follows the page: −1 the left page, 1 the right.
+  const moveCamera = useCallback((to: 'left' | 'right', duration: number, done?: () => void) => {
+    const target = to === 'left' ? -1 : 1;
+    if (reducedMotion || duration <= 0) { side.value = target; done?.(); return; }
+    side.value = withTiming(target, { duration, easing: ReEasing.bezier(0.25, 0.1, 0.25, 1) },
+      finished => { if (finished && done) runOnJS(done)(); });
+  }, [reducedMotion, side]);
+
   // Physical 3D page navigation
-  const goToSpread = useCallback((targetSpreadIndex: number) => {
-    if (isTurningLocked.current || targetSpreadIndex === currentSpread) return;
-    if (targetSpreadIndex < 0 || targetSpreadIndex > maxSpread) return;
+  const goToSpread = useCallback((targetSpreadIndex: number, focus?: 'left' | 'right') => {
+    if (isTurningLocked.current || targetSpreadIndex < 0 || targetSpreadIndex > maxSpread) return;
+    if (targetSpreadIndex === currentSpread) {
+      if (closeUp && focus && focus !== focusSide) {
+        isTurningLocked.current = true; setPanning(true); setFocusSide(focus);
+        moveCamera(focus, PAN_DURATION, () => { isTurningLocked.current = false; setPanning(false); });
+      }
+      return;
+    }
+    if (closeUp && focus) { setFocusSide(focus); moveCamera(focus, reducedMotion ? 0 : TURN_DURATION); }
 
     if (reducedMotion) {
       setSpreadIndex(targetSpreadIndex);
@@ -160,83 +189,55 @@ export function PavilionBookReader({
       setTurning(null);
       isTurningLocked.current = false;
     });
-  }, [currentSpread, maxSpread, reducedMotion, turnProgress]);
+  }, [currentSpread, maxSpread, reducedMotion, turnProgress, closeUp, focusSide, moveCamera]);
 
-  const turnPage = useCallback((dir: 1 | -1) => {
-    goToSpread(currentSpread + dir);
-  }, [currentSpread, goToSpread]);
+  // One navigation for arrows, swipes and keys. Two pages: turn the leaf. Close up: within a spread the camera pans to
+  // the other page (no paper moves); past it the leaf turns and the camera follows it to the page it brings.
+  const canPrev = closeUp ? (focusSide === 'right' || currentSpread > 0) : currentSpread > 0;
+  const canNext = closeUp ? (focusSide === 'left' || currentSpread < maxSpread) : currentSpread < maxSpread;
+  const next = useCallback(() => {
+    if (!closeUp) { goToSpread(currentSpread + 1); return; }
+    if (focusSide === 'left') goToSpread(currentSpread, 'right');
+    else goToSpread(currentSpread + 1, 'left');
+  }, [closeUp, focusSide, currentSpread, goToSpread]);
+  const prev = useCallback(() => {
+    if (!closeUp) { goToSpread(currentSpread - 1); return; }
+    if (focusSide === 'right') goToSpread(currentSpread, 'left');
+    else goToSpread(currentSpread - 1, 'right');
+  }, [closeUp, focusSide, currentSpread, goToSpread]);
+  const nav = useRef({ next, prev }); nav.current = { next, prev };
+  const swipe = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+    onPanResponderRelease: (_e, g) => { if (g.dx < -50) nav.current.next(); else if (g.dx > 50) nav.current.prev(); },
+  }), []);
 
-  // Active category / chapter detection for bookmarks
+  // Active category / chapter detection for bookmarks: close up, the page being read; two pages, the spread.
   const activeCategoryId = useMemo(() => {
-    if (bookId === 'collection') {
-      const activeSpread = spreads[currentSpread];
-      if (!activeSpread) return 'happy';
-
-      if (compact) {
-        const pageNum = activeSpread.right?.pageNumber ?? 1;
-        const match = flowerCollection.categoryRanges.find(
-          r => pageNum >= r.startPage && pageNum <= r.endPage
-        );
-        return match?.id ?? 'happy';
-      }
-
-      // Two-page spread: if right page is the category intro, highlight it
-      const rightPageNum = activeSpread.right?.pageNumber;
-      const rightMatch = rightPageNum
-        ? flowerCollection.categoryRanges.find(r => r.startPage === rightPageNum)
-        : null;
-      if (rightMatch) return rightMatch.id;
-
-      const leftPageNum = activeSpread.left?.pageNumber ?? rightPageNum ?? 1;
-      const leftMatch = flowerCollection.categoryRanges.find(
-        r => leftPageNum >= r.startPage && leftPageNum <= r.endPage
-      );
-      return leftMatch?.id ?? 'happy';
+    const ranges = bookId === 'collection' ? flowerCollection.categoryRanges
+      : bookId === 'notes' ? instructionCollection.chapterRanges : null;
+    if (!ranges) return null;
+    const fallback = bookId === 'collection' ? 'happy' : 'welcome';
+    const activeSpread = spreads[currentSpread];
+    if (!activeSpread) return fallback;
+    if (closeUp) {
+      const pageNum = (focusSide === 'left' ? activeSpread.left : activeSpread.right)?.pageNumber ?? 1;
+      return ranges.find(r => pageNum >= r.startPage && pageNum <= r.endPage)?.id ?? fallback;
     }
-
-    if (bookId === 'notes') {
-      const activeSpread = spreads[currentSpread];
-      if (!activeSpread) return 'welcome';
-
-      if (compact) {
-        const pageNum = activeSpread.right?.pageNumber ?? 1;
-        const match = instructionCollection.chapterRanges.find(
-          r => pageNum >= r.startPage && pageNum <= r.endPage
-        );
-        return match?.id ?? 'welcome';
-      }
-
-      // Two-page spread: if right page is the chapter intro, highlight it
-      const rightPageNum = activeSpread.right?.pageNumber;
-      const rightMatch = rightPageNum
-        ? instructionCollection.chapterRanges.find(r => r.startPage === rightPageNum)
-        : null;
-      if (rightMatch) return rightMatch.id;
-
-      const leftPageNum = activeSpread.left?.pageNumber ?? rightPageNum ?? 1;
-      const leftMatch = instructionCollection.chapterRanges.find(
-        r => leftPageNum >= r.startPage && leftPageNum <= r.endPage
-      );
-      return leftMatch?.id ?? 'welcome';
-    }
-
-    return null;
-  }, [bookId, spreads, currentSpread, compact, flowerCollection, instructionCollection]);
+    // Two-page spread: if right page is the category intro, highlight it
+    const rightPageNum = activeSpread.right?.pageNumber;
+    const rightMatch = rightPageNum ? ranges.find(r => r.startPage === rightPageNum) : null;
+    if (rightMatch) return rightMatch.id;
+    const leftPageNum = activeSpread.left?.pageNumber ?? rightPageNum ?? 1;
+    return ranges.find(r => leftPageNum >= r.startPage && leftPageNum <= r.endPage)?.id ?? fallback;
+  }, [bookId, spreads, currentSpread, closeUp, focusSide, flowerCollection, instructionCollection]);
 
   // Bookmark click handler (navigates to that category/chapter introductory page)
   const handleBookmarkClick = useCallback((catId: string) => {
-    if (bookId === 'collection') {
-      const targetPage = flowerCollection.categoryPageMap[catId];
-      if (targetPage == null) return;
-      const targetSpread = compact ? targetPage - 1 : Math.floor((targetPage - 1) / 2);
-      goToSpread(targetSpread);
-    } else if (bookId === 'notes') {
-      const targetPage = instructionCollection.chapterPageMap[catId];
-      if (targetPage == null) return;
-      const targetSpread = compact ? targetPage - 1 : Math.floor((targetPage - 1) / 2);
-      goToSpread(targetSpread);
-    }
-  }, [bookId, compact, flowerCollection, instructionCollection, goToSpread]);
+    const targetPage = bookId === 'collection' ? flowerCollection.categoryPageMap[catId]
+      : bookId === 'notes' ? instructionCollection.chapterPageMap[catId] : null;
+    if (targetPage == null) return;
+    goToSpread(Math.floor((targetPage - 1) / 2), targetPage % 2 === 1 ? 'left' : 'right');
+  }, [bookId, flowerCollection, instructionCollection, goToSpread]);
 
   // Reader debug tools for testing and visual verification
   useEffect(() => {
@@ -244,8 +245,12 @@ export function PavilionBookReader({
       (window as any).__readerDebug = {
         get spreadIndex() { return currentSpread; },
         get spreadsCount() { return spreads.length; },
+        get focusSide() { return focusSide; },
+        get closeUp() { return closeUp; },
+        get fit() { return reading.fit; },
         goToSpread,
-        turnPage,
+        next,
+        prev,
         pauseTurnAt: (val: number) => {
           turnProgress.stopAnimation();
           isTurningLocked.current = true;
@@ -260,37 +265,44 @@ export function PavilionBookReader({
         },
       };
     }
-  }, [currentSpread, spreads.length, goToSpread, turnPage, turnProgress]);
+  }, [currentSpread, spreads.length, focusSide, closeUp, goToSpread, next, prev, turnProgress]);
 
-  // Keyboard navigation on web
+  // Keyboard navigation (web)
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') turnPage(1);
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') turnPage(-1);
+      if (!interactive) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') nav.current.next();
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') nav.current.prev();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [turnPage]);
+  }, [interactive]);
 
-  // Render individual page surface
+  const busy = !!turning || panning || !interactive;
+
+  // Render individual page surface (always at the reference paper size; placed and scaled by its wrapper)
   const renderPageSurface = (
     page: PageData | null,
     side: 'left' | 'right',
-    interactive: boolean,
+    pageInteractive: boolean,
     isTurningLeaf = false
   ) => {
     const isLeft = side === 'left';
-    const thisPageWidth = compact ? pageWidth : (isLeft ? leftPageWidth : rightPageWidth);
+    // Close up, only the page being read carries the arrows; with two pages, the left page ‹ and the right page ›.
+    const showControls = pageInteractive && (closeUp ? side === focusSide : true);
+    const showPrev = showControls && canPrev && (closeUp || isLeft);
+    const showNext = showControls && canNext && (closeUp || !isLeft);
 
     return (
       <View
-        testID={isLeft ? 'reflection-left-page' : 'reflection-right-page'}
+        testID={isTurningLeaf ? undefined : (isLeft ? 'reflection-left-page' : 'reflection-right-page')}
+        {...(pageInteractive ? swipe.panHandlers : {})}
         style={[
           styles.pageSurface,
-          { width: thisPageWidth, height: pageHeight },
-          compact ? styles.compactPageBackground : (isLeft ? styles.leftPageCorners : styles.rightPageCorners),
+          { width: PW, height: PH },
+          isLeft ? styles.leftPageCorners : styles.rightPageCorners,
           isTurningLeaf && (isLeft ? styles.leftPageShadow : styles.rightPageShadow),
         ]}
       >
@@ -298,40 +310,26 @@ export function PavilionBookReader({
         <Image source={parchment} style={StyleSheet.absoluteFill} resizeMode="stretch" />
 
         {/* Central gutter spine crease shading */}
-        {!compact && (
-          <View
-            pointerEvents="none"
-            style={[styles.spineFoldShading, isLeft ? styles.spineFoldLeft : styles.spineFoldRight]}
-          />
-        )}
+        <View
+          pointerEvents="none"
+          style={[styles.spineFoldShading, isLeft ? styles.spineFoldLeft : styles.spineFoldRight]}
+        />
 
         {/* Outer fore-edge vignette */}
-        {!compact && (
-          <View
-            pointerEvents="none"
-            style={[styles.foreEdgeVignette, isLeft ? styles.foreEdgeLeft : styles.foreEdgeRight]}
-          />
-        )}
+        <View
+          pointerEvents="none"
+          style={[styles.foreEdgeVignette, isLeft ? styles.foreEdgeLeft : styles.foreEdgeRight]}
+        />
 
         {/* The unified decorative gold border */}
         <View
           pointerEvents="none"
-          style={[
-            styles.decorativeGoldBorder,
-            compact ? { left: 16, right: 16 } : (isLeft ? styles.leftGoldBorder : styles.rightGoldBorder),
-          ]}
+          style={[styles.decorativeGoldBorder, isLeft ? styles.leftGoldBorder : styles.rightGoldBorder]}
         />
 
         {/* Content container inside the decorative frame */}
         {page ? (
-          <View
-            style={[
-              styles.pageInnerContainer,
-              compact
-                ? ((bookId === 'collection' || bookId === 'notes') ? styles.pageInnerCompactCollection : styles.pageInnerCompact)
-                : (isLeft ? styles.pageInnerLeft : styles.pageInnerRight),
-            ]}
-          >
+          <View style={[styles.pageInnerContainer, isLeft ? styles.pageInnerLeft : styles.pageInnerRight]}>
             {/* Header / Eyebrow */}
             {(page.eyebrow || page.header) && (
               <View style={styles.pageHeader}>
@@ -342,69 +340,45 @@ export function PavilionBookReader({
             )}
 
             {/* Page Body Content */}
-            <View style={styles.pageBodyContent}>
-              {page.render(interactive)}
+            <View testID="reflection-page-body" style={styles.pageBodyContent}>
+              {page.render(pageInteractive)}
             </View>
 
             {/* Subtle Page Footer & Number */}
-            <View style={styles.pageFooter}>
-              {(isLeft || compact) && currentSpread > 0 && (
+            <View testID="reflection-page-footer" style={styles.pageFooter}>
+              {showPrev ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={locale === 'zh-Hans' ? '上一页' : 'Previous page'}
                   hitSlop={12}
-                  onPress={() => turnPage(-1)}
+                  disabled={busy}
+                  onPress={prev}
                   style={styles.navArrowBtn}
                 >
                   <Text style={styles.arrowSymbol}>‹</Text>
                 </Pressable>
-              )}
+              ) : null}
               <Text style={styles.pageNumberText}>
                 {locale === 'zh-Hans' ? `第 ${page.pageNumber} 页` : `— ${page.pageNumber} —`}
               </Text>
-              {(!isLeft || compact) && currentSpread < maxSpread && (
+              {showNext ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={locale === 'zh-Hans' ? '下一页' : 'Next page'}
                   hitSlop={12}
-                  onPress={() => turnPage(1)}
+                  disabled={busy}
+                  onPress={next}
                   style={styles.navArrowBtn}
                 >
                   <Text style={styles.arrowSymbol}>›</Text>
                 </Pressable>
-              )}
+              ) : null}
             </View>
           </View>
         ) : (
           <View style={[styles.pageInnerContainer, styles.blankPageContainer]}>
             <Image source={botanical} style={styles.blankPageWatermark} resizeMode="contain" />
           </View>
-        )}
-
-        {/* Tap zones on outer edges */}
-        {interactive && (
-          <>
-            {isLeft && currentSpread > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={locale === 'zh-Hans' ? '向前翻页' : 'Turn page back'}
-                onPress={() => turnPage(-1)}
-                style={styles.leftEdgeTapZone}
-              >
-                <View style={styles.edgeHintTab}><Text style={styles.edgeHintArrow}>‹</Text></View>
-              </Pressable>
-            )}
-            {!isLeft && currentSpread < maxSpread && !(compact && bookId === 'collection') && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={locale === 'zh-Hans' ? '向后翻页' : 'Turn page forward'}
-                onPress={() => turnPage(1)}
-                style={styles.rightEdgeTapZone}
-              >
-                <View style={styles.edgeHintTab}><Text style={styles.edgeHintArrow}>›</Text></View>
-              </Pressable>
-            )}
-          </>
         )}
       </View>
     );
@@ -441,284 +415,228 @@ export function PavilionBookReader({
     outputRange: [0, 0.75, 0.75, 0],
   });
 
+  // The reading camera on the book layer: zoom by s about (ox, oy). The layer fills the screen and scales about its
+  // centre, hence the translation. The painting behind is not in this layer, so it never moves.
+  const cameraStyle = useAnimatedStyle(() => {
+    const c = camera.value;
+    return { transform: [
+      { translateX: (c.ox - screen.width / 2) * (1 - c.s) },
+      { translateY: (c.oy - screen.height / 2) * (1 - c.s) },
+      { scale: c.s },
+    ] };
+  }, [screen.width, screen.height]);
+
+  // Close-up chrome (put-back, bookmarks, volumes) stays at screen size beside the page being read.
+  const sideWindows = screenChrome ? { l: reading.left.window, r: reading.right.window } : null;
+  const chromeStyle = useAnimatedStyle(() => {
+    if (!sideWindows) return { opacity: 1 };
+    const u = Math.min(1, Math.max(0, (side.value + 1) / 2)), { l, r } = sideWindows;
+    const x = l.x + (r.x - l.x) * u, y = l.y + (r.y - l.y) * u;
+    return { left: x, top: y, width: l.width, height: l.height, opacity: Math.min(1, Math.max(0, (zoom.value - .8) / .2)) };
+  }, [sideWindows]);
+
+  const leftLeaf = leaves.left, rightLeaf = leaves.right;
+  const pageInteractive = (s: 'left' | 'right') => !busy && (!closeUp || s === focusSide);
+  const bookTop = Math.min(leftLeaf.y, rightLeaf.y), bookHeight = Math.max(leftLeaf.height, rightLeaf.height);
+  const chromeSide = screenChrome && reading.chrome === 'side';
+
+  const putBack = (
+    <Pressable
+      testID="reflection-put-back"
+      accessibilityRole="button"
+      accessibilityLabel={locale === 'zh-Hans' ? '把书放回书架' : 'Put the book back on the shelf'}
+      disabled={busy}
+      onPress={onClose}
+      hitSlop={10}
+      style={[styles.closeBookBtn, screenChrome
+        ? { right: 4, top: 4 }
+        : { left: rightLeaf.x + rightLeaf.width - 28, top: bookTop + 4 }]}
+    >
+      <Text style={styles.closeBookBtnText}>✕</Text>
+    </Pressable>
+  );
+
+  const bookmarkTabs = (bookId === 'collection' || bookId === 'notes') && (() => {
+    const isNotes = bookId === 'notes';
+    const tabs = isNotes ? INSTRUCTION_BOOKMARK_CATEGORIES : BOOKMARK_CATEGORIES;
+    const row = screenChrome && !chromeSide;
+    return (
+      <View
+        testID="reflection-bookmarks"
+        pointerEvents={busy ? 'none' : 'box-none'}
+        style={[
+          styles.bookmarksContainer,
+          row ? [styles.bookmarksRow, { left: 0, right: 0, bottom: '100%' }]
+            : screenChrome ? [styles.bookmarksDesktop, { top: 22 }]
+            : [styles.bookmarksDesktop, { left: rightLeaf.x + rightLeaf.width, top: bookTop + Math.max(22, (bookHeight - tabs.length * 42) / 2) }],
+        ]}
+      >
+        {tabs.map((tab) => {
+          const isActive = activeCategoryId === tab.id;
+          const tabLabel = typeof tab.label === 'string' ? tab.label : (tab.label[locale] ?? tab.label.en);
+          return (
+            <Pressable
+              key={tab.id}
+              testID={`reflection-bookmark-${tab.id}`}
+              accessibilityRole="tab"
+              accessibilityLabel={locale === 'zh-Hans' ? `书签：${tabLabel}` : `Bookmark ${tabLabel}`}
+              accessibilityState={{ selected: isActive }}
+              hitSlop={{ top: 3, bottom: 3, left: 4, right: 8 }}
+              onPress={() => handleBookmarkClick(tab.id)}
+              style={[
+                styles.bookmarkTab,
+                isNotes && styles.instructionBookmarkTab,
+                row ? styles.bookmarkTabRow : styles.bookmarkTabDesktop,
+                isActive && (isNotes ? styles.instructionBookmarkTabActiveDesktop : styles.bookmarkTabActiveDesktop),
+              ]}
+            >
+              <View
+                style={[
+                  styles.tabAccentLine,
+                  isNotes && styles.instructionTabAccentLine,
+                  isActive && (isNotes ? styles.instructionTabAccentLineActive : styles.tabAccentLineActive),
+                  row && styles.tabAccentLineRow,
+                ]}
+              />
+              <Text
+                style={[
+                  styles.bookmarkTabText,
+                  isNotes && styles.instructionBookmarkTabText,
+                  row ? styles.bookmarkTabTextRow : styles.bookmarkTabTextDesktop,
+                  isActive && (isNotes ? styles.instructionBookmarkTabTextActive : styles.bookmarkTabTextActive),
+                ]}
+                numberOfLines={1}
+              >
+                {tabLabel}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  })();
+
+  // Book Chapter / Ribbon Navigation for Weekly/Monthly
+  const volumes = (bookId === 'weekly' || bookId === 'monthly') && reports.length > 1 && (
+    <View
+      pointerEvents={busy ? 'none' : 'box-none'}
+      style={[
+        styles.chapterRibbonBar,
+        chromeSide ? styles.chapterRibbonColumn
+          : screenChrome ? { left: 8, bottom: '100%', marginBottom: 6 }
+          : { left: leftLeaf.x + 20, top: bookTop - 26 },
+      ]}
+    >
+      <Text style={styles.chapterRibbonLabel}>
+        {locale === 'zh-Hans' ? '往期回看:' : 'Volumes:'}
+      </Text>
+      {reports.slice(0, 5).map(rep => {
+        const isSelected = selectedReport?.id === rep.id;
+        let title = rep.periodKey;
+        if (rep.type === 'weekly') {
+          title = weekLabel(rep.periodKey, locale).title;
+        } else if (rep.type === 'monthly') {
+          const match = rep.periodKey.match(/(\d{4})-(\d{2})/);
+          if (match) {
+            title = locale === 'zh-Hans'
+              ? `${Number(match[1])}年${Number(match[2])}月`
+              : new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          }
+        }
+        return (
+          <Pressable
+            key={rep.id}
+            disabled={busy}
+            onPress={() => { onSelectReport(rep); setSpreadIndex(0); if (closeUp && focusSide !== 'left') { setFocusSide('left'); moveCamera('left', 0); } }}
+            style={[styles.chapterPill, isSelected && styles.chapterPillActive]}
+          >
+            <Text style={[styles.chapterPillText, isSelected && styles.chapterPillTextActive]}>
+              {title}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
   return (
-    <View style={[styles.readerRoot, { width: readingRect.width, height: pageHeight }]}>
-      {/* Left Page (Resting) */}
-      {!compact && (
-        <View style={{ position: 'absolute', left: 0, top: 0, width: leftPageWidth, height: pageHeight }}>
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      <ReAnimated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, cameraStyle]}>
+        {/* Left Page (Resting) */}
+        <View pointerEvents={pageInteractive('left') ? 'auto' : 'none'} style={onLeaf(leftLeaf)}>
           {renderPageSurface(
             turning ? (isBackwards ? targetSpread?.left ?? null : activeSpread.left) : activeSpread.left,
             'left',
-            !turning,
-            false
+            pageInteractive('left'),
           )}
         </View>
-      )}
 
-      {/* Right Page (Resting) */}
-      <View style={{ position: 'absolute', left: rightPageOffset, top: 0, width: rightPageWidth, height: pageHeight }}>
-        {renderPageSurface(
-          turning ? (isBackwards ? activeSpread.right : targetSpread?.right ?? null) : activeSpread.right,
-          compact ? 'left' : 'right',
-          !turning,
-          false
+        {/* Right Page (Resting) */}
+        <View pointerEvents={pageInteractive('right') ? 'auto' : 'none'} style={onLeaf(rightLeaf)}>
+          {renderPageSurface(
+            turning ? (isBackwards ? activeSpread.right : targetSpread?.right ?? null) : activeSpread.right,
+            'right',
+            pageInteractive('right'),
+          )}
+        </View>
+
+        {/* 3D Physical Turning Leaf: hinged at the spine (the right leaf's inner edge), on the book's own geometry */}
+        {turning && (
+          <View pointerEvents="none" style={[styles.turningLeafWrapper, onLeaf(rightLeaf)]}>
+            <Animated.View
+              testID="reflection-turning-leaf"
+              accessible={false}
+              aria-hidden
+              style={{
+                position: 'absolute', left: 0, top: 0, width: PW, height: PH,
+                ...(Platform.OS === 'web' ? { transformStyle: 'preserve-3d' as const } : {}),
+                transform: [
+                  { perspective: PW * 7 },
+                  { translateX: -PW / 2 },
+                  { rotateY },
+                  { translateX: PW / 2 },
+                ],
+              }}
+            >
+              {/* Front of the turning leaf (Current spread right page) */}
+              <Animated.View style={[StyleSheet.absoluteFill, { backfaceVisibility: 'hidden', opacity: frontOpacity }]}>
+                {renderPageSurface(isBackwards ? targetSpread?.right ?? null : activeSpread.right, 'right', false, true)}
+              </Animated.View>
+
+              {/* Back of the turning leaf (Next spread left page, rotated 180deg) */}
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { backfaceVisibility: 'hidden', opacity: backOpacity, transform: [{ rotateY: '180deg' }] },
+                ]}
+              >
+                {renderPageSurface(isBackwards ? activeSpread.left : targetSpread?.left ?? null, 'left', false, true)}
+                {/* Backside paper tint */}
+                <View style={[StyleSheet.absoluteFill, styles.backsidePaperTint]} />
+              </Animated.View>
+
+              {/* Specular Ridge Highlight */}
+              <Animated.View style={[styles.ridgeHighlight, { opacity: foldHighlightOpacity }]} />
+
+              {/* Dynamic cast shadow across page */}
+              <Animated.View style={[StyleSheet.absoluteFill, styles.movingLeafShadow, { opacity: dynamicShadowOpacity }]} />
+            </Animated.View>
+          </View>
         )}
-      </View>
 
-      {/* 3D Physical Turning Leaf */}
-      {turning && (
-        <Animated.View
-          testID="reflection-turning-leaf"
-          pointerEvents="none"
-          accessible={false}
-          aria-hidden
-          style={[
-            styles.turningLeafWrapper,
-            {
-              position: 'absolute',
-              left: rightPageOffset,
-              top: 0,
-              width: rightPageWidth,
-              height: pageHeight,
-              ...(Platform.OS === 'web' ? { transformStyle: 'preserve-3d' as const } : {}),
-              transform: [
-                { perspective: rightPageWidth * 7 },
-                { translateX: -rightPageWidth / 2 },
-                { rotateY },
-                { translateX: rightPageWidth / 2 },
-              ],
-            },
-          ]}
-        >
-          {/* Front of the turning leaf (Current spread right page) */}
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { backfaceVisibility: 'hidden', opacity: frontOpacity },
-            ]}
-          >
-            {renderPageSurface(
-              isBackwards ? targetSpread?.right ?? null : activeSpread.right,
-              'right',
-              false,
-              true
-            )}
-          </Animated.View>
+        {/* Two pages: the book's own put-back, bookmarks and volumes, as on the desktop */}
+        {!screenChrome && putBack}
+        {!screenChrome && bookmarkTabs}
+        {!screenChrome && volumes}
+      </ReAnimated.View>
 
-          {/* Back of the turning leaf (Next spread left page, rotated 180deg) */}
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backfaceVisibility: 'hidden',
-                opacity: backOpacity,
-                transform: [{ rotateY: '180deg' }],
-              },
-            ]}
-          >
-            {renderPageSurface(
-              isBackwards ? activeSpread.left : targetSpread?.left ?? null,
-              'left',
-              false,
-              true
-            )}
-            {/* Backside paper tint */}
-            <View style={[StyleSheet.absoluteFill, styles.backsidePaperTint]} />
-          </Animated.View>
-
-          {/* Specular Ridge Highlight */}
-          <Animated.View
-            style={[
-              styles.ridgeHighlight,
-              { opacity: foldHighlightOpacity },
-            ]}
-          />
-
-          {/* Dynamic cast shadow across page */}
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.movingLeafShadow,
-              { opacity: dynamicShadowOpacity },
-            ]}
-          />
-        </Animated.View>
-      )}
-
-      {/* Put back button (Close book and return to shelf) */}
-      <Pressable
-        testID="reflection-put-back"
-        accessibilityRole="button"
-        accessibilityLabel={locale === 'zh-Hans' ? '把书放回书架' : 'Put the book back on the shelf'}
-        disabled={!!turning}
-        onPress={onClose}
-        hitSlop={10}
-        style={[
-          styles.closeBookBtn,
-          {
-            left: readingRect.width - (compact ? 36 : 28),
-            top: 4,
-          },
-        ]}
-      >
-        <Text style={styles.closeBookBtnText}>✕</Text>
-      </Pressable>
-
-      {/* 8 Physical Bookmarks along the outer right edge for Flower Language Collection */}
-      {bookId === 'collection' && (
-        <View
-          testID="reflection-bookmarks"
-          pointerEvents={turning ? 'none' : 'box-none'}
-          style={[
-            styles.bookmarksContainer,
-            compact ? styles.bookmarksCompact : styles.bookmarksDesktop,
-            {
-              top: compact
-                ? Math.max(14, (pageHeight - 8 * 34) / 2)
-                : Math.max(22, (pageHeight - 8 * 42) / 2),
-            },
-          ]}
-        >
-          {BOOKMARK_CATEGORIES.map((tab) => {
-            const isActive = activeCategoryId === tab.id;
-            const tabLabel = typeof tab.label === 'string' ? tab.label : (tab.label[locale] ?? tab.label.en);
-            return (
-              <Pressable
-                key={tab.id}
-                testID={`reflection-bookmark-${tab.id}`}
-                accessibilityRole="tab"
-                accessibilityLabel={locale === 'zh-Hans' ? `书签：${tabLabel}` : `Bookmark ${tabLabel}`}
-                accessibilityState={{ selected: isActive }}
-                hitSlop={
-                  compact
-                    ? { top: 2, bottom: 2, left: 4, right: 6 }
-                    : { top: 3, bottom: 3, left: 4, right: 8 }
-                }
-                onPress={() => handleBookmarkClick(tab.id)}
-                style={[
-                  styles.bookmarkTab,
-                  compact ? styles.bookmarkTabCompact : styles.bookmarkTabDesktop,
-                  isActive && (compact ? styles.bookmarkTabActiveCompact : styles.bookmarkTabActiveDesktop),
-                ]}
-              >
-                <View
-                  style={[
-                    styles.tabAccentLine,
-                    compact && styles.tabAccentLineCompact,
-                    isActive && styles.tabAccentLineActive,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.bookmarkTabText,
-                    compact ? styles.bookmarkTabTextCompact : styles.bookmarkTabTextDesktop,
-                    isActive && styles.bookmarkTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {tabLabel}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      {/* 7 Physical Bookmarks along the outer right edge for Instruction Book */}
-      {bookId === 'notes' && (
-        <View
-          testID="reflection-bookmarks"
-          pointerEvents={turning ? 'none' : 'box-none'}
-          style={[
-            styles.bookmarksContainer,
-            compact ? styles.bookmarksCompact : styles.bookmarksDesktop,
-            {
-              top: compact
-                ? Math.max(14, (pageHeight - 7 * 34) / 2)
-                : Math.max(22, (pageHeight - 7 * 42) / 2),
-            },
-          ]}
-        >
-          {INSTRUCTION_BOOKMARK_CATEGORIES.map((tab) => {
-            const isActive = activeCategoryId === tab.id;
-            const tabLabel = typeof tab.label === 'string' ? tab.label : (tab.label[locale] ?? tab.label.en);
-            return (
-              <Pressable
-                key={tab.id}
-                testID={`reflection-bookmark-${tab.id}`}
-                accessibilityRole="tab"
-                accessibilityLabel={locale === 'zh-Hans' ? `书签：${tabLabel}` : `Bookmark ${tabLabel}`}
-                accessibilityState={{ selected: isActive }}
-                hitSlop={
-                  compact
-                    ? { top: 2, bottom: 2, left: 4, right: 6 }
-                    : { top: 3, bottom: 3, left: 4, right: 8 }
-                }
-                onPress={() => handleBookmarkClick(tab.id)}
-                style={[
-                  styles.bookmarkTab,
-                  styles.instructionBookmarkTab,
-                  compact ? styles.bookmarkTabCompact : styles.bookmarkTabDesktop,
-                  isActive && (compact ? styles.instructionBookmarkTabActiveCompact : styles.instructionBookmarkTabActiveDesktop),
-                ]}
-              >
-                <View
-                  style={[
-                    styles.tabAccentLine,
-                    styles.instructionTabAccentLine,
-                    compact && styles.tabAccentLineCompact,
-                    isActive && styles.instructionTabAccentLineActive,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.bookmarkTabText,
-                    styles.instructionBookmarkTabText,
-                    compact ? styles.bookmarkTabTextCompact : styles.bookmarkTabTextDesktop,
-                    isActive && styles.instructionBookmarkTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {tabLabel}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Book Chapter / Ribbon Navigation for Weekly/Monthly */}
-      {(bookId === 'weekly' || bookId === 'monthly') && reports.length > 1 && (
-        <View style={styles.chapterRibbonBar}>
-          <Text style={styles.chapterRibbonLabel}>
-            {locale === 'zh-Hans' ? '往期回看:' : 'Volumes:'}
-          </Text>
-          {reports.slice(0, 5).map(rep => {
-            const isSelected = selectedReport?.id === rep.id;
-            let title = rep.periodKey;
-            if (rep.type === 'weekly') {
-              title = weekLabel(rep.periodKey, locale).title;
-            } else if (rep.type === 'monthly') {
-              const match = rep.periodKey.match(/(\d{4})-(\d{2})/);
-              if (match) {
-                title = locale === 'zh-Hans'
-                  ? `${Number(match[1])}年${Number(match[2])}月`
-                  : new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-              }
-            }
-            return (
-              <Pressable
-                key={rep.id}
-                onPress={() => { onSelectReport(rep); setSpreadIndex(0); }}
-                style={[styles.chapterPill, isSelected && styles.chapterPillActive]}
-              >
-                <Text style={[styles.chapterPillText, isSelected && styles.chapterPillTextActive]}>
-                  {title}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      {/* Close up: the same controls, at screen size, around the page being read */}
+      {screenChrome && (
+        <ReAnimated.View testID="reflection-reading-window" pointerEvents="box-none" style={[{ position: 'absolute' }, chromeStyle]}>
+          {putBack}
+          {bookmarkTabs}
+          {volumes}
+        </ReAnimated.View>
       )}
     </View>
   );
@@ -1678,11 +1596,16 @@ const styles = StyleSheet.create({
   },
   chapterRibbonBar: {
     position: 'absolute',
-    top: -26,
-    left: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  chapterRibbonColumn: {
+    left: '100%',
+    top: 8,
+    marginLeft: 8,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   chapterRibbonLabel: {
     fontFamily: 'Georgia',
@@ -1719,6 +1642,30 @@ const styles = StyleSheet.create({
   bookmarksDesktop: {
     left: '100%',
     width: 76,
+  },
+  bookmarksRow: {
+    flexDirection: 'row',
+    gap: 3,
+    marginBottom: 2,
+  },
+  // Close up on a narrow screen the bookmarks stand up from the head of the page, their accent along the top.
+  tabAccentLineRow: {
+    left: '30%',
+    right: '30%',
+    top: 3,
+    bottom: 'auto',
+    width: 'auto',
+    height: 2,
+  },
+  bookmarkTabRow: {
+    flex: 1,
+    width: 'auto',
+    height: 28,
+    paddingTop: 4,
+    paddingHorizontal: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
   },
   bookmarksCompact: {
     right: 2,
@@ -1787,6 +1734,10 @@ const styles = StyleSheet.create({
   bookmarkTabTextDesktop: {
     fontSize: 10,
     letterSpacing: 0.15,
+  },
+  bookmarkTabTextRow: {
+    fontSize: 9,
+    letterSpacing: -0.2,
   },
   bookmarkTabTextCompact: {
     fontSize: 7.5,
