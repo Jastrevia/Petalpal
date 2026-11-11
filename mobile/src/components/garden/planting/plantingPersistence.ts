@@ -3,14 +3,18 @@ import { FlowerPlacement } from './placementValidator';
 import type { FlowerMessage } from './flowerDetailData';
 import { nativeSecurityEnabled } from '../../../services/nativeSecurity';
 import { createReloadObservation } from '../../../services/nativeSecurityHarness/reloadObservation';
+import { scopeEventDraft } from '../../../services/eventDraft';
+import { scopeMailbox } from '../../../services/mailbox';
 
 export interface FlowerPlacementRecord extends FlowerPlacement {
   supportCount: number;
   sourceType?: import('../../../services/garden').FlowerSource;
   dailyCheckInId?: string;
-  /** SERVER: planted, spot saved on the server. LOCAL: planted earlier, spot only on this device.
-   * FALLBACK: not planted yet, shown at a preview spot. */
-  placementOrigin?: 'SERVER' | 'LOCAL' | 'FALLBACK';
+  /** SERVER: planted, spot persisted on the server.
+   * LOCAL: planted earlier with its spot only on this device (or in the local no-backend Garden).
+   * UNPLANTED: the owner's Event flower with no spot yet; never drawn, has no coordinates.
+   * FALLBACK: an older non-Event flower with no spot, shown at a preview spot on its month's grass. */
+  placementOrigin?: 'SERVER' | 'LOCAL' | 'UNPLANTED' | 'FALLBACK';
   variant?: string;
   rarity?: string;
   growthState?: string;
@@ -26,9 +30,9 @@ export interface FlowerPlacementRecord extends FlowerPlacement {
   messages?: FlowerMessage[];
 }
 
-/** An Event flower that has no spot yet: it joins the Garden only when its owner plants it with ✓. */
-export function awaitsPlanting(flower: Pick<FlowerPlacementRecord, 'placementOrigin' | 'sourceType'>) {
-  return flower.placementOrigin === 'FALLBACK' && flower.sourceType === 'EVENT';
+/** An Event flower with no spot yet: it joins the Garden only when its owner plants it with ✓ (Plant). */
+export function awaitsPlanting(flower: Pick<FlowerPlacementRecord, 'placementOrigin'>) {
+  return flower.placementOrigin === 'UNPLANTED';
 }
 
 // PetalPal private-store registry: placements include derived emotions/details.
@@ -144,6 +148,7 @@ async function eraseKey(key: string) {
 // Each activation starts fresh, including after process restart/failed cleanup.
 export function scopeFlowerPlacements(owner: string | null): Promise<boolean> {
   const outgoing = activeOwner;
+  scopeEventDraft(owner); scopeMailbox(owner);
   activeOwner = owner; generation++; storageReady = false; memoryPlacementsStore = null;
   if (nativeSecurityEnabled) cleanupResult = null;
   const session = capturePlacementSession();
@@ -262,6 +267,7 @@ let memoryPlacementsStore: FlowerPlacementRecord[] | null = null;
 let previewPlacements: FlowerPlacementRecord[] | null = null;
 export function setPreviewPlacementMemory(owner: string | null) {
   if (!__DEV__) return;
+  scopeEventDraft(owner); scopeMailbox(owner);
   activeOwner = owner; generation++; memoryPlacementsStore = null;
   previewPlacements = owner ? [] : null;
   storageReady = Boolean(owner);

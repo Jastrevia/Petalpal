@@ -13,6 +13,7 @@ export async function socialCorpus(t, { prisma, replace, send, rawSend }) {
     { id: 'header-request', senderId: 'carol', receiverId: 'content', status: 'pending' },
   ];
   const flower = { id: 'bob-flower', userId: 'bob', gardenId: 'garden-bob', supportCount: 0, messages: [],
+    worldX: 1100, worldY: 900, regionId: 'Land09',
     event: 'social-private-canary', generationSeed: 'social-private-canary',
     dailyCheckIn: { journal: { content: 'social-private-canary' } } };
   const visits = [];

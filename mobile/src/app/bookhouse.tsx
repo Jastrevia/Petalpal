@@ -20,7 +20,7 @@ import {
 import { readEvent } from '../services/events';
 import { loadGardenPlacements } from '../components/garden/planting/gardenHydration';
 import { loadFlowerSource } from '../components/garden/planting/flowerDetailApi';
-import { loadFlowerPlacements, type FlowerPlacementRecord } from '../components/garden/planting/plantingPersistence';
+import { awaitsPlanting, loadFlowerPlacements, type FlowerPlacementRecord } from '../components/garden/planting/plantingPersistence';
 import { ICONS, ParchmentButton, RoundButton, TitlePlaque, TreehouseBackdrop } from '../components/bookhouse/TreehouseArt';
 import { measureBook, shelfLayout, TreehouseShelf, type ShelfRect, type ShelfSlot } from '../components/bookhouse/TreehouseShelf';
 import { MonthBook, type BookMode, type ClosedTo } from '../components/bookhouse/MonthBook';
@@ -533,7 +533,8 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
   const load = useCallback(async () => { setLoading(true); setError(''); try {
     const [records, placements] = await Promise.all([loadGardenPlacements(userId, userId, timezone), loadFlowerPlacements()]);
     const plantedDates = new Map(placements.map(p => [p.flowerId, p.plantedDate]));
-    setFlowers(records.map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
+    // Flower History lists planted flowers; one not planted yet (a draft) is not part of it.
+    setFlowers(records.filter(flower => !awaitsPlanting(flower)).map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
       ? plantedDates.get(flower.flowerId) || flower.plantedDate : flower.plantedDate })).sort((a, b) => b.plantedDate.localeCompare(a.plantedDate)));
   } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); } }, [userId, timezone]);
   useEffect(() => { void load(); return () => { version.current++; }; }, [load]);

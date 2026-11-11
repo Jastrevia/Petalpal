@@ -341,7 +341,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const activeModeRef = useRef(activeMode);
   // The month being planted (planting only), for taps and the camera.
   const plantingMonth = activeMode === 'planting' ? targetFlower?.month ?? null : null;
-  const plantingMonthRef = useRef(plantingMonth); plantingMonthRef.current = plantingMonth;
   const onOpenEventsRef = useRef(onOpenEvents); onOpenEventsRef.current = onOpenEvents;
   const perfFixtureRef=useRef(false);perfFixtureRef.current=fixtureParents!==null;
   const placementsRef = useRef(placements);

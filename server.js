@@ -83,6 +83,7 @@ import {
   withOnboardingGuideFairy,
   nextUnlockableFairy
 } from "./lib/fairy-config.js";
+import { installMailbox } from "./lib/mailbox.js";
 import { OnboardingTutorialError, onboardingTutorialState, updateOnboardingTutorial } from "./lib/onboarding-tutorial.js";
 import { monthFromLocalDate, normalizeProgress } from "./lib/fairy-progress.js";
 import { resolveDailyFlowerEmotion } from "./lib/daily-flower-input.js";
@@ -793,6 +794,7 @@ async function getGardenResponse(userId, { includePrivate = false, viewerUserId 
 
 
 installCommunityPolicy(app, prisma);
+installMailbox(app, { db: prisma });
 installAiOutputReporting(app, prisma);
 app.get("/ai/disclosure", (_req,res) => res.json(aiDisclosure()));
 installSocialSafety(app, { db: prisma, realtime, clearVisitors: async (tx, a, b) => {
