@@ -250,7 +250,10 @@ paths:
     get:
       tags: [Garden]
       summary: Get a user's garden
-      description: Private journal/emotion data is included only for the garden owner.
+      description: >-
+        Private journal/emotion data is included only for the garden owner. Visitors receive planted
+        flowers only (a persisted spot in worldX/worldY/regionId); a flower that has not been planted
+        yet is never sent to them. The owner's flowers carry worldX/worldY null until planted.
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:

@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { CLUSTER_FOOTPRINT_RADIUS, LAND_CLUSTER_SIZE, plantFlowerOnce } from "../../lib/flower-placement.js";
+import { CLUSTER_FOOTPRINT_RADIUS, LAND_CLUSTER_SIZE, plantFlowerOnce, plantedSpot } from "../../lib/flower-placement.js";
+import { historyFlowerMetadata } from "../../lib/history-metadata.js";
 
 // In-memory Flower rows behind the same calls the module makes inside its transaction.
 function fakeDatabase(rows) {
@@ -12,7 +13,7 @@ function fakeDatabase(rows) {
     flower: {
       findFirst: async ({ where }) => rows.find(row => row.id === where.id && row.userId === where.userId) ?? null,
       findMany: async ({ where }) => rows.filter(row => row.userId === where.userId && row.regionId === where.regionId
-        && row.worldX !== null && row.id !== where.NOT.id),
+        && row.id !== where.NOT.id),
       updateMany: async ({ where, data }) => {
         const row = rows.find(item => item.id === where.id && item.userId === where.userId && item.worldX === null);
         if (!row) return { count: 0 };
@@ -75,6 +76,46 @@ test("clusters on the same land keep their spacing", async () => {
   await assert.rejects(plantFlowerOnce(db, { userId: "owner", flowerId: "b", body: { worldX: 1000 + 2 * r - 2, worldY: 900, landId: "Land04" } }),
     { status: 409, code: "TOO_CLOSE" });
   assert.equal((await plantFlowerOnce(db, { userId: "owner", flowerId: "b", body: { worldX: 1000 + 2 * r, worldY: 900, landId: "Land04" } })).created, true);
+});
+
+test("planted means a persisted spot; nothing else is ever read as a position", () => {
+  assert.deepEqual(plantedSpot({ worldX: 10, worldY: 20, regionId: "Land03" }), { worldX: 10, worldY: 20, landId: "Land03" });
+  // An unplanted flower has no position, whatever its legacy left/top columns hold.
+  assert.equal(plantedSpot({ worldX: null, worldY: null, regionId: null, left: 400, top: 560, layoutVersion: 1 }), null);
+  assert.equal(plantedSpot({ worldX: null, worldY: null, regionId: "Land04", left: 400, top: 560, layoutVersion: 1 }), null);
+  // Legacy layoutVersion 2 rows kept a confirmed spot in left/top: read explicitly, only when valid.
+  assert.deepEqual(plantedSpot({ worldX: null, regionId: "Land04", left: 400, top: 560, layoutVersion: 2 }), { worldX: 400, worldY: 560, landId: "Land04" });
+  assert.equal(plantedSpot({ worldX: null, regionId: null, left: 400, top: 560, layoutVersion: 2 }), null);
+  assert.equal(plantedSpot({ worldX: null, regionId: "Land04", left: 5000, top: 560, layoutVersion: 2 }), null);
+  // The owner's Garden metadata reads the same spot (never left/top) as a visitor.
+  const unplanted = historyFlowerMetadata({ id: "x", worldX: null, worldY: null, regionId: null, left: 400, top: 560, layoutVersion: 1 });
+  assert.deepEqual([unplanted.worldX, unplanted.worldY, Object.hasOwn(unplanted, "left")], [null, null, false]);
+  const legacy = historyFlowerMetadata({ id: "y", worldX: null, worldY: null, regionId: "Land04", left: 400, top: 560, layoutVersion: 2 });
+  assert.deepEqual([legacy.worldX, legacy.worldY, legacy.regionId], [400, 560, "Land04"]);
+});
+
+test("a legacy layoutVersion 2 spot stays put and keeps neighbours apart", async () => {
+  const r = CLUSTER_FOOTPRINT_RADIUS[LAND_CLUSTER_SIZE[4]];
+  const rows = [flower("old", { regionId: "Land04", left: 1000, top: 900, layoutVersion: 2 }), flower("new")];
+  const db = fakeDatabase(rows);
+  const same = await plantFlowerOnce(db, { userId: "owner", flowerId: "old", body: { worldX: 1000, worldY: 900, landId: "Land04" } });
+  assert.equal(same.created, false);
+  await assert.rejects(plantFlowerOnce(db, { userId: "owner", flowerId: "old", body: { worldX: 1100, worldY: 900, landId: "Land04" } }),
+    { status: 409, code: "PLACEMENT_LOCKED" });
+  await assert.rejects(plantFlowerOnce(db, { userId: "owner", flowerId: "new", body: { worldX: 1000 + r, worldY: 900, landId: "Land04" } }),
+    { status: 409, code: "TOO_CLOSE" });
+});
+
+test("a new flower is never given a default, random or generated position", () => {
+  const source = fs.readFileSync(new URL("../../server.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /getNonOverlappingPosition/);
+  // Every Flower create writes only the fixed legacy columns, never a spot.
+  const creates = source.match(/flower\.(create|upsert)\(\{[\s\S]*?\n\s*\}\);/g) || [];
+  assert.ok(creates.length >= 2);
+  for (const create of creates) {
+    assert.match(create, /UNPLACED_LEGACY_COLUMNS/);
+    assert.doesNotMatch(create, /worldX|worldY|placedAt|Math\.random/);
+  }
 });
 
 test("server cluster sizes match the app's land rule", () => {

@@ -21,7 +21,9 @@ const COPY = {
 };
 
 export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: FlowerPlacementRecord) => void }) {
-  const { placements, isGardenLoading, gardenError } = usePlanting();
+  // Planted flowers and the owner's not-yet-planted ones (tapping one of those starts planting it).
+  const { placements: planted, unplantedFlowers, isGardenLoading, gardenError } = usePlanting();
+  const placements = useMemo(() => [...planted, ...unplantedFlowers], [planted, unplantedFlowers]);
   const { light } = usePanelTheme();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();

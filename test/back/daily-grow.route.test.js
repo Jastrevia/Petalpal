@@ -256,8 +256,12 @@ test("Daily Grow route preserves the Month 1 vertical-slice contract", async (t)
     );
 
     const socialGarden = await api(baseUrl, `/users/${owner.id}/garden`, { token: "friend-token" });
-    const socialFlower = socialGarden.body.flowers[0];
     assert.equal(socialGarden.status, 200);
+    assert.deepEqual(socialGarden.body.flowers, [], 'Unplanted flowers are invisible to visitors');
+    Object.assign(state.flower, { worldX: 1100, worldY: 900, regionId: 'Land09' });
+    const plantedGarden = await api(baseUrl, `/users/${owner.id}/garden`, { token: "friend-token" });
+    assert.equal(plantedGarden.status, 200);
+    const socialFlower = plantedGarden.body.flowers[0];
     for (const field of ["event", "generationSeed", "dailyCheckInId", "dailyCheckIn", "emotionResult"]) {
       assert.equal(Object.hasOwn(socialFlower, field), false);
     }

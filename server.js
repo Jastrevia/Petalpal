@@ -710,37 +710,10 @@ async function ensureGarden(userId, database = prisma) {
 
   return garden;
 }
-function getNonOverlappingPosition(existingFlowers) {
-    const gardenWidth = 700;
-    const flowerWidth = 100;
-    const grassStart = 520;
-    const grassEnd = 640;
-  
-    let left = 0;
-    let top = 0;
-    let tries = 0;
-    let overlapping = true;
-  
-    while (overlapping && tries < 100) {
-      left = Math.random() * (gardenWidth - flowerWidth);
-      top = grassStart + Math.random() * (grassEnd - grassStart);
-  
-      overlapping = existingFlowers.some((flower) => {
-        const flowerLeft = Number(flower.left);
-        const flowerTop = Number(flower.top);
-  
-        return (
-          Math.abs(left - flowerLeft) < 90 &&
-          Math.abs(top - flowerTop) < 90
-        );
-      });
-  
-      tries += 1;
-    }
-  
-    return { left, top };
-  }
-  
+// Flower.left / Flower.top are the old web Garden's columns (NOT NULL, layoutVersion 1). A new
+// flower has no Garden spot until its owner confirms one with Plant (lib/flower-placement.js),
+// so it is never given a default, random or generated position.
+const UNPLACED_LEGACY_COLUMNS = Object.freeze({ left: 0, top: 0 });
 
 async function getGardenResponse(userId, { includePrivate = false, viewerUserId = userId, database = prisma } = {}) {
   const user = await getUser(userId, database);
@@ -2526,7 +2499,7 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
       const garden = await ensureGarden(event.ownerId, database);
       const recentFlowers = await database.flower.findMany({
         where: { userId: event.ownerId }, orderBy: { createdAt: "desc" }, take: 5,
-        select: { name: true, left: true, top: true }
+        select: { name: true }
       });
       const chosen = previewEventFlower({
         userId: event.ownerId, localDate: event.localDate, primaryGardenMood,
@@ -2540,7 +2513,7 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
           img: chosen.img, speciesCode: chosen.speciesCode, colorAccent: chosen.colorAccent,
           visualEffect: chosen.visualEffect, season: chosen.season, generationSeed: chosen.generationSeed,
           variant: chosen.variant, rarity: chosen.rarity, growthState: chosen.growthState,
-          ...getNonOverlappingPosition(recentFlowers), userId: event.ownerId,
+          ...UNPLACED_LEGACY_COLUMNS, userId: event.ownerId,
           gardenId: garden.id, sourceEventId: event.id
         }
       });
@@ -3460,15 +3433,6 @@ app.post("/users/:userId/flowers", aiRateLimit, async (req, res) => {
       });
     }
 
-    const existingFlowers = await prisma.flower.findMany({
-      where: {
-        gardenId: garden.id,
-      },
-      select: { left: true, top: true },
-      orderBy: { createdAt: "desc" },
-      take: 1000
-    });
-
     const recentFlowers = await prisma.flower.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -3510,9 +3474,6 @@ const fairyEvent = resolveFairyEvent({
   distinctCheckInCount,
   newFlowerRarity: chosen.rarity
 });
-
-const position =
-  getNonOverlappingPosition(existingFlowers);
 
 const createdFlower = await prisma.$transaction(async (tx) => {
   if (!(await reserveFlowerPlanting(tx, { userId: user.id, localDate })).granted) return null;
@@ -3557,8 +3518,7 @@ const createdFlower = await prisma.$transaction(async (tx) => {
       name: chosen.name,
       meaning: chosen.meaning,
       img: chosen.img,
-      left: position.left,
-      top: position.top,
+      ...UNPLACED_LEGACY_COLUMNS,
       supportCount: 0,
       variant: chosen.variant,
       rarity: chosen.rarity,

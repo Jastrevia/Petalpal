@@ -36,12 +36,17 @@ export function OnboardingGardenLayer({ camera, onOpenTreehouse }: { camera: Gar
   const active = tourRunning(tour) && Boolean(tour.step && STEP_SPECS[tour.step]);
 
   // Synchronize Garden planting mode with the active onboarding step: never leave planting
-  // controls active when the tutorial moves off `plant.place` or ends.
+  // controls active when the tutorial moves off `plant.place` or ends. Outside the tutorial this
+  // layer leaves planting alone: an owner planting an Event flower is not the tour's to cancel.
+  const tourPlanting = active && tour.step === 'plant.place';
+  const wasTourPlanting = useRef(tourPlanting);
   useEffect(() => {
-    if ((!active || tour.step !== 'plant.place') && planting.activeMode !== 'normal') {
+    const leftTourPlanting = wasTourPlanting.current && !tourPlanting;
+    wasTourPlanting.current = tourPlanting;
+    if ((leftTourPlanting || (active && !tourPlanting)) && planting.activeMode !== 'normal') {
       planting.cancelPlacement();
     }
-  }, [active, tour.step, planting.activeMode, planting.cancelPlacement]);
+  }, [active, tourPlanting, planting.activeMode, planting.cancelPlacement]);
 
   useEffect(() => {
     if (active && (tour.step === 'plant.growth' || tour.step === 'plant.months')) {

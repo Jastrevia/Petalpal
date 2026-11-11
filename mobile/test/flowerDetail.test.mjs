@@ -82,6 +82,7 @@ function modalHarness(overrides = {}, events = { readEvent: async () => { throw 
     './PlantingContext': { usePlanting: () => value }, 'react-native': native,
     './plantingRegionData': monthData, '../../../services/events': events,
     '../../../services/locale': { useAppLocale: () => locale },
+    '../../services/locale': { useAppLocale: () => locale },
   });
   const Modal = load('FlowerDetailModal').default;
   hooks.mount(() => Modal());
@@ -781,4 +782,166 @@ test('an Event that cannot be read shows a short note instead of failing', async
   button(hooks.render(), 'View Event ▾').props.onPress();
   await hooks.flush();
   assert.ok(textContent(hooks.render()).includes('This Event can’t be opened right now.'));
+});
+
+// ---- Message reactions toggle, and deleting a message you left -------------------------------
+const reply = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
+function reactionHarness(server) {
+  const hooks = hookHarness();
+  const load = loadPlantingModules(undefined, hooks.react, undefined, true, { fetch: server });
+  load('../../../services/api').configureApi({ apiBaseUrl: '', getAccessToken: async () => 'token' });
+  const { useMessageReactions } = load('../../../services/messageReactions');
+  hooks.mount(() => useMessageReactions(['m1']));
+  return hooks;
+}
+// A fake of PUT /messages/:id/reaction with the server's rules (one reaction per person).
+function reactionServer(start = { likes: 3, mine: null }) {
+  let state = { ...start }; const puts = []; let fail = false; let hold = null;
+  const fetch = async (url, init = {}) => {
+    if (url.startsWith('/messages/reactions')) return reply({ reactions: { m1: state } });
+    puts.push(JSON.parse(init.body).kind);
+    if (hold) await hold;
+    if (fail) return reply({ error: 'Temporary failure' }, 503);
+    const kind = JSON.parse(init.body).kind;
+    state = { likes: state.likes - (state.mine === 'LIKE' ? 1 : 0) + (kind === 'LIKE' ? 1 : 0), mine: kind };
+    return reply(state);
+  };
+  return { fetch, puts, get state() { return state; }, failNext(v = true) { fail = v; }, holdWith(p) { hold = p; } };
+}
+
+test('reactions toggle: none→like→none, none→dislike→none, like↔dislike, counts follow', async () => {
+  const server = reactionServer();
+  const hooks = reactionHarness(server.fetch);
+  let state = await hooks.flush();
+  assert.deepEqual(plain(state.reactions.m1), { likes: 3, mine: null });
+  const step = async (action, expected) => { await action(state); state = await hooks.flush(); assert.deepEqual(plain(state.reactions.m1), expected); };
+  await step(s => s.toggle('m1', 'LIKE'), { likes: 4, mine: 'LIKE' });        // 1. none → like
+  await step(s => s.toggle('m1', 'LIKE'), { likes: 3, mine: null });          // 2. like → none
+  await step(s => s.react('m1', 'DISLIKE'), { likes: 3, mine: 'DISLIKE' });   // 3. none → dislike (after its reason)
+  await step(s => s.react('m1', null), { likes: 3, mine: null });             // 4. dislike → none
+  await step(s => s.toggle('m1', 'LIKE'), { likes: 4, mine: 'LIKE' });
+  await step(s => s.react('m1', 'DISLIKE'), { likes: 3, mine: 'DISLIKE' });   // 5. like → dislike
+  await step(s => s.toggle('m1', 'LIKE'), { likes: 4, mine: 'LIKE' });        // 6. dislike → like
+  assert.deepEqual(server.puts, ['LIKE', null, 'DISLIKE', null, 'LIKE', 'DISLIKE', 'LIKE']);
+});
+
+test('rapid taps send one request; a failed change is undone and says so subtly', async () => {
+  const server = reactionServer({ likes: 1, mine: null });
+  const hooks = reactionHarness(server.fetch);
+  let state = await hooks.flush();
+  const gate = deferred(); server.holdWith(gate.promise);
+  const first = state.toggle('m1', 'LIKE');
+  state = await hooks.flush();
+  assert.deepEqual(plain(state.reactions.m1), { likes: 2, mine: 'LIKE' }, 'shown at once');
+  assert.equal(state.busy.m1, true);
+  for (let i = 0; i < 5; i++) { state.toggle('m1', 'LIKE'); state.react('m1', 'DISLIKE'); } // 7. rapid taps
+  gate.resolve(); server.holdWith(null); await first; state = await hooks.flush();
+  assert.deepEqual(server.puts, ['LIKE'], 'only one request while one was on its way');
+  assert.deepEqual(plain(state.reactions.m1), { likes: 2, mine: 'LIKE' });
+  server.failNext();                                                            // 8. API failure → rollback
+  await state.toggle('m1', 'LIKE'); state = await hooks.flush();
+  assert.deepEqual(plain(state.reactions.m1), { likes: 2, mine: 'LIKE' }, 'the optimistic removal is undone');
+  assert.equal(state.failed, 'm1');
+  server.failNext(false);
+  await state.toggle('m1', 'LIKE'); state = await hooks.flush();
+  assert.deepEqual(plain(state.reactions.m1), { likes: 1, mine: null });
+  assert.equal(state.failed, null);
+});
+
+test('the message list: toggle buttons show the selection, Delete only on my own messages, Cancel deletes nothing', async () => {
+  const toggles = [], reacts = [], deletes = [];
+  const messages = [
+    { id: 'theirs', author: 'Petal', authorUserId: 'friend', text: 'You are doing well' },
+    { id: 'mine', author: 'Visitor', authorUserId: 'visitor', text: 'Lovely flower' },
+    { id: 'legacy', author: 'Old friend', text: 'No author id' },
+  ];
+  const reactionsStub = { useMessageReactions: () => ({ reactions: { theirs: { likes: 2, mine: 'DISLIKE' } }, busy: {}, failed: 'theirs',
+    toggle: (...args) => { toggles.push(args); }, react: (...args) => { reacts.push(args); } }),
+    deleteOwnMessage: async () => { throw new Error('not via the modal'); } };
+  const value = {
+    selectedFlower: placement, selectedFlowerIsOwner: false, currentUserId: 'visitor',
+    flowerDetailSource: { ...source, messages }, isDetailLoading: false, isDetailWorking: false, detailError: '',
+    closeFlowerDetail() {}, supportFlower() {}, leaveMessage: async () => true, deleteSelectedFlower: async () => true,
+    deleteMessage: async (id) => { deletes.push(id); return ''; },
+  };
+  const hooks = hookHarness(() => value);
+  const native = Object.fromEntries(['Image', 'Modal', 'Pressable', 'ScrollView', 'Text', 'TextInput', 'View'].map((name) => [name, name]));
+  native.StyleSheet = { create: (styles) => styles, absoluteFill: {} };
+  const load = loadPlantingModules(undefined, hooks.react, undefined, true, {
+    './PlantingContext': { usePlanting: () => value }, 'react-native': native, './plantingRegionData': monthData,
+    '../../../services/locale': { useAppLocale: () => 'en' }, '../../../services/messageReactions': reactionsStub,
+  });
+  const Modal = load('FlowerDetailModal').default;
+  let tree = hooks.mount(() => Modal());
+  const nodes = () => elements(tree);
+  const byTest = id => nodes().filter(node => node.props?.testID === id);
+  // Reactions only on other people's messages; Delete only on mine (not on one with no author id).
+  assert.equal(byTest('message-like').length, 2);
+  assert.equal(byTest('message-delete').length, 1);
+  byTest('message-like')[0].props.onPress();
+  assert.deepEqual(toggles, [['theirs', 'LIKE']]);
+  // My current dislike is shown selected; tapping it removes it directly (no reason sheet).
+  const dislikeTrigger = nodes().find(node => node.props?.trigger)?.props.trigger(() => { throw new Error('no sheet'); });
+  assert.equal(dislikeTrigger.props.accessibilityState.selected, true);
+  assert.equal(dislikeTrigger.props.accessibilityLabel, 'Remove your dislike');
+  dislikeTrigger.props.onPress();
+  assert.deepEqual(reacts, [['theirs', null]]);
+  assert.ok(nodes().some(node => node.props?.accessibilityRole === 'alert' && textContent(node).includes('Couldn’t update your reaction')));
+  // Delete asks first; Cancel deletes nothing.
+  const dialog = () => nodes().find(node => node.props?.visible !== undefined && node.props?.onDelete && node.props?.error !== undefined && !node.props.flowerName && node.props.visible !== false && node.type?.name === 'DeleteMessageDialog');
+  assert.equal(dialog(), undefined);
+  byTest('message-delete')[0].props.onPress(); tree = await hooks.flush();
+  assert.ok(dialog(), 'the confirmation opens');
+  dialog().props.onCancel(); tree = await hooks.flush();
+  assert.equal(dialog(), undefined); assert.deepEqual(deletes, []);
+  byTest('message-delete')[0].props.onPress(); tree = await hooks.flush();
+  await dialog().props.onDelete(); tree = await hooks.flush();
+  assert.deepEqual(deletes, ['mine']);
+  assert.equal(dialog(), undefined, 'closes once the server has deleted it');
+  // The confirmation text and buttons.
+  const copy = load('DeleteFlowerDialog').DELETE_MESSAGE_COPY.en;
+  assert.deepEqual([copy.title, copy.cancel, copy.delete], ['Delete this message? This action cannot be undone.', 'Cancel', 'Delete']);
+});
+
+test('provider: only my own message is deleted, it leaves the view after the server deletes it, and a live delete removes it too', async () => {
+  const hooks = hookHarness();
+  const calls = { deleted: [] };
+  let onMessageDeleted, failDelete = false;
+  const messages = [
+    { id: 'mine', author: 'Visitor', authorUserId: 'visitor', text: 'Lovely flower' },
+    { id: 'theirs', author: 'Petal', authorUserId: 'friend', text: 'Keep growing' },
+    { id: 'gone-live', author: 'Petal', authorUserId: 'friend', text: 'Soon deleted' },
+  ];
+  const load = loadPlantingModules(memoryStorage(), hooks.react, undefined, true, {
+    './flowerDetailApi': {
+      loadFlowerSession: async () => null, loadFlowerSource: async () => ({ ...source, messages }),
+      giveFlowerSupport: async () => source, leaveFlowerMessage: async () => source, deleteSourceFlower: async () => {},
+      subscribeToFlowerUpdates: (_owner, _flower, _update, deleted) => { onMessageDeleted = deleted; return () => {}; },
+    },
+    '../../../services/messageReactions': { deleteOwnMessage: async (id) => { calls.deleted.push(id); if (failDelete) throw new Error('Message not found'); return { success: true }; } },
+    './approvedPlantingMasks': { getApprovedMonthCentroid: () => ({ x: 100, y: 100 }) },
+    './placementValidator': { validateFlowerPlacement: () => ({ isValid: true }) },
+    './plantingRegionData': monthData,
+  });
+  const Provider = load('PlantingContext').PlantingProvider;
+  const props = { children: null, gardenOwnerUserId: 'owner', session: { user: { id: 'visitor', name: 'Visitor' } } };
+  hooks.mount(() => { const wrapper = Provider(props); return wrapper.type(wrapper.props).props.value; });
+  let current = await hooks.flush();
+  current.openFlowerDetail(placement); current = await hooks.flush();
+  const ids = () => current.flowerDetailSource.messages.map(message => message.id);
+  assert.deepEqual(ids(), ['mine', 'theirs', 'gone-live']);
+  // Someone else's message: refused before any request.
+  assert.match(await current.deleteMessage('theirs'), /Only the person who left this message/);
+  assert.deepEqual(calls.deleted, []);
+  // A failed delete keeps the message and reports the error.
+  failDelete = true;
+  assert.equal(await current.deleteMessage('mine'), 'Message not found'); current = await hooks.flush();
+  assert.deepEqual(ids(), ['mine', 'theirs', 'gone-live']);
+  failDelete = false;
+  assert.equal(await current.deleteMessage('mine'), ''); current = await hooks.flush();
+  assert.deepEqual(ids(), ['theirs', 'gone-live']);
+  assert.deepEqual(calls.deleted, ['mine', 'mine']);
+  // Its author deleted a message elsewhere: the open view drops it.
+  onMessageDeleted('gone-live'); current = await hooks.flush();
+  assert.deepEqual(ids(), ['theirs']);
 });

@@ -474,7 +474,9 @@ test('planting Cancel works before save, during save (ignoring late save respons
   assert.equal(await current.confirmPlacement(), false);
   current = await hooks.flush();
   assert.equal(current.activeMode, 'planting');
-  assert.equal(current.validationResult?.isValid, false);
+  // A failed save keeps the valid preview (Plant can be retried) and shows the error.
+  assert.equal(current.validationResult?.isValid, true);
+  assert.equal(current.placementNotice?.kind, 'error');
   current.cancelPlacement();
   current = await hooks.flush();
   assert.equal(current.activeMode, 'normal');
@@ -588,10 +590,54 @@ test('step changes and preview jumps exit planting mode and transition Event -> 
   store.dispatchOnboarding({ type: 'gardenFocused' });
   assert.equal(store.onboardingState().step, 'mailbox');
 
-  // Verify OnboardingGardenLayer source guarantees cancelPlacement when step !== 'plant.place'
-  const gardenLayerSource = read('components/onboarding/OnboardingGardenLayer.tsx');
-  assert.match(gardenLayerSource, /if \(\(!active \|\| tour\.step !== 'plant\.place'\) && planting\.activeMode !== 'normal'\)/);
-  assert.match(gardenLayerSource, /planting\.cancelPlacement\(\)/);
+});
+
+// P0 regression: the tour layer is always mounted in the Garden. It cancelled every planting
+// outside the tour (an Event's Plant entered planting and was cancelled at once). It may only end
+// planting that belongs to the tour: when the tour leaves plant.place / ends, or while the tour
+// runs on another step.
+test('the tour layer never cancels an owner planting outside the tour, and still ends tour planting', () => {
+  const hooks = hookHarness();
+  let tour = { phase: 'completed', step: 'done' };
+  let planting = { activeMode: 'normal' };
+  let cancels = 0;
+  const stub = () => null;
+  const load = loadPlantingModules(undefined, hooks.react, undefined, true, {
+    'react-native': { Image: 'Image', Text: 'Text', View: 'View', StyleSheet: { create: styles => styles, absoluteFill: {} } },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
+    '../bond/keepsakeArt': { KEEPSAKE_ART: {} },
+    '../garden/planting/PlantingContext': { usePlanting: () => planting },
+    './onboardingStore': { useOnboarding: () => tour, dispatchOnboarding() {},
+      tourRunning: value => value.phase === 'active' && value.step !== 'done' },
+    './FairyFinale': { FairyFinale: stub }, './FairyIntro': { FairyIntro: stub },
+    './MonthLabels': { MonthLabels: stub, monthLabelAnchors: () => [] },
+    './OnboardingGuide': { OnboardingGuide: stub, serif: 'serif' },
+    './OnboardingStepView': { OnboardingStepView: stub, useTourLocale: () => 'en' },
+    './onboardingTargets': { useOnboardingTargetRect: () => null },
+  });
+  const { OnboardingGardenLayer } = load('../../onboarding/OnboardingGardenLayer');
+  const camera = { fit: 0, viewport: { width: 0, height: 0 }, baseX: 0, baseY: 0, animateTo: async () => true };
+  const render = () => hooks.render();
+  const set = (nextTour, mode) => {
+    tour = nextTour;
+    planting = { activeMode: mode, cancelPlacement: () => { cancels++; }, refreshGarden: async () => {} };
+  };
+  set(tour, 'normal');
+  hooks.mount(() => OnboardingGardenLayer({ camera, onOpenTreehouse() {} }));
+  // Tour finished: the owner taps Plant on an Event, planting starts and stays.
+  set({ phase: 'completed', step: 'done' }, 'planting'); render(); render();
+  assert.equal(cancels, 0, 'Planting outside the tour is never cancelled by the tour layer');
+  set({ phase: 'idle', step: 'intro.name' }, 'planting'); render();
+  assert.equal(cancels, 0);
+  // The tour's own planting step: kept while on plant.place …
+  set({ phase: 'active', step: 'plant.place' }, 'planting'); render();
+  assert.equal(cancels, 0);
+  // … and ended when the tour moves on or ends.
+  set({ phase: 'active', step: 'plant.growth' }, 'planting'); render();
+  assert.equal(cancels, 1);
+  set({ phase: 'active', step: 'plant.place' }, 'planting'); render();
+  set({ phase: 'completed', step: 'done' }, 'planting'); render();
+  assert.equal(cancels, 2, 'Ending the tour on plant.place ends its planting');
 });
 
 test('per-user onboarding persistence: new accounts start at intro, returning completed stay completed, incomplete resumes safe step, users are isolated', async () => {

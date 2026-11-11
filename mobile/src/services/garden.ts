@@ -66,12 +66,18 @@ export async function loadGarden(ownerId: string, viewerId: string): Promise<Gar
 }
 
 // Plants the owner's flower at its spot, once. The server refuses any later move (409).
+// Returns the spot as the server persisted it: that, not the local preview, is the flower's spot.
 export interface FlowerSpot { worldX: number; worldY: number; landId: string }
 export async function plantFlowerSpot(ownerId: string, flowerId: string, spot: FlowerSpot): Promise<FlowerSpot> {
   const saved = await apiRequest<Partial<FlowerSpot>>(`/users/${encodeURIComponent(ownerId)}/flowers/${encodeURIComponent(flowerId)}/placement`,
     'POST', { worldX: spot.worldX, worldY: spot.worldY, landId: spot.landId });
   if (saved.worldX !== spot.worldX || saved.worldY !== spot.worldY || saved.landId !== spot.landId) throw new Error('Unable to save this flower’s spot. Try again.');
-  return spot;
+  return { worldX: saved.worldX, worldY: saved.worldY, landId: saved.landId };
+}
+/** The month (1–12) of a Garden land id such as "Land04"; null for anything else. */
+export function landMonth(landId: string | null | undefined): number | null {
+  const match = /^Land(0[1-9]|1[0-2])$/.exec(typeof landId === 'string' ? landId : '');
+  return match ? Number(match[1]) : null;
 }
 
 // Who came by the owner's Garden: the server keeps the latest 30 visit records with the

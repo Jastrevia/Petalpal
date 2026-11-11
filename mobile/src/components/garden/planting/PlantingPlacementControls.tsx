@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { onboardingTarget } from '../../onboarding/onboardingTargets';
-import { usePlanting } from './PlantingContext';
+import { PLANTING_AREA_MESSAGE, usePlanting } from './PlantingContext';
 import { MONTH_REGION_METAS } from './plantingRegionData';
 import { clusterFootprintRadius } from './flowerClusters';
 import { useAppLocale } from '../../../services/locale';
@@ -35,6 +35,8 @@ function zhFeedback(text: string) {
     'This flower belongs in another month’s land': '这朵花属于另一个月的土地。',
     'This flower is already planted. Its spot can’t change.': '这朵花已经种下了，位置不能再改。',
     'Unable to plant here. Try again.': '没能种在这里，请再试一次。',
+    [PLANTING_AREA_MESSAGE]: '这里不能种花。请在这个月花园的草地上选一个位置。',
+    'Unable to save this flower’s spot. Try again.': '没能保存这朵花的位置，请再试一次。',
   };
   const month = text.match(/^This flower belongs in the (\w+) garden\.$/);
   if (month) {
@@ -86,6 +88,7 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
     confirmPlacement,
     cancelPlacement,
     showPlacementDebug,
+    placementNotice,
   } = usePlanting();
   const zh = useAppLocale() === 'zh-Hans';
 
@@ -97,8 +100,13 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   const monthName = zh ? ZH_MONTHS[targetFlower.month - 1] ?? `${targetFlower.month} 月` : meta?.monthName || `Month ${targetFlower.month}`;
 
   const isValid = validationResult?.isValid ?? false;
-  // Nothing is planted until ✓: first a tap on the lawn shows the ghost there.
-  const feedback = !previewCoords || !validationResult?.userFeedback
+  // Nothing is planted until ✓: first a tap on the lawn shows the ghost there. An invalid tap or a
+  // failed save shows its message here and changes nothing else (the valid ghost and ✓ stay).
+  const warning = Boolean(placementNotice) || Boolean(previewCoords && !isValid);
+  const retry = placementNotice?.kind === 'error' && previewCoords && isValid
+    ? (zh ? ' 再点 ✓ 重试。' : ' Tap ✓ to try again.') : '';
+  const feedback = placementNotice ? `${zh ? zhFeedback(placementNotice.message) : placementNotice.message}${retry}`
+    : !previewCoords || !validationResult?.userFeedback
     ? (zh ? `点一下${monthName}花园里你想种的地方。` : `Tap the spot in the ${monthName} garden where it should grow.`)
     : isValid ? (zh ? '点 ✓ 就种在这里。' : 'Tap ✓ to plant it here.')
     : zh ? zhFeedback(validationResult.userFeedback) : validationResult.userFeedback;
@@ -119,13 +127,15 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
         <View
           style={[
             styles.feedbackPill,
-            previewCoords && !isValid && styles.feedbackInvalid,
+            warning && styles.feedbackInvalid,
           ]}
         >
           <Text
+            accessibilityRole={placementNotice ? 'alert' : undefined}
+            accessibilityLiveRegion="polite"
             style={[
               styles.feedbackText,
-              previewCoords && !isValid && styles.feedbackTextInvalid,
+              warning && styles.feedbackTextInvalid,
             ]}
           >
             {feedback}

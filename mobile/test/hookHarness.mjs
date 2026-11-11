@@ -28,6 +28,11 @@ export function hookHarness(context = () => null) {
       if (!slots[i] || changed(slots[i].deps, deps)) slots[i] = { value: fn, deps };
       return slots[i].value;
     },
+    useMemo(fn, deps) {
+      const i = cursor++;
+      if (!slots[i] || changed(slots[i].deps, deps)) slots[i] = { value: fn(), deps };
+      return slots[i].value;
+    },
     useEffect(fn, deps) {
       const i = cursor++;
       const previous = slots[i];

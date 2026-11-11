@@ -279,16 +279,6 @@ export type GardenSceneProps = {
   renderOverlay?: (camera: GardenCameraApi) => import('react').ReactNode;
 };
 
-// Whether a tap is on (or within a finger's reach of) a month's lawn.
-const NEAR_LAWN = 30;
-function nearLawn(month: number, x: number, y: number) {
-  if (isOnMonthLawn(month, { x, y })) return true;
-  for (let i = 0; i < 8; i++) {
-    const a = i * Math.PI / 4;
-    if (isOnMonthLawn(month, { x: x + Math.cos(a) * NEAR_LAWN, y: y + Math.sin(a) * NEAR_LAWN })) return true;
-  }
-  return false;
-}
 // The month whose lawn is at (x, y), when that lawn has flowers.
 function plantedLawnAt(placements: readonly { month: number }[], x: number, y: number) {
   const months = new Set(placements.map(p => p.month));
@@ -344,7 +334,6 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const activeModeRef = useRef(activeMode);
   // The month being planted (planting only), for taps and the camera.
   const plantingMonth = activeMode === 'planting' ? targetFlower?.month ?? null : null;
-  const plantingMonthRef = useRef(plantingMonth); plantingMonthRef.current = plantingMonth;
   const onOpenEventsRef = useRef(onOpenEvents); onOpenEventsRef.current = onOpenEvents;
   const perfFixtureRef=useRef(false);perfFixtureRef.current=fixtureParents!==null;
   const placementsRef = useRef(placements);
@@ -1156,9 +1145,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     if(perfFixtureRef.current)return;
     if (activeModeRef.current !== 'normal') {
       if (readOnly) return;
-      // Planting zooms in on the month's lawn: a tap well away from it leaves planting.
-      const month = plantingMonthRef.current;
-      if (month !== null && !(typeof onboardingActive === 'function' && onboardingActive()) && !nearLawn(month, worldX, worldY)) { cancelPlacement(); return; }
+      // Every tap while planting only chooses a preview. A tap off this month's grass (road,
+      // water, objects, another month) stays in planting and shows why; only Cancel leaves.
       updatePreview(worldX, worldY);
     } else {
       const currentPlacements = placementsRef.current;

@@ -3,14 +3,16 @@ import { FlowerPlacement } from './placementValidator';
 import type { FlowerMessage } from './flowerDetailData';
 import { nativeSecurityEnabled } from '../../../services/nativeSecurity';
 import { createReloadObservation } from '../../../services/nativeSecurityHarness/reloadObservation';
+import { scopeEventDraft } from '../../../services/eventDraft';
 
 export interface FlowerPlacementRecord extends FlowerPlacement {
   supportCount: number;
   sourceType?: import('../../../services/garden').FlowerSource;
   dailyCheckInId?: string;
-  /** SERVER: planted, spot saved on the server. LOCAL: planted earlier, spot only on this device.
-   * FALLBACK: not planted yet, shown at a preview spot. */
-  placementOrigin?: 'SERVER' | 'LOCAL' | 'FALLBACK';
+  /** SERVER: planted, spot persisted on the server (the only spot a backend Garden draws).
+   * LOCAL: planted in the local (no-backend) Garden on this device.
+   * UNPLANTED: the owner's flower with no persisted spot yet; never drawn, has no coordinates. */
+  placementOrigin?: 'SERVER' | 'LOCAL' | 'UNPLANTED';
   variant?: string;
   rarity?: string;
   growthState?: string;
@@ -26,9 +28,9 @@ export interface FlowerPlacementRecord extends FlowerPlacement {
   messages?: FlowerMessage[];
 }
 
-/** An Event flower that has no spot yet: it joins the Garden only when its owner plants it with ✓. */
-export function awaitsPlanting(flower: Pick<FlowerPlacementRecord, 'placementOrigin' | 'sourceType'>) {
-  return flower.placementOrigin === 'FALLBACK' && flower.sourceType === 'EVENT';
+/** A flower with no persisted spot: it joins the Garden only when its owner plants it with ✓ (Plant). */
+export function awaitsPlanting(flower: Pick<FlowerPlacementRecord, 'placementOrigin'>) {
+  return flower.placementOrigin === 'UNPLANTED';
 }
 
 // PetalPal private-store registry: placements include derived emotions/details.
@@ -144,6 +146,7 @@ async function eraseKey(key: string) {
 // Each activation starts fresh, including after process restart/failed cleanup.
 export function scopeFlowerPlacements(owner: string | null): Promise<boolean> {
   const outgoing = activeOwner;
+  scopeEventDraft(owner);
   activeOwner = owner; generation++; storageReady = false; memoryPlacementsStore = null;
   if (nativeSecurityEnabled) cleanupResult = null;
   const session = capturePlacementSession();
@@ -262,6 +265,7 @@ let memoryPlacementsStore: FlowerPlacementRecord[] | null = null;
 let previewPlacements: FlowerPlacementRecord[] | null = null;
 export function setPreviewPlacementMemory(owner: string | null) {
   if (!__DEV__) return;
+  scopeEventDraft(owner);
   activeOwner = owner; generation++; memoryPlacementsStore = null;
   previewPlacements = owner ? [] : null;
   storageReady = Boolean(owner);

@@ -236,8 +236,8 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     readOnly: false, fit: 1, selectedFlower: null, cameraZoom: { value: 1 }, cameraX: { value: 0 }, cameraY: { value: 0 }, baseX: 0, baseY: 0,
     __DEV__: false, perfFixtureRef: { current: false }, fairyStateRef: { current: 'idle' }, activeModeRef: { current: 'normal' }, placementsRef: { current: [] }, useMonthlyGrowth: true,
     hitCluster: () => null, updatePreview: () => calls.push('placement'), openFlowerDetail: () => calls.push('detail'),
-    // Planting zooms in on its month's lawn; a tap well away from it leaves planting.
-    plantingMonthRef: { current: null }, nearLawn: () => true, cancelPlacement: () => calls.push('cancel'),
+    // While planting, every tap only chooses a preview; no tap leaves planting (only Cancel does).
+    cancelPlacement: () => calls.push('cancel'),
     // A lawn with flowers opens Events (owner's Garden only).
     onOpenEventsRef: { current: () => {} }, plantedLawnAt: () => null, openLawnEvents: () => calls.push('events'),
     monthLawnOpensEvents: false, monthLawnAt: () => null, showLawnNote: () => calls.push('note'),
@@ -271,8 +271,8 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   context.monthLawnAt = () => null; context.monthLawnOpensEvents = false;
   context.hitsMailbox = () => true; context.fairyRef.current.isMailboxBusy = () => true;
   context.activeModeRef.current = 'plant'; expect(['placement']);
-  context.plantingMonthRef.current = 10; expect(['placement']);
-  context.nearLawn = () => false; expect(['cancel']); context.nearLawn = () => true; context.plantingMonthRef.current = null;
+  // Far from the lawn (road, water, another month) is still only a preview attempt, never a cancel.
+  calls.length = 0; tap(5000, -300); assert.deepEqual([...calls], ['placement']);
   context.activeModeRef.current = 'normal'; context.hitCluster = () => ({ id: 'synthetic-flower' }); expect(['detail']);
   context.selectedFlower = {}; expect([]); context.selectedFlower = null;
   context.hitCluster = () => null; expect([]);
