@@ -36,7 +36,11 @@ import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 
 import { MagicLevitationAura } from './MagicLevitationAura';
 
-import { isLetterRead, MAILBOX_LETTERS as LETTERS, markLetterRead } from './mailboxReadState';
+import { isLetterRead, mailboxLetters, markLetterRead, subscribeMailboxLetters } from './mailboxReadState';
+
+import { confirmLetterRead, deleteReadLetter, isLetterReadConfirmed, syncMailbox } from '../../services/mailbox';
+
+import { DELETE_LETTER_COPY, DeleteLetterDialog } from './DeleteLetterDialog';
 
 import type { Letter, MailboxPhase, MailboxVisualState } from './types';
 
@@ -141,7 +145,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const [letters, setLetters] = useState<Letter[]>(() =>
 
-    LETTERS.map((letter) => ({
+    mailboxLetters().map((letter) => ({
 
       ...localizedLetter(letter, locale),
 
@@ -151,7 +155,13 @@ export const MailboxPage = memo(function MailboxPage() {
 
   );
 
-  const [selectedLetterId, setSelectedLetterId] = useState<string>(LETTERS[Math.min(1, LETTERS.length - 1)].id);
+  const [selectedLetterId, setSelectedLetterId] = useState<string>(() => {
+
+    const present = mailboxLetters();
+
+    return present[Math.min(1, present.length - 1)]?.id ?? '';
+
+  });
 
   const [visualState, setVisualState] = useState<MailboxVisualState>('reading');
 
@@ -192,6 +202,30 @@ export const MailboxPage = memo(function MailboxPage() {
     );
 
   }, []);
+
+
+
+  // The owner's mailbox follows the server: letters they deleted stay gone, and what the server
+
+  // has as read is read here. (The store tells us whenever read or deleted state changes.)
+
+  useEffect(() => {
+
+    const refresh = () => setLetters(mailboxLetters().map((letter) => ({
+
+      ...localizedLetter(letter, locale),
+
+      read: isLetterRead(letter.id),
+
+    })));
+
+    const stop = subscribeMailboxLetters(refresh);
+
+    void syncMailbox();
+
+    return stop;
+
+  }, [locale]);
 
 
 
@@ -254,6 +288,94 @@ export const MailboxPage = memo(function MailboxPage() {
     [letters, selectedLetterId]
 
   );
+
+
+
+  // The open letter was deleted (here or on another device): show one that is still there.
+
+  useEffect(() => {
+
+    if (letters.length && activeIndex < 0) setSelectedLetterId(letters[0].id);
+
+  }, [letters, activeIndex]);
+
+
+
+  // A letter that is fully open has been read. Delete is offered only once the server has
+
+  // recorded that (confirmLetterRead), never from this device's say-so alone.
+
+  const openLetterId = phase === 'reading' ? activeLetter?.id : undefined;
+
+  useEffect(() => {
+
+    if (!openLetterId) return;
+
+    markLetterAsRead(openLetterId);
+
+    void confirmLetterRead(openLetterId);
+
+  }, [openLetterId, markLetterAsRead]);
+
+  const canDeleteOpenLetter = Boolean(openLetterId) && !isTransitioning && isLetterReadConfirmed(openLetterId as string);
+
+
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [deleteError, setDeleteError] = useState('');
+
+  const askDeleteOpenLetter = useCallback(() => {
+
+    if (!openLetterId) return;
+
+    setDeleteError(''); setDeleteTarget(openLetterId);
+
+  }, [openLetterId]);
+
+  const cancelDelete = useCallback(() => { setDeleteTarget(null); setDeleteError(''); }, []);
+
+  const confirmDelete = useCallback(async () => {
+
+    if (!deleteTarget || isDeleting) return;
+
+    setIsDeleting(true); setDeleteError('');
+
+    try {
+
+      const index = letters.findIndex((l) => l.id === deleteTarget);
+
+      const neighbour = letters[index + 1] ?? letters[index - 1];
+
+      // Removed from the list only once the server has deleted it.
+
+      await deleteReadLetter(deleteTarget);
+
+      clearTimers();
+
+      setPendingLetterId(null);
+
+      setSelectedLetterId(neighbour?.id ?? '');
+
+      // The letter closes: back to the resting stack of the letters that remain.
+
+      setPhase('stack'); setVisualState('holding'); setTransitionStage('idle'); setIsTransitioning(false);
+
+      setDeleteTarget(null);
+
+    } catch {
+
+      setDeleteError(DELETE_LETTER_COPY[locale].failed);
+
+    } finally {
+
+      setIsDeleting(false);
+
+    }
+
+  }, [deleteTarget, isDeleting, letters, locale]);
 
 
 
@@ -467,6 +589,8 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const handleNext = useCallback(() => {
 
+    if (!letters.length) return;
+
     const nextIdx = (activeIndex + 1) % letters.length;
 
     handleSelectLetter(letters[nextIdx].id);
@@ -476,6 +600,8 @@ export const MailboxPage = memo(function MailboxPage() {
 
 
   const handlePrev = useCallback(() => {
+
+    if (!letters.length) return;
 
     const prevIdx = (activeIndex - 1 + letters.length) % letters.length;
 
@@ -876,6 +1002,8 @@ export const MailboxPage = memo(function MailboxPage() {
 
               onPress={handleToggleState}
 
+              disabled={letters.length === 0}
+
               style={({ pressed }) => [
 
                 styles.modeToggleButton,
@@ -918,6 +1046,20 @@ export const MailboxPage = memo(function MailboxPage() {
 
             {/* Dominant Unfolded Letter (State 3) or Floating Envelopes Stack (State 1) */}
 
+            {letters.length === 0 ? (
+
+              <View testID="mailbox-empty" style={styles.paginationPill}>
+
+                <Text style={styles.paginationText}>
+
+                  {locale === 'zh-Hans' ? '信箱里现在没有信。' : 'No letters in your mailbox right now.'}
+
+                </Text>
+
+              </View>
+
+            ) : (
+
             <FloatingLetterStack
 
               letters={letters}
@@ -934,11 +1076,15 @@ export const MailboxPage = memo(function MailboxPage() {
 
               onToggleUnfold={handleToggleState}
 
+              onDeleteActive={canDeleteOpenLetter ? askDeleteOpenLetter : undefined}
+
               maxContentWidth={contentWidth}
 
               maxContentHeight={Math.min(540, windowHeight * 0.68)}
 
             />
+
+            )}
 
           </View>
 
@@ -978,7 +1124,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
             <Text style={styles.paginationText}>
 
-              — ❧ {activeIndex + 1} / {letters.length} ☙ —
+              — ❧ {letters.length ? activeIndex + 1 : 0} / {letters.length} ☙ —
 
             </Text>
 
@@ -1011,6 +1157,10 @@ export const MailboxPage = memo(function MailboxPage() {
         </View>
 
       </SafeAreaView>
+
+      <DeleteLetterDialog visible={Boolean(deleteTarget)} busy={isDeleting} error={deleteError}
+
+        onCancel={cancelDelete} onDelete={() => void confirmDelete()} />
 
     </View>
 

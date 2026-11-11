@@ -29,6 +29,8 @@ export const createEvent = (content: string, primaryGardenMood: PrimaryMood, ide
   apiRequest<EventResponse>('/events', 'POST', { content: content.trim(), primaryGardenMood },
     { headers: { 'Idempotency-Key': idempotencyKey } });
 export const readEvent = (id: string) => apiRequest<BackendEvent>(`/events/${encodeURIComponent(id)}`);
+// Deletes the owner's Event; its flower (and any report that showed it) goes with it on the server.
+export const deleteEvent = (id: string) => apiRequest<{ success: boolean }>(`/events/${encodeURIComponent(id)}`, 'DELETE');
 export async function eventFlowers(userId: string) {
   const garden = await apiRequest<{ flowers: BackendFlower[] }>(`/users/${encodeURIComponent(userId)}/garden`);
   return garden.flowers.filter((flower) => flower.sourceEventId);

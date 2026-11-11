@@ -162,6 +162,35 @@
   };
   // Events saved in this preview: each grows a flower; AI "reads" it a few seconds later.
   const ownFlowers = [], events = new Map();
+  // An Event's flower species, chosen by the server's own rules (lib/event-flower.js
+  // previewEventFlower → lib/flower-variant-config.js speciesPoolForPrimary → lib/flower-engine.js
+  // generateFlowerMetadata): the Primary mood's approved pool; the pick is seeded by
+  // sha256(`${userId}:${localDate}:${mood}:none`) and skips the owner's recent flower names.
+  // POOLS mirrors speciesPoolForPrimary(mood, data/flowerDB.js) exactly; mobile/test/previewFixtures.test.mjs
+  // fails if they drift. AI labels never change the species, only its accents.
+  const POOLS = {
+    SUNNY_BLOOM: [["SUNFLOWER","Sunflower","Happiness","🌻"],["GERBERA_DAISY","Gerbera Daisy","Cheerfulness","🌼"],["COREOPSIS","Coreopsis","Bright days","🌼"],["DAISY","Daisy","Simple joy","🌼"]],
+    GENTLE_BLOOM: [["HYDRANGEA","Hydrangea","Heartfelt thanks","💐"]],
+    QUIET_BLOOM: [["BLUEBELL","Bluebell","Gentle solitude","🪻"],["ANEMONE","Anemone","Quiet longing","🌸"],["HEATHER","Heather","Holding on","🪻"]],
+    HEALING_BLOOM: [["CHAMOMILE","Chamomile","Strength in hard times","🌼"],["SNOWDROP","Snowdrop","Hope","🤍"]],
+    FIRE_BLOOM: [["POPPY","Poppy","Burning heart","🌺"],["PETUNIA","Petunia","Restless energy","🌺"],["GENTIAN","Gentian","Standing firm","🪻"]],
+    WONDER_BLOOM: [["TULIP","Tulip","Fresh wonder","🌷"],["BIRD_OF_PARADISE","Bird of Paradise","Wonder","🌺"],["YELLOW_DAFFODIL","Yellow Daffodil","New beginnings","🌼"],["WHITE_ROSE","White Rose","An open heart","🤍"]],
+    DRIFTING_BLOOM: [["DANDELION","Dandelion","Wishes on the wind","🌼"],["ASTER","Aster","Patience","🪻"],["YELLOW_RAPESEED_FLOWER","Yellow Rapeseed Flower","Gentle drift","🌼"]],
+    PEACEFUL_BLOOM: [["LAVENDER","Lavender","Serenity","🪻"],["CHINESE_VIOLET_CRESS","Chinese Violet Cress","Quiet companionship","🪻"],["OLIVE","Olive","Peace","🫒"]],
+  };
+  async function eventFlowerSpecies(mood, localDate) {
+    const options = (POOLS[mood] || []).map(([speciesCode, name, meaning, img]) => ({ speciesCode, name, meaning, img }));
+    if (!options.length) return null;
+    const digest = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
+      .map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const seed = await digest(`${uid}:${localDate}:${mood}:none`);
+    const fraction = Number.parseInt((await digest(`species:${seed}`)).slice(0, 12), 16) / 0xffffffffffff;
+    const recentNames = [...ownFlowers].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 5).map(f => f.name);
+    const recent = new Set(recentNames.slice(0, Math.max(0, options.length - 1)));
+    const fresh = options.filter(option => !recent.has(option.name));
+    const pool = fresh.length ? fresh : options;
+    return pool[Math.floor(fraction * pool.length)];
+  }
   for (const [id, item] of Object.entries(SHORT_EVENTS)) events.set(id, { id, content: item.content, occurredAt: item.occurredAt,
     localDate: item.occurredAt.slice(0, 10), primaryGardenMood: item.mood, secondaryEmotions: [], emotionStatus: 'SKIPPED' });
   // Flowers already planted in every land (small 1-3, 5, 6; medium 4, 7-9; large 10-12), at spots
@@ -175,6 +204,11 @@
   // Today's plantings: deleting a flower never gives one back.
   let plantedToday = 0;
   const reactions = {};
+  const MAILBOX_KEY = 'petalpal-local-preview-mailbox-v1';
+  let mailbox = {};
+  try { mailbox = JSON.parse(sessionStorage.getItem(MAILBOX_KEY) || '{}') || {}; } catch { /* fine */ }
+  const saveMailbox = () => { try { sessionStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox)); } catch { /* fine */ } };
+  let messageSeq = 0;
   let consent = { aiProcessing: false, personalization: false, memoryEnabled: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' };
   const EMOTIONS = { en: ['calm', 'grateful', 'a little tired'], zh: ['平静', '感激', '有点累'] };
   window.fetch = async (input, options = {}) => {
@@ -317,7 +351,7 @@
       if (p.startsWith('/ai/future-letters/') && method === 'DELETE') { loop.letters = loop.letters.filter(l => l.id !== p.split('/').pop()); return json(true); }
       if (p === '/ai/insight-mutes' && method === 'PUT') { loop.mutes = loop.mutes.filter(w => w !== request.word); if (request.muted) loop.mutes.push(request.word); return json({ word: request.word, muted: request.muted }); }
       if (p === `/users/${friend}/flowers/ff1/support` && method === 'POST') { friendFlower.supportCount++; friendFlower.supportState = { supportedToday: true, canSupport: false }; return json(friendFlower); }
-      if (p === `/users/${friend}/flowers/ff1/message` && method === 'POST') { friendFlower.messages.push({ id: 'm' + friendFlower.messages.length, text: request.text, userId: uid, authorUserId: uid, author: user.name }); return json(friendFlower); }
+      if (p === `/users/${friend}/flowers/ff1/message` && method === 'POST') { friendFlower.messages.push({ id: 'm' + (++messageSeq), text: request.text, userId: uid, authorUserId: uid, author: user.name }); return json(friendFlower); }
       if (p === `/users/me/blocks/${friend}`) { blocked = method === 'PUT'; return json({ success: true }); }
       if (p === '/friends/request' && method === 'POST') {
         const sent = { id: 'r-' + request.receiverId, senderId: uid, receiverId: request.receiverId, status: 'pending', createdAt: new Date().toISOString(),
@@ -357,9 +391,19 @@
       if (p === '/api/redeem') return json({ redemptions });
       if (p === '/messages/reactions') return json({ reactions: Object.fromEntries((url.searchParams.get('ids') || '').split(',').map(id => [id, reactions[id] ?? { likes: 2, mine: null }])) });
       if (/^\/messages\/[^/]+\/reaction$/.test(p) && method === 'PUT') {
+        // Like lib/social-safety.js: set your one reaction (LIKE, DISLIKE) or remove it (null); never on your own message.
         const id = p.split('/')[2], before = reactions[id] ?? { likes: 2, mine: null };
-        reactions[id] = before.mine ? before : { likes: before.likes + (request.kind === 'LIKE' ? 1 : 0), mine: request.kind };
-        return json(reactions[id]);
+        if (friendFlower.messages.some(message => message.id === id && message.userId === uid)) return json({ error: 'Message is unavailable' }, 404);
+        if (![null, 'LIKE', 'DISLIKE'].includes(request.kind)) return json({ error: 'Unsupported request' }, 400);
+        reactions[id] = { likes: before.likes - (before.mine === 'LIKE' ? 1 : 0) + (request.kind === 'LIKE' ? 1 : 0), mine: request.kind };
+        return json(reactions[id], 200, 250);
+      }
+      // Like DELETE /messages/:messageId: only the message's author; anyone else gets the same 404.
+      if (/^\/messages\/[^/]+$/.test(p) && method === 'DELETE') {
+        const id = p.split('/')[2], index = friendFlower.messages.findIndex(message => message.id === id && message.userId === uid);
+        if (index < 0) return json({ error: 'Message not found' }, 404);
+        friendFlower.messages.splice(index, 1); delete reactions[id];
+        return json({ success: true, messageId: id }, 200, 300);
       }
       // Renaming, as the server: once per pet every 7 days, 1–12 characters.
       if (/^\/api\/fairy\/pets\/(puppy|maltese)\/name$/.test(p) && method === 'PUT') {
@@ -375,17 +419,45 @@
         return json({ created, locale: 'en', checkIn: { localDate: day(0), streak: 4, graceUsed: false }, awarded: created ? 2 : 0, levelUp: null,
           keepsakes: created ? [{ id: 'acorn-teacup', rarity: 'COMMON', name: 'Acorn Teacup', note: 'I saved this one for you.', reason: 'DAILY', firstTime: true }] : [] });
       }
+      // Mailbox state like lib/mailbox.js: read, then delete (only once read), for this owner only.
+      // Kept for this browser tab (sessionStorage), so a reload shows what a real server would keep.
+      if (p === '/mailbox/letters/state') return json({ read: Object.keys(mailbox).filter(id => mailbox[id] === 'read'), deleted: Object.keys(mailbox).filter(id => mailbox[id] === 'deleted') });
+      const mail = p.match(/^\/mailbox\/letters\/([^/]+)(\/read)?$/);
+      if (mail && (method === 'PUT' || method === 'DELETE')) {
+        const id = mail[1];
+        if (!/^letter-(garden-1|meadow-2|moonbed-3|friend-4|news-5)$/.test(id)) return json({ error: 'Unsupported request' }, 400);
+        if (mail[2] && method === 'PUT') {
+          if (mailbox[id] === 'deleted') return json({ error: 'Letter not found', code: 'LETTER_DELETED' }, 404);
+          mailbox[id] = 'read'; saveMailbox(); return json({ letterId: id, read: true }, 200, 600);
+        }
+        if (!mail[2] && method === 'DELETE') {
+          if (!mailbox[id]) return json({ error: 'Read this letter before deleting it', code: 'LETTER_UNREAD' }, 409);
+          mailbox[id] = 'deleted'; saveMailbox(); return json({ success: true, letterId: id }, 200, 400);
+        }
+      }
       if (p === '/events' && method === 'POST') {
         const id = 'e' + (events.size + 1), now = new Date().toISOString();
         const event = { id, content: request.content, occurredAt: now, localDate: day(0), primaryGardenMood: request.primaryGardenMood,
           secondaryEmotions: [], emotionStatus: consent.aiProcessing ? 'RUNNING' : 'SKIPPED', memoryProcessingAllowed: consent.memoryEnabled, readyAt: Date.now() + 4000 };
         events.set(id, event);
-        const flower = { id: 'f' + id, userId: uid, sourceEventId: id, name: 'Lavender', speciesCode: 'LAVENDER', mood: request.primaryGardenMood,
-          img: 'lavender.png', createdAt: now, event: '', supportCount: 0, sourceEvent: { secondaryEmotions: [] } };
+        // Like lib/flower-quota.js: a third Event in a day is still saved, it just grows no flower.
+        if (plantedToday >= 2) return json({ event, flower: null, emotion: { status: event.emotionStatus, labels: [] }, memoryJob: null,
+          dailyFlowers: { limit: 2, planted: plantedToday, limitReached: true } }, 201, 900);
+        const chosen = await eventFlowerSpecies(request.primaryGardenMood, event.localDate);
+        if (!chosen) return json({ error: 'Unsupported Primary Garden Mood' }, 400);
+        const flower = { id: 'f' + id, userId: uid, sourceEventId: id, name: chosen.name, speciesCode: chosen.speciesCode, mood: request.primaryGardenMood,
+          img: chosen.img, meaning: chosen.meaning, createdAt: now, event: '', supportCount: 0, sourceEvent: { secondaryEmotions: [] } };
         ownFlowers.unshift(flower); plantedToday++;
         return json({ event, flower, emotion: { status: event.emotionStatus, labels: [] }, memoryJob: null, dailyFlowers: { limit: 2, planted: plantedToday, limitReached: false } }, 201, 900);
       }
       const eventRead = p.match(/^\/events\/(.+)$/);
+      // Like DELETE /events/:eventId: the Event goes, and its flower with it (the daily count stays).
+      if (eventRead && method === 'DELETE') {
+        if (!events.delete(eventRead[1])) return json({ error: 'Event not found' }, 404);
+        const index = ownFlowers.findIndex(flower => flower.sourceEventId === eventRead[1]);
+        if (index >= 0) ownFlowers.splice(index, 1);
+        return json({ success: true }, 200, 300);
+      }
       if (eventRead && events.has(eventRead[1])) {
         const event = events.get(eventRead[1]);
         if (event.emotionStatus === 'RUNNING' && Date.now() >= event.readyAt) {

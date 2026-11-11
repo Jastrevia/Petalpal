@@ -59,3 +59,26 @@ const styles = StyleSheet.create({
   card: { width: '100%', maxWidth: 420, gap: 10, padding: 20, borderRadius: 18, borderWidth: 1 },
   input: { minHeight: 42, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, fontSize: 15 },
 });
+
+// Deleting a message you left: a plain confirmation in the same style (no typed phrase).
+export const DELETE_MESSAGE_COPY = {
+  en: { title: 'Delete this message? This action cannot be undone.', cancel: 'Cancel', delete: 'Delete', deleting: 'Deleting…' },
+  'zh-Hans': { title: '删除这条留言？此操作无法撤销。', cancel: '取消', delete: '删除', deleting: '正在删除…' },
+};
+export function DeleteMessageDialog({ visible, busy, error, onCancel, onDelete }: {
+  visible: boolean; busy: boolean; error?: string; onCancel: () => void; onDelete: () => void;
+}) {
+  const copy = DELETE_MESSAGE_COPY[useAppLocale()];
+  const { theme } = usePanelTheme();
+  return <Modal transparent animationType="fade" visible={visible} onRequestClose={busy ? undefined : onCancel}>
+    <View style={styles.backdrop}>
+      <Pressable accessibilityLabel={copy.cancel} style={StyleSheet.absoluteFill} onPress={busy ? undefined : onCancel} />
+      <View accessibilityViewIsModal testID="delete-message-dialog" style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text accessibilityRole="header" style={[ui.text, { color: theme.text, fontWeight: '700' }]}>{copy.title}</Text>
+        <FeatureActionButton danger title={busy ? copy.deleting : copy.delete} disabled={busy} onPress={onDelete} />
+        <FeatureActionButton secondary title={copy.cancel} disabled={busy} onPress={onCancel} />
+        {error ? <Text accessibilityRole="alert" style={[ui.text, { color: '#E0978A' }]}>{error}</Text> : null}
+      </View>
+    </View>
+  </Modal>;
+}

@@ -217,7 +217,7 @@ test('current Event displays only its canonical Flower, retains old pending flow
     return response({ flowers: [...storedFlowers].reverse() });
   }, {
     '../services/auth': { useAuth: () => ({ session }) },
-    'expo-router': { router: { navigate() {} } },
+    'expo-router': { router: { navigate() {} }, usePathname: () => '/' },
   }, hooks.react);
   api.configureApi({ apiBaseUrl: '', getAccessToken: async () => 'test-token' });
   const { useEventJournal } = load('../../../hooks/useEventJournal');
@@ -251,17 +251,18 @@ test('current Event displays only its canonical Flower, retains old pending flow
     else if (node && typeof node === 'object') { nodes.push(node); visit(node.props?.children); }
   }
   visit(panel);
-  const labels = nodes.filter(node => node.type === 'Text' && Array.isArray(node.props.children) &&
-    node.props.children[0] === 'AI emotion suggestions (not a diagnosis): ').map(node => node.props.children[1]);
-  assert.deepEqual(labels, ['fear, disappointment', 'fear, disappointment']);
-  assert.equal(nodes.some(node => node.type === 'Image' && node.props.source?.uri), false, 'Backend emoji is artwork, not a URL');
-  assert.equal(nodes.some(node => node.type === 'Text' && node.props.children === '🌷'), true);
+  const labels = nodes.filter(node => node.type === 'Text' && ['fear', 'disappointment'].includes(node.props.children))
+    .map(node => node.props.children);
+  assert.deepEqual(labels, ['fear', 'disappointment']);
+  assert.equal(nodes.some(node => node.type === 'Text' && node.props.children === 'Suggestions, not a diagnosis.'), true);
+  const thumbnails = nodes.filter(node => node.type?.name === 'FlowerThumb');
+  assert.equal(thumbnails.length, 1, 'Only the current Event flower is shown');
+  assert.equal(thumbnails[0].props.image, flower.img);
   assert.equal(nodes.some(node => node.type === 'Text' && node.props.children === 'Your flower'), true);
-  assert.deepEqual(nodes.filter(node => node.type?.name === 'EventSection' && node.key).map(node => node.key), [flower.id]);
 
   await state.refresh(); state = await hooks.flush();
   assert.deepEqual(Array.from(state.flowers, item => item.id), [flower.id], 'Garden ordering cannot change the current result');
-  assert.equal(state.flowers[0].sourceEvent.secondaryEmotions.join(', '), labels[1], 'Later Garden refresh stays consistent');
+  assert.equal(state.flowers[0].sourceEvent.secondaryEmotions.join(', '), labels.join(', '), 'Later Garden refresh stays consistent');
   await state.refreshEventStatus(); state = await hooks.flush();
   assert.deepEqual(Array.from(state.flowers, item => item.id), [flower.id], 'Event status refresh retains the same flower');
   failRefresh = true;
@@ -400,6 +401,13 @@ test('Friends sidebar opens the native panel, deep links reuse it, and Return to
     './planting/PlantingContext': { usePlanting: () => planting },
     '../../services/auth': { useAuth: () => ({ session: { user: { id: 'owner' } } }) },
     './EventsPanel': { EventsPanel: 'EventsPanel' },
+    '../bond/OurBondPanel': { OurBondPanel: 'OurBondPanel' },
+    './GardenDock': { GardenDock: 'GardenDock' },
+    '../../services/fairyRuntime': { useFairyRuntime: () => null, refreshFairyRuntime() {}, markFairyMomentsRead() {} },
+    '../../services/fairyCloseness': { useClosenessSummary: () => ({ on: false, summary: null }) },
+    '../../services/userRealtime': { startUserRealtime() {}, stopUserRealtime() {} },
+    '../../services/friendAlerts': { startFriendAlerts() {}, stopFriendAlerts() {}, useFriendAlerts: () => ({ incoming: 0, newFriends: [] }) },
+    runtimeGlobals: { setInterval: () => 0, clearInterval() {} },
     '../garden-test': { __esModule: true, default: 'FairyScreen' },
   }, hooks.react);
   const { GardenHud } = load('../GardenHud');
@@ -450,7 +458,7 @@ test('Friends sidebar opens the native panel, deep links reuse it, and Return to
   const staticContent = featureNodes(staticPanel).find(node => typeof node.type === 'function' && node.type.name === 'FeatureContent');
   const destination = staticContent.type(nativeContent.props);
   assert.equal(destination.type.name, 'FriendsPanel'); assert.equal(destination.key, 'owner');
-  featureNodes(panel).find(node => node.props?.title === 'Return to Garden' || node.props?.accessibilityLabel === 'Return to Garden').props.onPress(); hud = await hooks.flush();
+  featureNodes(panel).find(node => node.props?.accessibilityLabel === 'Close').props.onPress(); hud = await hooks.flush();
   assert.equal(featureNodes(hud).find(node => node.type === overlay.type).props.feature, undefined);
   assert.equal(navigation.length, 0, 'Garden stays on its existing route');
   featureNodes(hud).find(node => node.props?.testID === 'hud-events').props.onPress(); hud = await hooks.flush();
@@ -467,10 +475,11 @@ test('Friends sidebar opens the native panel, deep links reuse it, and Return to
   params = {}; hud = hooks.render();
   featureNodes(hud).find(node => node.props?.testID === 'hud-fairy').props.onPress();
   hud = await hooks.flush();
-  assert.deepEqual(navigation, []); assert.equal(focused, 1);
+  assert.deepEqual(navigation, []); assert.equal(focused, 0);
+  assert.equal(featureNodes(hud).find(node => node.type?.name === 'FairyEntryCard').props.visible, true);
   assert.equal(featureNodes(hud).find(node => node.type === overlay.type).props.feature, undefined);
   params = { feature: 'fairy' }; hooks.render(); await hooks.flush();
-  assert.deepEqual(navigation, []); assert.equal(focused, 2);
+  assert.deepEqual(navigation, []); assert.equal(focused, 1);
   assert.equal(params.feature, undefined);
 });
 
@@ -640,6 +649,13 @@ test('the existing Settings panel contains the account-scoped Garden privacy con
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-symbols': { SymbolView: 'Symbol' },
     './EventsPanel': { EventsPanel: 'EventsPanel' },
+    '../bond/OurBondPanel': { OurBondPanel: 'OurBondPanel' },
+    './GardenDock': { GardenDock: 'GardenDock' },
+    '../../services/fairyRuntime': { useFairyRuntime: () => null, refreshFairyRuntime() {}, markFairyMomentsRead() {} },
+    '../../services/fairyCloseness': { useClosenessSummary: () => ({ on: false, summary: null }) },
+    '../../services/userRealtime': { startUserRealtime() {}, stopUserRealtime() {} },
+    '../../services/friendAlerts': { startFriendAlerts() {}, stopFriendAlerts() {}, useFriendAlerts: () => ({ incoming: 0, newFriends: [] }) },
+    runtimeGlobals: { setInterval: () => 0, clearInterval() {} },
     '../../services/auth': { useAuth: () => ({ session: { user: { id: 'owner', name: 'Alex Chen' } } }) },
   }, react);
   const feature = load('../../../services/featureCatalog').gardenFeature('settings');

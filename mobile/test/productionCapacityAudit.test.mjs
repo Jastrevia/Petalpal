@@ -51,5 +51,5 @@ for(let month=1;month<=12;month++){
 }
 const context=fs.readFileSync(new URL('mobile/src/components/garden/planting/PlantingContext.tsx',ROOT),'utf8');
 assert.ok(context.includes('const confirmed = validateAt(previewCoords.worldX, previewCoords.worldY, targetFlower.month,'));
-assert.ok(context.includes('landId: MONTH_REGION_METAS[targetFlower.month].landId'));
+assert.ok(context.includes('const landId = MONTH_REGION_METAS[targetFlower.month].landId;'));
 console.log(`PASS: ${scenariosChecked} deterministic scenarios, ${parentsChecked} real-parent-shaped witnesses; 12 masks, authoritative radii, no user storage/backend access, locked Growth/art/performance/checkpoint inputs unchanged.`);

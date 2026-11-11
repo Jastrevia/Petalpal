@@ -143,6 +143,8 @@ interface ExpandedLetterProps {
   sheetHeight?: number;
   isFolded?: boolean;
   hideFoldTab?: boolean;
+  /** Shown only for a letter the server has recorded as read (see services/mailbox.ts). */
+  onDelete?: () => void;
 }
 
 export const ExpandedLetter = memo(function ExpandedLetter({
@@ -153,6 +155,7 @@ export const ExpandedLetter = memo(function ExpandedLetter({
   sheetHeight,
   isFolded = false,
   hideFoldTab = false,
+  onDelete,
 }: ExpandedLetterProps) {
   const zh = useAppLocale() === 'zh-Hans';
   const tone = STATIONERY_TONES[letter.paperTone || 'cream'];
@@ -416,6 +419,27 @@ export const ExpandedLetter = memo(function ExpandedLetter({
           <Text style={[styles.foldTabText, { color: tone.inkSecondary }]}>
             {zh ? '折回信封 ⤶' : 'Return ⤶'}
           </Text>
+        </Pressable>
+      )}
+
+      {/* ── 12. DELETE TAB (top-right twin of the fold tab; only once the letter is read) ── */}
+      {onDelete && !hideFoldTab && !isFolded && (
+        <Pressable
+          testID="letter-delete"
+          accessibilityRole="button"
+          accessibilityLabel={zh ? '删除这封信' : 'Delete this letter'}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={onDelete}
+          style={({ pressed }) => [
+            styles.deleteTabButton,
+            {
+              backgroundColor: tone.accentParchment,
+              borderColor: tone.border,
+            },
+            pressed && styles.foldTabPressed,
+          ]}
+        >
+          <Text style={[styles.foldTabText, { color: tone.inkSecondary }]}>🗑</Text>
         </Pressable>
       )}
     </View>
@@ -804,6 +828,26 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  deleteTabButton: {
+    position: 'absolute',
+    top: -12,
+    right: 14,
+    minHeight: 24,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    zIndex: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 3px 8px rgba(45, 20, 60, 0.22)',
+        cursor: 'pointer',
+        transition: 'transform 0.18s ease, opacity 0.18s ease',
+      },
+    }),
+  },
   foldTabPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.96 }],

@@ -18,7 +18,7 @@ import { MONTH_REGION_METAS } from './plantingRegionData';
 import { resolveFlowerDetail } from './flowerDetailData';
 import { sourceFlowerImageUri } from './flowerDetailApi';
 import { clusterDrawing } from './flowerClusters';
-import { DeleteFlowerDialog } from './DeleteFlowerDialog';
+import { DeleteFlowerDialog, DeleteMessageDialog } from './DeleteFlowerDialog';
 import { readEvent } from '../../../services/events';
 import { useAppLocale } from '../../../services/locale';
 import { flowerMeaningText, flowerNameText } from '../../../services/flowerNames';
@@ -29,10 +29,12 @@ const MOOD_ZH: Record<string, string> = { SUNNY_BLOOM: '开心', PEACEFUL_BLOOM:
 const COPY = {
   en: { month: (name: string) => `${name} Garden`, garden: 'Garden', mood: 'Mood', planted: 'Planted', memory: 'Memory', meaning: 'Meaning', hideEvent: 'Hide Event ▴', viewEvent: 'View Event ▾', opening: 'Opening…',
     eventError: 'This Event can’t be opened right now.', support: (n: number) => `♥ Support received: ${n}`, messages: 'Messages', friend: 'Friend', sending: ' (sending...)', loading: 'Loading flower details…',
-    supported: 'Supported today ✓', working: 'Working...', give: 'Give Support 💗', placeholder: 'Leave a kind message...', leave: 'Leave Message', signIn: 'Sign in to interact with this flower.', close: 'Close flower details', like: 'Like this message', dislike: 'Dislike this message' },
+    supported: 'Supported today ✓', working: 'Working...', give: 'Give Support 💗', placeholder: 'Leave a kind message...', leave: 'Leave Message', signIn: 'Sign in to interact with this flower.', close: 'Close flower details', like: 'Like this message', dislike: 'Dislike this message',
+    unlike: 'Remove your like', undislike: 'Remove your dislike', reactionFailed: 'Couldn’t update your reaction. Please try again.', deleteMessage: 'Delete your message' },
   'zh-Hans': { month: (name: string) => `${name}花园`, garden: '花园', mood: '心情', planted: '种下于', memory: '记忆', meaning: '花语', hideEvent: '收起事件 ▴', viewEvent: '查看事件 ▾', opening: '正在打开…',
     eventError: '这件事暂时打不开。', support: (n: number) => `♥ 收到的支持：${n}`, messages: '留言', friend: '朋友', sending: '（发送中…）', loading: '正在加载这朵花…',
-    supported: '今天已支持 ✓', working: '处理中…', give: '送上支持 💗', placeholder: '留下一句温柔的话…', leave: '留言', signIn: '登录后才能和这朵花互动。', close: '关闭花朵详情', like: '赞这条留言', dislike: '不喜欢这条留言' },
+    supported: '今天已支持 ✓', working: '处理中…', give: '送上支持 💗', placeholder: '留下一句温柔的话…', leave: '留言', signIn: '登录后才能和这朵花互动。', close: '关闭花朵详情', like: '赞这条留言', dislike: '不喜欢这条留言',
+    unlike: '取消赞', undislike: '取消不喜欢', reactionFailed: '没能更新你的回应，请再试一次。', deleteMessage: '删除我的留言' },
 };
 
 const FLOWER_ASSETS: Record<string, any> = {
@@ -49,6 +51,7 @@ export default function FlowerDetailModal() {
     closeFlowerDetail,
     supportFlower,
     leaveMessage,
+    deleteMessage,
     deleteSelectedFlower,
     selectedFlowerIsOwner,
     currentUserId,
@@ -66,13 +69,18 @@ export default function FlowerDetailModal() {
   // (Its messages come from the detail below; hooks stay above the early return.)
   const messageIds = (selectedFlower ? resolveFlowerDetail(selectedFlower, flowerDetailSource).messages : [])
     .filter(message => message.id && !message.pending && (message.authorUserId || message.userId) !== currentUserId).map(message => message.id as string);
-  const { reactions, like, dislike } = useMessageReactions(messageIds);
+  const { reactions, busy: reactionBusy, failed: reactionFailed, react, toggle } = useMessageReactions(messageIds);
+  // A message I left: deleted only after I confirm, and only once the server has deleted it.
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
+  const [deleteMessageError, setDeleteMessageError] = useState('');
   // Owner-only, on tap: the Event this flower grew from (GET /events/:id is owner-scoped).
   const [sourceEvent, setSourceEvent] = useState<{ id: string; state: 'loading' | 'ready' | 'error'; text?: string } | null>(null);
   const eventId = selectedFlowerIsOwner ? selectedFlower?.sourceEventId : undefined;
 
   useEffect(() => {
     setConfirmDelete(false);
+    setMessageToDelete(null); setDeleteMessageError('');
     setSourceEvent(null);
     if (!selectedFlower) setMessageText('');
   }, [selectedFlower?.flowerId]);
@@ -119,6 +127,14 @@ export default function FlowerDetailModal() {
   const supportedToday = !!detail.supportState?.supportedToday;
   const supportDisabled = !currentUserId || isDetailLoading || isDetailWorking || supportedToday ||
     detail.supportState?.canSupport === false;
+
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete || deletingMessage) return;
+    setDeletingMessage(true); setDeleteMessageError('');
+    const error = await deleteMessage(messageToDelete);
+    setDeletingMessage(false);
+    if (error) setDeleteMessageError(error); else setMessageToDelete(null);
+  };
 
   const sendMessage = async () => {
     const clean = messageText.trim();
@@ -202,25 +218,40 @@ export default function FlowerDetailModal() {
             {detail.messages.map((message, index) => {
               const authorId = message.authorUserId || message.userId;
               const votable = message.id && !message.pending && authorId !== currentUserId;
-              const reaction = votable ? reactions[message.id as string] : undefined;
-              return <View key={message.id || index} style={styles.messageRow}>
+              const mineToDelete = Boolean(message.id && !message.pending && currentUserId && authorId === currentUserId);
+              const id = message.id as string;
+              const reaction = votable ? reactions[id] : undefined;
+              const working = Boolean(votable && reactionBusy[id]);
+              return <View key={message.id || index}>
+              <View style={styles.messageRow}>
                 <Text style={[styles.messageText, styles.messageBody]}>
                   {message.author || message.senderName || copy.friend}: {message.text}{message.pending ? copy.sending : ''}
                 </Text>
+                {/* Like / Dislike toggle: tapping your current reaction removes it; the other one replaces it. */}
                 {votable ? <View style={styles.reactions}>
-                  <Pressable testID="message-like" accessibilityRole="button" accessibilityLabel={copy.like} accessibilityState={{ selected: reaction?.mine === 'LIKE', disabled: Boolean(reaction?.mine) }}
-                    disabled={Boolean(reaction?.mine)} onPress={() => void like(message.id as string, reaction)} hitSlop={6} style={styles.reaction}>
+                  <Pressable testID="message-like" accessibilityRole="button" accessibilityLabel={reaction?.mine === 'LIKE' ? copy.unlike : copy.like}
+                    accessibilityState={{ selected: reaction?.mine === 'LIKE', busy: working }}
+                    onPress={() => void toggle(id, 'LIKE')} hitSlop={6} style={[styles.reaction, reaction?.mine === 'LIKE' && styles.reactionSelected]}>
                     <Text style={[styles.reactionIcon, reaction?.mine === 'LIKE' && styles.reactionChosen]}>👍🏻</Text>
                     {reaction?.likes ? <Text style={styles.reactionCount}>{reaction.likes}</Text> : null}
                   </Pressable>
-                  {/* A dislike asks why first (the same reasons as a report), and counts once a reason is sent. */}
+                  {/* A new dislike asks why first (the same reasons as a report), and counts once a reason is sent.
+                      Tapping your dislike again just removes it. */}
                   <SafetyActions dislike messageId={message.id} userId={authorId} onBlocked={closeFlowerDetail}
-                    onReported={() => void dislike(message.id as string, reaction)}
-                    trigger={open => <Pressable testID="message-dislike" accessibilityRole="button" accessibilityLabel={copy.dislike} accessibilityState={{ selected: reaction?.mine === 'DISLIKE', disabled: Boolean(reaction?.mine) }}
-                      disabled={Boolean(reaction?.mine)} onPress={open} hitSlop={6} style={styles.reaction}>
+                    onReported={() => void react(id, 'DISLIKE')}
+                    trigger={open => <Pressable testID="message-dislike" accessibilityRole="button" accessibilityLabel={reaction?.mine === 'DISLIKE' ? copy.undislike : copy.dislike}
+                      accessibilityState={{ selected: reaction?.mine === 'DISLIKE', busy: working }}
+                      onPress={reaction?.mine === 'DISLIKE' ? () => void react(id, null) : working ? undefined : open} hitSlop={6}
+                      style={[styles.reaction, reaction?.mine === 'DISLIKE' && styles.reactionSelected]}>
                       <Text style={[styles.reactionIcon, reaction?.mine === 'DISLIKE' && styles.reactionChosen]}>👎🏻</Text>
                     </Pressable>} />
                 </View> : null}
+                {mineToDelete ? <Pressable testID="message-delete" accessibilityRole="button" accessibilityLabel={copy.deleteMessage}
+                  onPress={() => { setDeleteMessageError(''); setMessageToDelete(id); }} hitSlop={6} style={styles.reaction}>
+                  <Text style={styles.reactionIcon}>🗑</Text>
+                </Pressable> : null}
+              </View>
+              {votable && reactionFailed === id ? <Text accessibilityRole="alert" style={styles.reactionError}>{copy.reactionFailed}</Text> : null}
               </View>;
             })}
           </View>}
@@ -268,6 +299,9 @@ export default function FlowerDetailModal() {
           </ScrollView>
         </View>
       </View>
+      <DeleteMessageDialog visible={Boolean(messageToDelete)} busy={deletingMessage} error={deleteMessageError}
+        onCancel={() => { if (!deletingMessage) { setMessageToDelete(null); setDeleteMessageError(''); } }}
+        onDelete={() => void confirmDeleteMessage()} />
       <DeleteFlowerDialog visible={confirmDelete && selectedFlowerIsOwner} flowerName={flowerNameText(detail.name, locale)} busy={isDetailWorking}
         error={confirmDelete ? detailError : ''} onCancel={() => setConfirmDelete(false)}
         onDelete={async () => { if (await deleteSelectedFlower()) setConfirmDelete(false); }} />
@@ -289,6 +323,8 @@ const createStyles = (theme: PanelTheme) => StyleSheet.create({
   reaction: { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 28, minHeight: 28, justifyContent: 'center' },
   reactionIcon: { fontSize: 15, opacity: .55 },
   reactionChosen: { opacity: 1 },
+  reactionSelected: { backgroundColor: `${theme.gold}40`, borderRadius: 14, paddingHorizontal: 4 },
+  reactionError: { fontSize: 11, color: theme.muted, marginTop: -2, marginBottom: 6 },
   reactionCount: { fontSize: 11, color: theme.muted },
   modalBackdrop: {
     flex: 1,

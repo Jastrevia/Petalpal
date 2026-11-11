@@ -148,7 +148,7 @@ test("a competing committed record returns its current count rather than the ear
       userBlock: { findFirst: async () => null },
       friendship: { findUnique: async () => ({ id: "confirmed" }) },
       flower: { findFirst: async () => ({
-        id: "flower-x", userId: "owner", gardenId: "garden-owner",
+        id: "flower-x", userId: "owner", gardenId: "garden-owner", worldX: 1100.5, worldY: 900.25, regionId: "Land09",
         supportCount: ++flowerReads === 1 ? 7 : 8
       }) },
       visitRecord: { findFirst: async () => ({ id: "competing-record" }) }
@@ -196,9 +196,10 @@ test("Daily Support reuses persisted visit history with atomic counts and author
         VALUES ('check-in-x', 'owner', '2026-09-27', 'UTC', CURRENT_TIMESTAMP);
       INSERT INTO "Journal" ("id", "userId", "dailyCheckInId", "content", "updatedAt")
         VALUES ('journal-x', 'owner', 'check-in-x', 'The actual originating memory.', CURRENT_TIMESTAMP);
-      INSERT INTO "Flower" ("id", "mood", "event", "name", "meaning", "img", "left", "top", "supportCount", "userId", "gardenId", "dailyCheckInId") VALUES
-        ('flower-x', 'calm', 'The actual originating memory.', 'Lotus', 'Peace', '/lotus.png', 101.125, 202.875, 7, 'owner', 'garden-owner', 'check-in-x'),
-        ('flower-y', 'happy', 'Legacy memory', 'Rose', 'Joy', '/rose.png', 300, 400, 0, 'owner', 'garden-owner', NULL);
+      INSERT INTO "Flower" ("id", "mood", "event", "name", "meaning", "img", "left", "top", "supportCount", "userId", "gardenId", "dailyCheckInId", "worldX", "worldY", "regionId") VALUES
+        ('flower-x', 'calm', 'The actual originating memory.', 'Lotus', 'Peace', '/lotus.png', 101.125, 202.875, 7, 'owner', 'garden-owner', 'check-in-x', 1100.5, 900.25, 'Land09'),
+        ('flower-y', 'happy', 'Legacy memory', 'Rose', 'Joy', '/rose.png', 300, 400, 0, 'owner', 'garden-owner', NULL, 1200, 1000, 'Land09'),
+        ('flower-unplanted', 'happy', '', 'Rose', 'Joy', '/rose.png', 0, 0, 0, 'owner', 'garden-owner', NULL, NULL, NULL, NULL);
       INSERT INTO "Message" ("id", "author", "text", "flowerId", "userId")
         VALUES ('message-x', 'Visitor', 'A kind prototype message', 'flower-x', 'visitor');
       INSERT INTO "VisitRecord" ("id", "visitorId", "visitorName", "visitorAvatar", "action", "gardenId", "userId") VALUES
@@ -399,4 +400,29 @@ test("Daily Support reuses persisted visit history with atomic counts and author
     assert.ok(path.basename(target).startsWith("petalpal-support-"));
     await rm(target, { recursive: true, force: true });
   }
+});
+
+// A visitor never reaches an Event flower its owner has not planted yet: not its detail, not Support, not a message.
+test("an unplanted flower is not found for visitors and stays readable by its owner", async () => {
+  const unplanted = { id: "draft", userId: "owner", gardenId: "garden-owner", sourceEventId: "event-draft", worldX: null, worldY: null, regionId: null,
+    left: 400, top: 560, layoutVersion: 1, supportCount: 0, messages: [] };
+  const tx = {
+    $queryRawUnsafe: async () => [],
+    user: { findUnique: async ({ where }) => ({ id: where.id, timezone: "UTC", name: where.id, allowGardenVisits: true,
+      communityTermsVersion: "petalpal-community-2026-10-15" }), findFirst: async () => null, findMany: async () => [] },
+    userBlock: { findFirst: async () => null, findMany: async () => [] },
+    friendship: { findUnique: async () => ({ id: "confirmed" }) },
+    flower: { findFirst: async () => ({ ...unplanted }) },
+    visitRecord: { findFirst: async () => null },
+  };
+  const database = { ...tx, $transaction: async (callback) => callback(tx) };
+  await assert.rejects(getFlowerDetail(database, { ownerUserId: "owner", flowerId: "draft", viewerUserId: "visitor" }),
+    { status: 404, code: "FLOWER_NOT_FOUND" });
+  await assert.rejects(giveFlowerSupport(database, { ownerUserId: "owner", flowerId: "draft", supporterUserId: "visitor" }),
+    { status: 404, code: "FLOWER_NOT_FOUND" });
+  const { sendFlowerMessage } = await import("../../lib/flower-support.js");
+  await assert.rejects(sendFlowerMessage(database, { ownerUserId: "owner", flowerId: "draft", viewerUserId: "visitor", text: "hi" }),
+    { status: 404, code: "FLOWER_NOT_FOUND" });
+  const own = await getFlowerDetail(database, { ownerUserId: "owner", flowerId: "draft", viewerUserId: "owner" });
+  assert.equal(own.id, "draft");
 });

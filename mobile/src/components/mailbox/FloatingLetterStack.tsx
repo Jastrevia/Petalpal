@@ -100,6 +100,10 @@ interface FloatingLetterStackProps {
 
   onToggleUnfold: () => void;
 
+  /** Delete for the open letter; passed only when that letter may be deleted. */
+
+  onDeleteActive?: () => void;
+
   maxContentWidth?: number;
 
   maxContentHeight?: number;
@@ -123,6 +127,8 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
   onSelectLetter,
 
   onToggleUnfold,
+
+  onDeleteActive,
 
   maxContentWidth = 400,
 
@@ -691,6 +697,8 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
               letter={activeLetter}
 
               onCollapse={onToggleUnfold}
+
+              onDelete={onDeleteActive}
 
               width={isPaperUnfolded ? letterExpandedWidth : paperPocketWidth}
 

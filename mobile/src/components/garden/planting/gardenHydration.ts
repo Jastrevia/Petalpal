@@ -1,5 +1,5 @@
 import { plantingRecord } from '../../../services/events';
-import { loadGarden, plantFlowerSpot, type GardenFlower } from '../../../services/garden';
+import { landMonth, loadGarden, plantFlowerSpot, type GardenFlower } from '../../../services/garden';
 import { loadFlowerPlacements, type FlowerPlacementRecord } from './plantingPersistence';
 import { getApprovedMonthCentroid, isFootprintInApprovedMonthMaskWorld } from './approvedPlantingMasks';
 import { MONTH_REGION_METAS } from './plantingRegionData';
@@ -9,6 +9,7 @@ export function gardenPlantingRecord(flower: GardenFlower, timezone = 'UTC'): Fl
     dailyCheckInId: flower.dailyCheckInId, secondaryEmotions: flower.secondaryEmotions,
     variant: flower.variant, rarity: flower.rarity, growthState: flower.growthState, season: flower.season };
 }
+
 const fallbackPoints = new Map<number, { x: number; y: number }[]>();
 function monthFallbackPoints(month: number) {
   const cached = fallbackPoints.get(month);
@@ -28,47 +29,71 @@ function monthFallbackPoints(month: number) {
   fallbackPoints.set(month, points);
   return points;
 }
-export function hydrateGardenPlacements(flowers: readonly GardenFlower[], local: readonly FlowerPlacementRecord[],
-  ownerId: string, viewerId: string, timezone = 'UTC'): FlowerPlacementRecord[] {
-  const localById = new Map((ownerId === viewerId ? local : [])
-    .filter(p => (!p.ownerUserId || p.ownerUserId === ownerId) && p.placementOrigin !== 'FALLBACK'
-      && Number.isFinite(p.worldX) && Number.isFinite(p.worldY))
-    .map(p => [p.flowerId, p]));
+
+/**
+ * Where each flower is drawn, for the owner's Garden and a visiting friend's:
+ * - SERVER: the spot the server persisted when its owner pressed Plant. Its land (and so its month and cluster
+ *   size) is that spot's land, never re-derived from the viewer's timezone.
+ * - LOCAL (owner only): a spot planted before the server kept spots, still only on this device (the server
+ *   refused or has not received it yet); shown there, as before.
+ * - UNPLANTED (owner only): an Event flower its owner has not planted yet. It has no coordinates (NaN, so
+ *   nothing draws it by accident) and is planted from the calendar. Visitors never receive one (the server
+ *   leaves it out, lib/garden-response.js awaitsPlanting).
+ * - FALLBACK: an older flower that is not an Event's and has no spot keeps its preview spot on its month's
+ *   grass, for the owner and visitors alike, so existing Gardens look exactly as they did.
+ */
+export function hydrateGardenPlacements(flowers: readonly GardenFlower[], ownerId: string, viewerId: string,
+  timezone = 'UTC', deviceSpots: ReadonlyMap<string, FlowerPlacementRecord> = new Map()): FlowerPlacementRecord[] {
+  const ownGarden = ownerId === viewerId;
   const slots = new Map<number, number>();
   // Sorting makes fallback placement independent of backend response order.
-  return [...flowers].sort((a, b) => a.id.localeCompare(b.id)).map(flower => {
+  return [...flowers].sort((a, b) => a.id.localeCompare(b.id)).flatMap((flower): FlowerPlacementRecord[] => {
     if (flower.userId !== ownerId) throw new Error('This flower belongs to another Garden.');
     const canonical = gardenPlantingRecord(flower, timezone);
-    // The server's planted spot is the truth, for the owner and for visiting friends.
-    if (typeof flower.worldX === 'number' && typeof flower.worldY === 'number') return { ...canonical,
-      worldX: flower.worldX, worldY: flower.worldY, landId: flower.regionId || MONTH_REGION_METAS[canonical.month].landId,
-      placementOrigin: 'SERVER' };
-    const localPlacement = localById.get(flower.id);
-    if (localPlacement) return { ...canonical, worldX: localPlacement.worldX, worldY: localPlacement.worldY,
-      landId: localPlacement.landId, scale: localPlacement.scale ?? canonical.scale, rotation: localPlacement.rotation ?? canonical.rotation,
-      placementOrigin: 'LOCAL' };
+    if (typeof flower.worldX === 'number' && Number.isFinite(flower.worldX)
+      && typeof flower.worldY === 'number' && Number.isFinite(flower.worldY)) {
+      const month = landMonth(flower.regionId) ?? canonical.month;
+      return [{ ...canonical, month, worldX: flower.worldX, worldY: flower.worldY,
+        landId: MONTH_REGION_METAS[month].landId, placementOrigin: 'SERVER' }];
+    }
+    const device = ownGarden ? deviceSpots.get(flower.id) : undefined;
+    if (device) return [{ ...canonical, worldX: device.worldX, worldY: device.worldY, landId: device.landId,
+      scale: device.scale ?? canonical.scale, rotation: device.rotation ?? canonical.rotation, placementOrigin: 'LOCAL' }];
+    if (canonical.sourceType === 'EVENT') {
+      if (!ownGarden) return [];
+      return [{ ...canonical, worldX: Number.NaN, worldY: Number.NaN, landId: undefined, placementOrigin: 'UNPLANTED' }];
+    }
     const points = monthFallbackPoints(canonical.month);
     const index = slots.get(canonical.month) || 0;
     slots.set(canonical.month, index + 1);
     const point = points[index % points.length];
-    return { ...canonical, worldX: point.x, worldY: point.y,
-      landId: MONTH_REGION_METAS[canonical.month].landId, placementOrigin: 'FALLBACK' };
+    return [{ ...canonical, worldX: point.x, worldY: point.y,
+      landId: MONTH_REGION_METAS[canonical.month].landId, placementOrigin: 'FALLBACK' }];
   });
 }
+
 export async function loadGardenPlacements(ownerId: string, viewerId: string, timezone = 'UTC') {
-  const [flowers, local] = await Promise.all([
-    loadGarden(ownerId, viewerId), ownerId === viewerId ? loadFlowerPlacements() : Promise.resolve([]),
+  const ownGarden = ownerId === viewerId;
+  const [loaded, local] = await Promise.all([
+    loadGarden(ownerId, viewerId), ownGarden ? loadFlowerPlacements() : Promise.resolve([]),
   ]);
-  const records = hydrateGardenPlacements(flowers, local, ownerId, viewerId, timezone);
-  // Spots planted before the server kept them live only on this device: save each once.
-  // A refused spot (e.g. too close under the cluster spacing) stays on this device only.
-  for (const record of records) {
-    if (ownerId !== viewerId || record.placementOrigin !== 'LOCAL') continue;
+  // Spots planted before the server kept them lived only on a device: offer each to the server
+  // once. An accepted spot becomes the server's; a refused or unsent one keeps showing at the
+  // device spot (LOCAL, as before), and the next load tries again.
+  const deviceSpots = new Map(local
+    .filter(p => (!p.ownerUserId || p.ownerUserId === ownerId) && (p.placementOrigin as string | undefined) !== 'FALLBACK'
+      && p.placementOrigin !== 'UNPLANTED' && Number.isFinite(p.worldX) && Number.isFinite(p.worldY))
+    .map(p => [p.flowerId, p]));
+  const flowers = [...loaded];
+  for (let i = 0; i < flowers.length; i++) {
+    const flower = flowers[i];
+    const device = deviceSpots.get(flower.id);
+    if (!ownGarden || !device || flower.worldX != null) continue;
     try {
-      await plantFlowerSpot(ownerId, record.flowerId, { worldX: record.worldX, worldY: record.worldY,
-        landId: MONTH_REGION_METAS[record.month].landId });
-      record.placementOrigin = 'SERVER'; record.landId = MONTH_REGION_METAS[record.month].landId;
+      const saved = await plantFlowerSpot(ownerId, flower.id, { worldX: device.worldX, worldY: device.worldY,
+        landId: MONTH_REGION_METAS[gardenPlantingRecord(flower, timezone).month].landId });
+      flowers[i] = { ...flower, worldX: saved.worldX, worldY: saved.worldY, regionId: saved.landId };
     } catch { /* Keep showing the device spot; the next load tries again. */ }
   }
-  return records;
+  return hydrateGardenPlacements(flowers, ownerId, viewerId, timezone, deviceSpots);
 }

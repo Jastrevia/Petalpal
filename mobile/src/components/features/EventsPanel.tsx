@@ -8,7 +8,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, TextInpu
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
 import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
-import { saveFlowerChoice } from '../../services/flowerChoices';
+import { loadFlowerChoice, saveFlowerChoice } from '../../services/flowerChoices';
 import { useAppLocale } from '../../services/locale';
 import { flowerNameText } from '../../services/flowerNames';
 import { clearAnswer, pendingAnswer } from '../../services/questionAnswer';
@@ -31,7 +31,7 @@ const COPY = {
     left: (n: number, of: number) => `${n} of ${of} flowers left to grow today.`, none: (of: number) => `You've grown today's ${of} flowers. Events still save; new flowers tomorrow.`,
     limit: (of: number) => `Today's ${of} flowers are already growing, so this Event didn't add one. Come back tomorrow for new flowers.`,
     yourFlower: 'Your flower', mood: 'Mood you chose', analysis: 'AI emotion analysis', notDiagnosis: 'Suggestions, not a diagnosis.',
-    pending: 'AI is reading your Event…', failed: 'AI analysis is unavailable right now. Your Event and flower are saved.',
+    pending: 'AI is reading your Event…', slow: 'AI analysis is taking longer than usual. Your Event and flower are saved: you can plant now, or check again in a moment.', checkAgain: 'Check again', failed: 'AI analysis is unavailable right now. Your Event and flower are saved.',
     skipped: 'AI is not turned on yet, so only your chosen mood is used. To turn it on, open Me → AI & privacy and tap "Save my AI choices".', noEmotions: 'No other feelings stood out.',
     show: 'Show this Event to friends', showHint: 'Friends who visit your Garden can read what you wrote on this flower.', hiddenHint: 'Only you can read what you wrote. Friends see just the flower.',
     satisfied: 'Happy with it? Plant your flower in the Garden.',
@@ -41,6 +41,8 @@ const COPY = {
     voice: 'Voice input', voiceHint: 'Record up to three minutes, then review the transcript before saving', recording: (t: string) => `Recording ${t} / 3:00`,
     transcribing: 'Transcribing…', preparing: 'Preparing microphone…', done: 'Done', cancel: 'Cancel', help: "What's the difference?",
     answering: (q: string) => `Answering: ${q}`, notAnswering: 'Not an answer',
+    unfinished: 'You have an unfinished Event. Would you like to continue where you left off?',
+    continueDraft: 'Continue', discardDraft: 'Discard',
   },
   'zh-Hans': {
     intro: '什么是事件？', introText: '写下今天的一件小事，选一个它带给你的心情。PetalPal 会保存它，AI 会读一读里面的情绪，然后为你的花园长出一朵花。',
@@ -50,7 +52,7 @@ const COPY = {
     left: (n: number, of: number) => `今天还能长 ${n} 朵花（共 ${of} 朵）。`, none: (of: number) => `今天的 ${of} 朵花都长出来了。事件照样会保存，明天再长新花。`,
     limit: (of: number) => `今天的 ${of} 朵花已经在长了，这件事没有再长出新花。明天再来吧。`,
     yourFlower: '你的花', mood: '你选的心情', analysis: 'AI 情绪分析', notDiagnosis: '只是建议，不是诊断。',
-    pending: 'AI 正在读你的事件…', failed: '暂时无法进行 AI 分析。你的事件和花都已保存。',
+    pending: 'AI 正在读你的事件…', slow: 'AI 分析比平时慢。你的事件和花都已保存：现在就可以种下，或者过一会儿再查看。', checkAgain: '再查看一次', failed: '暂时无法进行 AI 分析。你的事件和花都已保存。',
     skipped: 'AI 还没开启，所以只用你选的心情。想开启的话，打开「我 → AI 与隐私」，点「保存我的 AI 选择」。', noEmotions: '没有发现其他明显的情绪。',
     show: '把这件事展示给朋友', showHint: '来逛花园的朋友能在这朵花上读到你写的内容。', hiddenHint: '只有你能读到写的内容，朋友只能看到花。',
     satisfied: '满意的话，就把花种进花园吧。',
@@ -60,6 +62,8 @@ const COPY = {
     voice: '语音输入', voiceHint: '最多录三分钟，保存前可以先看一遍转出来的文字', recording: (t: string) => `正在录音 ${t} / 3:00`,
     transcribing: '正在转文字…', preparing: '正在准备麦克风…', done: '完成', cancel: '取消', help: '两种有什么区别？',
     answering: (q: string) => `回答：${q}`, notAnswering: '不是回答',
+    unfinished: '你有一件还没完成的事件。要从上次停下的地方继续吗？',
+    continueDraft: '继续', discardDraft: '放弃',
   },
 };
 
@@ -85,6 +89,23 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
     await saveFlowerChoice(flower.id, { showToFriends, withoutAnalysis }).catch(() => undefined);
     onClose(); journal.placeFlower(flower);
   }
+  // An unfinished Event is answered first: Continue picks it up where it was left, Discard removes it.
+  async function continueDraft() {
+    const resumed = await journal.continueDraft();
+    if (!resumed?.flower) return;
+    const choice = await loadFlowerChoice(resumed.flower.id).catch(() => ({ showToFriends: undefined }));
+    setShowToFriends(Boolean(choice.showToFriends));
+    if (resumed.step === 'placing') { onClose(); journal.placeFlower(resumed.flower); }
+  }
+  if (journal.draftPrompt && !saved) return <View style={styles.body}>
+    <View accessibilityLiveRegion="polite" style={styles.notice}>
+      <Text accessibilityRole="alert" style={styles.text}>{copy.unfinished}</Text>
+    </View>
+    <EventAction title={copy.continueDraft} onPress={() => void continueDraft()} disabled={journal.draftBusy} />
+    <EventAction secondary title={copy.discardDraft} onPress={() => void journal.discardDraft()} disabled={journal.draftBusy} />
+    {journal.draftBusy ? <ActivityIndicator color="#477D70" /> : null}
+    {journal.error ? <View style={styles.notice}><Text accessibilityRole="alert" style={styles.text}>{journal.error}</Text></View> : null}
+  </View>;
   return <View style={styles.body}>
     {introOpen ? <View accessibilityLiveRegion="polite" style={styles.intro}>
       <Text style={styles.introTitle}>{copy.intro}</Text>
@@ -160,7 +181,11 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         </View>
         <View style={styles.rule} />
         <Text style={styles.cardLabel}>{copy.analysis}</Text>
-        {status === 'PENDING' || status === 'RUNNING' ? <View style={ui.row}><ActivityIndicator color="#477D70" /><Text style={styles.text}>{copy.pending}</Text></View>
+        {(status === 'PENDING' || status === 'RUNNING') && journal.analysisTimedOut ? <>
+            <Text accessibilityRole="alert" style={styles.text}>{copy.slow}</Text>
+            <EventAction secondary title={copy.checkAgain} onPress={() => void journal.refreshEventStatus()} />
+          </>
+          : status === 'PENDING' || status === 'RUNNING' ? <View style={ui.row}><ActivityIndicator color="#477D70" /><Text style={styles.text}>{copy.pending}</Text></View>
           : status === 'SUCCESS' ? <>
             <View style={styles.chips}>{(saved.event.secondaryEmotions.length ? saved.event.secondaryEmotions : []).map(item =>
               <Text key={item} style={styles.chip}>{item}</Text>)}</View>

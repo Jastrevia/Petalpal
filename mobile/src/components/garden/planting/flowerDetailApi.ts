@@ -50,7 +50,7 @@ export async function deleteSourceFlower(ownerId: string, flowerId: string): Pro
 }
 
 export function subscribeToFlowerUpdates(ownerId: string, flowerId: string,
-  onUpdate: (flower: FlowerSourceDetail) => void): () => void {
+  onUpdate: (flower: FlowerSourceDetail) => void, onMessageDeleted?: (messageId: string) => void): () => void {
   let cancelled = false;
   let disconnect: (() => void) | undefined;
   accessToken().then((token) => {
@@ -65,6 +65,10 @@ export function subscribeToFlowerUpdates(ownerId: string, flowerId: string,
     };
     socket.on('supportUpdated', update);
     socket.on('messageAdded', update);
+    // Its author deleted a message: it leaves every open view of this flower.
+    socket.on('messageDeleted', (payload: { gardenOwnerId?: string; flowerId?: string; messageId?: string }) => {
+      if (payload?.gardenOwnerId === ownerId && payload.flowerId === flowerId && payload.messageId) onMessageDeleted?.(payload.messageId);
+    });
   }).catch(() => { /* Detail requests still report actionable connection errors. */ });
   return () => { cancelled = true; disconnect?.(); };
 }
