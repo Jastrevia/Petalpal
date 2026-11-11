@@ -31,18 +31,18 @@ test("花语年鉴: twelve month gardens, the most returning theme with its firs
   assert.equal(book.summary, "这一年你在 4 天里写下了 5 条记录。");
   assert.equal(book.echo.word, "室友");
   assert.deepEqual([book.echo.first.text, book.echo.last.text], ["和室友去公园散步。", "室友送了我一盆花。"]);
-  assert.equal(book.echo.line, "“室友”在 3 个月里出现了 3 次。");
+  assert.equal(book.echo.line, "这一年你 3 次写到“室友”，前后跨了 3 个月。");
   assert.deepEqual(book.firsts.map(item => [item.word, item.date]), [["面试", "2026-10-20"]], "a hidden one is left out");
   assert.deepEqual(book.goods.map(item => [item.text, item.count]).slice(0, 1), [["阳光很好。", 2]]);
   assert.equal(book.card.name, "圣杯三");
   assert.deepEqual(book.card.reasons.map(item => item.reason), ["三月的理由。", "七月的理由。"]);
-  assert.equal(book.card.line, "这一年抽到了 2 次。");
+  assert.equal(book.card.line, "这一年，它来了 2 次。");
   const muted = buildAlmanac({ year: 2026, timezone: "UTC", locale: "zh-Hans", events: EVENTS, weeks: WEEKS, mutes: ["室友", "面试"] });
   assert.equal(muted.echo, null);
   assert.deepEqual(muted.firsts, []);
   const gone = buildAlmanac({ year: 2026, timezone: "UTC", locale: "en", events: EVENTS.filter(item => item.id !== "e"), weeks: WEEKS });
   assert.deepEqual(gone.firsts, [], "a first time whose Event is gone is not shown");
-  assert.equal(gone.summary, "4 entries on 3 days.");
+  assert.equal(gone.summary, "You wrote 4 entries on 3 days this year.");
 });
 
 test("花语年鉴 access: this year's opens on 25 December in the account's day; earlier years any time; owner-only reads", async () => {

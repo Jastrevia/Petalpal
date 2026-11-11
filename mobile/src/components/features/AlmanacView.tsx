@@ -10,11 +10,11 @@ import { PETAL_ART } from './weeklyArt';
 // day's main mood, nothing where nothing was written), the theme that came back most with its first and latest words,
 // the firsts, the year's small good things and its petal card with every reason stacked. On the paper, no boxes.
 const COPY = {
-  en: { back: '‹ Petal collection', gardens: 'Twelve gardens', echo: 'What came back most', first: 'First', latest: 'Latest', firsts: 'First times',
+  en: { back: '‹ Petal collection', gardens: 'Twelve gardens', echo: 'What you wrote about most', first: 'First', latest: 'Latest', firsts: 'First times',
     goods: 'Small good things of the year', card: 'Petal card of the year', months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     failed: 'The almanac can’t be opened right now.', notYet: 'This year’s almanac opens on 25 December.', retry: 'Try again', times: (n: number) => `×${n}` },
-  'zh-Hans': { back: '‹ 花语集', gardens: '十二个月的花园', echo: '回声最多的主题', first: '第一次', latest: '最近一次', firsts: '第一次时间线',
-    goods: '年度好事清单', card: '年度花语卡', months: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
+  'zh-Hans': { back: '‹ 花语集', gardens: '十二个月的花园', echo: '这一年写得最多的', first: '第一次', latest: '最近一次', firsts: '这一年的第一次',
+    goods: '这一年的小好事', card: '年度花语卡', months: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
     failed: '现在打不开花语年鉴。', notYet: '今年的花语年鉴 12 月 25 日开放。', retry: '再试一次', times: (n: number) => `${n} 次` },
 } as const;
 

@@ -1,7 +1,7 @@
 import { ApiError } from './api';
 import { MONTH_NAMES } from './bookhouse';
 import type { PrimaryMood } from './events';
-import { listReflections, MONTHLY_COPY, monthly2, readReflection, shortDate, SHORT_COPY, type ReflectionReport, type SavedReport } from './reflections';
+import { listReflections, MONTHLY_COPY, monthly2, readReflection, shortDate, SHORT_COPY, weekOfMonth, type ReflectionReport, type SavedReport } from './reflections';
 
 // The Treehouse's Monthly Report archive: one extra book per year on the My Journals shelf, after December. It is a
 // book of its own kind, never a thirteenth month: it is named by MONTHLY_REPORT_ARCHIVE (and archiveKey), and every
@@ -122,7 +122,7 @@ export function reportBlocks(report: ArchiveReport, year: number): ReportBlock[]
       blocks.push({ type: 'rule' }, { type: 'section', text: en.spread });
       for (let i = 0; i < month.spread.length; i += CARDS_PER_ROW) {
         blocks.push({ type: 'cards', cards: month.spread.slice(i, i + CARDS_PER_ROW)
-          .map(card => ({ cardId: card.cardId, name: card.name, role: en.roles[card.role], headline: card.headline })) });
+          .map(card => ({ cardId: card.cardId, name: card.name, role: en.week(weekOfMonth(card.periodKey)), headline: card.headline })) });
       }
     }
     month.changes.forEach(change => {
@@ -143,7 +143,7 @@ export function reportBlocks(report: ArchiveReport, year: number): ReportBlock[]
     }
     if (month.people.length) {
       blocks.push({ type: 'rule' }, { type: 'section', text: en.people });
-      for (const item of month.people) blocks.push({ type: 'text', text: `“${item.word}” · ${en.peopleLine(item.count, item.mood, item.moodCount)}` });
+      for (const item of month.people) blocks.push({ type: 'text', text: en.peopleLine(item.word, item.count, item.mood, item.moodCount) });
     }
     if (month.question) blocks.push({ type: 'rule' }, { type: 'section', text: en.question }, { type: 'text', text: month.question });
   } else {

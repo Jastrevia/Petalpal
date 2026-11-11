@@ -355,8 +355,9 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
           <Text style={v.pairLabel}>{short.card.name}</Text>
           <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.line}</Text>
           <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.text}</Text>
-          {short.card.reason && <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>}
-          <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>
+          {/* "Why this card" already says what was counted; the mood fact line shows only when there is no reason. */}
+          {short.card.reason ? <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.reason}</Text>
+            : <Text selectable={interactive} style={[v.text, s.stretch]}>{short.card.fact}</Text>}
         </View>
 
         {interactive && <ShareCardButton card={short.card} headline={short.headline} week={date ? `${date.eyebrow} ${date.range}`.trim() : ''}

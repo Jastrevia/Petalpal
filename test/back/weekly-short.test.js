@@ -272,14 +272,14 @@ test("petal card: the design's lifting week, and fact lines for a shift and a mi
     assert.equal(card.arc, "LIFTING");
     assert.ok(ARC_CARDS.LIFTING.includes(card.cardId));
     assert.equal(card.fact, locale === "en" ? "You chose Quiet 4 times this week; Fri–Sun had Healing twice."
-      : "这周你 4 次选了「低落」，周五到周日有 2 次「治愈」。");
+      : "这周你 4 次选了『低落』，周五到周日有 2 次『治愈』。");
   }
   const sameMood = render("zh-Hans", [Q, D, H, H], [days[0], days[2], days[5], days[6]]);
-  assert.equal(sameMood.fact, "这周你 2 次选了「治愈」，都在周五到周日。");
+  assert.equal(sameMood.fact, "这周你 2 次选了『治愈』，都在周五到周日。");
   assert.equal(render("en", [Q, D, H, H], [days[0], days[2], days[5], days[6]]).fact, "You chose Healing twice this week, all on Fri–Sun.");
   const mixed = render("zh-Hans", [S, Q, W, F, F], [days[0], days[2], days[4], days[5], days[6]]);
   assert.equal(mixed.arc, "MIXED");
-  assert.equal(mixed.fact, "这周你选了 4 种心情，最多的是「愤怒」，2 次。");
+  assert.equal(mixed.fact, "这周你选了 4 种心情，最多的是『愤怒』，2 次。");
   assert.equal(render("en", [S, Q, W, F, F], [days[0], days[2], days[4], days[5], days[6]]).fact,
     "You chose 4 different moods this week, Fire most often (twice).");
 });

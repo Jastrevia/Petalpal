@@ -180,7 +180,7 @@ test('M3 insight types are read with their labels; SELF_TALK keeps no subject to
     { kind: 'INSIGHT', type: 'BODY_SIGNAL', role: 'secondary', text: 'b', subject: '睡眠', evidence: ev, ...meta }] });
   assert.equal(short.insights.main.type, 'FIRST_TIME');
   assert.deepEqual(short.insights.secondary.map(item => [item.type, item.subject]), [['SELF_TALK', null], ['RHYTHM', null], ['BODY_SIGNAL', '睡眠']]);
-  assert.equal(SHORT_COPY['zh-Hans'].types.SELF_TALK, '反复的句式');
+  assert.equal(SHORT_COPY['zh-Hans'].types.SELF_TALK, '又写到的话');
 });
 
 test('Monthly 2.0: read only with its headline version; every part checked; malformed parts skipped', () => {

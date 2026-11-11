@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { readEvent } from '../../services/events';
-import { MONTHLY_COPY, MOOD_SPECIES, SHORT_COPY, shortDate, type Monthly2 } from '../../services/reflections';
+import { MONTHLY_COPY, MOOD_SPECIES, SHORT_COPY, shortDate, weekOfMonth, type Monthly2 } from '../../services/reflections';
 import { useAppLocale } from '../../services/locale';
 import { clusterPicture } from '../garden/planting/flowerClusters';
 import { petalCardArt } from '../petalCards/petalCardArt';
@@ -12,7 +12,7 @@ import { WEEKLY_ART } from './weeklyArt';
 
 // Monthly 2.0 (backend lib/monthly-insights.js) as one spread of the blue book, written on the paper like the Weekly 2.0
 // pages: left — the date, headline, this month's garden (a calendar, one painted flower per day in that day's main mood,
-// empty soil where nothing was written) and the spread of Weekly cards; right — what changed, threads, small good
+// empty soil where nothing was written) and the month's Weekly cards, each under its week of the month; right — what changed, threads, small good
 // things, the people of the month (folded) and the question. Pages turn (Paged), never scroll.
 type Opened = { at: string; id: string; text: string | null };
 
@@ -71,7 +71,7 @@ export function MonthlyReport2({ month, part = 'all', interactive, date, report 
     <View style={v.spread}>{month.spread.map(card => {
       const art = petalCardArt(card.cardId);
       return <View key={card.periodKey} style={v.card}>
-        <Text style={v.label}>{m.roles[card.role]}</Text>
+        <Text style={v.label}>{m.week(weekOfMonth(card.periodKey))}</Text>
         {art && <Image source={art} contentFit="contain" style={v.cardArt} accessibilityLabel={card.name} />}
         <Text style={v.label}>{card.name}</Text>
         {card.headline && <Text selectable={interactive} style={[v.text, v.center]}>{card.headline}</Text>}
@@ -101,7 +101,7 @@ export function MonthlyReport2({ month, part = 'all', interactive, date, report 
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: peopleOpen }} hitSlop={12} onPress={() => setPeopleOpen(value => !value)} style={v.date}>
         <Text style={v.dateText}>{peopleOpen ? m.hide : m.show}</Text></Pressable></View>
     {peopleOpen && month.people.map(item => <Text key={item.word} selectable={interactive} style={v.text}>
-      {`“${item.word}” · ${m.peopleLine(item.count, item.mood, item.moodCount)}`}</Text>)}</> });
+      {m.peopleLine(item.word, item.count, item.mood, item.moodCount)}</Text>)}</> });
   if (month.question) right.push({ key: 'question', node: <>{right.length ? rule : null}{eyebrow(m.question)}
     <Text selectable={interactive} style={v.text}>{month.question}</Text></> });
   if (report) right.push({ key: 'report', node: report });
