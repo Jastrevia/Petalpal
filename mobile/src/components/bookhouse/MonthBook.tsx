@@ -648,3 +648,5 @@ const styles = StyleSheet.create({
   draftNote: { color: '#FFE2A8' },
   pageSub: { fontSize: 12.5, color: '#F3DFB6', textShadowColor: '#0B0603', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
 });
+/** The bookmarks, rail and controls row, shared with the Monthly Report archive (MonthlyReportBook) so both books match. */
+export { styles as monthBookStyles };

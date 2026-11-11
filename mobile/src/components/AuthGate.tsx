@@ -1,7 +1,7 @@
 import { PrivacyLinks } from './features/PrivacyAndSupport';
 import { COMMUNITY_VERSION, COMMUNITY_TEXT, COMMUNITY_TEXT_ZH } from './features/CommunityGuidelines';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fonts, Spacing } from '../constants/theme';
 import { useAuth, type EmailToConnect } from '../services/auth';
@@ -11,6 +11,7 @@ import { LoginPreviewPage } from './auth/LoginPreviewPage';
 import { AccountFrame, AvatarChoice, Check, CornerButton, Field, FooterLinks, Message, PrimaryButton, TextLink } from './auth/AccountPages';
 import { LEGACY_AVATAR_IDS } from './avatars/avatarArt';
 import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
+import { PigeonLoadingScreen } from './loading/PigeonLoadingExperience';
 import { router, usePathname } from 'expo-router';
 import { GuestContext, type Guest } from '../services/guest';
 import { devVariant } from '../services/deviceReset';
@@ -105,11 +106,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />
       {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}</View>);
   }
-  if (auth.loading) return <View style={styles.loading}>
-    <ActivityIndicator color="#365b42" accessibilityLabel="Loading session" />
-    <Text style={styles.body}>{auth.phase === 'registering' ? copy.creating : copy.opening}</Text>
+  // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
+  // loading screen takes over in the same place with measured progress once it mounts.
+  if (auth.loading) return <PigeonLoadingScreen testID="session-loading" progress={null}
+    message={auth.phase === 'registering' ? copy.creating : copy.opening}>
     {auth.phase === 'registering' ? null : <WakingFlowerFacts />}
-  </View>;
+  </PigeonLoadingScreen>;
   const profile = auth.phase === 'profileRequired';
   // An identity that never finished signing in still has its welcome page to finish on; only without one can a session be retried.
   const retry = auth.identity && auth.error && !profile;
@@ -225,7 +227,7 @@ const COPY = {
     confirm: 'Confirm Password', confirmPlaceholder: 'Once more', mismatch: 'The two passwords don’t match.',
     avatar: 'Choose Your Avatar',
     accept: 'I accept the', guidelines: 'Community Guidelines', close: 'Close',
-    create: 'Create Account', enter: 'Enter My Garden', saving: 'Saving…', creating: 'Creating your account…', opening: 'Opening PetalPal…',
+    create: 'Create Account', enter: 'Enter My Garden', saving: 'Saving…', creating: 'Creating your account…', opening: 'Preparing your garden…',
     retry: 'Try again', other: 'Use another account', back: 'Back', backToGarden: 'Back to the Garden',
     haveAccount: 'Already have an account?', connect: 'Connect to your email?',
     forgotPassword: 'Forgot your password?', forgotName: 'Forgot your username?',
@@ -246,7 +248,7 @@ const COPY = {
     confirm: '确认密码', confirmPlaceholder: '再输入一次密码', mismatch: '两次输入的密码不一样。',
     avatar: '选择你的头像',
     accept: '我接受', guidelines: '社区准则', close: '关闭',
-    create: '创建账号', enter: '进入我的花园', saving: '正在保存…', creating: '正在创建你的账号…', opening: '正在打开 PetalPal…',
+    create: '创建账号', enter: '进入我的花园', saving: '正在保存…', creating: '正在创建你的账号…', opening: '正在准备你的花园…',
     retry: '重试', other: '换一个账号', back: '返回', backToGarden: '返回花园',
     haveAccount: '已有账号？', connect: '连接你的邮箱？',
     forgotPassword: '忘记密码？', forgotName: '忘记账号名？',
@@ -267,7 +269,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#C9A35E' },
   guidelinesTitle: { color: '#4A3426', fontFamily: Fonts.rounded, fontSize: 22, fontWeight: '700' },
   guidelinesBody: { maxHeight: 360 },
-  loading: { flex: 1, backgroundColor: '#eff4e9', alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: 16 },
   body: { color: '#5A4636', fontFamily: Fonts.sans, fontSize: 15, lineHeight: 23 },
   closeButton: { minHeight: 48, backgroundColor: '#EFE3F3', borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: Spacing.three },
   closeText: { color: '#6B4A8A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '600' },

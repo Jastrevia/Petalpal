@@ -4,6 +4,17 @@ import { LoadSkiaWeb } from '@shopify/react-native-skia/lib/module/web/LoadSkiaW
 import { configureGardenWebCanvasCache, isOwnedGardenWebView } from './src/components/garden/webCanvasCache';
 import { configureGardenWebDeletedImageGuard, configureGardenWebDispose, configureGardenWebNativeOwnership, configureGardenWebRootCleanup } from './src/components/garden/webNativeHandles';
 
+// Boot screen (public/index.html): put its sweep, turns and wingbeat on the page clock (performance.now), the clock the
+// app's loading screen (PigeonLoadingExperience) uses too, so they continue unbroken when React takes over. It runs here,
+// first thing in the bundle, because the page may load scripts only from /_expo/ (no inline or other script files).
+(function syncBootScreenClock() {
+  const boot = typeof document !== 'undefined' && document.getElementById('pp-boot'); if (!boot) return;
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pass = reduced ? 3.2 : 1.6, now = performance.now() / 1000;
+  const delays = { '.band': now % (2 * pass), '.mover': now % (2 * pass), '.face': now % (2 * pass), '.strip': now % 5.1667, '.bob': now % 5.2 };
+  for (const selector in delays) { const element = boot.querySelector(selector); if (element) element.style.animationDelay = -delays[selector] + 's'; }
+})();
+
 LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
   .then(() => {
     configureGardenWebCanvasCache(globalThis.CanvasKit);
@@ -41,4 +52,16 @@ LoadSkiaWeb({ locateFile: () => '/canvaskit.wasm' })
     configureGardenWebRootCleanup(SkiaSGRoot.prototype, nativeId => isOwnedGardenWebView(globalThis.SkiaViewApi, nativeId));
     return require('expo-router/entry');
   })
-  .catch(error => console.error('Garden graphics initialization failed', error));
+  .catch(error => {
+    console.error('Garden graphics initialization failed', error);
+    // The boot loading screen (public/index.html) is still up: say so and offer a reload
+    // instead of leaving the bar sweeping forever.
+    const message = typeof document !== 'undefined' && document.getElementById('pp-boot-message');
+    if (message) {
+      message.textContent = 'PetalPal couldn\u2019t start. ';
+      const retry = document.createElement('a');
+      retry.href = ''; retry.textContent = 'Reload';
+      retry.onclick = event => { event.preventDefault(); window.location.reload(); };
+      message.appendChild(retry);
+    }
+  });

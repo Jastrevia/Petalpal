@@ -11,7 +11,10 @@ test('the Garden opens the mailbox, treehouse and pavilion through one re-entry 
   assert.equal((source.match(/router\.push\(/g) || []).length, 1, 'only leaveTo pushes a route');
   assert.match(source, /if \(leaving\.current\) return;\s*leaving\.current = true;\s*router\.push\(path\);/);
   assert.match(source, /useFocusEffect\(useCallback\(\(\) => \{[\s\S]{0,120}?leaving\.current = false;/);
-  for (const name of ['openMailbox', 'openBookhouse', 'openReflection']) assert.match(source, new RegExp(`const ${name} = useCallback\\(\\(\\) => leaveTo\\(`));
+  for (const name of ['openMailbox', 'openBookhouse']) assert.match(source, new RegExp(`const ${name} = useCallback\\(\\(\\) => leaveTo\\(`));
+  // A Garden month sign opens the pavilion at its month through the same guard; the pavilion itself opens at no month.
+  assert.match(source, /const openReflection = useCallback\(\(month\?: number\) =>\s*leaveTo\(month \? \{ pathname: '\/reflection', params: \{ month: String\(month\) \} \} : '\/reflection'\), \[leaveTo\]\);/);
+  assert.match(source, /onOpenReflection=\{openReflection\}/);
   assert.doesNotMatch(source, /onOpenBookhouse=\{\(\) => router/);
   assert.doesNotMatch(source, /onOpenReflection=\{\(\) => router/);
 });

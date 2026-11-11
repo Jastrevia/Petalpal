@@ -21,14 +21,16 @@ export default function HomeScreen() {
   // A tap on the mailbox, treehouse or pavilion opens it straight away; a second tap (or another
   // place) while the Garden is leaving does nothing, so a double tap never stacks two screens.
   const leaving = useRef(false);
-  const leaveTo = useCallback((path: '/mailbox' | '/bookhouse' | '/reflection') => {
+  const leaveTo = useCallback((path: '/mailbox' | '/bookhouse' | '/reflection' | { pathname: '/reflection'; params: { month: string } }) => {
     if (leaving.current) return;
     leaving.current = true;
     router.push(path);
   }, []);
   const openMailbox = useCallback(() => leaveTo('/mailbox'), [leaveTo]);
   const openBookhouse = useCallback(() => leaveTo('/bookhouse'), [leaveTo]);
-  const openReflection = useCallback(() => leaveTo('/reflection'), [leaveTo]);
+  // A month sign opens the pavilion at its month; the pavilion itself opens at the current one.
+  const openReflection = useCallback((month?: number) =>
+    leaveTo(month ? { pathname: '/reflection', params: { month: String(month) } } : '/reflection'), [leaveTo]);
   useFocusEffect(useCallback(() => {
     dispatchOnboarding({ type: 'gardenFocused' }); leaving.current = false; }, []));
   useEffect(() => { void SplashScreen.hideAsync(); }, []);

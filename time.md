@@ -205,6 +205,14 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   `maxAttempts: 1`. The Mobile Monthly book calls it once per visit when last
   month's reflection is missing. No scheduler creates Monthly jobs.
   TESTED BEHAVIOR: [test/back/monthly-trigger.route.test.js](test/back/monthly-trigger.route.test.js).
+- **Treehouse Monthly Report archive (read-only):** the My Journals shelf's 13th book per year
+  ([mobile/src/services/monthlyArchive.ts](mobile/src/services/monthlyArchive.ts)) files each saved
+  Monthly report under the year and month of its `periodKey` (`YYYY-MM`, account timezone) — never by
+  `periodStartUtc` and never by the device clock, so a January that starts on 31 December UTC stays in
+  its own year. A month unlocks only when a saved report for it has `narrativeStatus` `GENERATED`; a
+  month never unlocks because it has passed. Paging through `GET /ai/reports` (newest period first)
+  stops once a page reaches a period starting before `YYYY-1-12-30T00:00Z`, a margin before 1 January
+  in every timezone. TESTED BEHAVIOR: [mobile/test/monthlyReportArchive.test.mjs](mobile/test/monthlyReportArchive.test.mjs).
 - **Yearly:** `YearlyReport` exists as a data model only. There is no Yearly
   period helper, generation path or trigger.
 

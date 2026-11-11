@@ -255,13 +255,20 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   }, []);
 
   // Invitation card layout measurements for anchored fairy coordinates
+  // Random animal character selected once per Login visit (50% Pigeon / 50% Squirrel)
+  const [loginAnimal] = useState<'pigeon' | 'squirrel'>(() => (Math.random() < 0.5 ? 'pigeon' : 'squirrel'));
+  const [devOverrideAnimal, setDevOverrideAnimal] = useState<'pigeon' | 'squirrel' | null>(null);
+  const activeAnimal = devOverrideAnimal ?? loginAnimal;
+  const animalRef = useRef<'pigeon' | 'squirrel'>(activeAnimal);
+  animalRef.current = activeAnimal;
+
   const [cardLayout, setCardLayout] = useState({ width: 420, height: 546 });
   const [manualFairyTime, setManualFairyTime] = useState<number | null>(null);
   const [isFairyPaused, setIsFairyPaused] = useState(false);
 
   // Expose test automation hooks in __DEV__ on Web
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && __DEV__ && !live) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && __DEV__) {
       (window as any).__SEEK_FAIRY = (ms: number | null) => {
         if (ms === null || ms === undefined) {
           setManualFairyTime(null);
@@ -276,8 +283,13 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
         setShowDevControls(false);
         entrance.play();
       };
+      (window as any).__DEV_SET_LOGIN_ANIMAL = (animal: 'pigeon' | 'squirrel' | null) => {
+        setDevOverrideAnimal(animal);
+      };
+      (window as any).__DEV_GET_LOGIN_ANIMAL = () => animalRef.current;
       (window as any).__DEV_RESET_ENTRANCE = () => {
         entrance.reset();
+        setDevOverrideAnimal(null);
         setBannerNotice(null);
         setEmailError(null);
         setPasswordError(null);
@@ -291,6 +303,8 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
         delete (window as any).__SEEK_FAIRY;
         delete (window as any).__DEV_PLAY_ENTRANCE;
         delete (window as any).__DEV_RESET_ENTRANCE;
+        delete (window as any).__DEV_SET_LOGIN_ANIMAL;
+        delete (window as any).__DEV_GET_LOGIN_ANIMAL;
       }
     };
   }, [entrance, live]);
@@ -535,8 +549,9 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                 />
               </View>
 
-              {/* APPROVED REAL FAIRY LOADING ANIMATION SYSTEM */}
+              {/* RANDOMIZED ANIMAL LOGIN ANIMATION SYSTEM (PIGEON / SQUIRREL) */}
               <FairyLoadingExperience
+                character={activeAnimal}
                 isLoading={entrance.phase === 'idle'}
                 isPaused={isFairyPaused}
                 manualTimeMs={manualFairyTime}

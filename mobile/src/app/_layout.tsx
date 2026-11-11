@@ -17,6 +17,7 @@ import { guestRouteAllowed, useGuest } from '../services/guest';
 import { devVariant } from '../services/deviceReset';
 import { DeviceResetDone } from '../components/features/DeviceReset';
 import { useEffect } from 'react';
+import { useAppReloadKey } from '../services/appReload';
 
 // Onboarding preview shell (/onboarding-preview): DEV-only, a synthetic signed-in owner and an
 // in-memory API instead of Firebase and Render. Production never loads it.
@@ -64,6 +65,8 @@ function AppNavigationTheme({ children }: { children: React.ReactNode }) {
 
 function TabLayout() {
   const { session } = useAuth();
+  // A native Refresh (services/appReload) starts the navigator and its screens again.
+  const reloadKey = useAppReloadKey();
   const pathname = usePathname();
 
   // DEV previews need a stable parent navigator outside NativeTabs' route list.
@@ -75,7 +78,7 @@ function TabLayout() {
       <AppNavigationTheme>
         <AnimatedSplashOverlay />
         <DevLoginEntranceHost>
-        <Stack>
+        <Stack key={reloadKey}>
           <Stack.Screen name="index" options={{ title: 'Garden', headerShown: false }} />
           <Stack.Screen name="reflection" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade' }} />
@@ -105,7 +108,7 @@ function TabLayout() {
     content = (
       <AppNavigationTheme>
         <AnimatedSplashOverlay />
-        <AppTabs />
+        <AppTabs key={reloadKey} />
       </AppNavigationTheme>
     );
   }
