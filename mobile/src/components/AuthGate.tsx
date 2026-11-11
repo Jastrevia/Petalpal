@@ -33,7 +33,8 @@ type Mode = 'signIn' | 'register' | 'welcome' | 'forgotPassword' | 'forgotName';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const [mode, setMode] = useState<Mode>('register');
+  // Signed out, the sign-in page comes first ("You’re always welcome here"); its Create account opens the create page.
+  const [mode, setMode] = useState<Mode>('signIn');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -61,7 +62,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // A new identity starts clean: no password or other account's details stay in memory.
     setName(''); setPassword(''); setConfirm(''); setProblem(''); setEmailPassword('');
     setConnect(null); setConnecting(false); setAvatar(LEGACY_AVATAR_IDS[0]); setCommunityAccepted(false);
-    setMode(current => (current === 'forgotName' ? current : 'register'));
+    setMode(current => (current === 'forgotName' ? current : 'signIn'));
   }, [auth.identity?.uid]);
   useEffect(() => {
     if (!auth.loading) void SplashScreen.hideAsync().catch(() => {});
@@ -88,7 +89,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <AccountFrame title={copy.foundTitle} subtitle={copy.foundBody}>
       <Field label={copy.accountName} icon="person" fixedValue={user.name} />
       <Field label={copy.ppNumber} fixedValue={(user as { accountId?: string }).accountId ?? ''} note={copy.ppNote} />
-      <PrimaryButton label={copy.enter} onPress={() => { setReveal(false); setMode('register'); }} testID="account-found-enter" />
+      <PrimaryButton label={copy.enter} onPress={() => { setReveal(false); setMode('signIn'); }} testID="account-found-enter" />
     </AccountFrame>;
   }
   const guestMode = auth.phase === 'signedOut' && !auth.loading && !(auth.identity && auth.error);
@@ -97,10 +98,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const overGarden = (page: ReactNode) => guestMode ? <GuestContext.Provider value={guest}><View style={{ flex: 1 }}>
     {children}{page ? <View style={StyleSheet.absoluteFill}>{page}</View> : null}</View></GuestContext.Provider> : page;
   if (guestMode && !accountScreen) return overGarden(null);
-  const leaveToGarden = () => { setAccountScreen(false); go('register'); if (pathname !== '/') router.replace('/'); };
+  const leaveToGarden = () => { setAccountScreen(false); go('signIn'); if (pathname !== '/') router.replace('/'); };
   const backToGarden = auth.phase === 'signedOut' && !working
     ? <CornerButton label={copy.backToGarden} icon="back" onPress={leaveToGarden} /> : null;
-  // Signed out, the create-account page comes first; the invitation card is for coming back to an account.
+  // Signed out, the sign-in (invitation) page comes first, with the English | 中文 switch at its top right; Create
+  // account there opens the create page.
   if (mode === 'signIn' && (auth.phase === 'signedOut' || (invitationSignIn && auth.loading)) && !(auth.identity && auth.error)) {
     return overGarden(<View style={{ flex: 1 }}><LoginPreviewPage onCreateAccount={() => go('register')}
       onSignIn={async (login, secret) => {
@@ -109,7 +111,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }}
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />
-      {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}</View>);
+      {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}
+      <View style={styles.signInLanguage}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} /></View></View>);
   }
   // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
   // loading screen takes over in the same place with measured progress once it mounts.
@@ -270,6 +273,7 @@ const COPY = {
 const styles = StyleSheet.create({
   signInBack: { position: 'absolute', top: 12, left: 12, zIndex: 50 },
   createCorner: { alignItems: 'flex-end', gap: 8 },
+  signInLanguage: { position: 'absolute', top: 12, right: 12, zIndex: 50 },
   policy: { marginTop: 12, alignItems: 'center' },
   scrim: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(8, 24, 22, 0.55)' },
   card: { width: '100%', maxWidth: 440, backgroundColor: '#FBF4EA', borderRadius: 24, padding: Spacing.four, gap: Spacing.three,

@@ -343,6 +343,12 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   const guest = nodes(tree).find((n) => n.type === 'GuestProvider');
   assert.ok(guest); assert.equal(nodes(tree).some((n) => n.type === 'Field'), false);
   guest.props.value.requestAccount(); tree = hooks.render();
+  // The sign-in (invitation) page comes first, with the English | 中文 switch (English by default); its Create account
+  // opens "Create your account".
+  const firstPage = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
+  assert.ok(firstPage, 'signed out, the sign-in page comes first');
+  assert.equal(nodes(tree).find((n) => n.type === 'LanguageSwitch')?.props.value, 'en');
+  firstPage.props.onCreateAccount(); tree = hooks.render();
   // "Create your account" lies over the still-mounted Garden: account name, password, confirm; no email.
   assert.ok(JSON.stringify(tree).includes('real-app'), 'the Garden stays mounted underneath');
   assert.equal(nodes(tree).find((n) => n.type === 'AccountFrame').props.title, 'Create your account');
@@ -407,10 +413,7 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   // Coming back to an account is the invitation page, which signs in through the real auth provider and keeps the policy links.
   auth = { ...auth, phase: 'signedOut', session: null }; tree = hooks.render();
   guest.props.value.requestAccount(); tree = hooks.render();
-  // The create page's corner: the English | 中文 switch (English by default) above "Already have an account?".
-  const createCorner = [nodes(tree).find((n) => n.type === 'AccountFrame').props.right.props.children].flat();
-  assert.equal(createCorner.find((n) => n?.type === 'LanguageSwitch')?.props.value, 'en');
-  createCorner.find((n) => n?.props?.testID === 'have-account').props.onPress(); tree = hooks.render();
+  // Signed out again, the account screen opens on the sign-in page straight away.
   const invitation = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
   assert.ok(invitation); assert.ok(invitation.props.footer); assert.doesNotMatch(text(tree), /Sign out/i);
   await invitation.props.onSignIn('Bloom_22', 'petals2026');
