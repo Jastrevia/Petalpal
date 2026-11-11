@@ -2,15 +2,17 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Asset } from 'expo-asset';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationStageProps } from './fairyAnimationAssets';
 
-/** This stage cannot tell when an action's last frame has shown, so the controller's clock ends it. */
-export const STAGE_REPORTS_END = false;
+/** Actions report their real last frame (the video's `ended`), so the tour moves on from it, never from a clock. */
+export const STAGE_REPORTS_END = true;
 
-// Web. Actions play as VP9-alpha WebM <video> (preloaded, restarted from frame 0 each request).
-// WebKit (Safari, and every iOS browser) does not draw WebM alpha, so there — and for any action a
-// video fails to play — actions play as the animated WebP instead. An <img> of a URL the page has
-// already shown continues that image's shared animation rather than starting over, so each play
-// gets its own blob: URL of the once-fetched file. In every mode the new picture is drawn only once
-// its first frame is ready, and the previous one stays until then.
+// Web. Actions play as <video> (preloaded, restarted from frame 0 each request): VP9-alpha WebM in Chrome,
+// Edge and Firefox; in WebKit (Safari, and every iOS browser), which does not draw WebM alpha, the HEVC-with-
+// alpha copies the iPhone app plays (the same approved frames), decoded by the video hardware so a busy page
+// cannot hold a frame back. Each action ends when its video reports `ended`. Only if a video cannot play does
+// that action fall back to the animated WebP; an <img> of a URL the page has already shown continues that
+// image's shared animation rather than starting over, so each play gets its own blob: URL of the once-fetched
+// file, and its end is timed from its first frame. In every mode the new picture is drawn only once its first
+// frame is ready, and the previous one stays until then.
 type Action = Exclude<FairyAnimationState, 'idle'>;
 const ACTIONS: Action[] = ['greet', 'celebrate', 'fly'];
 const WEBM: Record<Action, number> = {
@@ -18,6 +20,13 @@ const WEBM: Record<Action, number> = {
   celebrate: require('@/assets/garden/fairy/onboarding-suite/fairy-celebrate.webm'),
   fly: require('@/assets/garden/fairy/onboarding-suite/fairy-fly.webm'),
 };
+const HEVC: Record<Action, number> = {
+  greet: require('@/assets/garden/fairy/onboarding-suite/fairy-greet.mov'),
+  celebrate: require('@/assets/garden/fairy/onboarding-suite/fairy-celebrate.mov'),
+  fly: require('@/assets/garden/fairy/onboarding-suite/fairy-fly.mov'),
+};
+// The tour guide's copy, made at the 370 px it is drawn (as on iPhone).
+const HEVC_FLY_GUIDE = { video: require('@/assets/garden/fairy/onboarding-suite/fairy-fly-guide.mov'), pixelHeight: 370 };
 const uri = (module: number) => Asset.fromModule(module).uri;
 
 const webkit = (() => {
@@ -26,6 +35,11 @@ const webkit = (() => {
   const iOS = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   return iOS || (/Safari\//.test(ua) && !/(Chrome|Chromium|Edg|OPR|Firefox|Android)/.test(ua));
 })();
+function videoSource(action: Action, height: number) {
+  if (!webkit) return uri(WEBM[action]);
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  return uri(action === 'fly' && height * dpr <= HEVC_FLY_GUIDE.pixelHeight ? HEVC_FLY_GUIDE.video : HEVC[action]);
+}
 
 const blobs = new Map<Action, Promise<Blob>>();
 function webpBlob(action: Action) {
@@ -60,11 +74,11 @@ const layer = (visible: boolean): CSSProperties => ({
   opacity: visible ? 1 : 0, visibility: visible ? 'visible' : 'hidden',
 });
 
-export function FairyAnimationStage({ play, loop, reduced, onStart }: FairyAnimationStageProps) {
+export function FairyAnimationStage({ play, loop, reduced, onStart, onEnd, height }: FairyAnimationStageProps) {
   const wanted = play.state === 'idle' ? 'idle' : `${play.state}:${play.id}`;
   const [onScreen, setOnScreen] = useState<string | null>(wanted === 'idle' ? 'idle' : null);
   if (wanted === 'idle' && onScreen !== 'idle') setOnScreen('idle');
-  const [noVideo, setNoVideo] = useState<ReadonlySet<Action>>(() => new Set(webkit ? ACTIONS : []));
+  const [noVideo, setNoVideo] = useState<ReadonlySet<Action>>(() => new Set());
   const [urls, setUrls] = useState<Record<string, string>>({});
   const liveUrls = useRef(urls);
   liveUrls.current = urls;
@@ -76,6 +90,10 @@ export function FairyAnimationStage({ play, loop, reduced, onStart }: FairyAnima
   useEffect(ensureHoverStyle, []);
 
   const shown = (key: string) => { if (key !== wanted) return; setOnScreen(key); onStart(play.id); };
+  const ended = (action: Action) => { if (action === wantedAction && !loop) onEnd?.(play.id); };
+  // A WebP fallback cannot report its last frame: end it its natural length after its first frame showed.
+  const webpEnd = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(webpEnd.current), [wanted]);
   const videoFailed = (action: Action) => setNoVideo(set => new Set(set).add(action));
 
   // Start the wanted action from its first frame; freeze every other video where it is.
@@ -108,8 +126,6 @@ export function FairyAnimationStage({ play, loop, reduced, onStart }: FairyAnima
   }, [wanted, onScreen, urls]);
   useEffect(() => () => { Object.values(liveUrls.current).forEach(url => URL.revokeObjectURL(url)); }, []);
 
-  // Prefetch, so the first play does not wait on the network.
-  useEffect(() => { if (webkit) ACTIONS.forEach(action => { webpBlob(action).catch(() => undefined); }); }, []);
 
   const imageKeys = [onScreen, wanted].filter((key, i, all): key is string =>
     !!key && key !== 'idle' && all.indexOf(key) === i && noVideo.has(key.split(':')[0] as Action) && !!urls[key]);
@@ -120,17 +136,24 @@ export function FairyAnimationStage({ play, loop, reduced, onStart }: FairyAnima
     {ACTIONS.filter(action => !noVideo.has(action)).map(action => <video
       key={action}
       ref={video => { videos.current.set(action, video); }}
-      src={uri(WEBM[action])}
+      src={videoSource(action, height)}
       preload="auto"
       playsInline
       muted
       loop={action === wantedAction && loop}
       onPlaying={() => { if (action === wantedAction) shown(wanted); }}
+      onEnded={() => ended(action)}
       onError={() => videoFailed(action)}
       style={layer(shownAction === action && (onScreen === wanted || action !== wantedAction))}
     />)}
     {imageKeys.map(key => <img key={key} src={urls[key]} alt=""
-      onLoad={() => shown(key)} onError={() => { if (key === wanted) setOnScreen('idle'); }}
+      onLoad={() => {
+        if (key !== wanted) return;
+        shown(key);
+        const action = key.split(':')[0] as Action;
+        clearTimeout(webpEnd.current);
+        if (!loop) webpEnd.current = setTimeout(() => ended(action), FAIRY_ANIMATION_ASSETS[action].durationMs);
+      }} onError={() => { if (key === wanted) setOnScreen('idle'); }}
       style={layer(onScreen === key)} />)}
   </div>;
 }
