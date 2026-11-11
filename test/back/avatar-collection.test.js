@@ -68,16 +68,18 @@ function fakeDatabase(users) {
 const newUser = () => ({ avatar: "fairy-1", avatarWelcomeAt: null });
 const sequence = values => { let i = 0; return n => values[i++ % values.length] % n; };
 
-test("registry: 32 Level 1 (the 8 originals kept), 16 Level 2, 27 Level 3, unique ids, art for each", () => {
-  assert.deepEqual(AVATAR_TIERS.map(t => [t.tier, t.unlockLevel, t.ids.length]), [[1, 1, 32], [2, 6, 16], [3, 14, 27]]);
-  assert.equal(new Set(AVATAR_IDS).size, 75);
+test("registry: 33 Level 1 (the 8 originals kept), 17 Level 2, 28 Level 3 (Xiaobai in each), unique ids, art for each", () => {
+  assert.deepEqual(AVATAR_TIERS.map(t => [t.tier, t.unlockLevel, t.ids.length]), [[1, 1, 33], [2, 6, 17], [3, 14, 28]]);
+  assert.equal(new Set(AVATAR_IDS).size, 78);
+  // Xiaobai, the Garden's Maltese: one portrait per tier, after the sheet portraits (scripts/crop-xiaobai-avatars.py).
+  assert.deepEqual(["l1-25", "l2-17", "l3-28"].map(avatarTier), [1, 2, 3]);
   assert.deepEqual(avatarsOfTier(1).slice(0, 8), [...LEGACY_AVATAR_IDS], "existing ids keep their place in Level 1");
   for (const id of AVATAR_IDS) {
     assert.match(id, /^(fairy-[1-8]|l[123]-\d{2})$/);
     assert.ok(fs.statSync(path.join(root, "mobile/assets/avatars", `${id}.webp`)).size < 40_000, id);
   }
   assert.equal(avatarTier("l3-27"), 3);
-  assert.equal(isLibraryAvatar("l3-28"), false);
+  assert.equal(isLibraryAvatar("l3-29"), false);
   assert.equal(isLibraryAvatar("🦋"), false);
   // Level 3 leaves out exactly level3-1 row 1 columns 1 and 2 and row 4 column 2 (30 cut, 27 kept).
   const script = fs.readFileSync(path.join(root, "scripts/crop-avatar-sheets.py"), "utf8");
@@ -134,7 +136,7 @@ test("level rewards: tiers by level, chosen not random, owned once, equipped ava
 
   db.setLevel("u", 2);
   let state = await avatarCollection(db, { userId: "u", env: ON });
-  assert.deepEqual(plain(state.pending), [{ level: 2, tier: 1, eligible: 32 - 4 }]);
+  assert.deepEqual(plain(state.pending), [{ level: 2, tier: 1, eligible: 33 - 4 }]);
   assert.equal(state.nextRewardLevel, 3);
   await assert.rejects(claimLevelAvatar(db, { userId: "u", level: 2, avatar: "l2-01", env: ON }), { code: "NOT_ELIGIBLE" }, "Lv 2 offers Level 1 only");
   await assert.rejects(claimLevelAvatar(db, { userId: "u", level: 2, avatar: owned[1], env: ON }), { code: "OWNED" });
@@ -291,8 +293,8 @@ test("avatar routes and wearing only owned avatars", async (t) => {
   const fresh = await call("/api/avatars");
   assert.equal(fresh.status, 200);
   assert.equal(fresh.body.welcome.needed, true);
-  assert.equal(fresh.body.total, 75);
-  assert.deepEqual(fresh.body.tiers.map(t => [t.tier, t.unlockLevel, t.total, t.unlocked]), [[1, 1, 32, true], [2, 6, 16, false], [3, 14, 27, false]]);
+  assert.equal(fresh.body.total, 78);
+  assert.deepEqual(fresh.body.tiers.map(t => [t.tier, t.unlockLevel, t.total, t.unlocked]), [[1, 1, 33, true], [2, 6, 17, false], [3, 14, 28, false]]);
   assert.equal((await call("/api/avatars/welcome", "POST", { avatar: "l1-02", extra: 1 })).status, 400);
   assert.equal((await call("/api/avatars/welcome", "POST", { avatar: "l3-01" })).status, 400);
   assert.equal((await call("/users/avatar", "PUT", { avatar: "l1-02" })).status, 403, "not owned yet");
