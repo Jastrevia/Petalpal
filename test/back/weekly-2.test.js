@@ -137,6 +137,9 @@ test("compute: thresholds per module, code-written facts, priority picks the mai
   assert.equal(candidates[0].role, "main");
   const link = candidates.find(candidate => candidate.type === "HIDDEN_LINK");
   assert.equal(link.subject, "妈妈"); assert.deepEqual(link.numbers, [3, 3, 11, 5]);
+  // The headline keeps the finding in plain words; the card reason reuses the fact's first sentence.
+  assert.equal(templateHeadline(link, "zh-Hans"), "写到“妈妈”的日子，心情多半不错");
+  assert.equal(link.lead, "这五周你 3 次写到“妈妈”，3 次选的都是『开心』、『平静』或『温柔』。");
   assert.ok(!candidates.some(candidate => candidate.evidence.some(item => item.sourceEventId === "e-s")), "a sensitive entry is never evidence");
   assert.equal(candidates.find(candidate => candidate.type === "SAID_BEFORE").fact, "9月2日你写下：“我想每天早上跑步。”那之后你又写了 7 条，其中 1 条提到“跑步”。");
   // English copy of the same facts (the entries stay as written).
@@ -170,7 +173,7 @@ test("rendering: headline, main insight, bouquet, secondary insights, petal card
   assert.deepEqual(main.evidence.map(item => item.sourceEventId), ["e-d", "c-0"]);
   const card = result.sections.find(section => section.kind === "PETAL_CARD");
   assert.ok(INSIGHT_CARDS.SAID_BEFORE.includes(card.cardId));
-  assert.match(card.reason, /^你写下“我想每天早上跑步”，之后又 1 次写到它。(战车画的是心里那股往前的劲。|权杖三里，小花仙站在山坡上，望着远处海上的小船。)$/u);
+  assert.match(card.reason, /^你写下“我想每天早上跑步”，之后又 1 次写到它。(战车这张牌讲的是下了决心往前走。|权杖三这张牌讲的是做了之后的等待。)$/u);
   assert.equal(result.sections.at(-1).claim, "下周跑步的时候，你想留意什么？");
   assert.equal(reportShowsEvent(result.sections, "e-d"), true); assert.equal(reportShowsEvent(result.sections, "e-a"), false);
   // The packet carries only candidates: aliases, facts and quotes; never ids, dates or moods.

@@ -197,7 +197,7 @@ test("weekly: a muted word removes candidates, threads and answers that carry it
   assert.equal(sectionsOf(muted).some(section => section.kind === "THREAD"), false);
   const short = input({ mutes: [], threads: [], answers: [], letters: [] }, CURRENT.slice(0, 2));
   const unlock = sectionsOf(short).find(section => section.kind === "UNLOCK");
-  assert.equal(unlock.claim, "一周写下 3 条，这本书就有话可说了。");
+  assert.equal(unlock.claim, "一周写下 3 条，就能看到这一周的回顾。");
 });
 
 test("weekly loop context: answers only to earlier weeks, letters due by the week's end and not carried before", async () => {
