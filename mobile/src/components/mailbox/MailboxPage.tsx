@@ -64,6 +64,68 @@ const BACKGROUND_NIGHT_PORTRAIT = require('../../../assets/mailbox/mailbox_bg_ni
 
 const LANTERN_NIGHT_ASSET = require('../../../assets/mailbox/lantern_night.png');
 
+// Night paintings: their pixel size and the part that must stay on screen (moon, carved sign,
+
+// flowering posts and the two lanterns on the table). `cover` alone would cut the moon or the
+
+// lanterns on some screen shapes (tablet portrait, phone landscape).
+
+const NIGHT_LANDSCAPE_ART = { width: 1672, height: 941, keep: { left: 250, top: 40, right: 1460, bottom: 900 } };
+
+const NIGHT_PORTRAIT_ART = { width: 941, height: 1672, keep: { left: 120, top: 40, right: 870, bottom: 1520 } };
+
+type NightArt = typeof NIGHT_LANDSCAPE_ART;
+
+// Fills the screen like `cover`, centred on the part to keep. Only when filling would cut into
+
+// that part does the painting scale down just enough to show it whole; the thin strips left at
+
+// the edges then show a softened copy of the same painting.
+
+function frameNightArt(art: NightArt, screenWidth: number, screenHeight: number) {
+
+  const { keep } = art;
+
+  const cover = Math.max(screenWidth / art.width, screenHeight / art.height);
+
+  const scale = Math.min(cover, screenWidth / (keep.right - keep.left), screenHeight / (keep.bottom - keep.top));
+
+  const width = art.width * scale, height = art.height * scale;
+
+  const place = (screen: number, size: number, start: number, end: number) =>
+
+    size <= screen ? (screen - size) / 2 : Math.min(0, Math.max(screen - size, screen / 2 - (start + end) / 2 * scale));
+
+  return {
+
+    left: place(screenWidth, width, keep.left, keep.right),
+
+    top: place(screenHeight, height, keep.top, keep.bottom),
+
+    width, height,
+
+    gaps: width < screenWidth - 0.5 || height < screenHeight - 0.5,
+
+  };
+
+}
+
+function NightBackdrop({ source, art, width, height }: { source: number; art: NightArt; width: number; height: number }) {
+
+  const frame = frameNightArt(art, width, height);
+
+  return <>
+
+    {frame.gaps ? <Image source={source} blurRadius={18} resizeMode="cover" style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.08 }] }]} /> : null}
+
+    <Image testID="mailbox-night-art" source={source} resizeMode="stretch"
+
+      style={{ position: 'absolute', left: frame.left, top: frame.top, width: frame.width, height: frame.height }} />
+
+  </>;
+
+}
+
 
 
 function useSafeInsets() {
@@ -804,15 +866,15 @@ export const MailboxPage = memo(function MailboxPage() {
 
       {/* ── ALIGNED NIGHTTIME BACKGROUND LAYER (1.8s smooth crossfade) ── */}
 
-      <Animated.Image
+      <Animated.View pointerEvents="none"
 
-        source={activeNightAsset}
+        style={[styles.backgroundCover, styles.nightBackdrop, { opacity: nightLighting }]}>
 
-        style={[styles.backgroundCover, { opacity: nightLighting }]}
+        <NightBackdrop source={activeNightAsset} art={isPortrait ? NIGHT_PORTRAIT_ART : NIGHT_LANDSCAPE_ART}
 
-        resizeMode="cover"
+          width={windowWidth} height={windowHeight} />
 
-      />
+      </Animated.View>
 
 
 
@@ -868,7 +930,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
 
 
-      {/* ── Cozy Hexagonal Wooden Lantern Resting on the Wooden Table ── */}
+      {/* ── Cozy Hexagonal Wooden Lantern Resting on the Wooden Table (day; the night painting has its own lanterns) ── */}
 
       <Animated.View
 
@@ -884,7 +946,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
               inputRange: [0, 0.4, 1],
 
-              outputRange: [0.35, 0.75, 1],
+              outputRange: [0.35, 0.15, 0],
 
             }),
 
@@ -1171,6 +1233,14 @@ export const MailboxPage = memo(function MailboxPage() {
 
 
 const styles = StyleSheet.create({
+
+  nightBackdrop: {
+
+    overflow: 'hidden',
+
+    backgroundColor: '#0E1A3A',
+
+  },
 
   backgroundCover: {
 

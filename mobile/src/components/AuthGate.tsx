@@ -100,7 +100,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />{backToGarden}</View>);
   }
-  // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
+  // Restoring the session can't be measured, so the bar waits (pulsing dots, bird over the start); the Garden's own
   // loading screen takes over in the same place with measured progress once it mounts.
   if (auth.loading) return <PigeonLoadingScreen testID="session-loading" progress={null}
     message={auth.phase === 'registering' ? 'Creating your account…' : 'Preparing your garden…'}>
