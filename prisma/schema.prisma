@@ -70,6 +70,7 @@ model User {
   insightThreads          InsightThread[]
   questionAnswers         QuestionAnswer[]
   futureLetters           FutureLetter[]
+  mailboxLetterStates     MailboxLetterState[]
   insightMutes            InsightMute[]
   weeklyReports           WeeklyReport[]
   monthlyReports          MonthlyReport[]
@@ -156,7 +157,7 @@ enum MessageReactionKind {
   DISLIKE
 }
 
-// One reaction per person per message, and the first one stands. A dislike comes with a Report.
+// One reaction per person per message (LIKE, DISLIKE, or none: the row is deleted). A dislike comes with a Report.
 model MessageReaction {
   id        String              @id @default(cuid())
   messageId String
@@ -395,6 +396,19 @@ model DailyFlowerQuota {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, localDate])
+}
+
+/// One owner's state for one Mailbox letter (lib/mailbox.js). A row exists once the owner has read
+/// the letter; deletedAt hides it from that owner's mailbox only. Letter content is app content.
+model MailboxLetterState {
+  userId    String
+  letterId  String    @db.VarChar(64)
+  readAt    DateTime  @default(now())
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, letterId])
 }
 
 /// A keepsake PPL gave the owner (lib/fairy-keepsakes.js ids); the collection is these rows.

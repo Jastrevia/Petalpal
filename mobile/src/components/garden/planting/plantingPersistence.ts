@@ -4,6 +4,7 @@ import type { FlowerMessage } from './flowerDetailData';
 import { nativeSecurityEnabled } from '../../../services/nativeSecurity';
 import { createReloadObservation } from '../../../services/nativeSecurityHarness/reloadObservation';
 import { scopeEventDraft } from '../../../services/eventDraft';
+import { scopeMailbox } from '../../../services/mailbox';
 
 export interface FlowerPlacementRecord extends FlowerPlacement {
   supportCount: number;
@@ -146,7 +147,7 @@ async function eraseKey(key: string) {
 // Each activation starts fresh, including after process restart/failed cleanup.
 export function scopeFlowerPlacements(owner: string | null): Promise<boolean> {
   const outgoing = activeOwner;
-  scopeEventDraft(owner);
+  scopeEventDraft(owner); scopeMailbox(owner);
   activeOwner = owner; generation++; storageReady = false; memoryPlacementsStore = null;
   if (nativeSecurityEnabled) cleanupResult = null;
   const session = capturePlacementSession();
@@ -265,7 +266,7 @@ let memoryPlacementsStore: FlowerPlacementRecord[] | null = null;
 let previewPlacements: FlowerPlacementRecord[] | null = null;
 export function setPreviewPlacementMemory(owner: string | null) {
   if (!__DEV__) return;
-  scopeEventDraft(owner);
+  scopeEventDraft(owner); scopeMailbox(owner);
   activeOwner = owner; generation++; memoryPlacementsStore = null;
   previewPlacements = owner ? [] : null;
   storageReady = Boolean(owner);
