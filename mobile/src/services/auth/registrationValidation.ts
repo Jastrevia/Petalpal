@@ -1,4 +1,5 @@
 import { ApiError } from '../api';
+import { signedOutLocale } from '../signedOutLocale';
 
 // The server checks all of these too (lib/accounts.js); here they only answer before a round trip.
 export const MIN_PASSWORD_LENGTH = 8;
@@ -46,10 +47,9 @@ export function profileError(profile: ProfileInput): string {
 export const PASSWORD_RESET_SENT = (email: string) =>
   `If ${email} has a PetalPal account, a link to set a new password is on its way. Check your inbox and spam folder.`;
 
-// Sign-in happens before the owner's language is known: the device's language decides (like AuthGate).
-export const deviceChinese = () => {
-  try { return /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale); } catch { return false; }
-};
+// Sign-in happens before the owner's language is known: the English | 中文 switch decides (like AuthGate),
+// English until 中文 is picked.
+export const deviceChinese = () => signedOutLocale() === 'zh-Hans';
 
 /** /auth/register made the account, then the Firebase sign-in after it failed: never register again. */
 export const ACCOUNT_CREATED_SIGN_IN_FAILED = 'petalpal/account-created-sign-in-failed';

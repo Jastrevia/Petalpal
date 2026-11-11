@@ -23,6 +23,7 @@ import { useLoginEntrance } from './useLoginEntrance';
 import { ENTRANCE_STILLS } from './entranceTimeline';
 import { FairyLoadingExperience } from './FairyLoadingExperience';
 import { Link } from 'expo-router';
+import { useSignedOutLocale } from '../../services/signedOutLocale';
 const INVITATION_MATERIALS = require('../../../assets/auth/invitation_materials_repaired.webp');
 
 // Top Botanical Sprout Fleuron above PetalPal brand title
@@ -187,11 +188,20 @@ function GoogleIcon({ size = 17 }: { size?: number }) {
   );
 }
 
-const LOGIN_COPY = /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale)
-  ? { label: '用户名 / PP 号', placeholder: '你的名字或 PP 号', missing: '请输入用户名或 PP 号',
-    forgot: '密码只能通过已连接的邮箱重置：请在上面输入你的邮箱，再点“忘记密码”。' }
-  : { label: 'Username / PP number', placeholder: 'Your name or PP number', missing: 'Please enter your username or PP number',
-    forgot: 'A password can only be reset through a connected email: enter that email above, then tap Forgot password.' };
+// In the language of the English | 中文 switch on the create-account page (services/signedOutLocale).
+const LOGIN_COPIES = {
+  zh: { label: '用户名 / PP 号', placeholder: '你的名字或 PP 号', missing: '请输入用户名或 PP 号',
+    forgot: '密码只能通过已连接的邮箱重置：请在上面输入你的邮箱，再点“忘记密码”。',
+    welcome: '这里永远欢迎你。', password: '密码', passwordPlaceholder: '输入你的密码', passwordMissing: '请输入密码',
+    showPassword: '显示密码', hidePassword: '隐藏密码', opening: '正在打开…', logIn: '登录', or: '或',
+    apple: '使用 Apple 继续', google: '使用 Google 继续', forgotPassword: '忘记密码？', createAccount: '创建账号' },
+  en: { label: 'Username / PP number', placeholder: 'Your name or PP number', missing: 'Please enter your username or PP number',
+    forgot: 'A password can only be reset through a connected email: enter that email above, then tap Forgot password.',
+    welcome: 'You’re always welcome here.', password: 'Password', passwordPlaceholder: 'Enter your password',
+    passwordMissing: 'Please enter your password', showPassword: 'Show password', hidePassword: 'Hide password',
+    opening: 'Opening…', logIn: 'Log In', or: 'or', apple: 'Continue with Apple', google: 'Continue with Google',
+    forgotPassword: 'Forgot password?', createAccount: 'Create account' },
+};
 
 export interface LoginPreviewPageProps {
   isHandoffTransitioning?: boolean;
@@ -224,6 +234,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   footer,
 }: LoginPreviewPageProps = {}) {
   const live = !!onSignIn;
+  const LOGIN_COPY = LOGIN_COPIES[useSignedOutLocale() === 'zh-Hans' ? 'zh' : 'en'];
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -358,7 +369,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
     }
 
     if (!password) {
-      setPasswordError('Please enter your password');
+      setPasswordError(LOGIN_COPY.passwordMissing);
       valid = false;
     } else if (password.length < 4) {
       setPasswordError('Password should be at least 4 characters');
@@ -578,7 +589,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                   <TopBotanicalFleuron size={17} color="#9E804D" />
                   <Text style={styles.invitationBrandTitle}>PetalPal</Text>
                   <RosetteDivider color="#B89F70" />
-                  <Text style={styles.welcomeTitle}>You’re always welcome here.</Text>
+                  <Text style={styles.welcomeTitle}>{LOGIN_COPY.welcome}</Text>
                   <SubtleLeafAccent color="#B89F70" />
                 </View>
 
@@ -650,10 +661,10 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       />
                     </View>
                     <View style={styles.inputTextColumn}>
-                    <Text nativeID="login-password-label" pointerEvents="none" style={styles.inputLabel}>Password</Text>
+                    <Text nativeID="login-password-label" pointerEvents="none" style={styles.inputLabel}>{LOGIN_COPY.password}</Text>
                     <TextInput
                       ref={passwordRef}
-                      accessibilityLabel="Password"
+                      accessibilityLabel={LOGIN_COPY.password}
                       aria-invalid={!!passwordError}
                       aria-describedby={passwordError ? 'login-password-error' : undefined}
                       style={[styles.textInput, styles.passwordInput]}
@@ -664,7 +675,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       }}
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
-                      placeholder="Enter your password"
+                      placeholder={LOGIN_COPY.passwordPlaceholder}
                       placeholderTextColor="#71685B"
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
@@ -683,7 +694,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       style={styles.eyeToggleBtn}
                       hitSlop={10}
                       accessibilityRole="button"
-                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                      accessibilityLabel={showPassword ? LOGIN_COPY.hidePassword : LOGIN_COPY.showPassword}
                       testID="toggle-password-visibility"
                       disabled={isSubmitting}
                       accessibilityState={{ disabled: isSubmitting }}
@@ -717,7 +728,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                     <View style={styles.buttonSparkleIconWrapper}>
                       <SparkleIcon size={13} color="#FAF7F0" />
                     </View>
-                    <Text style={styles.buttonText}>{signingIn ? 'Opening…' : 'Log In'}</Text>
+                    <Text style={styles.buttonText}>{signingIn ? LOGIN_COPY.opening : LOGIN_COPY.logIn}</Text>
                     <Text style={styles.buttonArrow}>→</Text>
                   </View>
                 </Pressable>
@@ -727,7 +738,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                 {/* Divider Line with "or" */}
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerHairline} />
-                  <Text style={styles.dividerText}>or</Text>
+                  <Text style={styles.dividerText}>{LOGIN_COPY.or}</Text>
                   <View style={styles.dividerHairline} />
                 </View>
 
@@ -740,7 +751,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       pressed && styles.socialButtonPressed,
                     ]}
                     disabled={isSubmitting}
-                    accessibilityLabel="Continue with Apple"
+                    accessibilityLabel={LOGIN_COPY.apple}
                     onPress={handleAppleSignIn}
                   >
                     <AppleIcon size={14} />
@@ -756,7 +767,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       pressed && styles.socialButtonPressed,
                     ]}
                     disabled={isSubmitting}
-                    accessibilityLabel="Continue with Google"
+                    accessibilityLabel={LOGIN_COPY.google}
                     onPress={handleGoogleSignIn}
                   >
                     <GoogleIcon size={14} />
@@ -779,7 +790,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       pressed && styles.linkPressed,
                     ]}
                   >
-                    <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                    <Text style={styles.forgotPasswordText}>{LOGIN_COPY.forgotPassword}</Text>
                   </Pressable>}
                   <Pressable
                     accessibilityRole="button"
@@ -791,7 +802,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                       pressed && styles.linkPressed,
                     ]}
                   >
-                    <Text style={styles.createAccountText}>Create account</Text>
+                    <Text style={styles.createAccountText}>{LOGIN_COPY.createAccount}</Text>
                   </Pressable>
                 </View>
               </ScrollView>

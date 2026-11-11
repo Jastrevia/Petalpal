@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GARDEN_FEATURES } from '../../services/featureCatalog';
 import { usePanelTheme } from '../features/PanelTheme';
 import { FEATURE_LABELS } from '../features/FeatureOverlay';
-import { momentLocale } from '../moments/momentFormat';
+import { useAppLocale } from '../../services/locale';
 import { SidebarIllustration } from './SidebarIllustration';
 import { usePlanting } from './planting/PlantingContext';
 
@@ -17,7 +17,8 @@ export function GuestGardenHud({ onFocusFairy, onAccount }: { onFocusFairy: () =
   const { activeMode, selectedFlower } = usePlanting();
   const [highlighted, setHighlighted] = useState<string>();
   // No account yet, so the device language decides (English or Simplified Chinese).
-  const locale = momentLocale(Intl.DateTimeFormat().resolvedOptions().locale);
+  // The guest Garden speaks the language picked with the English | 中文 switch (English until 中文 is picked).
+  const locale = useAppLocale();
   const chinese = locale === 'zh-Hans';
   const phone = width < 600 || (width < 900 && height < 500);
   const iconSize = phone ? Math.max(28, Math.min(height < 500 ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;

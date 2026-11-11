@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { deviceResetSteps, finishDeviceReset, runDeviceReset, useDeviceResetResult } from '../../services/deviceReset';
 import { momentLocale } from '../moments/momentFormat';
+import { useSignedOutLocale } from '../../services/signedOutLocale';
 
 const COPY = {
   en: { reset: 'Reset this device (test build)', confirm: 'Sign out and erase everything PetalPal keeps on this phone? Entries on the server stay with the test account.',
@@ -12,10 +13,11 @@ const COPY = {
     erase: '清除', cancel: '取消', working: '正在清除…', done: '这台手机已清除', close: '请在后台划掉 PetalPal Dev，再重新打开，交给下一位测试者。',
     failed: '有些数据没有清除成功。请把 App 从手机上删除后，再交给下一位测试者。' },
 } as const;
-// Shown signed out too, so the device language decides when there is no account.
+// Shown signed out too, so the English | 中文 switch decides when there is no account.
 function useCopy() {
   const preferred = useAuth().experience?.user.preferredLocale;
-  return COPY[momentLocale(preferred ?? Intl.DateTimeFormat().resolvedOptions().locale)];
+  const chosen = useSignedOutLocale();
+  return COPY[momentLocale(preferred ?? chosen)];
 }
 
 // Only rendered in the dev variant. Asks once before erasing.

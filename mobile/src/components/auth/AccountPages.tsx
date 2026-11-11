@@ -102,6 +102,24 @@ export function CornerButton({ label, icon, onPress, testID }: { label: string; 
   </Pressable>;
 }
 
+// English | 中文 for the pages before there is an account (services/signedOutLocale): the same dark pill as the
+// corner buttons, the chosen language in gold.
+export function LanguageSwitch({ value, onChange }: { value: 'en' | 'zh-Hans'; onChange: (next: 'en' | 'zh-Hans') => void }) {
+  const option = (locale: 'en' | 'zh-Hans', label: string, a11y: string) => {
+    const selected = value === locale;
+    return <Pressable accessibilityRole="radio" accessibilityLabel={a11y} accessibilityState={{ selected }} hitSlop={6}
+      testID={`language-${locale}`} onPress={() => { if (!selected) onChange(locale); }}
+      style={({ pressed }) => [styles.languageOption, selected && styles.languageSelected, pressed && styles.pressed]}>
+      <Text style={[styles.languageText, selected && styles.languageTextSelected]}>{label}</Text>
+    </Pressable>;
+  };
+  return <View accessibilityRole="radiogroup" style={styles.languageSwitch}>
+    {option('en', 'English', 'English')}
+    <Text style={styles.languageDivider}>|</Text>
+    {option('zh-Hans', '中文', '中文（简体）')}
+  </View>;
+}
+
 // A labelled field: a little gold flower before the label, a cream pill with an icon, a note below.
 export function Field({ label, note, icon, secret, narrow, fixedValue, ...input }: TextInputProps & {
   label: string; note?: string; icon?: Glyph; secret?: boolean; narrow?: boolean; fixedValue?: string;
@@ -221,6 +239,13 @@ const styles = StyleSheet.create({
   cornerButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 13, borderRadius: 18,
     backgroundColor: 'rgba(58, 48, 70, 0.62)', borderWidth: 1, borderColor: 'rgba(233, 201, 121, 0.75)' },
   cornerText: { fontFamily: FONT_BODY, fontSize: 15, color: '#FFF8EC', flexShrink: 1 },
+  languageSwitch: { flexDirection: 'row', alignItems: 'center', minHeight: 36, paddingHorizontal: 6, borderRadius: 18,
+    backgroundColor: 'rgba(58, 48, 70, 0.62)', borderWidth: 1, borderColor: 'rgba(233, 201, 121, 0.75)' },
+  languageOption: { minHeight: 30, justifyContent: 'center', paddingHorizontal: 9, borderRadius: 15 },
+  languageSelected: { backgroundColor: 'rgba(233, 201, 121, 0.22)' },
+  languageText: { fontFamily: FONT_BODY, fontSize: 15, color: 'rgba(255, 248, 236, 0.72)' },
+  languageTextSelected: { color: '#F3D891', fontWeight: '600' },
+  languageDivider: { fontFamily: FONT_BODY, fontSize: 14, color: 'rgba(233, 201, 121, 0.6)' },
   message: { fontFamily: FONT_BODY, fontSize: 15, lineHeight: 21, color: TEXT, textAlign: 'center', marginTop: 10 },
   messageAlert: { color: '#9A3D3D' },
 });

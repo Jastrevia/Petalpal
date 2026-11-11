@@ -322,7 +322,7 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
     },
     './auth/LoginPreviewPage': { LoginPreviewPage: 'LoginPreviewPage' },
     './auth/AccountPages': { AccountFrame: 'AccountFrame', AvatarChoice: 'AvatarChoice', Check: 'Check', CornerButton: 'CornerButton', Field: 'Field',
-      FooterLinks: 'FooterLinks', Message: 'Message', PrimaryButton: 'PrimaryButton', TextLink: 'TextLink' },
+      FooterLinks: 'FooterLinks', LanguageSwitch: 'LanguageSwitch', Message: 'Message', PrimaryButton: 'PrimaryButton', TextLink: 'TextLink' },
     './avatars/avatarArt': { LEGACY_AVATAR_IDS: ['fairy-1', 'fairy-2'] },
     './features/AccountRecovery': { ConnectEmailScreen: 'ConnectEmailScreen' },
     '../constants/theme': { Fonts: { sans: 'sans', rounded: 'rounded' }, Spacing: { two: 8, three: 16, four: 24 } },
@@ -407,7 +407,10 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   // Coming back to an account is the invitation page, which signs in through the real auth provider and keeps the policy links.
   auth = { ...auth, phase: 'signedOut', session: null }; tree = hooks.render();
   guest.props.value.requestAccount(); tree = hooks.render();
-  nodes(tree).find((n) => n.type === 'AccountFrame').props.right.props.onPress(); tree = hooks.render();
+  // The create page's corner: the English | 中文 switch (English by default) above "Already have an account?".
+  const createCorner = [nodes(tree).find((n) => n.type === 'AccountFrame').props.right.props.children].flat();
+  assert.equal(createCorner.find((n) => n?.type === 'LanguageSwitch')?.props.value, 'en');
+  createCorner.find((n) => n?.props?.testID === 'have-account').props.onPress(); tree = hooks.render();
   const invitation = nodes(tree).find((n) => n.type === 'LoginPreviewPage');
   assert.ok(invitation); assert.ok(invitation.props.footer); assert.doesNotMatch(text(tree), /Sign out/i);
   await invitation.props.onSignIn('Bloom_22', 'petals2026');

@@ -8,7 +8,8 @@ import { useAuth, type EmailToConnect } from '../services/auth';
 import { accountNameError, passwordError } from '../services/auth/registrationValidation';
 import { ConnectEmailScreen } from './features/AccountRecovery';
 import { LoginPreviewPage } from './auth/LoginPreviewPage';
-import { AccountFrame, AvatarChoice, Check, CornerButton, Field, FooterLinks, Message, PrimaryButton, TextLink } from './auth/AccountPages';
+import { AccountFrame, AvatarChoice, Check, CornerButton, Field, FooterLinks, LanguageSwitch, Message, PrimaryButton, TextLink } from './auth/AccountPages';
+import { setSignedOutLocale, useSignedOutLocale } from '../services/signedOutLocale';
 import { LEGACY_AVATAR_IDS } from './avatars/avatarArt';
 import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
 import { PigeonLoadingScreen } from './loading/PigeonLoadingExperience';
@@ -74,8 +75,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     finally { busy.current = false; setWorking(false); }
   }
   const go = (next: Mode) => { setProblem(''); auth.clearMessage?.(); setMode(next); };
-  const zh = /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale);
+  // Before there is an account, the English | 中文 switch decides (English until 中文 is picked); a new account is
+  // created in that language.
+  const chosenLocale = useSignedOutLocale();
+  const zh = chosenLocale === 'zh-Hans';
   const copy = zh ? COPY.zh : COPY.en;
+  const chooseLocale = (next: 'en' | 'zh-Hans') => { setSignedOutLocale(next); rememberDisplayLocale(next); };
 
   if (auth.phase === 'signedIn' && auth.session) {
     if (!reveal || mode !== 'forgotName') return <>{children}</>;
@@ -156,7 +161,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   // The account's details, for the welcome page's button (and the profile step of an existing identity, which has no password here).
-  const details = { name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
+  const details = { name, avatar, aiConsent: false, preferredLocale: chosenLocale, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
     ...(profile ? {} : { password }) };
   if (mode === 'welcome' || profile) {
     const corner = profile || auth.identity?.email ? null : <CornerButton label={connect ? `✓ ${connect.email}` : copy.connect} icon="envelope"
@@ -188,7 +193,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setName(trimmed); auth.clearMessage?.(); setMode('welcome');
   };
   return overGarden(<AccountFrame title={copy.createTitle} subtitle={copy.createBody} fairyAt={0}
-    left={backToGarden} right={<CornerButton label={copy.haveAccount} icon="envelope" onPress={() => go('signIn')} testID="have-account" />}>
+    left={backToGarden} right={<View style={styles.createCorner}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} />
+      <CornerButton label={copy.haveAccount} icon="envelope" onPress={() => go('signIn')} testID="have-account" /></View>}>
     <Field label={copy.accountName} icon="person" narrow value={name} onChangeText={setName} editable={!working} maxLength={20}
       autoComplete="username-new" placeholder={copy.namePlaceholder} note={copy.nameRule} />
     <Field label={copy.password} icon="lock" narrow secret value={password} onChangeText={setPassword} editable={!working}
@@ -263,6 +269,7 @@ const COPY = {
 
 const styles = StyleSheet.create({
   signInBack: { position: 'absolute', top: 12, left: 12, zIndex: 50 },
+  createCorner: { alignItems: 'flex-end', gap: 8 },
   policy: { marginTop: 12, alignItems: 'center' },
   scrim: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(8, 24, 22, 0.55)' },
   card: { width: '100%', maxWidth: 440, backgroundColor: '#FBF4EA', borderRadius: 24, padding: Spacing.four, gap: Spacing.three,
