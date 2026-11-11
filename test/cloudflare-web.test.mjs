@@ -81,7 +81,9 @@ test('real Cloudflare runtime serves the actual Expo export, routes, artwork and
   await page.getByTestId('open-create-account').waitFor({ timeout: 20000 });
   await page.getByTestId('language-en').waitFor();
   await page.getByText('Terms of Use', { exact: true }).waitFor();
-  await page.getByTestId('open-create-account').click();
+  // The invitation card breathes (a slow, endless float), so the link is never "stable" for Playwright's default
+  // click; click it where it is. The create-account page appearing below proves the click landed.
+  await page.getByTestId('open-create-account').click({ force: true });
   await page.getByTestId('create-account').waitFor({ timeout: 20000 });
   assert.equal(failures.length, 0, 'Expo runtime has no uncaught browser errors');
   assert.equal(await page.evaluate(async () => (await fetch('/canvaskit.wasm')).headers.get('content-type')), 'application/wasm');
