@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { momentLocale, type MomentLocale } from '../components/moments/momentFormat';
 import { useAuth } from './auth';
+import { useSignedOutLocale } from './signedOutLocale';
 
-// The app language: the owner's preferredLocale ('en' or 'zh-Hans'), chosen in Me. Every screen
-// shows one language, never a mix.
+// The app language: the owner's preferredLocale ('en' or 'zh-Hans'), chosen in Me; before there is an account
+// (signed out, the guest Garden), the English | 中文 switch on the create-account page (signedOutLocale). Every
+// screen shows one language, never a mix; what people wrote stays in the language they wrote it in.
 export type AppLocale = MomentLocale;
 export function useAppLocale(): AppLocale {
-  let authLocale: AppLocale = 'en';
+  const chosen = useSignedOutLocale();
+  let authLocale: AppLocale = chosen;
   try {
-    authLocale = momentLocale(useAuth().experience?.user.preferredLocale);
+    const preferred = useAuth().experience?.user.preferredLocale;
+    authLocale = preferred ? momentLocale(preferred) : chosen;
   } catch {
-    authLocale = 'en';
+    authLocale = chosen;
   }
 
   const [devLocale, setDevLocale] = useState<AppLocale | null>(() => {

@@ -114,17 +114,23 @@ export function problemReportUrl(now=new Date()){
 
 // Compact sign-in footer: links plus a one-line safety note; the full notice
 // stays one tap away here and in the in-app Privacy & support panel.
+// The account pages' footer, in the app language (before an account, the English | 中文 switch's).
+const LINKS_COPY={en:{agree:'By continuing, you agree to the',and:'and',terms:'Terms of Use',privacy:'Privacy Policy',
+  notTherapy:'PetalPal is not a therapist or emergency service.',open:'Privacy & support',hide:'Hide privacy & support'},
+ 'zh-Hans':{agree:'继续即表示你同意',and:'和',terms:'使用条款',privacy:'隐私政策',
+  notTherapy:'PetalPal 不是心理治疗，也不是紧急求助服务。',open:'隐私与帮助',hide:'收起隐私与帮助'}};
 export function PrivacyLinks(){
  const [expanded,setExpanded]=useState(false);
  const [status,setStatus]=useState('');
+ const t=LINKS_COPY[useAppLocale()];
  const link={color:'#365b42',textDecorationLine:'underline' as const};
  if(expanded) return <View style={{gap:10}}><PrivacyAndSupport/>
-  <Text accessibilityRole="button" style={[ui.caption,link]} onPress={()=>setExpanded(false)}>Hide privacy & support</Text></View>;
+  <Text accessibilityRole="button" style={[ui.caption,link]} onPress={()=>setExpanded(false)}>{t.hide}</Text></View>;
  return <View style={{gap:6}}>
-  <Text style={[ui.caption,{textAlign:'center'}]}>By continuing, you agree to the{' '}
-   <Text accessibilityRole="link" style={link} onPress={()=>void openPolicy(process.env.EXPO_PUBLIC_TERMS_URL,setStatus)}>Terms of Use</Text>{' '}and{' '}
-   <Text accessibilityRole="link" style={link} onPress={()=>void openPolicy(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL,setStatus)}>Privacy Policy</Text>.
-   {' '}PetalPal is not a therapist or emergency service.</Text>
-  <Text accessibilityRole="button" style={[ui.caption,link,{textAlign:'center'}]} onPress={()=>setExpanded(true)}>Privacy & support</Text>
+  <Text style={[ui.caption,{textAlign:'center'}]}>{t.agree}{' '}
+   <Text accessibilityRole="link" style={link} onPress={()=>void openPolicy(process.env.EXPO_PUBLIC_TERMS_URL,setStatus)}>{t.terms}</Text>{' '}{t.and}{' '}
+   <Text accessibilityRole="link" style={link} onPress={()=>void openPolicy(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL,setStatus)}>{t.privacy}</Text>.
+   {' '}{t.notTherapy}</Text>
+  <Text accessibilityRole="button" style={[ui.caption,link,{textAlign:'center'}]} onPress={()=>setExpanded(true)}>{t.open}</Text>
   {status?<Text accessibilityRole="alert" style={ui.caption}>{status}</Text>:null}</View>;
 }

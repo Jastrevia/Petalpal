@@ -84,6 +84,7 @@ import {
   nextUnlockableFairy
 } from "./lib/fairy-config.js";
 import { installMailbox } from "./lib/mailbox.js";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import { OnboardingTutorialError, onboardingTutorialState, updateOnboardingTutorial } from "./lib/onboarding-tutorial.js";
 import { monthFromLocalDate, normalizeProgress } from "./lib/fairy-progress.js";
 import { resolveDailyFlowerEmotion } from "./lib/daily-flower-input.js";
@@ -192,6 +193,13 @@ if (process.env.NATIVE_SECURITY_TEST === '1') {
 }
 const PORT = Number(process.env.PORT) || 3000;
 const server = http.createServer(app);
+// Account deletion's per-account bound on failed attempts (wrong or missing password confirmations), in
+// express-rate-limit as well as the app's own limiter so code scanning sees the route is limited.
+const accountDeletionRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: false, legacyHeaders: false, validate: false,
+  keyGenerator: req => req.auth?.userId || ipKeyGenerator(req.ip || ""),
+  handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many attempts. Wait a few minutes, then try again.", code: "RATE_LIMITED" })
+});
 const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit, passwordChange: passwordChangeRateLimit } = rateLimiters();
 
 app.use((req, res, next) => {
@@ -4116,14 +4124,31 @@ app.post("/analyze-mood", aiRateLimit, async (req, res) => {
   }
 });
 
-app.delete("/users/:id", async (req, res) => {
+// Wrong passwords given to confirm a deletion count against the signed-in account (passwordChange limiter),
+// as for changing a password: a stolen session cannot guess the password here either. accountDeletionRateLimit
+// (express-rate-limit, which code scanning recognizes) holds the same per-account bound.
+app.delete("/users/:id", passwordChangeRateLimit, accountDeletionRateLimit, async (req, res) => {
     try {
       const id = req.params.id;
 
       if (!requireOwnUser(req, res, id)) return;
-      // An account with no password and no email cannot sign in again, so it must not be asked to.
-      const canSignInAgain = req.firebase.email || await prisma.accountPassword.findUnique({ where: { userId: id }, select: { userId: true } }).catch(() => true);
-      if (canSignInAgain && !requireRecentAuthentication(req, res)) return;
+      if (!signedInRecently(req)) {
+        // Not signed in within the last few minutes. An account that signs in with its email signs in again (no
+        // lookup needed). Otherwise: a name-and-password account confirms with its password right here instead of
+        // signing out and in again; an account with no password and no email cannot sign in again, so it is not
+        // asked to (a failed lookup counts as having a password: the stricter path).
+        const password = typeof req.body?.password === "string" ? req.body.password : undefined;
+        if (req.firebase.email && password === undefined) { requireRecentAuthentication(req, res); return; }
+        const stored = await prisma.accountPassword.findUnique({ where: { userId: id }, select: { hash: true } }).catch(() => undefined);
+        if (stored === null && !req.firebase.email) {
+          // No password and no email: nothing to confirm with.
+        } else if (!stored?.hash) { requireRecentAuthentication(req, res); return; }
+        else if (password === undefined) {
+          return res.status(403).json({ error: "Enter your password to delete your account.", code: "PASSWORD_CONFIRMATION_REQUIRED" });
+        } else if (!await verifyPassword(password, stored.hash)) {
+          return res.status(403).json({ error: "That isn’t your password.", code: "PASSWORD_INCORRECT" });
+        }
+      }
 
       if (process.env.NATIVE_SECURITY_TEST === '1') {
         const target = await prisma.user.findUnique({ where: { id }, select: { email: true, firebaseUid: true } });

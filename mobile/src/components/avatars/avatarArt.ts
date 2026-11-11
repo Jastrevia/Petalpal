@@ -35,6 +35,8 @@ export const AVATAR_ART: Record<string, number> = {
   'l1-22': require('@/assets/avatars/l1-22.webp'),
   'l1-23': require('@/assets/avatars/l1-23.webp'),
   'l1-24': require('@/assets/avatars/l1-24.webp'),
+  // Xiaobai, the Garden's Maltese, one portrait per tier (scripts/crop-xiaobai-avatars.py).
+  'l1-25': require('@/assets/avatars/l1-25.webp'),
   'l2-01': require('@/assets/avatars/l2-01.webp'),
   'l2-02': require('@/assets/avatars/l2-02.webp'),
   'l2-03': require('@/assets/avatars/l2-03.webp'),
@@ -51,6 +53,7 @@ export const AVATAR_ART: Record<string, number> = {
   'l2-14': require('@/assets/avatars/l2-14.webp'),
   'l2-15': require('@/assets/avatars/l2-15.webp'),
   'l2-16': require('@/assets/avatars/l2-16.webp'),
+  'l2-17': require('@/assets/avatars/l2-17.webp'),
   'l3-01': require('@/assets/avatars/l3-01.webp'),
   'l3-02': require('@/assets/avatars/l3-02.webp'),
   'l3-03': require('@/assets/avatars/l3-03.webp'),
@@ -78,6 +81,7 @@ export const AVATAR_ART: Record<string, number> = {
   'l3-25': require('@/assets/avatars/l3-25.webp'),
   'l3-26': require('@/assets/avatars/l3-26.webp'),
   'l3-27': require('@/assets/avatars/l3-27.webp'),
+  'l3-28': require('@/assets/avatars/l3-28.webp'),
 };
 export const AVATAR_IDS = Object.keys(AVATAR_ART);
 export type AvatarTier = 1 | 2 | 3;

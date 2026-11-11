@@ -8,7 +8,8 @@ import { useAuth, type EmailToConnect } from '../services/auth';
 import { accountNameError, passwordError } from '../services/auth/registrationValidation';
 import { ConnectEmailScreen } from './features/AccountRecovery';
 import { LoginPreviewPage } from './auth/LoginPreviewPage';
-import { AccountFrame, AvatarChoice, Check, CornerButton, Field, FooterLinks, Message, PrimaryButton, TextLink } from './auth/AccountPages';
+import { AccountFrame, AvatarChoice, Check, CornerButton, Field, FooterLinks, LanguageSwitch, Message, PrimaryButton, TextLink } from './auth/AccountPages';
+import { setSignedOutLocale, useSignedOutLocale } from '../services/signedOutLocale';
 import { LEGACY_AVATAR_IDS } from './avatars/avatarArt';
 import { rememberDisplayLocale, WakingFlowerFacts } from './loading/WakingFlowerFacts';
 import { PigeonLoadingScreen } from './loading/PigeonLoadingExperience';
@@ -32,7 +33,8 @@ type Mode = 'signIn' | 'register' | 'welcome' | 'forgotPassword' | 'forgotName';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const [mode, setMode] = useState<Mode>('register');
+  // Signed out, the sign-in page comes first ("You’re always welcome here"); its Create account opens the create page.
+  const [mode, setMode] = useState<Mode>('signIn');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -60,7 +62,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // A new identity starts clean: no password or other account's details stay in memory.
     setName(''); setPassword(''); setConfirm(''); setProblem(''); setEmailPassword('');
     setConnect(null); setConnecting(false); setAvatar(LEGACY_AVATAR_IDS[0]); setCommunityAccepted(false);
-    setMode(current => (current === 'forgotName' ? current : 'register'));
+    setMode(current => (current === 'forgotName' ? current : 'signIn'));
   }, [auth.identity?.uid]);
   useEffect(() => {
     if (!auth.loading) void SplashScreen.hideAsync().catch(() => {});
@@ -74,8 +76,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     finally { busy.current = false; setWorking(false); }
   }
   const go = (next: Mode) => { setProblem(''); auth.clearMessage?.(); setMode(next); };
-  const zh = /^zh/i.test(Intl.DateTimeFormat().resolvedOptions().locale);
+  // Before there is an account, the English | 中文 switch decides (English until 中文 is picked); a new account is
+  // created in that language.
+  const chosenLocale = useSignedOutLocale();
+  const zh = chosenLocale === 'zh-Hans';
   const copy = zh ? COPY.zh : COPY.en;
+  const chooseLocale = (next: 'en' | 'zh-Hans') => { setSignedOutLocale(next); rememberDisplayLocale(next); };
 
   if (auth.phase === 'signedIn' && auth.session) {
     if (!reveal || mode !== 'forgotName') return <>{children}</>;
@@ -83,7 +89,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <AccountFrame title={copy.foundTitle} subtitle={copy.foundBody}>
       <Field label={copy.accountName} icon="person" fixedValue={user.name} />
       <Field label={copy.ppNumber} fixedValue={(user as { accountId?: string }).accountId ?? ''} note={copy.ppNote} />
-      <PrimaryButton label={copy.enter} onPress={() => { setReveal(false); setMode('register'); }} testID="account-found-enter" />
+      <PrimaryButton label={copy.enter} onPress={() => { setReveal(false); setMode('signIn'); }} testID="account-found-enter" />
     </AccountFrame>;
   }
   const guestMode = auth.phase === 'signedOut' && !auth.loading && !(auth.identity && auth.error);
@@ -92,10 +98,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const overGarden = (page: ReactNode) => guestMode ? <GuestContext.Provider value={guest}><View style={{ flex: 1 }}>
     {children}{page ? <View style={StyleSheet.absoluteFill}>{page}</View> : null}</View></GuestContext.Provider> : page;
   if (guestMode && !accountScreen) return overGarden(null);
-  const leaveToGarden = () => { setAccountScreen(false); go('register'); if (pathname !== '/') router.replace('/'); };
+  const leaveToGarden = () => { setAccountScreen(false); go('signIn'); if (pathname !== '/') router.replace('/'); };
   const backToGarden = auth.phase === 'signedOut' && !working
     ? <CornerButton label={copy.backToGarden} icon="back" onPress={leaveToGarden} /> : null;
-  // Signed out, the create-account page comes first; the invitation card is for coming back to an account.
+  // Signed out, the sign-in (invitation) page comes first, with the English | 中文 switch at its top right; Create
+  // account there opens the create page.
   if (mode === 'signIn' && (auth.phase === 'signedOut' || (invitationSignIn && auth.loading)) && !(auth.identity && auth.error)) {
     return overGarden(<View style={{ flex: 1 }}><LoginPreviewPage onCreateAccount={() => go('register')}
       onSignIn={async (login, secret) => {
@@ -104,7 +111,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }}
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />
-      {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}</View>);
+      {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}
+      <View style={styles.signInLanguage}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} /></View></View>);
   }
   // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
   // loading screen takes over in the same place with measured progress once it mounts.
@@ -156,7 +164,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   // The account's details, for the welcome page's button (and the profile step of an existing identity, which has no password here).
-  const details = { name, avatar, aiConsent: false, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
+  const details = { name, avatar, aiConsent: false, preferredLocale: chosenLocale, communityTermsVersion: communityAccepted ? COMMUNITY_VERSION : undefined,
     ...(profile ? {} : { password }) };
   if (mode === 'welcome' || profile) {
     const corner = profile || auth.identity?.email ? null : <CornerButton label={connect ? `✓ ${connect.email}` : copy.connect} icon="envelope"
@@ -188,7 +196,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setName(trimmed); auth.clearMessage?.(); setMode('welcome');
   };
   return overGarden(<AccountFrame title={copy.createTitle} subtitle={copy.createBody} fairyAt={0}
-    left={backToGarden} right={<CornerButton label={copy.haveAccount} icon="envelope" onPress={() => go('signIn')} testID="have-account" />}>
+    left={backToGarden} right={<View style={styles.createCorner}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} />
+      <CornerButton label={copy.haveAccount} icon="envelope" onPress={() => go('signIn')} testID="have-account" /></View>}>
     <Field label={copy.accountName} icon="person" narrow value={name} onChangeText={setName} editable={!working} maxLength={20}
       autoComplete="username-new" placeholder={copy.namePlaceholder} note={copy.nameRule} />
     <Field label={copy.password} icon="lock" narrow secret value={password} onChangeText={setPassword} editable={!working}
@@ -263,6 +272,8 @@ const COPY = {
 
 const styles = StyleSheet.create({
   signInBack: { position: 'absolute', top: 12, left: 12, zIndex: 50 },
+  createCorner: { alignItems: 'flex-end', gap: 8 },
+  signInLanguage: { position: 'absolute', top: 12, right: 12, zIndex: 50 },
   policy: { marginTop: 12, alignItems: 'center' },
   scrim: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(8, 24, 22, 0.55)' },
   card: { width: '100%', maxWidth: 440, backgroundColor: '#FBF4EA', borderRadius: 24, padding: Spacing.four, gap: Spacing.three,

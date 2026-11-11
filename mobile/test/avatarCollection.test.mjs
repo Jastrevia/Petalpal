@@ -20,10 +20,10 @@ const collection = (overrides = {}) => ({
   pending: [{ level: 5, tier: 1, eligible: 28 }, { level: 6, tier: 2, eligible: 44 }], ready: 2, nextRewardLevel: 7, claims: [], ...overrides,
 });
 
-test('the app shows the same three tiers as the server: 32, 16 and 27 avatars', () => {
+test('the app shows the same three tiers as the server: 33, 17 and 28 avatars', () => {
   const { AVATAR_TIERS: app, avatarTier } = modules().load('../../avatars/avatarArt');
   assert.deepEqual(plain(app), AVATAR_TIERS.map(({ tier, unlockLevel, ids }) => ({ tier, unlockLevel, ids: [...ids] })));
-  assert.deepEqual(plain(app).map(t => t.ids.length), [32, 16, 27]);
+  assert.deepEqual(plain(app).map(t => t.ids.length), [33, 17, 28]);
   assert.equal(avatarTier('fairy-4'), 1);
   assert.equal(avatarTier('l2-16'), 2);
   assert.equal(avatarTier('🐝'), null);

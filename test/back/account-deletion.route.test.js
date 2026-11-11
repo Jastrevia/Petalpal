@@ -155,3 +155,48 @@ test("account deletion is owner-only, deletes all related data and retains a dur
   const rolledBack=await remove("owner-token");assert.equal(rolledBack.status,500);
   assert.deepEqual(current.state,deletionTransaction().state);
 });
+
+// Not signed in within the last few minutes: a name-and-password account confirms with its password in the
+// delete dialog instead of signing out and in again. Without it, or with a wrong one, nothing is deleted.
+test("a password account not signed in recently deletes only after confirming its password", async (t) => {
+  const { hashPassword } = await import("../../lib/accounts.js");
+  const hash = await hashPassword("garden-pass-1");
+  const originals = { user: prisma.user.findUnique, password: prisma.accountPassword.findUnique, update: prisma.accountDeletion.update,
+    audit: prisma.auditEvent.create, transaction: prisma.$transaction };
+  const current = deletionTransaction();
+  let transactions = 0, deletedUid = null;
+  prisma.user.findUnique = async () => ({ id: "owner-1" });
+  prisma.accountPassword.findUnique = async ({ where }) => where.userId === "owner-1" ? { hash } : null;
+  prisma.accountDeletion.update = async ({ data }) => Object.assign(current.state.deletionRecord, data);
+  prisma.auditEvent.create = async () => ({ id: "audit-1" });
+  prisma.$transaction = async (callback) => { transactions++; return callback(current.tx); };
+  setFirebaseTokenVerifierForTests(async () => ({ uid: "firebase-owner", email_verified: false,
+    iat: Math.floor(Date.now() / 1000), auth_time: Math.floor(Date.now() / 1000) - 3600 }));
+  setFirebaseUserDeleterForTests(async (uid) => { deletedUid = uid; });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(async () => {
+    prisma.user.findUnique = originals.user; prisma.accountPassword.findUnique = originals.password;
+    prisma.accountDeletion.update = originals.update; prisma.auditEvent.create = originals.audit; prisma.$transaction = originals.transaction;
+    setFirebaseTokenVerifierForTests(); setFirebaseUserDeleterForTests();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  const remove = (body) => fetch(`http://127.0.0.1:${server.address().port}/users/owner-1`, {
+    method: "DELETE", headers: { Authorization: "Bearer stale-owner", "Content-Type": "application/json" },
+    ...(body ? { body: JSON.stringify(body) } : {}) });
+
+  const ask = await remove();
+  assert.equal(ask.status, 403);
+  assert.equal((await ask.json()).code, "PASSWORD_CONFIRMATION_REQUIRED");
+  const wrong = await remove({ password: "not-the-one-1" });
+  assert.equal(wrong.status, 403);
+  assert.equal((await wrong.json()).code, "PASSWORD_INCORRECT");
+  assert.equal(transactions, 0); assert.equal(deletedUid, null);
+  assert.deepEqual(current.state, deletionTransaction().state, "nothing is deleted without the right password");
+
+  const confirmed = await remove({ password: "garden-pass-1" });
+  assert.equal(confirmed.status, 200);
+  assert.equal(deletedUid, "firebase-owner");
+  assert.equal(current.state.user, false);
+  assert.ok(current.state.deletionRecord.completedAt);
+});
