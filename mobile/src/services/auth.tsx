@@ -51,7 +51,8 @@ interface AuthState extends AuthSnapshot {
   /** Saves the app language (also the Weekly reflection language) and switches the app to it. */
   updateLocale: (locale: 'en' | 'zh-Hans') => Promise<void>;
   logout: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  /** `password`: confirms a name-and-password account that has not signed in within the last few minutes. */
+  deleteAccount: (password?: string) => Promise<void>;
   retry: () => Promise<void>;
 }
 const emptyState = (phase: AuthPhase = 'initializing', error = ''): AuthSnapshot => ({
@@ -137,13 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!firebaseAuth().currentUser || generation === version.current) setState(emptyState('signedOut', signedOutError.current));
   }
 
-  async function deleteAccount() {
+  async function deleteAccount(password?: string) {
     const user = firebaseAuth().currentUser;
     const owner = state.session?.user.id;
     const generation = version.current;
     if (!user || !owner || state.identity?.uid !== user.uid || !isCurrent(user, generation)) throw new Error('Sign in to delete your account.');
     // Backend owns remote/Firebase deletion. Failure must not claim deletion.
-    const result = await apiRequest<{ success: boolean; pending?: boolean; dataDeleted?: boolean; message?: string }>(`/users/${encodeURIComponent(owner)}`, 'DELETE');
+    const result = await apiRequest<{ success: boolean; pending?: boolean; dataDeleted?: boolean; message?: string }>(`/users/${encodeURIComponent(owner)}`, 'DELETE',
+      password ? { password } : undefined);
     if (!result.success && !result.dataDeleted) throw new Error(result.message || 'Account deletion was not confirmed.');
     if (isCurrent(user, generation)) await logout(result.pending ? result.message || 'Identity deletion is pending. Contact support.' : 'Your account was deleted.');
   }

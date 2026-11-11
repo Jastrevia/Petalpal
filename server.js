@@ -4116,14 +4116,29 @@ app.post("/analyze-mood", aiRateLimit, async (req, res) => {
   }
 });
 
-app.delete("/users/:id", async (req, res) => {
+// Wrong passwords given to confirm a deletion count against the signed-in account (passwordChange limiter),
+// as for changing a password: a stolen session cannot guess the password here either.
+app.delete("/users/:id", passwordChangeRateLimit, async (req, res) => {
     try {
       const id = req.params.id;
 
       if (!requireOwnUser(req, res, id)) return;
       // An account with no password and no email cannot sign in again, so it must not be asked to.
-      const canSignInAgain = req.firebase.email || await prisma.accountPassword.findUnique({ where: { userId: id }, select: { userId: true } }).catch(() => true);
-      if (canSignInAgain && !requireRecentAuthentication(req, res)) return;
+      // (A failed lookup counts as having a password: the stricter path.)
+      const stored = await prisma.accountPassword.findUnique({ where: { userId: id }, select: { hash: true } }).catch(() => undefined);
+      const canSignInAgain = req.firebase.email || stored !== null;
+      if (canSignInAgain && !signedInRecently(req)) {
+        // Not signed in within the last few minutes: a name-and-password account confirms with its password right
+        // here instead of signing out and in again. Anything else still needs a fresh sign-in.
+        if (!stored?.hash) { requireRecentAuthentication(req, res); return; }
+        const password = typeof req.body?.password === "string" ? req.body.password : undefined;
+        if (password === undefined) {
+          return res.status(403).json({ error: "Enter your password to delete your account.", code: "PASSWORD_CONFIRMATION_REQUIRED" });
+        }
+        if (!await verifyPassword(password, stored.hash)) {
+          return res.status(403).json({ error: "That isn’t your password.", code: "PASSWORD_INCORRECT" });
+        }
+      }
 
       if (process.env.NATIVE_SECURITY_TEST === '1') {
         const target = await prisma.user.findUnique({ where: { id }, select: { email: true, firebaseUid: true } });
