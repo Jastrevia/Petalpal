@@ -128,7 +128,7 @@ test("a listed owner's reading is written once from the card, its orientation, t
   assert.doesNotMatch(f.calls[0].messages[0].content, /private sentence/);
   assert.equal(f.calls[0].model, PETAL_READING_MODEL_ID);
   // The prompt: no certain outcomes, no picture or tarot lessons, plain voice, and the words the validator rejects.
-  for (const rule of [/never of certain outcomes/, /Do not describe the picture/, /Do not teach tarot/, /No metaphors/, /可以试着…/, /好运, 厄运, 倒霉/, /you should, you must/]) {
+  for (const rule of [/never of certain outcomes/, /Do not describe the picture/, /Do not teach tarot/, /No metaphors/, /Keep every sentence literal/, /do not write that it shows you care/, /可以试着…/, /好运, 厄运, 倒霉/, /you should, you must/]) {
     assert.match(f.calls[0].system, rule);
   }
   const reserved = (await f.pg.query(`SELECT "actionCode" FROM "AuditEvent" WHERE "eventType"='AI_GATEWAY_USD_RESERVED'`)).rows;
