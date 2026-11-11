@@ -35,11 +35,12 @@
         height: 100%;
         flex: 1;
       }
-      /* Boot loading screen: Letterwing flying along the progress bar. It is plain HTML so it shows
-         while the app's code and graphics engine download; React replaces it on its first render with
-         the same screen in the same place (PigeonLoadingExperience.tsx, same sizes and timings). Nothing
-         is measured yet, so a band sweeps to and fro and the bird follows its centre, turning at each
-         end. The script after the markup puts every animation on the page clock that React uses too. */
+      /* Boot loading screen: Letterwing over the progress bar. It is plain HTML so it shows while the
+         app's code and graphics engine download; React replaces it on its first render with the same
+         screen in the same place (PigeonLoadingExperience.tsx, same sizes, colours and timings). Nothing
+         is measured yet, so the bar stays empty with three dots pulsing in place and the bird waits over
+         the start of the bar, wings beating; it moves only when the app has real progress to show.
+         bootstrap.web.js puts every animation on the page clock that React uses too. */
       #pp-boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
         padding: 0 16px 240px; background: #EEF3E6; font-family: serif; overflow: hidden; }
       #pp-boot .halo { position: absolute; width: 640px; height: 640px; top: 50%; left: 50%; margin: -400px 0 0 -320px;
@@ -51,14 +52,12 @@
       #pp-boot .track { position: relative; box-sizing: border-box; width: 100%; height: 16px; border-radius: 8px; border: 1.5px solid #C8A55E;
         background: #FBF6EA; padding: 1.5px; box-shadow: 0 1px 6px #9E804D33, inset 0 1px 2px #9E804D22; }
       #pp-boot .inner { position: relative; height: 100%; border-radius: 6px; overflow: hidden; }
-      #pp-boot .band { position: absolute; top: 0; bottom: 0; width: 32%; border-radius: 6px;
-        background: linear-gradient(180deg, #7DBDC2 0%, #5AA4AB 55%, #4F979E 100%); }
-      #pp-boot .band::after { content: ''; position: absolute; left: 4px; right: 4px; top: 1.5px; height: 3px; border-radius: 2px; background: #fff; opacity: .32; }
-      #pp-boot .band, #pp-boot .mover { animation: 1.6s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate; }
-      #pp-boot .band { animation-name: pp-band; } #pp-boot .mover { animation-name: pp-follow; }
-      #pp-boot .rail { position: absolute; left: 3px; right: 3px; bottom: 16px; height: 116px; pointer-events: none; }
+      #pp-boot .waiting { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
+      #pp-boot .dot { width: 5px; height: 5px; border-radius: 2.5px; background: #5AA4AB; opacity: .3; animation: pp-wait 1.2s ease-in-out infinite; }
+      /* The rail's bottom is where React puts the bird's box (railHeight in PigeonLoadingExperience.tsx), so the bird does not move at the handoff. */
+      #pp-boot .rail { position: absolute; left: 3px; right: 3px; bottom: 17px; height: 116px; pointer-events: none; }
       #pp-boot .mover { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; }
-      #pp-boot .face { position: absolute; left: -85px; bottom: 0; width: 170px; height: 116px; animation: pp-face 3.2s linear infinite; }
+      #pp-boot .face { position: absolute; left: -85px; bottom: 0; width: 170px; height: 116px; }
       #pp-boot .bob { width: 100%; height: 100%; filter: drop-shadow(0 5px 6px #6B5A3A22); animation: pp-bob 2.6s ease-in-out infinite alternate; }
       #pp-boot .wings { position: relative; width: 100%; height: 100%; overflow: hidden; }
       #pp-boot .strip { position: absolute; left: 0; top: 0; width: 6200%; height: 100%; will-change: transform;
@@ -70,20 +69,15 @@
       @media (max-height: 699px) { #pp-boot { padding-bottom: 140px; } }
       @media (max-width: 599px) {
         #pp-boot .sky { height: 118px; }
-        #pp-boot .rail { height: 92px; }
+        #pp-boot .rail { bottom: 20px; height: 92px; }
         #pp-boot .face { left: -67.5px; width: 135px; height: 92px; }
         #pp-boot .bar { width: max(120px, min(300px, calc(100vw - 159px))); }
       }
       @keyframes pp-wings { to { transform: translateX(-98.387%); } }
       @keyframes pp-bob { from { transform: translateY(-1.5px) rotate(-0.5deg); } to { transform: translateY(1.5px) rotate(0.5deg); } }
-      @keyframes pp-band { from { transform: translateX(0); } to { transform: translateX(212.5%); } }
-      @keyframes pp-follow { from { transform: translateX(16%); } to { transform: translateX(84%); } }
-      @keyframes pp-face {
-        0% { transform: scaleX(1); } 47% { transform: scaleX(1); }
-        53% { transform: scaleX(-1); } 97% { transform: scaleX(-1); } 100% { transform: scaleX(1); } }
+      @keyframes pp-wait { 0%, 100% { opacity: .3; } 40% { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) {
-        #pp-boot .band, #pp-boot .mover { animation-duration: 3.2s; } #pp-boot .face { animation-duration: 6.4s; }
-        #pp-boot .bob, #pp-boot .strip { animation: none; }
+        #pp-boot .bob, #pp-boot .strip, #pp-boot .dot { animation: none; } #pp-boot .dot { opacity: .7; }
       }
     </style>
   </head>
@@ -96,7 +90,7 @@
         <div class="halo"></div>
         <div class="stage">
           <div class="sky"></div>
-          <div class="bar"><div class="track"><div class="inner"><div class="band"></div></div></div>
+          <div class="bar"><div class="track"><div class="inner"><div class="waiting" aria-hidden="true"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
             <div class="rail"><div class="mover"><div class="face"><div class="bob"><div class="wings"><div class="strip"></div></div></div></div></div></div>
             <div class="sprig" style="left:24%"><svg viewBox="0 0 18 13" width="22" height="16" fill="none" aria-hidden="true" style="transform:scaleX(-1)"><path d="M9 13 C9 9.5 9.8 6.4 12.6 4" stroke="#7FA88E" stroke-width="1" stroke-linecap="round"/><path d="M12.6 4 C13.4 1.6 15.6 0.6 17.6 1 C16.8 3.2 14.8 4.4 12.6 4 Z" fill="#7FA88E" opacity=".85"/><path d="M9.4 8.4 C7.6 6.6 5.2 6.2 3.4 7 C4.8 8.8 7.2 9.2 9.4 8.4 Z" fill="#94B9A0" opacity=".85"/></svg></div><div class="sprig" style="left:50%"><svg viewBox="0 0 18 13" width="22" height="16" fill="none" aria-hidden="true" style="transform:scale(.8);transform-origin:50% 100%"><path d="M9 13 C9 9.5 9.8 6.4 12.6 4" stroke="#7FA88E" stroke-width="1" stroke-linecap="round"/><path d="M12.6 4 C13.4 1.6 15.6 0.6 17.6 1 C16.8 3.2 14.8 4.4 12.6 4 Z" fill="#7FA88E" opacity=".85"/><path d="M9.4 8.4 C7.6 6.6 5.2 6.2 3.4 7 C4.8 8.8 7.2 9.2 9.4 8.4 Z" fill="#94B9A0" opacity=".85"/></svg></div><div class="sprig" style="left:76%"><svg viewBox="0 0 18 13" width="22" height="16" fill="none" aria-hidden="true"><path d="M9 13 C9 9.5 9.8 6.4 12.6 4" stroke="#7FA88E" stroke-width="1" stroke-linecap="round"/><path d="M12.6 4 C13.4 1.6 15.6 0.6 17.6 1 C16.8 3.2 14.8 4.4 12.6 4 Z" fill="#7FA88E" opacity=".85"/><path d="M9.4 8.4 C7.6 6.6 5.2 6.2 3.4 7 C4.8 8.8 7.2 9.2 9.4 8.4 Z" fill="#94B9A0" opacity=".85"/></svg></div>
             <div class="cap l"><svg width="65" height="44" viewBox="0 0 50 34" fill="none" aria-hidden="true"> <path d="M38 17.2 C39.5 17.3 40.6 17.2 42 17" stroke="#7FA88E" stroke-width="1" stroke-linecap="round"/> <path d="M29 18 C23 19.5 17 24 10.5 22 C4.5 20 3 13.5 7 11 C10 9.2 13 11.6 11.2 14" stroke="#7FA88E" stroke-width="1.15" stroke-linecap="round"/> <path d="M18 21.6 C16.8 26.5 12.8 29 9 28.4 C10.6 24.6 13.8 22.2 18 21.6 Z" fill="#7FA88E" opacity="0.85"/> <path d="M24 19.2 C24.4 14.6 27 11.4 29.6 10.6 C29.4 14.6 27.4 17.8 24 19.2 Z" fill="#94B9A0" opacity="0.9"/> <path d="M9.5 21.5 C6.5 23.3 3.4 23 1.6 21 C4.6 19.4 7.4 19.6 9.5 21.5 Z" fill="#94B9A0" opacity="0.8"/> <ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(0 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(72 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(144 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(216 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(288 33 17)"/> <circle cx="33" cy="17" r="1.9" fill="#D9B25C"/> </svg></div><div class="cap r"><svg width="65" height="44" viewBox="0 0 50 34" fill="none" aria-hidden="true"> <path d="M38 17.2 C39.5 17.3 40.6 17.2 42 17" stroke="#7FA88E" stroke-width="1" stroke-linecap="round"/> <path d="M29 18 C23 19.5 17 24 10.5 22 C4.5 20 3 13.5 7 11 C10 9.2 13 11.6 11.2 14" stroke="#7FA88E" stroke-width="1.15" stroke-linecap="round"/> <path d="M18 21.6 C16.8 26.5 12.8 29 9 28.4 C10.6 24.6 13.8 22.2 18 21.6 Z" fill="#7FA88E" opacity="0.85"/> <path d="M24 19.2 C24.4 14.6 27 11.4 29.6 10.6 C29.4 14.6 27.4 17.8 24 19.2 Z" fill="#94B9A0" opacity="0.9"/> <path d="M9.5 21.5 C6.5 23.3 3.4 23 1.6 21 C4.6 19.4 7.4 19.6 9.5 21.5 Z" fill="#94B9A0" opacity="0.8"/> <ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(0 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(72 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(144 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(216 33 17)"/><ellipse cx="33" cy="13.6" rx="2.5" ry="3.5" fill="#F2CFCA" stroke="#E3B0AA" stroke-width=".4" transform="rotate(288 33 17)"/> <circle cx="33" cy="17" r="1.9" fill="#D9B25C"/> </svg></div></div>
