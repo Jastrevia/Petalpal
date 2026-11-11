@@ -797,6 +797,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
                     hitSlop={8}
                     disabled={isSubmitting}
                     onPress={handleCreateAccount}
+                    testID="open-create-account"
                     style={({ pressed }) => [
                       styles.linkPressable,
                       pressed && styles.linkPressed,
