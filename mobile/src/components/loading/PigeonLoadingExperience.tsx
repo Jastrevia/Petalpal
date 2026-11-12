@@ -4,10 +4,12 @@ import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text,
 // PetalPal's loading screen: Letterwing (the mailbox's spirit bird) flies along a turquoise
 // progress bar as a living progress indicator. It only reflects real work: `progress` is a
 // measured fraction (0–1), and the bird's centre always sits over the leading edge of the fill.
-// When nothing is measurable (`progress` null) a soft band sweeps to and fro without a number
-// and the bird follows the band's centre, turning round at each end. `done` is set by the caller
-// only once the screen behind it is genuinely ready: the bar and the bird reach the end together,
-// then the whole screen fades and `onExited` fires. The bird never leaves the bar.
+// When nothing is measurable (`progress` null) the bar stays empty, three dots pulse in place
+// inside it and the bird waits over the start, wings beating; no fake progress, no sweeping.
+// `done` is set by the caller only once the screen behind it is genuinely ready: the bar and the
+// bird reach the end together, the bird flaps there a moment, then the whole screen fades and
+// `onExited` fires. The bird never leaves the bar. public/index.html draws the same screen
+// before React starts; keep the two in step.
 
 // Letterwing sheet (see garden/Letterwing.tsx): 220 × 150 cells, 11 to a row, painted facing
 // right at 12 fps. Frames 0–61 are FLY, one whole flying clip whose first frame equals its last,
@@ -21,15 +23,16 @@ const WING_SECONDS = FLY_FRAMES / CELL.fps;
 const MOVE_MS = 600, REDUCED_MOVE_MS = 200;
 const MOVE_EASING_CSS = 'cubic-bezier(0.33, 1, 0.68, 1)'; // the same ease-out cubic
 const FADE_MS = 450;
-// Indeterminate band: 32 % of the bar, one pass across in PASS seconds, eased in and out
-// (sine) so it slows to a stop before each turn.
-const BAND = 0.32;
-const PASS_SECONDS = 1.6, REDUCED_PASS_SECONDS = 3.2;
-const SWEEP_EASING_CSS = 'cubic-bezier(0.37, 0, 0.63, 1)'; // ease-in-out sine
+// After the last move to the end, the bird keeps flapping at the end of the full bar this long
+// before the screen fades.
+const DONE_HOLD_MS = 250;
+// Waiting dots (nothing measurable yet): size, gap, and one pulse running across all three.
+const DOT_SIZE = 5, DOT_GAP = 6;
+const DOT_PULSE_SECONDS = 1.2, DOT_STAGGER = 0.2;
 
 // One clock for every loading screen (the web boot screen in public/index.html uses the same
-// page clock), so the sweep and the wingbeat carry on unbroken when one loading screen hands
-// over to the next.
+// page clock), so the wingbeat and the waiting dots carry on unbroken when one loading screen
+// hands over to the next.
 const CLOCK_ORIGIN = Date.now();
 function clockSeconds() {
   return (Platform.OS === 'web' && typeof performance !== 'undefined' ? performance.now() : Date.now() - CLOCK_ORIGIN) / 1000;
@@ -78,9 +81,9 @@ export function PigeonLoadingScreen({
   useEffect(() => {
     if (!done) { fade.setValue(1); return; }
     // The bar and the bird finish their last move to the end together (same duration as every
-    // move), then the screen fades over the Garden, which is already ready and receives touches.
+    // move), the bird flaps at the end for a moment, then the screen fades over the Garden, which is already ready and receives touches.
     const run = Animated.sequence([
-      Animated.delay(reduced ? REDUCED_MOVE_MS : MOVE_MS),
+      Animated.delay((reduced ? REDUCED_MOVE_MS : MOVE_MS) + DONE_HOLD_MS),
       Animated.timing(fade, { toValue: 0, duration: reduced ? 250 : FADE_MS, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
     ]);
     run.start(({ finished }) => { if (finished) exitedRef.current?.(); });
@@ -117,12 +120,14 @@ function useReducedMotionPreference() {
 
 // The bar with Letterwing flying just above it. Geometry comes from the bar's rendered inner
 // width (measured), and the bird's rail is laid exactly over the bar's inside: rail x = 0 is the
-// fill's start, rail x = inner is its end. Determinate: fill leading edge = bird centre =
-// progress × inner, both eased with MOVE_MS. Indeterminate: band and bird share one timeline.
+// fill's start, rail x = inner is its end. One position drives both: the fill's leading edge and
+// the bird's centre sit at `at` × inner and ease there together with MOVE_MS. Measured progress →
+// `at` is that fraction. Nothing measurable yet → `at` stays 0: the bar is empty, three dots pulse
+// in place inside it and the bird hovers over the start with its wings beating. It never sweeps,
+// never turns round, and moves only when real progress arrives.
 function ProgressFlight({ progress, barWidth, birdHeight, reduced }: { progress: number | null; barWidth: number; birdHeight: number; reduced: boolean }) {
   const determinate = progress !== null && Number.isFinite(progress);
-  const value = determinate ? Math.max(0, Math.min(1, progress as number)) : 0;
-  const pass = reduced ? REDUCED_PASS_SECONDS : PASS_SECONDS;
+  const at = determinate ? Math.max(0, Math.min(1, progress as number)) : 0;
   const birdWidth = birdHeight * CELL.w / CELL.h;
   const [measured, setMeasured] = useState<number | null>(null);
   const inner = measured ?? barWidth - 2 * TRACK_INSET;
@@ -130,70 +135,55 @@ function ProgressFlight({ progress, barWidth, birdHeight, reduced }: { progress:
   // Inset so Letterwing's feet hover slightly (~3-4 px) above the top edge of the track.
   const birdBottomInset = Math.round(birdHeight * 0.15) - 4;
   const railHeight = lane + 14 + birdBottomInset;
-  const motion = useFlightMotion(determinate, value, pass, reduced);
+  const motion = useFlightMotion(at, reduced);
   const moveMs = reduced ? REDUCED_MOVE_MS : MOVE_MS;
-  const band = inner * BAND;
 
   const web = Platform.OS === 'web';
-  const sweepTiming = (name: string, alternate: boolean) =>
-    `${name} ${alternate ? pass : 2 * pass}s ${alternate ? SWEEP_EASING_CSS : 'linear'} ${motion.sweepDelay}s infinite${alternate ? ' alternate' : ''}`;
+  // Web: the first paint is at the start of the bar (where the boot screen's bird waits), then
+  // transitions carry every change, so the bird never jumps.
+  const webAt = motion.armed ? at : 0;
   const webMove = motion.armed ? `transform ${moveMs}ms ${MOVE_EASING_CSS}` : 'none';
 
   const fillNode = web
-    ? determinate
-      ? <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '100%', borderRadius: 6, overflow: 'hidden', ...WEB_FILL,
-          transform: `translateX(${(motion.fillAt - 1) * 100}%)`, transition: webMove }}><View style={styles.fillShine} /></div>
-      : <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${BAND * 100}%`, borderRadius: 6, overflow: 'hidden', ...WEB_FILL,
-          animation: sweepTiming('ppl-sweep-band', true) }}><View style={styles.fillShine} /></div>
-    : <Animated.View style={[styles.fill, { position: 'absolute', left: 0, top: 0, bottom: 0, width: determinate ? inner : band,
-        transform: [{ translateX: determinate
-          ? motion.fill.interpolate({ inputRange: [0, 1], outputRange: [-inner, 0] })
-          : motion.sweep.interpolate({ inputRange: SWEEP_STEPS, outputRange: SWEEP_STEPS.map(t => (1 - Math.cos(Math.PI * t)) / 2 * (inner - band)) }) }] }]}>
+    ? <div data-testid="pigeon-loading-fill" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '100%', borderRadius: 6, overflow: 'hidden', ...WEB_FILL,
+        transform: `translateX(${(webAt - 1) * 100}%)`, transition: webMove }}><View style={styles.fillShine} /></div>
+    : <Animated.View testID="pigeon-loading-fill" style={[styles.fill, { position: 'absolute', left: 0, top: 0, bottom: 0, width: inner,
+        transform: [{ translateX: motion.fill.interpolate({ inputRange: [0, 1], outputRange: [-inner, 0] }) }] }]}>
         <View style={styles.fillShine} />
       </Animated.View>;
 
-  // Bird centre on the rail: determinate → progress × inner; indeterminate → locked to the band's centre.
+  // Bird centre on the rail = the fill's leading edge (at × inner).
   const birdNode = web
-    ? determinate
-      ? <div data-testid="pigeon-loading-mover" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
-          transform: `translateX(${motion.birdAt * 100}%)`, transition: webMove }}>
-          <div style={{ position: 'absolute', left: -birdWidth / 2, bottom: 0, width: birdWidth, height: birdHeight }}>
-            <WebLetterwing height={birdHeight} reduced={reduced} />
-          </div>
+    ? <div data-testid="pigeon-loading-mover" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
+        transform: `translateX(${webAt * 100}%)`, transition: webMove }}>
+        <div style={{ position: 'absolute', left: -birdWidth / 2, bottom: 0, width: birdWidth, height: birdHeight }}>
+          <WebLetterwing height={birdHeight} reduced={reduced} />
         </div>
-      : <div data-testid="pigeon-loading-mover" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
-          animation: sweepTiming('ppl-sweep-bird', true) }}>
-          <div style={{ position: 'absolute', left: -birdWidth / 2, bottom: 0, width: birdWidth, height: birdHeight, animation: sweepTiming('ppl-face', false) }}>
-            <WebLetterwing height={birdHeight} reduced={reduced} />
-          </div>
-        </div>
+      </div>
     : <Animated.View testID="pigeon-loading-mover" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
-        transform: [{ translateX: determinate
-          ? motion.bird.interpolate({ inputRange: [0, 1], outputRange: [0, inner] })
-          : motion.sweep.interpolate({ inputRange: SWEEP_STEPS, outputRange: SWEEP_STEPS.map(t => band / 2 + (1 - Math.cos(Math.PI * t)) / 2 * (inner - band)) }) }] }}>
-        <Animated.View style={{ position: 'absolute', left: -birdWidth / 2, bottom: 0, width: birdWidth, height: birdHeight,
-          transform: determinate ? [] : [{ scaleX: motion.sweep.interpolate({ inputRange: [0, 0.04, 0.96, 1.04, 1.96, 2], outputRange: [1, 1, -1, -1, 1, 1] }) }] }}>
+        transform: [{ translateX: motion.bird.interpolate({ inputRange: [0, 1], outputRange: [0, inner] }) }] }}>
+        <View style={{ position: 'absolute', left: -birdWidth / 2, bottom: 0, width: birdWidth, height: birdHeight }}>
           <NativeLetterwing height={birdHeight} reduced={reduced} />
-        </Animated.View>
+        </View>
       </Animated.View>;
 
   return <View style={{ width: barWidth + 2 * ORNAMENT_PAD, height: lane + 44 }}>
     {web ? <style>{WEB_CSS}</style> : null}
     <View style={{ position: 'absolute', left: 0, right: 0, top: lane, height: 44, alignItems: 'center', justifyContent: 'center' }}>
       <View accessibilityRole="progressbar" accessibilityLabel="Loading progress"
-        accessibilityValue={determinate ? { min: 0, max: 100, now: Math.round(value * 100) } : undefined}
+        accessibilityValue={determinate ? { min: 0, max: 100, now: Math.round(at * 100) } : undefined}
         accessibilityState={{ busy: true }} testID="pigeon-loading-bar"
-        {...(web ? { dataSet: { progress: determinate ? value.toFixed(3) : 'indeterminate' } } as object : {})}
+        {...(web ? { dataSet: { progress: determinate ? at.toFixed(3) : 'indeterminate' } } as object : {})}
         style={[styles.track, { width: barWidth }]}>
         <View style={styles.trackInner} onLayout={event => {
           const next = event.nativeEvent.layout.width;
           if (next > 0 && Math.abs(next - inner) > 0.5) setMeasured(next);
-        }}>{fillNode}</View>
+        }}>{fillNode}<WaitingDots visible={!determinate} reduced={reduced} /></View>
       </View>
       <View pointerEvents="none" style={[styles.endCap, { left: 0 }]}><EndOrnament /></View>
       <View pointerEvents="none" style={[styles.endCap, { right: 0, transform: [{ scaleX: -1 }] }]}><EndOrnament /></View>
-      {[0.24, 0.5, 0.76].map((at, index) => <View key={at} pointerEvents="none"
-        style={[styles.sprig, { left: ORNAMENT_PAD + barWidth * at - 11, transform: index === 1 ? [] : [{ scaleX: index === 0 ? -1 : 1 }] }]}>
+      {[0.24, 0.5, 0.76].map((spot, index) => <View key={spot} pointerEvents="none"
+        style={[styles.sprig, { left: ORNAMENT_PAD + barWidth * spot - 11, transform: index === 1 ? [] : [{ scaleX: index === 0 ? -1 : 1 }] }]}>
         <Sprig small={index === 1} />
       </View>)}
     </View>
@@ -203,49 +193,64 @@ function ProgressFlight({ progress, barWidth, birdHeight, reduced }: { progress:
   </View>;
 }
 
-// Samples for the native sweep: 0–1 going right, 1–2 coming back, eased (sine) like the web band.
-const SWEEP_STEPS = Array.from({ length: 33 }, (_, i) => i / 16);
+// The waiting sign while nothing is measurable: three dots in the middle of the empty bar that
+// brighten one after another. They stay in place (no number, no sweeping band) and fade out as
+// soon as real progress starts filling the bar. Same dots, sizes and timing as public/index.html.
+function WaitingDots({ visible, reduced }: { visible: boolean; reduced: boolean }) {
+  const [delay] = useState(() => -(clockSeconds() % DOT_PULSE_SECONDS));
+  if (Platform.OS === 'web') {
+    return <div data-testid="pigeon-loading-waiting" aria-hidden="true" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: DOT_GAP, opacity: visible ? 1 : 0, transition: 'opacity 300ms ease-out' }}>
+      {[0, 1, 2].map(i => <div key={i} style={{ width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2, backgroundColor: TURQUOISE,
+        opacity: reduced ? 0.7 : 0.3, animation: reduced ? undefined : `ppl-wait ${DOT_PULSE_SECONDS}s ease-in-out ${delay + i * DOT_STAGGER}s infinite` }} />)}
+    </div>;
+  }
+  return visible ? <NativeWaitingDots reduced={reduced} /> : null;
+}
 
-// Drives the shared motion values. Determinate: `fillAt`/`birdAt` (web) or `fill`/`bird`
-// (native) ease to the measured value together. On the first frame after a sweeping screen,
-// the bird starts where that screen left it and both settle on the measured value in one move.
-function useFlightMotion(determinate: boolean, value: number, pass: number, reduced: boolean) {
+function NativeWaitingDots({ reduced }: { reduced: boolean }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduced) { pulse.setValue(0); return; }
+    const run = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: DOT_PULSE_SECONDS * 1000, easing: Easing.linear, useNativeDriver: true }));
+    run.start();
+    return () => run.stop();
+  }, [reduced, pulse]);
+  return <View testID="pigeon-loading-waiting" pointerEvents="none" style={styles.waiting}>
+    {[0, 1, 2].map(i => <Animated.View key={i} style={[styles.dot, { opacity: reduced ? 0.7
+      : pulse.interpolate({ inputRange: DOT_STEPS, outputRange: DOT_STEPS.map(t => dotOpacity(t - i * DOT_STAGGER / DOT_PULSE_SECONDS)) }) }]} />)}
+  </View>;
+}
+
+// One dot's brightness over a pulse (0–1): 0.3 → 1 at 40 %, back to 0.3 (the web keyframes).
+const DOT_STEPS = Array.from({ length: 25 }, (_, i) => i / 24);
+function dotOpacity(phase: number) {
+  const u = ((phase % 1) + 1) % 1;
+  return u < 0.4 ? 0.3 + 0.7 * (u / 0.4) : 1 - 0.7 * ((u - 0.4) / 0.6);
+}
+
+// Drives the shared position. Web: `armed` turns transitions on after the first paint. Native:
+// `fill` and `bird` ease to the same target with the same duration and easing.
+function useFlightMotion(at: number, reduced: boolean) {
   const [armed, setArmed] = useState(false);
-  const fill = useRef(new Animated.Value(value)).current;
-  const bird = useRef(new Animated.Value(value)).current;
-  const sweep = useRef(new Animated.Value(0)).current;
-  const [sweepDelay, setSweepDelay] = useState(() => -(clockSeconds() % (2 * pass)));
-  useEffect(() => { setSweepDelay(-(clockSeconds() % (2 * pass))); }, [pass]);
-  // Web: paint the starting position once, then let transitions carry every later change.
+  const fill = useRef(new Animated.Value(0)).current;
+  const bird = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     let second = 0;
     const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => setArmed(true)); });
-    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+    // A page in a background tab gets no animation frames: arm anyway, so the bar and the bird
+    // still show the real progress there.
+    const fallback = setTimeout(() => setArmed(true), 100);
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); clearTimeout(fallback); };
   }, []);
   useEffect(() => {
-    if (!determinate || Platform.OS === 'web') return;
-    const config = { toValue: value, duration: reduced ? REDUCED_MOVE_MS : MOVE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true };
+    if (Platform.OS === 'web') return;
+    const config = { toValue: at, duration: reduced ? REDUCED_MOVE_MS : MOVE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true };
     const run = Animated.parallel([Animated.timing(fill, config), Animated.timing(bird, config)]);
     run.start();
     return () => run.stop();
-  }, [determinate, value, reduced, fill, bird]);
-  useEffect(() => {
-    if (determinate || Platform.OS === 'web') return;
-    // One linear timeline 0 → 2 per round trip, started where the shared clock is.
-    const phase = (clockSeconds() % (2 * pass)) / pass;
-    sweep.setValue(phase);
-    const round = pass * 2000;
-    const run = Animated.sequence([
-      Animated.timing(sweep, { toValue: 2, duration: (2 - phase) / 2 * round, easing: Easing.linear, useNativeDriver: true }),
-      Animated.loop(Animated.sequence([
-        Animated.timing(sweep, { toValue: 0, duration: 0, useNativeDriver: true }),
-        Animated.timing(sweep, { toValue: 2, duration: round, easing: Easing.linear, useNativeDriver: true }),
-      ])),
-    ]);
-    run.start();
-    return () => run.stop();
-  }, [determinate, pass, sweep]);
-  return { armed, fill, bird, sweep, sweepDelay, fillAt: value, birdAt: value };
+  }, [at, reduced, fill, bird]);
+  return { armed, fill, bird };
 }
 
 // Web: the FLY frames from a one-row strip (public/loading/letterwing-fly.webp, made from the
@@ -256,15 +261,7 @@ const WEB_STRIP = '/loading/letterwing-fly.webp';
 const WEB_CSS = `
 @keyframes ppl-wings { from { transform: translateX(0); } to { transform: translateX(-${(FLY_FRAMES - 1) / FLY_FRAMES * 100}%); } }
 @keyframes ppl-bob { from { transform: translateY(-1.5px) rotate(-0.5deg); } to { transform: translateY(1.5px) rotate(0.5deg); } }
-@keyframes ppl-sweep-band { from { transform: translateX(0%); } to { transform: translateX(212.5%); } }
-@keyframes ppl-sweep-bird { from { transform: translateX(16%); } to { transform: translateX(84%); } }
-@keyframes ppl-face {
-  0% { transform: scaleX(1); }
-  47% { transform: scaleX(1); }
-  53% { transform: scaleX(-1); }
-  97% { transform: scaleX(-1); }
-  100% { transform: scaleX(1); }
-}
+@keyframes ppl-wait { 0%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
 `;
 function WebLetterwing({ height, reduced }: { height: number; reduced: boolean }) {
   const width = height * CELL.w / CELL.h;
@@ -374,6 +371,8 @@ const styles = StyleSheet.create({
     boxShadow: '0 1px 6px #9E804D33, inset 0 1px 2px #9E804D22' },
   trackInner: { flex: 1, borderRadius: 6, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 6, backgroundColor: TURQUOISE, overflow: 'hidden' },
+  waiting: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: DOT_GAP },
+  dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2, backgroundColor: TURQUOISE },
   fillShine: { position: 'absolute', left: 4, right: 4, top: 1.5, height: 3, borderRadius: 2, backgroundColor: '#FFFFFF', opacity: 0.32 },
   endCap: { position: 'absolute', top: 0, width: 65, height: 44 },
   sprig: { position: 'absolute', top: -2, width: 22, height: 16 },

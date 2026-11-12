@@ -114,7 +114,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}
       <View style={styles.signInLanguage}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} /></View></View>);
   }
-  // Restoring the session can't be measured, so the bar sweeps without a number; the Garden's own
+  // Restoring the session can't be measured, so the bar waits (pulsing dots, bird over the start); the Garden's own
   // loading screen takes over in the same place with measured progress once it mounts.
   if (auth.loading) return <PigeonLoadingScreen testID="session-loading" progress={null}
     message={auth.phase === 'registering' ? copy.creating : copy.opening}>
