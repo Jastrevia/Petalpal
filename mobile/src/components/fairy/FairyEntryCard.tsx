@@ -3,6 +3,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View, type ImageSourcePropTy
 import type { ClosenessSummary } from '../../services/fairyCloseness';
 import { fairyRuntimeBlock, refreshFairyRuntime } from '../../services/fairyRuntime';
 import { useFairyName, withFairyName } from '../../services/fairyName';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const HEART = require('@/assets/fairy-entry/bond-heart.webp');
 const BOOK = require('@/assets/fairy-entry/moments-book.webp');
@@ -47,7 +48,7 @@ export function FairyEntryCard({ visible, locale, closeness, closenessOn, moment
     setRetrying(false);
     if (runtime?.moments) { setLocked(false); onOpenMoments(); }
   }
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={close} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={close} statusBarTranslucent>
     <Pressable accessibilityLabel={copy.close} onPress={close} style={styles.backdrop}>
       <Pressable accessibilityViewIsModal onPress={() => undefined} style={styles.frame}>
         {/* English leads; Chinese is the quieter second line, only for zh-Hans owners. */}

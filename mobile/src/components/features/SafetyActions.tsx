@@ -6,6 +6,7 @@ import { UserAvatar } from '../avatars/UserAvatar';
 import { FeatureActionButton, ui } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
 import { useAppLocale } from '../../services/locale';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 const reasons = ['HARASSMENT','HATE_SPEECH','SELF_HARM','SPAM','PRIVACY','OTHER'];
 const COPY = {
   en: { dislikeIntro: 'Why don’t you like this message? Your identity is not shown to them. Private entries are not included.', dislikeReceived: 'Got it. Thank you for telling us.', reportMessage: 'Report message', reportUser: 'Report / Block user', reason: (r: string) => r.replaceAll('_',' '),
@@ -41,7 +42,7 @@ export function SafetyActions({ userId, messageId, onBlocked, trigger, onReporte
   return <View>
     {trigger ? trigger(() => { setStatus(''); setOpen(true); }, busy)
       : <FeatureActionButton secondary title={messageId ? copy.reportMessage : copy.reportUser} onPress={() => { setStatus(''); setOpen(true); }} disabled={busy} />}
-    <Modal transparent visible={open} animationType="fade" onRequestClose={close}>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={open} animationType="fade" onRequestClose={close}>
       <View style={styles.backdrop}>
         <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={close} />
         <ScrollView style={[styles.sheet, { backgroundColor: theme.surface, borderColor: theme.gold }]} contentContainerStyle={{ gap: 8 }}>

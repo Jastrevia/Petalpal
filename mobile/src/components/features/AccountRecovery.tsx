@@ -9,6 +9,7 @@ import { usePlanting } from '../garden/planting/PlantingContext';
 import { FeatureActionButton, FeatureSection, ui } from './FeatureUI';
 import { usePanelTheme } from './PanelTheme';
 import { Dialog } from './PrivacyAndSupport';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const COPY = {
   en: { connectTitle: 'Connect to your email', connectBody: 'Get your Weekly and Monthly reflections by email later, and sign in on any phone. We’ll send a link to check it’s yours.',
@@ -70,7 +71,7 @@ export function ConnectEmailScreen({ chinese, initial, knownPassword, onSave, on
   };
   const action = (title: string, onPress: () => void, secondary = false) => <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onPress}
     style={[connectStyles.button, secondary && connectStyles.secondary, busy && connectStyles.disabled]}><Text style={[connectStyles.buttonText, secondary && connectStyles.secondaryText]}>{title}</Text></Pressable>;
-  return <Modal visible animationType="slide" onRequestClose={onClose}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} visible animationType="slide" onRequestClose={onClose}>
     <KeyboardAvoidingView style={connectStyles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[connectStyles.page, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
         <View testID="connect-email" style={connectStyles.card}>

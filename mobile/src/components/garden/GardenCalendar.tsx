@@ -13,6 +13,7 @@ import { bondCopy } from '../bond/bondCopy';
 import { useFairyName } from '../../services/fairyName';
 import { CalendarCheckIn } from '../bond/CalendarCheckIn';
 import { flowerNameText } from '../../services/flowerNames';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const COPY = {
   en: { weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'], dateLocale: 'en', loading: 'Loading Garden…', none: 'No flowers or events for this day.', event: 'Event', flower: 'Flower', plant: 'Plant in Garden', view: 'View in Garden',
@@ -73,7 +74,7 @@ export function GardenCalendar({ onFocusFlower }: { onFocusFlower: (flower: Flow
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={.7} style={[label, { marginLeft: size * (locale === 'zh-Hans' ? .36 : .39), width: size * (locale === 'zh-Hans' ? .56 : .47), textAlign: 'center', fontSize: size * (locale === 'zh-Hans' ? .105 : .14) }]}>{today.toLocaleDateString(copy.dateLocale, { month: 'short', day: 'numeric' })}</Text>
       {__DEV__ && simulated && <Text style={{ position: 'absolute', top: 59, right: 8, fontSize: 10, color: ink }}>DEV date</Text>}
     </Pressable>
-    <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
       <View style={{ flex: 1, backgroundColor: '#13291D66', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
         <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => setOpen(false)} style={{ position: 'absolute', inset: 0 }} />
         <View accessibilityViewIsModal style={{ width: Math.min(390, width - 36), maxHeight: height - insets.top - insets.bottom - 36, padding: 18, borderRadius: 16, backgroundColor: popup.paper, borderWidth: 1, borderColor: popup.edge, boxShadow: `0 8px 28px #08251F30, inset 0 0 36px ${popup.shade}` }}>

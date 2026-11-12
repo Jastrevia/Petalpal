@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { useAppLocale } from '../../../services/locale';
 import { FeatureActionButton, ui } from '../../features/FeatureUI';
 import { usePanelTheme } from '../../features/PanelTheme';
+import { MODAL_ORIENTATIONS } from '../../../constants/orientation';
 
 /** Typed in English in both languages. */
 export const DELETE_FLOWER_PHRASE = 'DELETE';
@@ -32,7 +33,7 @@ export function DeleteFlowerDialog({ visible, flowerName, busy, error, onCancel,
   const [typed, setTyped] = useState('');
   useEffect(() => { if (!visible) setTyped(''); }, [visible]);
   const confirmed = typed.trim() === DELETE_FLOWER_PHRASE;
-  return <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
     <View style={styles.backdrop}>
       <Pressable accessibilityLabel={copy.keep} style={StyleSheet.absoluteFill} onPress={busy ? undefined : onCancel} />
       <View accessibilityViewIsModal style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -70,7 +71,7 @@ export function DeleteMessageDialog({ visible, busy, error, onCancel, onDelete }
 }) {
   const copy = DELETE_MESSAGE_COPY[useAppLocale()];
   const { theme } = usePanelTheme();
-  return <Modal transparent animationType="fade" visible={visible} onRequestClose={busy ? undefined : onCancel}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent animationType="fade" visible={visible} onRequestClose={busy ? undefined : onCancel}>
     <View style={styles.backdrop}>
       <Pressable accessibilityLabel={copy.cancel} style={StyleSheet.absoluteFill} onPress={busy ? undefined : onCancel} />
       <View accessibilityViewIsModal testID="delete-message-dialog" style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>

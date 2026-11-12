@@ -11,6 +11,7 @@ import { pickTapLine, RECENT_TAP_LINES } from '../garden/fairy/tapLines';
 import { bondCopy, BOND_TIERS, type BondLocale } from './bondCopy';
 import { useFairyName } from '../../services/fairyName';
 import { keepsakeArt } from './keepsakeArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // The owner's PPL illustration, cut out with soft contact shadows baked in, lying on a
 // watercolor stone deck painted once for each panel theme (same composition, day and night).
@@ -63,7 +64,7 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
   };
   const quote = said?.text ?? summary?.greeting;
 
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} style={styles.sheet}>
         <ScrollView contentContainerStyle={styles.content}>

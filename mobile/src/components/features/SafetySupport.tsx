@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FIND_A_HELPLINE_URL, safetyConcern, supportLines, type SafetyConcern } from '../../services/emotionalSafety';
 import { useAppLocale, type AppLocale } from '../../services/locale';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // What PPL's Garden says when someone writes words of danger. It speaks first as someone who cares,
 // then says exactly what can be done right now, the way Claude and ChatGPT answer such moments: no
@@ -84,7 +85,7 @@ export function SafetySupportSheet({ concern, onClose, keepLabel }: { concern: S
   const locale = useAppLocale(), copy = COPY[locale];
   if (!concern) return null;
   const text = copy[concern];
-  return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.scrim}>
       <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={StyleSheet.absoluteFill} />
       <View testID="safety-support-sheet" accessibilityViewIsModal style={styles.card}>

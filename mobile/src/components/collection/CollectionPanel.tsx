@@ -10,6 +10,7 @@ import { keepsakeArt } from '../bond/keepsakeArt';
 import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { PET_IMAGES, PetWardrobeCollection, usePetsSummary, WARDROBE_COPY, wardrobeCount } from './PetWardrobeCollection';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // Collection (收藏), opened from the Garden dock under Letters: the keepsakes her check-ins give
 // and the avatar collection, moved here from Our Bond (owner, 2026-11-06). Today's new keepsakes
@@ -42,7 +43,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
   const ownedAvatars = alerts.newAvatars.length ? alerts.newAvatars.slice(0, 3) : avatars?.owned.length ? avatars.owned.slice(-3) : AVATAR_THUMBS;
   const avatarNote = alerts.reward ? copy.ready : alerts.newAvatars.length ? copy.gifted(alerts.newAvatars.length) : null;
 
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} style={styles.sheet} testID="collection-panel">
         <Image source={CASKET} style={styles.casket} resizeMode="contain" accessible={false} />

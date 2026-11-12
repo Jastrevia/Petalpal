@@ -7,6 +7,7 @@ import type { BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { AVATAR_ART, AVATAR_TIERS, avatarTier, type AvatarTier } from './avatarArt';
 import { avatarCopy } from './avatarCopy';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 type TileState = 'equipped' | 'owned' | 'available' | 'locked';
 export function tileState(id: string, collection: Collection, equipped: string | undefined): TileState {
@@ -95,7 +96,7 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
     }
   }
 
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} style={styles.sheet}>
         <View style={styles.head}>

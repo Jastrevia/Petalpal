@@ -7,6 +7,7 @@ import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { AVATAR_ART, AVATAR_TIERS } from './avatarArt';
 import { avatarCopy } from './avatarCopy';
 import { useFairyName, withFairyName } from '../../services/fairyName';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // A new account's first avatar: the whole Level 1 collection to choose from, then PPL's gift of
 // three more at random. The server gives the gift once per account; accounts from before the
@@ -75,7 +76,7 @@ export function AvatarWelcome({ locale, enabled }: { locale: BondLocale; enabled
     } catch { setError(copy.welcomeFailed); } finally { setBusy(false); }
   }
 
-  return <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={() => { if (gift) setGift(null); }}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" statusBarTranslucent onRequestClose={() => { if (gift) setGift(null); }}>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.sheet}>
         {gift ? <View style={styles.giftBody}>

@@ -6,6 +6,7 @@ import { useAvatarCollection, useBondCelebrationHeld, useWelcomeActive } from '.
 import { BOND_TIERS, type BondLocale } from '../bond/bondCopy';
 import { usePanelTheme, type PanelTheme } from '../features/PanelTheme';
 import { avatarCopy } from './avatarCopy';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const BLOOM = require('@/assets/bond/checkin-bloom.webp');
 export const bondLevelSeenKey = (userId: string) => `petalpal_bond_avatar_level_seen_v1:${encodeURIComponent(userId)}`;
@@ -46,7 +47,7 @@ export function BondLevelUp({ userId, locale, summary, paused, onChoose }: {
     AsyncStorage.setItem(bondLevelSeenKey(userId), String(level)).catch(() => undefined);
     if (choose) onChoose();
   };
-  return <Modal transparent visible animationType="fade" onRequestClose={() => done(false)} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={() => done(false)} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.card}>
         <Animated.View style={[styles.bloomWrap, { opacity: bloom, transform: [{ scale: bloom.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }, { rotate: bloom.interpolate({ inputRange: [0, 1], outputRange: ['-12deg', '0deg'] }) }] }]}>

@@ -7,6 +7,7 @@ import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from '../garden/critters/accessoryIc
 import { forPet, isWorn, petShelf, SHELVES, type Piece, type Shelf } from '../garden/critters/petRing';
 import { CREAM, GOLD, RING_ICONS, TONES } from '../garden/critters/PetRingMenu';
 import type { BondLocale } from '../bond/bondCopy';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // Pet dress-up in Collection (owner, 2026-11-06): the golden puppy's and Xiaobai's wardrobes, two
 // pieces per part (hats, capes, pendants), each worn, owned or opening at a later Bond level, drawn
@@ -100,7 +101,7 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
   const plate = Math.min(400, width - 24);
   const circle = Math.max(76, Math.min(104, (plate - 96) / 2.6));
 
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} testID="pet-wardrobe"
         style={[styles.plate, { width: plate, backgroundColor: ground, boxShadow: `0 10px 30px ${tone.shadow}AA` }]}>

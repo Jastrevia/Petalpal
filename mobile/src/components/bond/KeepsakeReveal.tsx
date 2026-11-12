@@ -5,6 +5,7 @@ import { holdBondCelebration } from '../../services/avatars';
 import { BOND, bondCopy, type BondLocale } from './bondCopy';
 import { useFairyName } from '../../services/fairyName';
 import { keepsakeArt } from './keepsakeArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // After a check-in: PPL's keepsakes one by one (design screen 4), her note on paper, the
 // closeness gained and any level-up.
@@ -27,7 +28,7 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const keepsake = result.keepsakes[Math.min(index, result.keepsakes.length - 1)];
   const last = index >= result.keepsakes.length - 1;
   const art = keepsakeArt(keepsake.id);
-  return <Modal transparent visible animationType="fade" onRequestClose={onDone} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onDone} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.sheet}>
         <Text accessibilityRole="header" style={styles.title}>{copy.reveal}</Text>

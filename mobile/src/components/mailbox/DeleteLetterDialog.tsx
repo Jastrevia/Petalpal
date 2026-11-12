@@ -1,6 +1,7 @@
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppLocale } from '../../services/locale';
 import { FONT_BODY, FONT_TITLE } from './ExpandedLetter';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 export const DELETE_LETTER_COPY = {
   en: { title: 'Delete this letter?', body: 'This letter will be permanently removed from your mailbox. This action cannot be undone.',
@@ -14,7 +15,7 @@ export function DeleteLetterDialog({ visible, busy, error, onCancel, onDelete }:
   visible: boolean; busy: boolean; error?: string; onCancel: () => void; onDelete: () => void;
 }) {
   const copy = DELETE_LETTER_COPY[useAppLocale()];
-  return <Modal transparent animationType="fade" visible={visible} onRequestClose={busy ? undefined : onCancel}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent animationType="fade" visible={visible} onRequestClose={busy ? undefined : onCancel}>
     <View style={styles.backdrop}>
       <Pressable accessibilityLabel={copy.cancel} style={StyleSheet.absoluteFill} onPress={busy ? undefined : onCancel} />
       <View accessibilityViewIsModal testID="delete-letter-dialog" style={styles.card}>

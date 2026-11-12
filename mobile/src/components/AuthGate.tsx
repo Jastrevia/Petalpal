@@ -17,6 +17,7 @@ import { router, usePathname } from 'expo-router';
 import { GuestContext, type Guest } from '../services/guest';
 import { devVariant } from '../services/deviceReset';
 import { DeviceResetButton } from './features/DeviceReset';
+import { MODAL_ORIENTATIONS } from '../constants/orientation';
 
 // Signed out, the account pages (the owner's mock-ups, 2026-11-06; AccountPages.tsx):
 // - "Create your account": the account name (unique, the sign-in name) and a password, twice. Below it,
@@ -212,7 +213,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 function Guidelines({ zh, title, close, onClose }: { zh: boolean; title: string; close: string; onClose: () => void }) {
-  return <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onClose}>
     <View style={styles.scrim}>
       <View accessibilityViewIsModal style={styles.card} testID="community-guidelines">
         <Text accessibilityRole="header" style={styles.guidelinesTitle}>{title}</Text>

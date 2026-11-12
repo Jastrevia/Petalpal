@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const serif = Platform.select({ ios: 'Georgia', default: 'serif' });
 
@@ -20,7 +21,7 @@ export function ImmersivePaper({ title, subtitle, onClose, closeLabel = 'Close',
     }).catch(() => rise.setValue(1));
     return () => { active = false; rise.stopAnimation(); };
   }, [rise]);
-  return <Modal transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
     {/* The keyboard must not cover the footer: its microphone and Save. */}
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
     <Animated.View style={[styles.scrim, { opacity: rise.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),

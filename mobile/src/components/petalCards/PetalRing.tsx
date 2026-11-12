@@ -8,6 +8,7 @@ import { PETAL_CARD_ART } from './petalCardArt';
 import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
 import { JOURNAL_ART } from '../features/journalKit';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const BACKS = {
   lilac: require('@/assets/petal-card-backs/lilac.webp'),
@@ -177,7 +178,7 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const backFace = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0, 0] });
   const frontFace = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const turn = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '90deg', '0deg'] });
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <GestureHandlerRootView style={{ flex: 1 }}><GestureDetector gesture={pan}>
     <View style={styles.sky}>
       {STARS.map(([x, y, s], i) => <View key={i} pointerEvents="none" style={[styles.star, { left: `${x}%`, top: `${y}%`, width: s, height: s }]} />)}

@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { petalCardArt } from '../petalCards/petalCardArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // 分享卡 (proposal "持续玩"): an image of the week's petal card made on the phone only when the owner taps Share — no
 // server work. By default it holds only the pre-written card (art, name, line) and the week; the week's headline is
@@ -38,7 +39,7 @@ export function ShareCardButton({ card, headline, week, locale, linkStyle }: {
   }
   return <>
     <Pressable accessibilityRole="button" hitSlop={12} onPress={() => setOpen(true)} style={styles.link}><Text style={linkStyle}>{t.share}</Text></Pressable>
-    <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+    <Modal supportedOrientations={MODAL_ORIENTATIONS} visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
       <View style={styles.scrim}>
         <View style={styles.sheet}>
           <Text accessibilityRole="header" style={styles.title}>{t.title}</Text>

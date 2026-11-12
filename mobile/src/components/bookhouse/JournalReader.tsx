@@ -6,6 +6,7 @@ import { LETTER_PAPER_BACKGROUND } from '../mailbox/paperTextures';
 import { BookhouseArt } from './BookhouseArt';
 import { JournalCover } from './JournalCover';
 import { Icon, ICONS, palette, serif } from './TreehouseArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const paperTexture = Platform.select({ web: { backgroundImage: LETTER_PAPER_BACKGROUND } as object, default: {} });
 
@@ -88,7 +89,7 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
     try { await onDelete(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to delete this journal. Please try again.'); setState('confirm'); }
   };
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={close}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={close}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close journal actions" onPress={close} style={styles.scrim} />
     <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 14, opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
       {state === 'menu' ? <>

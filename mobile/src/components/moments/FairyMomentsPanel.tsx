@@ -11,6 +11,7 @@ import { avatarArt } from '../avatars/avatarArt';
 import { AvatarPicker } from '../avatars/AvatarPicker';
 import { CoverPicker } from './CoverPicker';
 import { momentCover } from './momentCovers';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const DEFAULT_COVER = MOMENT_PHOTOS['IN_TREEHOUSE/2']; // until the owner picks a cover from the library
 const DEFAULT_AVATAR = MOMENT_PHOTOS['TEA_TIME/3']; // her own photo until the owner picks a library avatar
@@ -95,7 +96,7 @@ export function FairyMomentsPanel({ visible, onClose, onFindFairy, highlightNewe
   const name = page?.fairy.name ?? 'PPL';
   const avatar = avatarArt(page?.fairy.avatar) ?? DEFAULT_AVATAR;
   const cover = momentCover(page?.fairy.cover) ?? DEFAULT_COVER;
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.overlay}>
       <Pressable accessibilityLabel={copy.close} onPress={onClose} style={[StyleSheet.absoluteFill, styles.backdrop]} />
       <View accessibilityViewIsModal accessibilityLabel={copy.title(name)}
