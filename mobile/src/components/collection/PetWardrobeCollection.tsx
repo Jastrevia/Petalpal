@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ApiError } from '../../services/api';
 import { loadPets, onPetsChanged, renamePet, type PetId, type PetsSummary } from '../../services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from '../garden/critters/accessoryIcons';
@@ -149,6 +149,8 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
           })}
         </View>
 
+        {/* On a short screen (a phone held sideways) the pieces and the hint scroll under the tabs. */}
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.cards}>
           {!pets && !off && !failed ? <ActivityIndicator color={CREAM} accessibilityLabel={copy.loading} /> : null}
           {off ? <Text style={styles.sub}>{copy.off}</Text> : null}
@@ -169,6 +171,7 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
         </View>
 
         <Text style={[styles.sub, { backgroundColor: tone.shade }]}>{copy.hint}</Text>
+        </ScrollView>
 
         {renaming ? <View style={styles.renameLayer}>
           <View accessibilityViewIsModal style={[styles.renameCard, { backgroundColor: ground }]} testID="wardrobe-rename">
@@ -238,6 +241,8 @@ const styles = StyleSheet.create({
   tabOn: { borderColor: GOLD },
   tabText: { ...text, fontSize: 12.5, opacity: 0.8 },
   tabTextOn: { opacity: 1 },
+  scroll: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 1 },
+  scrollContent: { alignItems: 'center' },
   cards: { flexDirection: 'row', justifyContent: 'center', gap: 18, marginTop: 18, marginBottom: 14, minHeight: 150 },
   card: { alignItems: 'center' },
   cardCircle: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 244, 224, 0.92)', borderWidth: 1.5, borderColor: 'rgba(233, 201, 121, 0.7)' },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { CheckInResult } from '../../services/fairyCloseness';
 import { holdBondCelebration } from '../../services/avatars';
 import { BOND, bondCopy, type BondLocale } from './bondCopy';
@@ -16,6 +16,10 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const copy = bondCopy(locale, fairyName);
   const [index, setIndex] = useState(0);
   const grow = useRef(new Animated.Value(0)).current;
+  // A phone held sideways is wide but short: the keepsake sits beside PPL's note instead of above it,
+  // and whatever still doesn't fit scrolls, with the button always in view.
+  const screen = useWindowDimensions();
+  const wide = screen.height < 520 && screen.width > screen.height;
   useEffect(() => { setIndex(0); }, [result]);
   // A Fairy Bond level-up celebration waits until the keepsakes have been looked at.
   const showing = Boolean(result?.keepsakes.length);
@@ -30,23 +34,27 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const art = keepsakeArt(keepsake.id);
   return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onDone} statusBarTranslucent>
     <View style={styles.backdrop}>
-      <View accessibilityViewIsModal style={styles.sheet}>
+      <View accessibilityViewIsModal style={[styles.sheet, wide && styles.sheetWide]}>
         <Text accessibilityRole="header" style={styles.title}>{copy.reveal}</Text>
-        <Animated.View style={[styles.halo, { opacity: grow, transform: [{ scale: grow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
-          {art ? <Image source={art} style={styles.art} resizeMode="contain" accessibilityIgnoresInvertColors /> : null}
-        </Animated.View>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{keepsake.name}</Text>
-          {keepsake.firstTime ? <Text style={styles.badge}>{copy.isNew}</Text> : null}
-        </View>
-        <Text style={styles.rarity}>{copy.rarity[keepsake.rarity]}</Text>
-        {keepsake.note ? <View style={styles.paper}>
-          <Text style={styles.note}>{keepsake.note}</Text>
-          <Text style={styles.sign}>— {fairyName} ♡</Text>
-        </View> : null}
-        {last && result.awarded ? <Text style={styles.points}>{copy.points(result.awarded)}</Text> : null}
-        {last && result.levelUp ? <Text style={styles.levelUp}>{copy.levelUp(result.levelUp.level, result.levelUp.title)}</Text> : null}
-        {last && result.checkIn.graceUsed ? <Text style={styles.grace}>{copy.grace}</Text> : null}
+        <ScrollView style={styles.scroll} contentContainerStyle={[styles.body, wide && styles.bodyWide]} showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.halo, wide && styles.haloWide, { opacity: grow, transform: [{ scale: grow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
+            {art ? <Image source={art} style={wide ? styles.artWide : styles.art} resizeMode="contain" accessibilityIgnoresInvertColors /> : null}
+          </Animated.View>
+          <View style={[styles.words, wide && styles.wordsWide]}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{keepsake.name}</Text>
+              {keepsake.firstTime ? <Text style={styles.badge}>{copy.isNew}</Text> : null}
+            </View>
+            <Text style={styles.rarity}>{copy.rarity[keepsake.rarity]}</Text>
+            {keepsake.note ? <View style={styles.paper}>
+              <Text style={styles.note}>{keepsake.note}</Text>
+              <Text style={styles.sign}>— {fairyName} ♡</Text>
+            </View> : null}
+            {last && result.awarded ? <Text style={styles.points}>{copy.points(result.awarded)}</Text> : null}
+            {last && result.levelUp ? <Text style={styles.levelUp}>{copy.levelUp(result.levelUp.level, result.levelUp.title)}</Text> : null}
+            {last && result.checkIn.graceUsed ? <Text style={styles.grace}>{copy.grace}</Text> : null}
+          </View>
+        </ScrollView>
         <Pressable accessibilityRole="button" onPress={() => (last ? onDone() : setIndex(index + 1))}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
           <Text style={styles.buttonText}>{last ? copy.keep : copy.next}</Text>
@@ -58,8 +66,16 @@ export function KeepsakeReveal({ result, locale, onDone }: {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18, backgroundColor: '#0B1F1BAA' },
-  sheet: { width: '100%', maxWidth: 380, alignItems: 'center', gap: 8, padding: 20, borderRadius: 22,
+  sheet: { width: '100%', maxWidth: 380, maxHeight: '100%', alignItems: 'center', gap: 8, padding: 20, borderRadius: 22,
     backgroundColor: BOND.paper, borderWidth: 1.5, borderColor: BOND.edge },
+  sheetWide: { maxWidth: 560, paddingVertical: 14 },
+  scroll: { alignSelf: 'stretch', flexGrow: 0 },
+  body: { alignItems: 'center', gap: 8 },
+  bodyWide: { flexDirection: 'row', gap: 18, paddingVertical: 2 },
+  words: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
+  wordsWide: { flex: 1, alignSelf: 'center' },
+  haloWide: { width: 132, height: 132, borderRadius: 66 },
+  artWide: { width: 116, height: 116 },
   title: { fontFamily: 'serif', fontSize: 18, color: BOND.ink },
   halo: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1E8D2' },
   art: { width: 150, height: 150 },

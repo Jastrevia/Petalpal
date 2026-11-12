@@ -47,6 +47,7 @@ function LoadingTestPreview() {
           progress={progress}
           message={`Loading PetalPal… (${progress !== null ? Math.round(progress * 100) + '%' : 'Indeterminate'})`}
           hint="Letterwing guiding progress"
+          rotateHint
         />
       </View>
     </View>

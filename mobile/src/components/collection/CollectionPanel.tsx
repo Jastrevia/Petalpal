@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAvatarCollection } from '../../services/avatars';
 import { markKeepsakesSeen, type CollectionAlerts } from '../../services/collectionAlerts';
 import { useClosenessSummary } from '../../services/fairyCloseness';
@@ -46,6 +46,8 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
   return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} style={styles.sheet} testID="collection-panel">
+        {/* On a short screen (a phone held sideways) the tiles scroll; the × stays in its corner. */}
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <Image source={CASKET} style={styles.casket} resizeMode="contain" accessible={false} />
         <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
 
@@ -93,6 +95,7 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable> : null}
+        </ScrollView>
 
         <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
           <Text style={styles.closeText}>×</Text>
@@ -109,7 +112,8 @@ export function CollectionPanel({ visible, locale, alerts, onClose }: { visible:
 function makeStyles(theme: PanelTheme) {
   return StyleSheet.create({
     backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 14, backgroundColor: '#0B1F1B99' },
-    sheet: { width: '100%', maxWidth: 400, paddingTop: 18, paddingBottom: 22, paddingHorizontal: 18, borderRadius: 26,
+    scroll: { flexGrow: 0 },
+    sheet: { width: '100%', maxWidth: 400, maxHeight: '100%', paddingTop: 18, paddingBottom: 22, paddingHorizontal: 18, borderRadius: 26,
       backgroundColor: theme.background, borderWidth: 1, borderColor: theme.gold },
     casket: { width: 96, height: 96, alignSelf: 'center' },
     title: { textAlign: 'center', fontFamily: 'serif', fontSize: 28, color: theme.text, marginTop: 2, marginBottom: 6 },

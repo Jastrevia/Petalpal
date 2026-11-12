@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { useAppLocale } from '../../services/locale';
 
 // PetalPal's loading screen: Letterwing (the mailbox's spirit bird) flies along a turquoise
 // progress bar as a living progress indicator. It only reflects real work: `progress` is a
@@ -58,14 +60,26 @@ export type PigeonLoadingProps = {
   children?: ReactNode;
   /** Cover the parent (Garden overlay) instead of filling a flex parent. */
   overlay?: boolean;
+  /** The "landscape recommended" note. Left out, the device decides (shouldShowRotateHint); the DEV
+   *  preview page passes true to look at it in a browser. */
+  rotateHint?: boolean;
   testID?: string;
 };
 
+// The app turns both ways and the Garden is at its best sideways. While a phone is held upright, the
+// loading screen says so with a small phone outline that turns onto its side. Not in a browser, not
+// on an iPad or another tablet (shorter side 600 points or more), and not once the phone is sideways.
+export function shouldShowRotateHint(os: string, isPad: boolean, width: number, height: number) {
+  return os !== 'web' && !isPad && height > width && Math.min(width, height) < 600;
+}
+const ROTATE_COPY = { en: 'Landscape recommended', 'zh-Hans': '推荐横屏' } as const;
+
 export function PigeonLoadingScreen({
-  progress, message, hint, done = false, onExited, children, overlay = false, testID = 'pigeon-loading',
+  progress, message, hint, done = false, onExited, children, overlay = false, rotateHint, testID = 'pigeon-loading',
 }: PigeonLoadingProps) {
   const { width, height } = useWindowDimensions();
   const reduced = useReducedMotionPreference();
+  const showRotate = rotateHint ?? shouldShowRotateHint(Platform.OS, Platform.OS === 'ios' && Platform.isPad, width, height);
   const compact = width < 600;
   const birdHeight = compact ? 92 : 116;
   const birdWidth = birdHeight * CELL.w / CELL.h;
@@ -101,6 +115,47 @@ export function PigeonLoadingScreen({
         {children}
       </View>
     </View>
+    {showRotate ? <RotateHint reduced={reduced} /> : null}
+  </Animated.View>;
+}
+
+// A phone outline in a gold hairline that turns from upright onto its side, rests, and turns back,
+// beside the words, between two short gold rules at the foot of the screen. It takes no touches and
+// no part in the layout, starts after the screen is up and fades with it, so it can never hold up or
+// move the loading itself. Reduced motion: the outline simply lies on its side.
+const TURN_MS = 1500, TURN_REST_MS = 2200, TURN_BACK_MS = 1100, TURN_WAIT_MS = 1000;
+function RotateHint({ reduced }: { reduced: boolean }) {
+  const label = ROTATE_COPY[useAppLocale()];
+  // Read without the hook's "no provider" error: a loading screen must show wherever it is mounted.
+  const bottom = (useContext(SafeAreaInsetsContext)?.bottom ?? 0) + 26;
+  const turn = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  const appear = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) { turn.setValue(1); appear.setValue(1); return; }
+    const native = Platform.OS !== 'web', easing = Easing.inOut(Easing.cubic);
+    turn.setValue(0);
+    const run = Animated.parallel([
+      Animated.timing(appear, { toValue: 1, duration: 600, delay: 300, easing: Easing.out(Easing.quad), useNativeDriver: native }),
+      Animated.loop(Animated.sequence([
+        Animated.delay(TURN_WAIT_MS),
+        Animated.timing(turn, { toValue: 1, duration: TURN_MS, easing, useNativeDriver: native }),
+        Animated.delay(TURN_REST_MS),
+        Animated.timing(turn, { toValue: 0, duration: TURN_BACK_MS, easing, useNativeDriver: native }),
+      ])),
+    ]);
+    run.start();
+    return () => run.stop();
+  }, [reduced, turn, appear]);
+  return <Animated.View testID="pigeon-loading-rotate-hint" pointerEvents="none" accessible accessibilityRole="text" accessibilityLabel={label}
+    style={[styles.rotate, { bottom, opacity: appear }]}>
+    <View style={styles.rotateRule} />
+    <View style={styles.rotatePhoneBox}>
+      <Animated.View style={[styles.rotatePhone, { transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-90deg'] }) }] }]}>
+        <View style={styles.rotatePhoneBar} />
+      </Animated.View>
+    </View>
+    <Text style={styles.rotateText}>{label}</Text>
+    <View style={styles.rotateRule} />
   </Animated.View>;
 }
 
@@ -370,6 +425,14 @@ const styles = StyleSheet.create({
   hintText: { fontSize: 13, lineHeight: 18, color: '#5d7263', textAlign: 'center' },
   // Hangs under the message without taking part in layout, so late content never moves the stage.
   below: { position: 'absolute', top: '100%', marginTop: 4, alignItems: 'center' },
+  // The "landscape recommended" note: a gold hairline phone, serif words, a short gold rule each side.
+  rotate: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  rotateRule: { width: 26, height: StyleSheet.hairlineWidth, minHeight: 0.5, backgroundColor: GOLD, opacity: 0.8 },
+  // Square, so the outline turns about its centre without moving the words beside it.
+  rotatePhoneBox: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  rotatePhone: { width: 13, height: 22, borderRadius: 3.5, borderWidth: 1, borderColor: GOLD, backgroundColor: '#FBF6EA', alignItems: 'center' },
+  rotatePhoneBar: { marginTop: 2.5, width: 4, height: 1, borderRadius: 0.5, backgroundColor: GOLD },
+  rotateText: { fontFamily: 'serif', fontSize: 12.5, lineHeight: 18, letterSpacing: 0.8, color: '#8A7440' },
   track: { height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: GOLD, backgroundColor: '#FBF6EA', padding: 1.5,
     boxShadow: '0 1px 6px #9E804D33, inset 0 1px 2px #9E804D22' },
   trackInner: { flex: 1, borderRadius: 6, overflow: 'hidden' },
