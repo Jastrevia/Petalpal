@@ -340,7 +340,7 @@ export const MOOD_SPECIES: Record<PrimaryMood, string> = { SUNNY_BLOOM: 'SUNFLOW
 export type ShortCopy = (typeof SHORT_COPY)[ShortLocale];
 export const SHORT_COPY = {
   en: { line: 'Line of the week', curve: 'Your week in moods', side: 'Side by side', thenNow: 'Then and now', then: 'Then', now: 'Now',
-    question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card',
+    question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card', cardMore: 'About this card',
     bouquet: 'This week’s bouquet',
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
     undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
@@ -355,7 +355,7 @@ export const SHORT_COPY = {
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
-    question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张',
+    question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张', cardMore: '这张牌讲什么',
     bouquet: '本周花束',
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
