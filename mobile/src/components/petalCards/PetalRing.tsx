@@ -7,6 +7,7 @@ import { drawPetalCard, requestPetalReading, type PetalCardFace, type PetalReadi
 import { PETAL_CARD_ART } from './petalCardArt';
 import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
+import { JOURNAL_ART } from '../features/journalKit';
 
 const BACKS = {
   lilac: require('@/assets/petal-card-backs/lilac.webp'),
@@ -14,25 +15,25 @@ const BACKS = {
 };
 
 const COPY = {
-  en: { title: 'THE PETAL RING', sub: "Spin through today's whole deck and choose one", hint: 'Drag to spin · tap the glowing card',
-    no: 'No.', round: 'Round', turnOver: 'Turn it over', close: 'Close', today: "Today's petal card", drawing: 'Drawing…',
-    failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose No. ${n} of today's deck`,
-    share: 'Share', preparing: 'Preparing…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
-    shareFailed: "Couldn't share this time. Try again.", ask: 'What would you like to ask today?',
-    askSub: 'One question a day, then draw a card for it', later: 'Come back later to draw', uses: (n: number) => `Today's draw: ${n}/1`, usedUp: "Today's draw: 1/1 used. Come back tomorrow.", upright: 'Upright', reversed: 'Reversed',
-    reading: 'The fairy’s reading', readingWait: 'The fairy is reading your card…',
-    readingConsent: 'Turn on AI processing in Privacy to see the fairy’s reading of your card.',
+  en: { title: 'THE PETAL RING', sub: 'Turn the ring slowly and choose one', hint: 'Drag to turn · tap the glowing card',
+    no: 'No.', turnOver: 'Turn it over', close: 'Close', today: "Today's petal card", drawing: 'Drawing…',
+    failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose card ${n}`,
+    share: 'Share', preparing: 'Making the picture…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
+    shareFailed: "Couldn't share this time. Try again.", ask: 'What’s on your mind today?',
+    askSub: 'One question a day, one card for it.', later: 'Come back later', uses: (_n: number) => 'Today’s card is still face down', usedUp: 'Today’s card is turned. The ring turns again tomorrow.', upright: 'Upright', reversed: 'Reversed',
+    reading: 'Reading', readingWait: 'Reading your card…',
+    readingConsent: 'Turn on AI processing in Privacy to see the reading of your card.',
     freeLeft: (n: number) => n === 0 ? 'That was your last free reading.' : `${n} free ${n === 1 ? 'reading' : 'readings'} left.`,
-    locked: 'Your free readings are used up. Unlocking the fairy’s readings for good is coming soon.' },
-  'zh-Hans': { title: 'THE PETAL RING', sub: '转动花环，翻遍今天的整副牌，选一张', hint: '拖动转圈 · 点发光的那张',
-    no: '第', round: '轮次', turnOver: '翻开它', close: '关闭', today: '今日花语卡', drawing: '正在抽牌…',
-    failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你选了今天的第 ${n} 张`,
-    share: '分享', preparing: '正在准备…', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
-    shareFailed: '这次没有分享成功，再试一次。', ask: '今天想问什么？', askSub: '每天问一件事，再为它抽一张牌', later: '等会再来抽', uses: (n: number) => `今日次数 ${n}/1`, usedUp: '今日次数 1/1 已用完，明天再来吧',
-    upright: '正位', reversed: '逆位', reading: '小花仙的解读', readingWait: '小花仙正在读这张牌…',
-    readingConsent: '在隐私设置里打开 AI 处理，就能看到小花仙对这张牌的解读。',
-    freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `免费解读还剩 ${n} 次。`,
-    locked: '免费的小花仙解读已经用完了。一次解锁、以后每天都能看的功能，马上就来。' },
+    locked: 'Your free readings are used up. A one-time unlock is on its way.' },
+  'zh-Hans': { title: '花环', sub: '慢慢转，在今天的牌里挑一张', hint: '拖动花环 · 轻点亮着的那张',
+    no: '第', turnOver: '翻开它', close: '收起', today: '今日花语卡', drawing: '正在抽牌…',
+    failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你挑了第 ${n} 张`,
+    share: '分享', preparing: '正在画分享图……', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
+    shareFailed: '这次没有分享成功，再试一次。', ask: '今天，想问问哪件事？', askSub: '一天一问，一问一张牌。', later: '晚一点再来', uses: (_n: number) => '今天的牌还没翻开', usedUp: '今天的牌翻开了。明天，花环会重新转起来。',
+    upright: '正位', reversed: '逆位', reading: '牌面解读', readingWait: '正在解读…',
+    readingConsent: '在隐私设置里打开 AI 处理，就能看到这张牌的解读。',
+    freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `还可以免费解读 ${n} 次。`,
+    locked: '免费解读用完了。一次解锁、每天都能看的方式还在准备。' },
 };
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -201,7 +202,6 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         <Text style={styles.sub}>{copy.sub}</Text>
         <View style={styles.counter}>
           <Text style={styles.counterText}>{copy.no} <Text style={styles.counterValue}>{frontNo}</Text> / {deckSize}</Text>
-          <Text style={styles.counterText}>{copy.round} <Text style={styles.counterValue}>{Math.floor((frontNo - 1) / size.n) + 1}</Text> / {Math.ceil(deckSize / size.n)}</Text>
         </View>
         <View style={styles.track}><View style={[styles.fill, { width: `${(frontNo / deckSize) * 100}%` }]} /></View>
       </View> : null}
@@ -235,13 +235,14 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
       </View> : null}
 
       {phase === 'revealed' && face ? <ScrollView style={[styles.reveal, { top: vh * 0.1 + bigH + 12 }]} contentContainerStyle={styles.revealContent}>
-        <Text testID="petal-used-up" accessibilityRole="alert" style={styles.usedUp}>{copy.usedUp}</Text>
         <Text style={styles.kicker}>{topic.label ?? copy.today}</Text>
         <Text style={styles.cardName}>{face.name}</Text>
         {face.keywords ? <Text style={styles.orientation}>{`${face.reversed ? copy.reversed : copy.upright} · ${face.keywords.join(locale === 'en' ? ', ' : '、')}`}</Text> : null}
         <Text style={styles.line}>{face.line}</Text>
         <Text style={styles.text}>{face.text}</Text>
+        {/* The reading opens under the same painted golden sprig that divides the pavilion's journal pages. */}
         {reading?.available && reading.status === 'READY' && reading.paragraphs?.length ? <View style={styles.reading}>
+          <Image source={JOURNAL_ART.divider} resizeMode="contain" accessible={false} style={styles.sprig} />
           <Text style={styles.readingTitle}>{copy.reading}</Text>
           {reading.paragraphs.map((paragraph, i) => <Text key={i} selectable style={styles.readingText}>{paragraph}</Text>)}
           {typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
@@ -252,6 +253,8 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         </View> : null}
         {reading?.available && reading.needsConsent ? <Text style={styles.disclaimer}>{copy.readingConsent}</Text> : null}
         <Text style={styles.disclaimer}>{face.disclaimer}</Text>
+        {/* Today's draw is used: said quietly at the foot of the page, after the card and its reading. */}
+        <Text testID="petal-used-up" style={styles.usedUp}>{copy.usedUp}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={copy.share} accessibilityState={{ disabled: !prepared }} disabled={!prepared}
           onPress={share} style={({ pressed }) => [styles.secondary, !prepared && styles.waiting, pressed && styles.pressed]}>
           <Text style={styles.secondaryText}>{prepared ? copy.share : copy.preparing}</Text>
@@ -320,10 +323,11 @@ const styles = StyleSheet.create({
   uses: { marginTop: 2, fontFamily: 'serif', fontSize: 12, color: '#C9C0E8' },
   later: { minHeight: 44, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   laterText: { fontFamily: 'serif', fontSize: 15, color: '#E9CF8A', textDecorationLine: 'underline' },
-  usedUp: { fontFamily: 'serif', fontSize: 13, color: '#F3DFA8', textAlign: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#E9CF8A66', backgroundColor: '#1B154088' },
+  usedUp: { fontFamily: 'serif', fontSize: 12, color: '#C9C0E8', textAlign: 'center', marginVertical: 4 },
   topicTag: { marginTop: 8, fontFamily: 'serif', fontSize: 15, color: '#F3DFA8' },
   orientation: { fontFamily: 'serif', fontSize: 13, letterSpacing: 1, color: '#E9CF8A', textAlign: 'center' },
-  reading: { alignSelf: 'stretch', marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderColor: '#E9CF8A44', gap: 10 },
+  reading: { alignSelf: 'center', width: '100%', maxWidth: 620, marginTop: 6, gap: 10 },
+  sprig: { alignSelf: 'center', width: 210, height: 42 },
   readingTitle: { fontFamily: 'serif', fontSize: 15, letterSpacing: 2, color: '#E9CF8A', textAlign: 'center' },
   readingText: { fontFamily: 'serif', fontSize: 15, lineHeight: 25, color: '#F1EAF9' },
   lockedNote: { alignSelf: 'stretch', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderColor: '#E9CF8A44',

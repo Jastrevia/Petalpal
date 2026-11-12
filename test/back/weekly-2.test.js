@@ -136,9 +136,18 @@ test("compute: thresholds per module, code-written facts, priority picks the mai
   assert.deepEqual(new Set(candidates.map(candidate => candidate.type)), new Set(["SAID_BEFORE", "HIDDEN_LINK", "SMALL_GOODS", "OPEN_QUESTION"]));
   assert.equal(candidates[0].role, "main");
   const link = candidates.find(candidate => candidate.type === "HIDDEN_LINK");
-  assert.equal(link.subject, "妈妈"); assert.deepEqual(link.numbers, [3, 3, 11, 6]);
+  assert.equal(link.subject, "妈妈"); assert.deepEqual(link.numbers, [3, 3, 11, 5]);
+  // The headline keeps the finding in plain words; the card reason reuses the fact's first sentence.
+  assert.equal(templateHeadline(link, "zh-Hans"), "写到“妈妈”的日子，心情多半不错");
+  assert.equal(link.lead, "这五周你 3 次写到“妈妈”，3 次选的都是『开心』、『平静』或『温柔』。");
   assert.ok(!candidates.some(candidate => candidate.evidence.some(item => item.sourceEventId === "e-s")), "a sensitive entry is never evidence");
-  assert.equal(candidates.find(candidate => candidate.type === "SAID_BEFORE").fact, "9月2日你写过：“我想每天早上跑步。”之后的 7 条记录里，有 1 条写到“跑步”。");
+  assert.equal(candidates.find(candidate => candidate.type === "SAID_BEFORE").fact, "9月2日你写下：“我想每天早上跑步。”那之后你又写了 7 条，其中 1 条提到“跑步”。");
+  // English copy of the same facts (the entries stay as written).
+  const en = computeInsights(input({ locale: "en" }), { days }).candidates;
+  assert.equal(en.find(candidate => candidate.type === "SAID_BEFORE").fact,
+    "On Sep 2 you wrote: “我想每天早上跑步。” You have written 7 entries since, and 1 of them mentions “跑步”.");
+  assert.equal(en.find(candidate => candidate.type === "HIDDEN_LINK").fact,
+    "You wrote about “妈妈” 3 times in the past five weeks and chose Sunny, Peaceful or Gentle all 3 times. Across all 11 entries, 5 were Sunny, Peaceful or Gentle.");
   // Same type is not the main insight two weeks running.
   assert.equal(computeInsights(input(), { days, previousMainType: "SAID_BEFORE" }).candidates[0].type, "HIDDEN_LINK");
   // Stored extractions are used when present (here: the plan sentence is not extracted, so no SAID_BEFORE).
@@ -150,7 +159,7 @@ test("compute: thresholds per module, code-written facts, priority picks the mai
   const lifting = [["c-0", "2026-09-14T12:00:00Z", "QUIET_BLOOM", "a。"], ["c-1", "2026-09-15T12:00:00Z", "DRIFTING_BLOOM", "b。"],
     ["c-2", "2026-09-18T12:00:00Z", "HEALING_BLOOM", "c。"], ["c-3", "2026-09-19T12:00:00Z", "HEALING_BLOOM", "d。"]];
   const trend = computeInsights(input({ current: lifting, earlier: [] }), { days }).candidates;
-  assert.deepEqual(trend.map(candidate => [candidate.type, candidate.fact]), [["TREND", "前半周多是「迷茫」，后半周「治愈」多了起来。"]]);
+  assert.deepEqual(trend.map(candidate => [candidate.type, candidate.fact]), [["TREND", "周一到周四多是『迷茫』，周五起『治愈』多了起来。"]]);
   assert.equal(keyPhrase("周末去看海"), "看海"); assert.equal(keyPhrase("我到底想要什么样的生活？"), null);
 });
 
@@ -164,7 +173,7 @@ test("rendering: headline, main insight, bouquet, secondary insights, petal card
   assert.deepEqual(main.evidence.map(item => item.sourceEventId), ["e-d", "c-0"]);
   const card = result.sections.find(section => section.kind === "PETAL_CARD");
   assert.ok(INSIGHT_CARDS.SAID_BEFORE.includes(card.cardId));
-  assert.equal(card.reason, "你说过“我想每天早上跑步。”，之后 1 次写到它。");
+  assert.equal(card.reason, "你写下“我想每天早上跑步”，之后又 1 次写到它。");
   assert.equal(result.sections.at(-1).claim, "下周跑步的时候，你想留意什么？");
   assert.equal(reportShowsEvent(result.sections, "e-d"), true); assert.equal(reportShowsEvent(result.sections, "e-a"), false);
   // The packet carries only candidates: aliases, facts and quotes; never ids, dates or moods.

@@ -35,15 +35,15 @@ test("Monthly 2.0: garden, spread, change, threads, small goods, people (folded 
   assert.deepEqual(kinds(result), ["MONTH_HEADLINE", "MONTH_GARDEN", "MONTH_SPREAD", "MONTH_CHANGE", "MONTH_THREADS", "MONTH_GOODS", "MONTH_PEOPLE", "MONTH_QUESTION"]);
   const [head, garden, spread, change, threads, goods, people, question] = result.sections;
   assert.equal(head.reportVersion, MONTHLY_2);
-  assert.equal(head.claim, "写到“面试”时，这个月不一样了");
+  assert.equal(head.claim, "“面试”：从『愤怒』到『平静』");
   assert.equal(garden.days.length, 31);
-  assert.equal(garden.claim, "这个月有 4 天写了记录，一共 5 条。");
+  assert.equal(garden.claim, "这个月你写了 5 条，落在 4 天里。");
   assert.deepEqual(garden.dayMoods.find(day => day.date === "2026-10-02"), { date: "2026-10-02", mood: "SUNNY_BLOOM" }, "a tie goes to the later entry");
   assert.equal(garden.dayMoods.find(day => day.date === "2026-10-03").mood, null, "a day without an entry stays empty soil");
   assert.deepEqual(spread.cards.map(card => [card.name, card.role, card.headline]), [["权杖三", "start", "说过想跑步，后来也写到了"], ["圣杯三", "now", "这周让你开心的，是很小的事。"]]);
-  assert.equal(change.claim, "上个月写到“面试”的 2 条里，有 2 条是『愤怒』；这个月的 2 条里，有 2 条是『平静』。");
+  assert.equal(change.claim, "上个月你 2 次写到“面试”，2 次都是『愤怒』。这个月也写了 2 次，2 次都是『平静』。");
   assert.deepEqual([change.then.quote, change.now.quote], ["准备面试到半夜。", "第二轮面试，聊得很开心。"]);
-  assert.deepEqual(threads.items.map(item => [item.keyword, item.count, item.line]), [["跑步", 1, "这个月之后有 1 条写到“跑步”。"]]);
+  assert.deepEqual(threads.items.map(item => [item.keyword, item.count, item.line]), [["跑步", 1, "那一周之后，这个月你又 1 次写到“跑步”。"]]);
   assert.deepEqual(goods.items.map(item => [item.text, item.count]).slice(0, 1), [["阳光很好。", 2]]);
   assert.deepEqual(people.people.map(item => [item.word, item.count]), [["妈妈", 2]]);
   assert.equal(question.claim, "下个月写到“面试”的时候，你想留意什么？");
@@ -66,9 +66,9 @@ test("Monthly 2.0: a month with fewer than 3 entries is a growing garden and a l
   assert.deepEqual(kinds(few), ["MONTH_HEADLINE", "MONTH_GARDEN", "MONTH_QUESTION"]);
   assert.equal(few.sections[0].claim, "这个月的花园还在长");
   const en = renderMonthly2(input({ locale: "en" }));
-  assert.equal(en.sections.find(section => section.kind === "MONTH_GARDEN").claim, "You wrote on 4 days this month, 5 entries in all.");
+  assert.equal(en.sections.find(section => section.kind === "MONTH_GARDEN").claim, "You wrote 5 entries this month, on 4 days.");
   assert.equal(en.sections.find(section => section.kind === "MONTH_CHANGE").claim,
-    "Last month, 2 of the 2 entries about “面试” were Fire; this month, 2 of 2 were Peaceful.");
+    "Last month you wrote about “面试” 2 times, both Fire. This month, 2 times again, both Peaceful.");
 });
 
 test("Monthly 2.0 switch: off unless listed; malformed is off", () => {

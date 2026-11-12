@@ -72,7 +72,7 @@ test("the echo is the page's last reveal, never sent to the model; alone it is t
   const alone = renderWeekly2(null, lone, weekly2Packet(lone), null).sections;
   const main = alone.find(section => section.kind === "INSIGHT");
   assert.equal(main.type, "ECHO"); assert.deepEqual(main.items.map(item => item.sourceEventId), ["far", "c-0"]);
-  assert.equal(alone[0].claim, "这句话，你以前也写过。");
+  assert.equal(alone[0].claim, "这句话，你以前也写过");
   // An echo whose earlier sentence is no longer in its Event (edited) is dropped.
   const edited = input({ current: many, echo: { ...ECHO, then: { ...ECHO.then, quote: "我从来没这么写过。" } } });
   assert.ok(!computeInsights(edited, { days: weeklyMoodCurve(edited).days }).candidates.some(candidate => candidate.type === "ECHO"));

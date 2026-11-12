@@ -368,7 +368,8 @@ export default function Reflection() {
   })).current;
 
   useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
-  const scene = useMemo(() => pavilionScene(width, height), [width, height]);
+  // A phone: each page of the open book fits the screen's width, with a small margin (the spread is two pages wide).
+  const scene = useMemo(() => pavilionScene(width, height, phone ? 2 * (screen.width - 16) : undefined), [width, height, phone, screen.width]);
   const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
   const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
   const instructionTop = scene.art.y + scene.art.height * .63 - 22;
@@ -381,6 +382,8 @@ export default function Reflection() {
   const pan = useRef(new Animated.Value(0)).current;
   const panAt = useRef<number | null>(null);
   const panning = useRef({ min: 0, max: 0 });
+  // A phone with a book open: where the view rests so that one whole page (left, right) is centred on the screen.
+  const snaps = useRef<number[] | null>(null);
   // The tap a browser may still send when a drag ends must not open or put back a book.
   const draggedAt = useRef(0);
   const justDragged = () => Date.now() - draggedAt.current < 300;
@@ -405,7 +408,9 @@ export default function Reflection() {
     onPanResponderRelease: (_event, g) => {
       draggedAt.current = Date.now();
       // A flick carries on a little, as a hand-moved picture would.
-      const to = clampPan((panAt.current ?? 0) + g.dx + g.vx * 160);
+      const loose = clampPan((panAt.current ?? 0) + g.dx + g.vx * 160);
+      // With a book open the view settles on a whole page, never between two.
+      const to = snaps.current ? snaps.current.reduce((best, snap) => Math.abs(snap - loose) < Math.abs(best - loose) ? snap : best) : loose;
       panAt.current = to;
       Animated.timing(pan, { toValue: to, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
     },
@@ -414,6 +419,7 @@ export default function Reflection() {
   const sceneWidth = width, artHeight = scene.art.height;
   const geometry = useMemo(() => pavilionGeometry(scene, open ?? 'weekly'), [scene, open]);
   const leaves = useMemo(() => pavilionFullLeaves(geometry.layout, focused), [geometry, focused]);
+  snaps.current = phone && open ? [leaves.left, leaves.right].map(leaf => clampPan((screen.width - leaf.width) / 2 - leaf.x)) : null;
   const compactBookTop = Math.min(scene.art.height * .36, height * .32);
   // Phones keep the chapter bookmarks outside the page's right edge, as on wide screens.
   const compactTabs = open === 'collection' || open === 'notes' ? 40 : 0;

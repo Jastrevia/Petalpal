@@ -4,28 +4,29 @@ import { keepSection, loadAlmanacYears, loadCollection, setMute, SHORT_COPY, sho
   type PetalCollection as Collection } from '../../services/reflections';
 import { useAppLocale } from '../../services/locale';
 import { AlmanacView } from './AlmanacView';
+import { journalKit } from './journalKit';
 
 // The cream book on the pavilion shelf (Weekly 2.0 闭环, backend lib/insight-loop.js): every petal card the Weekly
 // reports drew with each week's "why this card" stacked, the insights the owner kept, the threads they follow, letters
 // to a later self and the words kept out of insights. Never "N more to collect". Written on the paper, no boxes.
 const COPY = {
-  en: { title: 'Petal collection', almanac: 'Almanac', almanacOf: (year: number) => `${year} in flowers`, cards: 'Petal cards', kept: 'Kept', insights: 'Insights you kept', letGo: 'Let go',
-    threads: 'Threads you follow', threadsNote: 'Follow an insight from a Weekly reflection; each Weekly then tells you how the thread went. Up to three.',
+  en: { title: 'Petal collection', almanac: 'Almanac', almanacOf: (year: number) => `${year} in flowers`, cards: 'Petal cards', kept: 'Kept', insights: 'Lines you kept', letGo: 'Let go',
+    threads: 'Threads you follow', threadsNote: 'Tap Follow in a Weekly page, and each week will tell you how often it came up again. Up to three.',
     letters: 'Letters to a later you', letterHint: 'One sentence for a later week…', send: 'Send', withdraw: 'Withdraw',
     due: (date: string) => `Arrives the week of ${date}`, arrived: (date: string) => `Arrived ${date}`,
     later: [['In 2 weeks', 14], ['In a month', 30], ['In 3 months', 91]] as [string, number][],
-    mutes: 'Kept out of insights', muteHint: 'A name or topic', add: 'Add', remove: (word: string) => `Remove ${word}`,
-    mutesNote: 'Insights never use these words, and lines that carry them are left out.',
-    empty: 'Nothing here yet. Cards and kept insights gather here week by week.', failed: 'That didn’t save. Try again in a moment.',
+    mutes: 'Words to leave out', muteHint: 'A name or topic', add: 'Add', remove: (word: string) => `Remove ${word}`,
+    mutesNote: 'Weekly and Monthly pages never use these words or quote lines that carry them.',
+    empty: 'Nothing here yet. Cards and the lines you keep gather here week by week.', failed: 'That didn’t save. Try again in a moment.',
     loadFailed: 'The collection can’t be opened right now.', retry: 'Try again' },
-  'zh-Hans': { title: '花语集', almanac: '花语年鉴', almanacOf: (year: number) => `${year} 花语年鉴`, cards: '花语卡', kept: '已收藏', insights: '收藏的洞察', letGo: '放下',
-    threads: '你在跟进的线', threadsNote: '在周报的洞察下点“跟进”，之后每份周报都会说说这条线的新动静。最多 3 条。',
+  'zh-Hans': { title: '花语集', almanac: '花语年鉴', almanacOf: (year: number) => `${year} 花语年鉴`, cards: '花语卡', kept: '已收藏', insights: '留下的句子', letGo: '放下',
+    threads: '你在留意的', threadsNote: '在周报里点“跟进”，之后每周都会告诉你这件事又被写到几次。最多 3 件。',
     letters: '给未来的信', letterHint: '写一句话给之后的自己……', send: '寄出', withdraw: '撤回',
     due: (date: string) => `会在 ${date} 那周的周报里出现`, arrived: (date: string) => `已在 ${date} 送达`,
     later: [['两周后', 14], ['一个月后', 30], ['三个月后', 91]] as [string, number][],
-    mutes: '不参与洞察的词', muteHint: '一个人名或主题', add: '添加', remove: (word: string) => `移除 ${word}`,
-    mutesNote: '洞察不会用到这些词，带着它们的句子也不会被引用。',
-    empty: '这里还是空的。花语卡和收藏的洞察会一周一周地留在这里。', failed: '没有保存成功，稍后再试。',
+    mutes: '不想被提起的词', muteHint: '一个人名或主题', add: '添加', remove: (word: string) => `移除 ${word}`,
+    mutesNote: '周报和月报不会提到这些词，带着它们的句子也不会被引用。',
+    empty: '这里还是空的。花语卡和你留下的句子会一周一周地留在这里。', failed: '没有保存成功，稍后再试。',
     loadFailed: '现在打不开花语集。', retry: '再试一次' },
 } as const;
 const addDays = (date: string, days: number) => {
@@ -55,8 +56,10 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
     try { await run(); await load(); } catch { setNote(t.failed); }
   }
   const week = (periodKey: string) => weekLabel(periodKey, lang).title;
-  const eyebrow = (text: string) => <Text accessibilityRole="header" style={c.eyebrow}>{text}</Text>;
-  const rule = <View accessible={false} style={c.rule} />;
+  // The same botanical-journal headings and painted dividers as the Weekly and Monthly pages (journalKit).
+  const kit = journalKit('collection');
+  const eyebrow = (text: string) => kit.heading(text);
+  const rule = kit.rule;
   const link = (label: string, onPress: () => void, a11y = label) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={12} onPress={onPress}
     style={({ pressed }) => [c.linkBox, pressed && { opacity: .6 }]}><Text style={c.link}>{label}</Text></Pressable>;
 
@@ -80,9 +83,10 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
         {book.cards.map(card => <View key={card.cardId} style={c.entry}>
           <Text style={c.name}>{card.name}{card.kept ? `  · ${t.kept}` : ''}</Text>
           <Text style={c.text}>{card.line}</Text>
-          {card.appearances.map(item => <Text key={item.reportId} style={[c.text, c.reason]}>
-            <Text style={{ color: SOFT }}>{week(item.periodKey)}　</Text>{item.reason ?? ''}
-          </Text>)}
+          {card.appearances.map(item => <View key={item.reportId} style={c.appearance}>
+            {kit.stamp(week(item.periodKey))}
+            <Text style={[c.text, { flex: 1 }]}>{item.reason ?? ''}</Text>
+          </View>)}
         </View>)}</>}
       {book.insights.length > 0 && <>{rule}{eyebrow(t.insights)}
         {book.insights.map(item => <View key={`${item.reportId}-${item.index}`} style={c.entry}>
@@ -129,9 +133,9 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
   </View>;
 }
 
-const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
+const INK = '#33241A', SOFT = '#6B543A', GOLD = '#A8823F';
 const c = StyleSheet.create({
-  title: { fontFamily: 'Georgia', color: INK, marginBottom: 12 },
+  title: { fontFamily: 'Georgia', fontWeight: '700', color: INK, marginBottom: 12 },
   eyebrow: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: GOLD, marginBottom: 6 },
   rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 16 },
   entry: { marginBottom: 12 },
@@ -139,6 +143,7 @@ const c = StyleSheet.create({
   text: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: INK },
   small: { fontFamily: 'Georgia', fontSize: 11, lineHeight: 18, color: SOFT },
   reason: { paddingLeft: 12, borderLeftWidth: 1, borderColor: '#A8823F55', marginTop: 4 },
+  appearance: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   linkBox: { minHeight: 36, justifyContent: 'center' },

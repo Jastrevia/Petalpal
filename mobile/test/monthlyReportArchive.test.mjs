@@ -120,9 +120,9 @@ const texts = blocks => plain(blocks.filter(b => 'text' in b).map(b => b.text));
 test('a Monthly 2.0 report keeps every section of the Pavilion, in its order', () => {
   const blocks = reportBlocks(entry(MONTHLY_2), 2026);
   const all = texts(blocks);
-  const order = ['March 2026', 'March was a month of small returns.', 'This month’s garden', 'Twelve days held an entry.', 'This month’s spread', 'What changed',
+  const order = ['March 2026', 'March was a month of small returns.', 'This month’s garden', 'Twelve days held an entry.', 'This month’s cards', 'What changed',
     'Work sounded lighter.', 'Last month', '“Too much”', 'This month', '“Enough”', 'Threads this month', '“Slept well”', 'Sleep came up three times.',
-    'Small good things', 'Tea with Mum  ×2', 'People this month', '“Mum” · 3 entries · Gentle 2', 'A question for next month', 'What would make April gentler?',
+    'Small good things', 'Tea with Mum  ×2', 'People this month', 'Mum · 3 times, Gentle 2', 'A question for next month', 'What would make April gentler?',
     '9 recorded events · Saved reflection'];
   let at = -1;
   for (const text of order) { const i = all.indexOf(text, at + 1); assert.ok(i > at, `${text} in order`); at = i; }
@@ -131,7 +131,7 @@ test('a Monthly 2.0 report keeps every section of the Pavilion, in its order', (
   // Four weekly cards: rows of at most three, every card kept.
   const rows = blocks.filter(b => b.type === 'cards');
   assert.deepEqual(plain(rows.map(r => r.cards.length)), [3, 1]);
-  assert.deepEqual(plain(rows.flatMap(r => r.cards.map(c => `${c.role}:${c.name}:${c.headline}`))), ['Start:The Gardener:Tending', 'Turn:The Lantern:null', 'Turn:The Bridge:null', 'Now:The Well:null']);
+  assert.deepEqual(plain(rows.flatMap(r => r.cards.map(c => `${c.role}:${c.name}:${c.headline}`))), ['Week 1:The Gardener:Tending', 'Week 2:The Lantern:null', 'Week 3:The Bridge:null', 'Week 4:The Well:null']);
 });
 
 test('an earlier report keeps its Summary, Themes and Patterns', () => {

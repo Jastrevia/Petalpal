@@ -33,9 +33,9 @@ test("第一次: a named word no earlier Event wrote, only after 4 weeks of hist
   assert.equal(of(muted, "FIRST_TIME").length, 0, "a muted word");
   const built = weekly2Packet(data), sections = renderWeekly2(null, data, built, null, { petalCards: true }).sections;
   const card = sections.find(section => section.kind === "PETAL_CARD");
-  assert.equal(sections.find(section => section.kind === "HEADLINE").claim, "这是你第一次写到面试。");
+  assert.equal(sections.find(section => section.kind === "HEADLINE").claim, "第一次写到“面试”");
   assert(INSIGHT_CARDS.FIRST_TIME.includes(card.cardId));
-  assert.equal(card.reason, "这是你第一次写到面试。");
+  assert.equal(card.reason, "这是你第一次写到“面试”。");
 });
 
 test("身体信号: one kind of signal in ≥3 entries with one mood in ≥ ⅔ of them, named by kind, never as the owner's words", () => {
@@ -46,7 +46,7 @@ test("身体信号: one kind of signal in ≥3 entries with one mood in ≥ ⅔ 
     ...WEEK, ["c-3", "2026-09-18T12:00:00Z", "DRIFTING_BLOOM", "熬夜写报告。"]
   ];
   const [body] = of(input(rows), "BODY_SIGNAL");
-  assert.equal(body.fact, "这五周有 3 条记录写到睡眠，你都选了『迷茫』。");
+  assert.equal(body.fact, "这五周你 3 次写到睡眠，3 次选的都是『迷茫』。");
   assert.equal(body.subject, "睡眠");
   assert.deepEqual(body.spans.map(span => span.text), ["熬夜写报告。", "又失眠了。", "昨晚没睡好。"]);
   const mixed = rows.map(row => row[0] === "e-2" ? [row[0], row[1], "SUNNY_BLOOM", row[3]] : row);
@@ -61,7 +61,7 @@ test("节律: ≥12 entries in four weeks; a mood mostly in one part of the loca
     ["n-1", "2026-08-25T23:10:00Z", "DRIFTING_BLOOM", "夜里。"], ["n-2", "2026-09-01T23:40:00Z", "DRIFTING_BLOOM", "夜里。"],
     ["n-3", "2026-09-08T02:00:00Z", "DRIFTING_BLOOM", "夜里。"], ["n-4", "2026-09-15T22:30:00Z", "DRIFTING_BLOOM", "夜里。"], ...WEEK];
   const [rhythm] = of(input(rows), "RHYTHM");
-  assert.equal(rhythm.fact, "这四周你选『迷茫』的 4 条记录里，有 4 条写在晚上 22 点以后。");
+  assert.equal(rhythm.fact, "这四周你 4 次选了『迷茫』，4 次都写在晚上 10 点以后。");
   assert.deepEqual(rhythm.spans, []);
   assert.equal(of(input(rows.slice(4)), "RHYTHM").length, 0, "fewer than 12 entries");
   assert.deepEqual(weekly2Packet(input(rows.slice(4))).unlock, { type: "RHYTHM", needed: 12 - rows.slice(4).filter(row => row[1] >= "2026-08-31").length });

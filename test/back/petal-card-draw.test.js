@@ -87,7 +87,7 @@ test("once a day: the chosen place gives today's card; a second draw keeps the f
   assert.equal(before.deckSize, 69);
   assert.equal((await todaysPetalDraw(db, { userId: "o", now: at("2026-10-22"), heavy: true })).deckSize, 78);
   assert.deepEqual(before.topics.map(topic => topic.id), PETAL_TOPIC_IDS);
-  assert.equal(before.topics[0].label, "今日运势");
+  assert.equal(before.topics[0].label, "今日指引");
   assert.equal(before.drawn, null);
   assert.equal(before.locale, "zh-Hans");
   assert.ok(!("deck" in before), "the deck order is never sent before the draw");

@@ -15,7 +15,8 @@ export const PAVILION_LANTERN: Rect = { x: 1208, y: 12, width: 90, height: 238 }
 export const PAVILION_CLOTH: Record<PavilionBookId, string> = {
   weekly: '#3E5742', monthly: '#244B70', notes: '#6C4772', collection: '#D9C49D',
 };
-export function pavilionScene(width: number, height: number) {
+// `maxBookWidth` (a phone): the open spread is no wider than this, so one whole page fits the screen's width.
+export function pavilionScene(width: number, height: number, maxBookWidth = Infinity) {
   const compact = width < 640;
   // Portrait crops toward the shelf, keeping all four books on screen. Wide views
   // contain the entire painting. Both the hit targets and origins use this camera.
@@ -28,7 +29,7 @@ export function pavilionScene(width: number, height: number) {
     const r = PAVILION_SLOTS[id];
     return { x: x + r.x * k, y: y + r.y * k, width: r.width * k, height: r.height * k };
   };
-  const bookWidth = Math.min(compact ? width - 24 : artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H);
+  const bookWidth = Math.min(compact ? width - 24 : artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H, maxBookWidth);
   const bookHeight = bookWidth * SPEC.H / (2 * SPEC.W);
   const bookX = compact ? (width - bookWidth) / 2 : x + artWidth * .56 - bookWidth / 2;
   const bookY = Math.max(slot('weekly').y + slot('weekly').height + 18, Math.min(y + artHeight * .30, height - bookHeight - 42));

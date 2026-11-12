@@ -22,6 +22,15 @@ test("a reading is three paragraphs in the right language and length, with no nu
   assert.equal(validPetalReading([ZH[0], ZH[1], "今天你一定会遇到对的人，留一点时间给自己，看看哪些东西其实已经可以放手。"], "zh-Hans"), false, "certainty");
   assert.equal(validPetalReading([ZH[0], ZH[1], "可以考虑买入一点股票，留一点时间给自己，看看哪些东西其实已经可以放手。"], "zh-Hans"), false, "finance");
   assert.equal(validPetalReading([ZH[0], ZH[1].replace("这几天", "这3天"), ZH[2]], "zh-Hans"), false, "numbers");
+  assert.equal(validPetalReading([ZH[0], ZH[1], "这几天可能有点倒霉，留一点时间给自己，看看哪些东西其实已经可以放手。"], "zh-Hans"), false, "luck (zh)");
+  assert.equal(validPetalReading([EN[0], EN[1], "With a little luck this week goes well, so keep a little space to notice what you are ready to set down."], "en"), false, "luck (en)");
+  // The agreed voice (owner 2026-11-11): the meaning for the topic first, the state and what to watch, one or two things to try.
+  assert.equal(validPetalReading(["逆位星星放在工作和学习上，意思是你对结果的信心正在变弱。事情并没有停，只是你越来越看不到它的进展，也开始怀疑自己能不能做好。",
+    "现在的状态多半是一直在投入，却很少得到让自己安心的反馈，所以容易把正常的疲惫看成能力不够。需要留意的是，这是一段低谷，不是对你能力的评价。",
+    "可以试着把手上的任务拆小，每天只定一件当天能做完的事，做完就记下来。也可以试着这周留出一个晚上，不安排任何任务。"], "zh-Hans"), true);
+  assert.equal(validPetalReading(["The Knight of Swords upright, for love, means you have made up your mind about something and want to say it now. You have mostly thought it through already.",
+    "Right now you are moving faster than the other person. You may feel you have said everything that needs saying while they are still taking in the first part, and being direct can come across as impatience or pressure. What needs care is your pace and tone, more than the point itself.",
+    "You could try writing down, in one sentence, the one thing you most want them to understand, and saying only that. Afterwards, you could try asking what they think and letting them finish before you answer."], "en"), true);
   assert.equal(validPetalReading([EN[0], EN[1], "You should quit your job today and keep a little space to notice what you are ready to set down."], "en"), false);
   assert.equal(validPetalReading([EN[0], EN[1], "What is ready? What can wait? Keep a little space today to notice what you are ready to set down."], "en"), false, "one question at most");
   assert.equal(validPetalReading([EN[0], `${EN[1]}\nMore.`, EN[2]], "en"), false, "no line breaks inside a paragraph");
@@ -118,7 +127,10 @@ test("a listed owner's reading is written once from the card, its orientation, t
     k: drawn.card.keywords, s: "一段结束，腾出新的位置。", d: drawn.card.text }, m: { 低落: 2, 治愈: 1 } });
   assert.doesNotMatch(f.calls[0].messages[0].content, /private sentence/);
   assert.equal(f.calls[0].model, PETAL_READING_MODEL_ID);
-  assert.match(f.calls[0].system, /never as certain outcomes/);
+  // The prompt: no certain outcomes, no picture or tarot lessons, plain voice, and the words the validator rejects.
+  for (const rule of [/never of certain outcomes/, /Do not describe the picture/, /Do not teach tarot/, /No metaphors/, /Keep every sentence literal/, /Do not repeat or paraphrase s or d/, /可以试着…/, /好运, 厄运, 倒霉/, /you should, you must/]) {
+    assert.match(f.calls[0].system, rule);
+  }
   const reserved = (await f.pg.query(`SELECT "actionCode" FROM "AuditEvent" WHERE "eventType"='AI_GATEWAY_USD_RESERVED'`)).rows;
   assert.deepEqual(reserved.map(row => row.actionCode), ["PETAL_READING"]);
   // Kept: asking again shows the same reading without another call.

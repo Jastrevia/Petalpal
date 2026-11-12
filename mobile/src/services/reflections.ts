@@ -264,15 +264,17 @@ export function monthly2(report: Pick<ReflectionReport, 'narrativeSections'>): M
     .map((item: any) => ({ word: item.word, count: item.count, mood: item.mood, moodCount: item.moodCount }));
   return { headline: head.claim, question: of('MONTH_QUESTION')[0]?.claim ?? null, garden, spread, changes, threads, goods, people };
 }
+// Which week of its month a Weekly period (`YYYY-MM-DD`, its Monday) is: the 1st–7th is week 1.
+export const weekOfMonth = (periodKey: string) => Math.floor((Number(periodKey.slice(8, 10)) - 1) / 7) + 1;
 export const MONTHLY_COPY = {
-  en: { garden: 'This month’s garden', spread: 'This month’s spread', roles: { start: 'Start', turn: 'Turn', now: 'Now' }, change: 'What changed',
+  en: { garden: 'This month’s garden', spread: 'This month’s cards', week: (n: number) => `Week ${n}`, change: 'What changed',
     lastMonth: 'Last month', thisMonth: 'This month', threads: 'Threads this month', goods: 'Small good things', times: (n: number) => `×${n}`,
-    people: 'People this month', show: 'Show', hide: 'Hide', peopleLine: (n: number, mood: string, k: number) => `${n} entries · ${mood} ${k}`,
+    people: 'People this month', show: 'Show', hide: 'Hide', peopleLine: (word: string, n: number, mood: string, k: number) => `${word} · ${n} ${n === 1 ? 'time' : 'times'}, ${mood} ${k}`,
     question: 'A question for next month', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], empty: 'No entry' },
-  'zh-Hans': { garden: '本月花园', spread: '本月牌阵', roles: { start: '开始', turn: '转折', now: '现在' }, change: '变化对照',
-    lastMonth: '上个月', thisMonth: '这个月', threads: '线索追踪', goods: '本月好事清单', times: (n: number) => `${n} 次`,
-    people: '本月的人', show: '展开', hide: '收起', peopleLine: (n: number, mood: string, k: number) => `${n} 条 · 『${mood}』${k} 条`,
-    question: '给下个月的问题', days: ['一', '二', '三', '四', '五', '六', '日'], empty: '没有记录' },
+  'zh-Hans': { garden: '本月花园', spread: '这个月的牌', week: (n: number) => `第 ${n} 周`, change: '这个月不一样的地方',
+    lastMonth: '上个月', thisMonth: '这个月', threads: '说过的话，后来', goods: '这个月的小好事', times: (n: number) => `${n} 次`,
+    people: '这个月写到的人', show: '展开', hide: '收起', peopleLine: (word: string, n: number, mood: string, k: number) => `${word}　写到 ${n} 次，其中『${mood}』${k} 次`,
+    question: '留给下个月', days: ['一', '二', '三', '四', '五', '六', '日'], empty: '没有记录' },
 } as const;
 
 // ---- 花语年鉴 (backend lib/almanac.js): built by code when opened, never stored ----
@@ -338,7 +340,7 @@ export const MOOD_SPECIES: Record<PrimaryMood, string> = { SUNNY_BLOOM: 'SUNFLOW
 export type ShortCopy = (typeof SHORT_COPY)[ShortLocale];
 export const SHORT_COPY = {
   en: { line: 'Line of the week', curve: 'Your week in moods', side: 'Side by side', thenNow: 'Then and now', then: 'Then', now: 'Now',
-    question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card',
+    question: 'A question for you', card: 'Petal card', more: 'Also this week', whyCard: 'Why this card', cardMore: 'About this card',
     bouquet: 'This week’s bouquet',
     oneMore: 'One more thing', inaccurate: 'Not right', hide: 'Hide', hidden: 'Hidden.', thanks: 'Thank you — noted, and hidden.',
     undo: 'Show again', feedbackFailed: 'That didn’t save. Try again in a moment.', answer: 'Write an entry to answer',
@@ -353,14 +355,14 @@ export const SHORT_COPY = {
     write: 'Write about it', open: 'Show the whole moment', close: 'Hide', loading: 'Opening…',
     unavailable: 'This moment can’t be opened right now.', support: 'Support', days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'] },
   'zh-Hans': { line: '本周一句', curve: '这周的心情', side: '两件事并排', thenNow: '那时与现在', then: '那时', now: '现在',
-    question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张',
+    question: '留给你的问题', card: '花语卡', more: '这周还有', whyCard: '为什么是这张', cardMore: '这张牌讲什么',
     bouquet: '本周花束',
     oneMore: '还有一件事', inaccurate: '不准确', hide: '隐藏', hidden: '已隐藏。', thanks: '谢谢，已记下，这条先收起来。',
     undo: '重新显示', feedbackFailed: '没有保存成功，稍后再试。', answer: '写一条来回答',
-    keep: '收藏', kept: '已收藏', follow: '跟进', following: '跟进中', threadLimit: '你已经在跟进 3 条线了，先在花语集里放下一条。',
-    threads: '你在跟进的线', answered: '你的回答', letter: '你写给自己的信', letterFrom: (date: string) => `写于${date}`,
-    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '隐藏关联', SMALL_GOODS: '好事清单', OPEN_QUESTION: '没回答的问题', TREND: '走向', ECHO: '时间回声',
-      FIRST_TIME: '第一次', BODY_SIGNAL: '身体信号', RHYTHM: '节律', SELF_TALK: '反复的句式' },
+    keep: '收藏', kept: '已收藏', follow: '跟进', following: '跟进中', threadLimit: '你已经在留意 3 件事了，先在花语集里放下一件。',
+    threads: '你在留意的', answered: '你的回答', letter: '你写给自己的信', letterFrom: (date: string) => `写于${date}`,
+    types: { SAID_BEFORE: '说过的话', HIDDEN_LINK: '常在一起的', SMALL_GOODS: '小小的好事', OPEN_QUESTION: '还开着的问题', TREND: '这一周的走向', ECHO: '回声',
+      FIRST_TIME: '第一次', BODY_SIGNAL: '身体说的话', RHYTHM: '一天里的时刻', SELF_TALK: '又写到的话' },
     moods: { SUNNY_BLOOM: '开心', GENTLE_BLOOM: '温柔', QUIET_BLOOM: '低落', HEALING_BLOOM: '治愈', FIRE_BLOOM: '愤怒',
       WONDER_BLOOM: '好奇', DRIFTING_BLOOM: '迷茫', PEACEFUL_BLOOM: '平静' }, moodChart: '这周的心情', pageOf: '页',
     page: '洞察', previousCard: '上一条', nextCard: '下一条',
