@@ -4,6 +4,7 @@ import { keepSection, loadAlmanacYears, loadCollection, setMute, SHORT_COPY, sho
   type PetalCollection as Collection } from '../../services/reflections';
 import { useAppLocale } from '../../services/locale';
 import { AlmanacView } from './AlmanacView';
+import { journalKit } from './journalKit';
 
 // The cream book on the pavilion shelf (Weekly 2.0 闭环, backend lib/insight-loop.js): every petal card the Weekly
 // reports drew with each week's "why this card" stacked, the insights the owner kept, the threads they follow, letters
@@ -55,8 +56,10 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
     try { await run(); await load(); } catch { setNote(t.failed); }
   }
   const week = (periodKey: string) => weekLabel(periodKey, lang).title;
-  const eyebrow = (text: string) => <Text accessibilityRole="header" style={c.eyebrow}>{text}</Text>;
-  const rule = <View accessible={false} style={c.rule} />;
+  // The same botanical-journal headings and painted dividers as the Weekly and Monthly pages (journalKit).
+  const kit = journalKit('collection');
+  const eyebrow = (text: string) => kit.heading(text);
+  const rule = kit.rule;
   const link = (label: string, onPress: () => void, a11y = label) => <Pressable accessibilityRole="button" accessibilityLabel={a11y} hitSlop={12} onPress={onPress}
     style={({ pressed }) => [c.linkBox, pressed && { opacity: .6 }]}><Text style={c.link}>{label}</Text></Pressable>;
 
@@ -80,9 +83,10 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
         {book.cards.map(card => <View key={card.cardId} style={c.entry}>
           <Text style={c.name}>{card.name}{card.kept ? `  · ${t.kept}` : ''}</Text>
           <Text style={c.text}>{card.line}</Text>
-          {card.appearances.map(item => <Text key={item.reportId} style={[c.text, c.reason]}>
-            <Text style={{ color: SOFT }}>{week(item.periodKey)}　</Text>{item.reason ?? ''}
-          </Text>)}
+          {card.appearances.map(item => <View key={item.reportId} style={c.appearance}>
+            {kit.stamp(week(item.periodKey))}
+            <Text style={[c.text, { flex: 1 }]}>{item.reason ?? ''}</Text>
+          </View>)}
         </View>)}</>}
       {book.insights.length > 0 && <>{rule}{eyebrow(t.insights)}
         {book.insights.map(item => <View key={`${item.reportId}-${item.index}`} style={c.entry}>
@@ -129,9 +133,9 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
   </View>;
 }
 
-const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
+const INK = '#33241A', SOFT = '#6B543A', GOLD = '#A8823F';
 const c = StyleSheet.create({
-  title: { fontFamily: 'Georgia', color: INK, marginBottom: 12 },
+  title: { fontFamily: 'Georgia', fontWeight: '700', color: INK, marginBottom: 12 },
   eyebrow: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: GOLD, marginBottom: 6 },
   rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 16 },
   entry: { marginBottom: 12 },
@@ -139,6 +143,7 @@ const c = StyleSheet.create({
   text: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: INK },
   small: { fontFamily: 'Georgia', fontSize: 11, lineHeight: 18, color: SOFT },
   reason: { paddingLeft: 12, borderLeftWidth: 1, borderColor: '#A8823F55', marginTop: 4 },
+  appearance: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   linkBox: { minHeight: 36, justifyContent: 'center' },

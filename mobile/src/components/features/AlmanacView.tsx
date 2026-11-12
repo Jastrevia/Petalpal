@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { loadAlmanac, shortDate, weekLabel, type Almanac } from '../../services/reflections';
+import { journalKit } from './journalKit';
 import { useAppLocale } from '../../services/locale';
 import { petalCardArt } from '../petalCards/petalCardArt';
 import { PETAL_ART } from './weeklyArt';
@@ -31,8 +32,10 @@ export function AlmanacView({ year, onBack, headingSize = 22 }: { year: number; 
       .catch(error => { if (!controller.signal.aborted) setState((error as { status?: number })?.status === 409 ? 'notYet' : 'error'); });
     return () => controller.abort();
   }, [year, attempt]);
-  const eyebrow = (text: string) => <Text accessibilityRole="header" style={a.eyebrow}>{text}</Text>;
-  const rule = <View accessible={false} style={a.rule} />;
+  // The same botanical-journal headings and painted dividers as the Weekly and Monthly pages (journalKit).
+  const kit = journalKit('collection');
+  const eyebrow = (text: string) => kit.heading(text);
+  const rule = kit.rule;
   const back = <Pressable accessibilityRole="button" hitSlop={12} onPress={onBack} style={a.linkBox}><Text style={a.link}>{t.back}</Text></Pressable>;
   if (state !== 'ready' || !book) return <View>{back}
     {state === 'loading' ? <ActivityIndicator color="#8B6C44" accessibilityLabel={String(year)} />
@@ -67,7 +70,7 @@ export function AlmanacView({ year, onBack, headingSize = 22 }: { year: number; 
       <Text style={a.text}>{book.echo.line}</Text>
       {([[t.first, book.echo.first], [t.latest, book.echo.last]] as const).map(([label, quote]) => <View key={label} style={a.pair}>
         <Text style={a.small}>{label} · {shortDate(quote.date, lang)}</Text>
-        <Text style={a.text}>{`“${quote.text}”`}</Text>
+        {kit.slip(<Text style={kit.slipText}>{`“${quote.text}”`}</Text>)}
       </View>)}</>}
     {book.firsts.length > 0 && <>{rule}{eyebrow(t.firsts)}
       {book.firsts.map((item, i) => <Text key={i} style={a.text}><Text style={{ color: SOFT }}>{shortDate(item.date, lang)}　</Text>{item.word}</Text>)}</>}

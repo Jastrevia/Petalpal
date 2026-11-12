@@ -11,6 +11,7 @@ import { startAnswer } from '../../services/questionAnswer';
 import { MoodPetalChart, useEventSpecies, WeeklyBouquet } from './WeeklyBloom';
 import { ART_RATIO, INSIGHT_ART, WEEKLY_ART } from './weeklyArt';
 import { ShareCardButton } from './ShareCard';
+import { journalKit, PageDecor } from './journalKit';
 
 const CURVE_HEIGHT = 104, DOT = 26, CHIP = DOT + 6;
 // One Event open at a time, under the part (`at`) that opened it.
@@ -212,19 +213,21 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   </>;
 
   if (short.version2) {
-    // Weekly 2.0 is written on the paper itself: no boxes, only painted vignettes, serif type and gold hairlines. Every
-    // block keeps one text size; the page is split into book pages (Paged) instead of scrolling.
-    const eyebrow = (text: string) => <Text style={v.eyebrow}>{text}</Text>;
+    // Weekly 2.0 is a page of a botanical journal (journalKit): blossom headings in the green of its own spine, painted
+    // vignettes and gilding, the owner's words on slips of paper, dates as stamps. The page is split into book pages
+    // (Paged) instead of scrolling.
+    const kit = journalKit('weekly');
+    const eyebrow = (text: string) => kit.heading(text);
     const art = (key: string, height: number, source = INSIGHT_ART[key]) => source
       ? <Image source={source} contentFit="contain" accessible={false} style={{ width: height * (ART_RATIO[key] ?? 1), height }} /> : null;
-    const rule = <View accessible={false} style={v.rule} />;
+    const rule = kit.rule;
     const dates = (item: Insight, at: string) => <View style={v.dates}>
       {item.evidence.map((entry, i) => {
         const on = opened?.at === at && opened.id === entry.eventId;
         return <Pressable key={entry.eventId} accessibilityRole="button" accessibilityLabel={shortDate(entry.date, lang)}
           accessibilityHint={on ? copy.close : copy.open} disabled={!interactive} hitSlop={10}
           onPress={() => void toggle(at, entry.eventId)} style={({ pressed }) => [v.date, pressed && { opacity: .6 }]}>
-          <Text style={[v.dateText, on && v.dateOn]}>{i ? '· ' : ''}{shortDate(entry.date, lang)}</Text>
+          {kit.stamp(shortDate(entry.date, lang), on)}
         </Pressable>;
       })}
     </View>;
@@ -232,8 +235,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
     const quiet = (label: string, onPress: () => void, on = false) => <Pressable key={label} accessibilityRole="button" hitSlop={12}
       accessibilityLabel={label} accessibilityState={{ selected: on }} onPress={onPress}
       style={({ pressed }) => [v.markButton, pressed && { opacity: .6 }]}><Text style={[v.markText, on && v.markOn]}>{label}</Text></Pressable>;
-    // The owner's own words stand on a line of their own (italic, a gold hairline at the left); the sentence around
-    // them is shown as saved. The main insight is one size larger than everything else on the page.
+    // The owner's own words stand apart on a slip of paper; the sentence around them is shown as saved. The main insight
+    // is one size larger than everything else on the page.
     const withQuote = (text: string, quote: string | null, main: boolean) => {
       const body = main ? v.mainText : v.text;
       if (!quote) return <Text selectable={interactive} style={body}>{text}</Text>;
@@ -241,7 +244,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       const before = (at >= 0 ? text.slice(0, at) : text).trim(), after = at >= 0 ? text.slice(at + quote.length + 2).trim() : '';
       return <>
         {!!before && <Text selectable={interactive} style={body}>{before}</Text>}
-        <Text selectable={interactive} style={[body, v.quote]}>{`“${quote}”`}</Text>
+        {kit.slip(<Text selectable={interactive} style={[kit.slipText, main && { fontSize: 15, lineHeight: 24 }]}>{`“${quote}”`}</Text>)}
         {!!after && <Text selectable={interactive} style={body}>{after}</Text>}
       </>;
     };
@@ -257,7 +260,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
             {eyebrow(copy.types[item.type])}
             {withQuote(item.text, item.quote?.text ?? null, main)}
           </View>
-          <View style={main ? v.artMain : v.art}>{art(item.type, main ? 60 : 50)}</View>
+          <View style={main ? v.artMain : v.art}>{art(item.type, main ? 72 : 50)}</View>
         </View>
         {item.items.map((thing, i) => <Text key={i} selectable={interactive} style={[v.text, v.good]}>{thing.text}</Text>)}
         {/* The code-written fact line is what the sentence above was checked against; shown again it only repeats it. */}
@@ -315,12 +318,13 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       if (short.curve) {
         left.push({ key: 'bouquet', node: <View style={v.block}>
           {eyebrow(copy.bouquet)}
-          <WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species}
-            openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />
+          {kit.bed(<WeeklyBouquet days={short.curve.days} points={points} locale={lang} dayNames={copy.days} species={species}
+            openId={opened?.at === 'bouquet' ? opened.id : null} interactive={interactive} onOpen={id => void toggle('bouquet', id)} />)}
           {panel('bouquet')}
         </View> });
+        // The chart shares the first left page with the bouquet (its heading sits beside it to save a line).
         left.push({ key: 'moods', node: <View style={v.block}>{eyebrow(copy.moodChart)}
-          <MoodPetalChart points={points} names={copy.moods} label={copy.moodChart} width={170} /></View> });
+          <MoodPetalChart points={points} names={copy.moods} label={copy.moodChart} width={150} /></View> });
       }
       right = [{ key: 'main', node: entry(insights.main, 'main', true) }];
       // More insights follow one under another; only the page itself turns.
@@ -348,7 +352,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
         <View style={v.cardRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={short.card.name} accessibilityHint={cardOpen ? copy.close : copy.cardMore}
             accessibilityState={{ expanded: cardOpen }} onPress={() => setCardOpen(value => !value)} style={({ pressed }) => pressed && { opacity: .8 }}>
-            <Image source={cardArt} contentFit="contain" style={v.cardArt} />
+            <View style={[kit.card, { padding: 4 }]}><Image source={cardArt} contentFit="contain" style={v.cardArt} /></View>
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={v.pairLabel}>{short.card.name}</Text>
@@ -374,8 +378,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
       if (question) right.push({ key: 'question', node: <>{rule}{question}</> });
     }
     // The report link is the last page's footer, apart from the question.
-    if (part === 'left') return <Paged blocks={left} testID="weekly-left-page" copy={copy} />;
-    if (part === 'right') return <Paged blocks={right} testID="weekly-right-page" copy={copy} footer={insights ? report : null} />;
+    if (part === 'left') return <Paged blocks={left} testID="weekly-left-page" copy={copy} decor="left" />;
+    if (part === 'right') return <Paged blocks={right} testID="weekly-right-page" copy={copy} footer={insights ? report : null} decor="right" />;
     return <Paged blocks={[...left, ...right]} testID="short-weekly-report" copy={copy} footer={insights ? report : null} />;
   }
   return <View testID="short-weekly-report">
@@ -448,11 +452,13 @@ const s = StyleSheet.create({
   disclaimer: { fontFamily: 'Georgia', color: '#8B6C44', fontSize: 11, lineHeight: 16, alignSelf: 'stretch' },
 });
 // Weekly 2.0: type on the page, gold hairlines, painted vignettes (no boxes).
-const INK = '#3F2F1F', SOFT = '#6B543A', GOLD = '#A8823F';
+const INK = '#33241A', SOFT = '#6B543A', GOLD = '#A8823F';
 // One page of the book: blocks laid out once, split into pages that fit the page's height (a block never splits; a
 // block taller than the page scrolls on its own page). Other pages' blocks stay laid out but hidden, so they keep their
 // measured place; "‹ 1 / 2 ›" turns.
-export function Paged({ blocks, testID, copy, footer = null }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy;
+export function Paged({ blocks, testID, copy, footer = null, decor }: { blocks: { key: string; node: ReactNode }[]; testID: string; copy: ShortCopy;
+  // Which page of the spread this is: its foot carries the journal's painted corner (journalKit PageDecor).
+  decor?: 'left' | 'right';
   // Shown under the last page only (the link to report this output); its room is kept on every page so pages never shift.
   footer?: ReactNode }) {
   const [height, setHeight] = useState(0);
@@ -478,7 +484,9 @@ export function Paged({ blocks, testID, copy, footer = null }: { blocks: { key: 
   const start = tops[pages[at]?.[0] ?? 0] ?? 0;
   const overflow = (pages[at] ?? []).reduce((sum, i) => sum + (sizes[blocks[i].key] ?? 0), 0) > room;
   useEffect(() => { scroller.current?.scrollTo({ y: start, animated: false }); }, [start, at]);
+  const pageUsed = (pages[at] ?? []).reduce((sum, i) => sum + (sizes[blocks[i].key] ?? 0), 0);
   return <View testID={testID} style={{ flex: 1, minHeight: 0 }} onLayout={event => setHeight(event.nativeEvent.layout.height)}>
+    {decor && height > 0 ? <PageDecor side={decor} free={Math.max(0, room - pageUsed)} /> : null}
     <ScrollView ref={scroller} style={{ flex: 1 }} scrollEnabled={overflow} showsVerticalScrollIndicator={overflow}>
       {blocks.map((block, i) => <View key={block.key} aria-hidden={!shown.has(i)} importantForAccessibility={shown.has(i) ? 'auto' : 'no-hide-descendants'}
         pointerEvents={shown.has(i) ? 'auto' : 'none'} style={!shown.has(i) ? { opacity: 0 } : undefined}
@@ -514,16 +522,14 @@ export function headlineSize(text: string, width: number, full = 21, least = 17)
 const v = StyleSheet.create({
   eyebrow: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: GOLD, marginBottom: 6 },
   range: { fontFamily: 'Georgia', fontSize: 13, color: SOFT, marginBottom: 10 },
-  headline: { fontFamily: 'Georgia', fontSize: 21, lineHeight: 30, color: INK, marginBottom: 16 },
+  headline: { fontFamily: 'Georgia', fontSize: 21, lineHeight: 30, fontWeight: '700', color: INK, marginBottom: 12 },
   block: { marginBottom: 12 },
-  rule: { height: 1, backgroundColor: '#A8823F40', marginVertical: 12 },
   entryHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   art: { width: 50, alignItems: 'center', paddingTop: 2 },
-  artMain: { width: 60, alignItems: 'center', paddingTop: 2 },
+  artMain: { width: 72, alignItems: 'center', paddingTop: 2 },
   text: { fontFamily: 'Georgia', fontSize: 14, lineHeight: 22, color: INK, marginBottom: 6 },
   // Two places are larger than the body: the main insight and the question.
   mainText: { fontFamily: 'Georgia', fontSize: 16, lineHeight: 26, color: INK, marginBottom: 6 },
-  quote: { fontStyle: 'italic', paddingLeft: 12, borderLeftWidth: 1, borderColor: '#A8823F88' },
   question: { alignItems: 'center', paddingVertical: 8 },
   questionText: { fontFamily: 'Georgia', fontSize: 17, lineHeight: 27, color: INK, textAlign: 'center', marginTop: 8, marginBottom: 6 },
   footer: { height: FOOTER, alignItems: 'center', justifyContent: 'center' },
@@ -533,7 +539,6 @@ const v = StyleSheet.create({
   foot: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12 },
   date: { minHeight: 32, justifyContent: 'center' },
   dateText: { fontFamily: 'Georgia', fontSize: 12, color: GOLD, textDecorationLine: 'underline', textDecorationColor: '#A8823F66' },
-  dateOn: { color: INK },
   marks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginLeft: 'auto' },
   markOn: { color: GOLD },
   markButton: { minHeight: 32, justifyContent: 'center' },
@@ -544,7 +549,7 @@ const v = StyleSheet.create({
   pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: PAGER },
   arrow: { minWidth: 44, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   arrowText: { fontFamily: 'Georgia', fontSize: 22, color: GOLD },
-  pageText: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: SOFT },
+  pageText: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 2, color: SOFT, opacity: .8 },
   pair: { marginBottom: 4 },
   pairLabel: { fontFamily: 'Georgia', fontSize: 11, letterSpacing: 1, color: '#8C6E3A', marginBottom: 2 },
   cardArt: { width: 96, height: 144, borderRadius: 6 },

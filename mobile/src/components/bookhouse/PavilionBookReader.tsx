@@ -24,7 +24,8 @@ import {
   INSTRUCTION_BOOKMARK_CATEGORIES,
 } from './instructionPages';
 
-const parchment = require('../../../assets/bookhouse/journal/parchment.webp');
+// The page itself: warm ivory handmade paper (FLUX.2 klein, cropped to plain grain), aged at its edges by styles.paperAge.
+const parchment = require('../../../assets/reflection/journal/paper.webp');
 const botanical = require('../../../assets/reflection/botanical.webp');
 
 export interface BookReaderProps {
@@ -51,6 +52,8 @@ interface PageData {
   header?: string;
   eyebrow?: string;
   render: (interactive: boolean) => ReactNode;
+  // The page's content turns its own pages ("‹ 1 / 2 ›"), so the footer shows no second page number.
+  ownPager?: boolean;
 }
 
 const TURN_DURATION = 540;
@@ -110,7 +113,7 @@ export function PavilionBookReader({
         const parts: Array<'left' | 'right' | 'all'> = compact ? ['all'] : ['left', 'right'];
         const report = selectedReport;
         const book = twoPointO && reportPage && report
-          ? parts.map((part, i) => ({ pageNumber: i + 1, render: (interactive: boolean) => reportPage(report, part, interactive) }))
+          ? parts.map((part, i) => ({ pageNumber: i + 1, ownPager: true, render: (interactive: boolean) => reportPage(report, part, interactive) }))
           : bookId === 'weekly' ? buildWeeklyPages(locale, selectedReport, details, onWriteEvent) : buildMonthlyPages(locale, selectedReport, details);
         if (bookId !== 'weekly' || !collectionPage) return book;
         // The collection starts on a page of its own (a fresh spread on wide screens).
@@ -312,6 +315,8 @@ export function PavilionBookReader({
       >
         {/* The full parchment paper texture of the physical page */}
         <Image source={parchment} style={StyleSheet.absoluteFill} resizeMode="stretch" />
+        {/* Gently foxed edges and a faint warm vignette, so the page is not a flat colour. */}
+        <View pointerEvents="none" style={styles.paperAge} />
 
         {/* Central gutter spine crease shading */}
         {!compact && (
@@ -362,8 +367,10 @@ export function PavilionBookReader({
               {page.render(interactive)}
             </View>
 
-            {/* Subtle Page Footer & Number */}
-            <View style={styles.pageFooter}>
+            {/* Subtle Page Footer & Number. A page with its own pager shows only the arrows that turn the spread,
+                and no footer at all when there is no spread to turn to. */}
+            {page.ownPager && !((isLeft || compact) && currentSpread > 0) && !((!isLeft || compact) && currentSpread < maxSpread) ? null
+            : <View style={[styles.pageFooter, page.ownPager && { borderTopWidth: 0, paddingTop: 0 }]}>
               {(isLeft || compact) && currentSpread > 0 && (
                 <Pressable
                   accessibilityRole="button"
@@ -375,9 +382,9 @@ export function PavilionBookReader({
                   <Text style={styles.arrowSymbol}>‹</Text>
                 </Pressable>
               )}
-              <Text style={styles.pageNumberText}>
+              {page.ownPager ? <View style={{ flex: 1 }} /> : <Text style={styles.pageNumberText}>
                 {locale === 'zh-Hans' ? `第 ${page.pageNumber} 页` : `— ${page.pageNumber} —`}
-              </Text>
+              </Text>}
               {(!isLeft || compact) && currentSpread < maxSpread && (
                 <Pressable
                   accessibilityRole="button"
@@ -389,7 +396,7 @@ export function PavilionBookReader({
                   <Text style={styles.arrowSymbol}>›</Text>
                 </Pressable>
               )}
-            </View>
+            </View>}
           </View>
         ) : (
           <View style={[styles.pageInnerContainer, styles.blankPageContainer]}>
@@ -1044,8 +1051,13 @@ const styles = StyleSheet.create({
   pageSurface: {
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#F3E4C7',
+    backgroundColor: '#F1E3C2',
     borderRadius: 6,
+  },
+  paperAge: {
+    position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
+    borderRadius: 6,
+    boxShadow: 'inset 0 0 34px #8A642E3D, inset 0 0 6px #6B4A2233',
   },
   compactPageBackground: {
     backgroundColor: '#F3E4C7',

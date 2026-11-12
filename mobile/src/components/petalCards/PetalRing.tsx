@@ -7,6 +7,7 @@ import { drawPetalCard, requestPetalReading, type PetalCardFace, type PetalReadi
 import { PETAL_CARD_ART } from './petalCardArt';
 import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
+import { JOURNAL_ART } from '../features/journalKit';
 
 const BACKS = {
   lilac: require('@/assets/petal-card-backs/lilac.webp'),
@@ -239,7 +240,9 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         {face.keywords ? <Text style={styles.orientation}>{`${face.reversed ? copy.reversed : copy.upright} · ${face.keywords.join(locale === 'en' ? ', ' : '、')}`}</Text> : null}
         <Text style={styles.line}>{face.line}</Text>
         <Text style={styles.text}>{face.text}</Text>
+        {/* The reading opens under the same painted golden sprig that divides the pavilion's journal pages. */}
         {reading?.available && reading.status === 'READY' && reading.paragraphs?.length ? <View style={styles.reading}>
+          <Image source={JOURNAL_ART.divider} resizeMode="contain" accessible={false} style={styles.sprig} />
           <Text style={styles.readingTitle}>{copy.reading}</Text>
           {reading.paragraphs.map((paragraph, i) => <Text key={i} selectable style={styles.readingText}>{paragraph}</Text>)}
           {typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
@@ -323,7 +326,8 @@ const styles = StyleSheet.create({
   usedUp: { fontFamily: 'serif', fontSize: 12, color: '#C9C0E8', textAlign: 'center', marginVertical: 4 },
   topicTag: { marginTop: 8, fontFamily: 'serif', fontSize: 15, color: '#F3DFA8' },
   orientation: { fontFamily: 'serif', fontSize: 13, letterSpacing: 1, color: '#E9CF8A', textAlign: 'center' },
-  reading: { alignSelf: 'stretch', marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderColor: '#E9CF8A44', gap: 10 },
+  reading: { alignSelf: 'center', width: '100%', maxWidth: 620, marginTop: 6, gap: 10 },
+  sprig: { alignSelf: 'center', width: 210, height: 42 },
   readingTitle: { fontFamily: 'serif', fontSize: 15, letterSpacing: 2, color: '#E9CF8A', textAlign: 'center' },
   readingText: { fontFamily: 'serif', fontSize: 15, lineHeight: 25, color: '#F1EAF9' },
   lockedNote: { alignSelf: 'stretch', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderColor: '#E9CF8A44',
