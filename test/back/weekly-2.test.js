@@ -173,7 +173,7 @@ test("rendering: headline, main insight, bouquet, secondary insights, petal card
   assert.deepEqual(main.evidence.map(item => item.sourceEventId), ["e-d", "c-0"]);
   const card = result.sections.find(section => section.kind === "PETAL_CARD");
   assert.ok(INSIGHT_CARDS.SAID_BEFORE.includes(card.cardId));
-  assert.match(card.reason, /^你写下“我想每天早上跑步”，之后又 1 次写到它。(战车这张牌讲的是下了决心往前走。|权杖三这张牌讲的是做了之后的等待。)$/u);
+  assert.equal(card.reason, "你写下“我想每天早上跑步”，之后又 1 次写到它。");
   assert.equal(result.sections.at(-1).claim, "下周跑步的时候，你想留意什么？");
   assert.equal(reportShowsEvent(result.sections, "e-d"), true); assert.equal(reportShowsEvent(result.sections, "e-a"), false);
   // The packet carries only candidates: aliases, facts and quotes; never ids, dates or moods.

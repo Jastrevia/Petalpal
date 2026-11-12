@@ -1,12 +1,13 @@
 # 花语卡牌面文案 V2：全稿（B 批，待批注）
 
-状态（2026-11-11）：**只是稿子，代码没有改**。确认后才会写进 `lib/petal-cards.js` 并同步测试。
+状态（2026-11-11）：**两轮都已确认，已写进 `lib/petal-cards.js`**（9 张重牌没动）。下表“现在”一栏是改之前的文案，留作对照。
+确认后的两处调整：“描述”开头的 12 张换掉了 7 张，直接从内容说起；愚者和倒吊人的英文去掉了 “will”（牌面护栏测试不允许预测类的词）。
 方向见 [CONTENT_UPGRADE.md](CONTENT_UPGRADE.md)：温柔但不诗意。
 
 ## 两轮改稿
 
 - **第一轮（已通过）：牌名下面那一句。** 用平常的话说这张牌讲什么；原句已经平实的没动，表里标“一句不变”。
-- **第二轮（这次新改，待确认）：正文。** 第一轮的正文是“画面描述 + 这张牌讲的是……”，批注后全部重写：
+- **第二轮（已通过）：正文。** 第一轮的正文是“画面描述 + 这张牌讲的是……”，批注后全部重写：
   - 不描述画面（用户看得到牌），不用固定句式；
   - 一到两句平实的话，讲这张牌的传统含义：通常描述什么处境，在工作、关系、自己身上常指什么；
   - 不重复上面那一句的意思，在它之外补充；
@@ -15,7 +16,7 @@
 
 表里“改后”一栏：**粗体是一句（第一轮）**，下面是正文（第二轮）。
 
-## 写进代码时连带要改的两处（还没改）
+## 连带改的两处（已改）
 
 1. 解读 prompt（`lib/petal-reading.js`）里对 `d` 的说明，从“picture text”改成“牌面含义文字”，“不复述 s / d”保留。
 2. 周报“为什么是这张”（`lib/insight-write.js`）去掉第二句“这张牌讲的是……”，只留事实句。卡片正文已经在讲牌的含义，两处不再说同一件事。这是改动最少的做法：删掉 `CARD_MEANINGS` 和拼接，测试里对应的断言同步。
@@ -25,7 +26,7 @@
 | 牌 | | 现在 | 改后 | 批注 |
 |---|---|---|---|---|
 | 愚者<br>`major-00` | 中 | **带着好奇，先走出一步。**<br>小花仙扛着小包袱、捧着一束小白花走到崖边，小白狗跟在脚边。路还看不清，好奇心已经先出发了。 | **带着好奇，开始一件新的事。**<br>常指一段新的经历刚开始：没有经验，也没有包袱，结果还说不准。 | |
-| The Fool | EN | **Curious first, one step out.**<br>The fairy walks to the cliff’s edge with a small bundle and a handful of white flowers, a white pup at her heels. The path isn’t clear yet, but her curiosity has already set off. | **Starting something new, out of curiosity.**<br>Usually about the very start of something: little experience, little baggage, and no way yet to know how it will turn out. | |
+| The Fool | EN | **Curious first, one step out.**<br>The fairy walks to the cliff’s edge with a small bundle and a handful of white flowers, a white pup at her heels. The path isn’t clear yet, but her curiosity has already set off. | **Starting something new, out of curiosity.**<br>Usually about the very start of something: little experience, little baggage, and no way yet to know how it turns out. | |
 | 魔术师<br>`major-01` | 中 | **手边的东西，已经够开始了。**<br>小花仙举起一根魔杖，桌上摆着一只杯子、一枚星币、一把小剑和一根枝条。不用等都准备齐，手边这些就能用。 | （一句不变）<br>指有能力、有条件把想法变成实际的东西。常出现在需要自己动手、主动推进的事情上。 | |
 | The Magician | EN | **What’s at hand is enough to begin.**<br>The fairy raises a wand; on the table sit a cup, a pentacle, a small sword and a branch. Nothing needs to be complete first. These are enough. | **What you have is enough to begin.**<br>Having the skill and the means to turn an idea into something real. It often comes up around things you have to start and drive yourself. | |
 | 女祭司<br>`major-02` | 中 | **安静下来，先听听自己。**<br>小花仙坐在两根柱子中间，手里拿着一卷书卷，脚边有一弯月亮。外面很吵的时候，心里的声音也还在。 | **安静下来，听听自己的想法。**<br>和直觉有关：有些事心里其实已经有了答案，只是还没说出口，也说不清理由。 | |
@@ -49,7 +50,7 @@
 | 正义<br>`major-11` | 中 | **对自己诚实一点。**<br>小花仙坐在两根柱子中间，一手举剑，一手拿天平。心里两边的东西都放上去看看，不急着分对错。 | **对自己诚实。**<br>关于责任和后果：做过的事会有相应的结果。也常和合同、规则、需要权衡的决定有关。 | |
 | Justice | EN | **A little more honest with yourself.**<br>The fairy sits between two pillars, a sword in one hand and scales in the other. Both sides can go on the scales, with no rush to decide who is right. | **Being honest with yourself.**<br>About accountability: actions have matching consequences. Often linked to contracts, rules and decisions that need weighing. | |
 | 倒吊人<br>`major-12` | 中 | **停一停，换个角度看。**<br>小花仙倒挂在树枝上，头发垂下来，表情很平静。卡住的时候停一下，倒过来的世界也挺有意思。 | （一句不变）<br>描述一段主动或被动的停顿：事情推不动，原来的做法行不通。常伴随着放下某个坚持。 | |
-| The Hanged Man | EN | **Pause, and look from another side.**<br>The fairy hangs upside down from a branch, hair falling, face calm. Stuck is a fine time to pause, and the world upside down is interesting too. | **Pause and look from another angle.**<br>Describes a pause, chosen or not: things will not move and the old approach is not working. It often goes with letting go of something you were holding to. | |
+| The Hanged Man | EN | **Pause, and look from another side.**<br>The fairy hangs upside down from a branch, hair falling, face calm. Stuck is a fine time to pause, and the world upside down is interesting too. | **Pause and look from another angle.**<br>Describes a pause, chosen or not: things are not moving and the old approach is not working. It often goes with letting go of something you were holding to. | |
 | 节制<br>`major-14` | 中 | **慢慢调和，不着急。**<br>小花仙把水从一只杯子倒进另一只杯子，一滴也没洒。冷的热的、快的慢的，可以一点一点兑匀。 | **慢慢调整，找到合适的度。**<br>常指把两样不同的东西配合好，比如工作和休息、自己和别人的需要。重点在耐心和适度。 | |
 | Temperance | EN | **Blending slowly, no hurry.**<br>The fairy pours water from one cup into another without spilling a drop. Warm and cold, fast and slow can be blended a little at a time. | **Adjusting slowly to find the right balance.**<br>Often about fitting two different things together, such as work and rest, or your needs and someone else’s. Patience and moderation are the point. | |
 | 星星<br>`major-17` | 中 | **难过之后，一点点亮起来。**<br>大星星挂在夜空，小花仙跪在池边，把两只罐子里的水慢慢倒出来。不急，也不用马上变好。 | **难过之后，慢慢恢复。**<br>和希望、信任有关：相信事情有改善的可能，也愿意重新坦诚地面对自己。也指平静和疗愈。 | |
@@ -79,8 +80,8 @@
 | Five of Wands | EN | **When things bump and clash.**<br>A few small figures wave branches at each other, more play-fight than fight. Friction is irritating, and the irritation shows how much you care. | **Friction and disagreement.**<br>Mostly small-scale contests: disagreement within a team, rivalry among classmates or colleagues. Usually not serious, but tiring. | |
 | 权杖六<br>`wands-06` | 中 | **被看见，被认可。**<br>小花仙骑着小马走在队伍前面，手里举着一根挂着花环的枝条。被别人看见的那一刻，可以好好收下。 | （一句不变）<br>指努力之后的公开成果，比如表扬、升职、比赛获胜。也涉及自信，以及别人的评价对自己的影响。 | |
 | Six of Wands | EN | **Seen, and recognized.**<br>The fairy rides at the front of the crowd, holding up a branch hung with a wreath. When someone sees you, you can take that moment in. | **Seen and recognized.**<br>A public result after effort, such as praise, a promotion or a win. It also touches on confidence and how much other people’s opinion affects you. | |
-| 权杖七<br>`wands-07` | 中 | **守住自己在意的东西。**<br>小花仙站在小坡上，挡住下面伸上来的六根枝条。守着很累，也说明它对你很重要。 | （一句不变）<br>描述处在需要为自己辩护的位置：观点受到质疑，或者有人来争同一样东西。 | |
-| Seven of Wands | EN | **Holding on to what matters.**<br>The fairy stands on a small rise, holding off six branches reaching up from below. Holding on is tiring, and it shows how much this matters to you. | **Standing up for what matters to you.**<br>Describes having to defend yourself: your view is being challenged, or others are competing for the same thing. | |
+| 权杖七<br>`wands-07` | 中 | **守住自己在意的东西。**<br>小花仙站在小坡上，挡住下面伸上来的六根枝条。守着很累，也说明它对你很重要。 | （一句不变）<br>处在需要为自己辩护的位置：观点受到质疑，或者有人来争同一样东西。 | |
+| Seven of Wands | EN | **Holding on to what matters.**<br>The fairy stands on a small rise, holding off six branches reaching up from below. Holding on is tiring, and it shows how much this matters to you. | **Standing up for what matters to you.**<br>Having to defend yourself: your view is being challenged, or others are competing for the same thing. | |
 | 权杖八<br>`wands-08` | 中 | **事情忽然快起来了。**<br>八根开着花的枝条一齐斜着飞过天空，下面是安静的河。一下子变快的时候，有点手忙脚乱也正常。 | **事情一下子快起来了。**<br>常指消息、出行、突然推进的计划。几件事同时发生，没有多少犹豫的时间。 | |
 | Eight of Wands | EN | **Suddenly, things speed up.**<br>Eight flowering branches fly across the sky together above a quiet river. When everything speeds up at once, feeling a bit flustered is normal. | **Things suddenly speed up.**<br>Often about messages, travel and plans that suddenly move. Several things happen at once, with little time to hesitate. | |
 | 权杖九<br>`wands-09` | 中 | **累了，但还站着。**<br>小花仙手臂上缠着绷带，紧紧握着一根枝条，身后立着一排。很累了还在坚持，这份力气值得被看见。 | **很累了，还在坚持。**<br>多出现在一件事的后半段：经历过挫折，变得防备，对新的麻烦格外警觉。 | |
@@ -124,10 +125,10 @@
 | Page of Cups | EN | **A small surprise inside.**<br>The fairy holds a cup, and a little fish peeks out to look back at her. A small surprise in the heart is worth a smile. | **A small surprise.**<br>The young, curious side of feeling: dreamy and easily touched. It can also mean news about a relationship or a creative idea. | |
 | 圣杯骑士<br>`cups-12` | 中 | **跟着心走的邀请。**<br>小花仙骑着白马慢慢蹚过小溪，一手举着一只杯子。听见心里的声音时，走慢一点也没关系。 | **跟着感情走。**<br>描述浪漫、理想化的人或做法，常和表白、邀请、追求有关。有时偏理想，不太顾及现实。 | |
 | Knight of Cups | EN | **An invitation to follow your heart.**<br>The fairy rides a white horse slowly across a stream, holding up a cup in one hand. When your heart calls, going slowly is fine. | **Following your feelings.**<br>Describes a romantic, idealistic person or approach, often linked to a confession, an invitation or courtship. It can lean idealistic and overlook practical matters. | |
-| 圣杯皇后<br>`cups-13` | 中 | **体贴别人，也体贴自己。**<br>小花仙坐在海边，安静地看着手里那只精致的杯子。对别人的温柔，也可以留一点给自己。 | （一句不变）<br>描述一个温和、善于倾听的人：情感细腻，直觉强，容易感受到周围人的情绪。 | |
-| Queen of Cups | EN | **Kind to others, kind to yourself.**<br>The fairy sits by the sea, quietly gazing at the fine cup in her hands. The gentleness you give others can be kept a little for yourself too. | **Kind to others and to yourself.**<br>Describes a gentle person who listens well: emotionally perceptive, intuitive and quick to sense how others feel. | |
-| 圣杯国王<br>`cups-14` | 中 | **情绪起伏里的平稳。**<br>小花仙坐在海中央的石座上，四周浪起浪落。心里有浪的时候，也有一块稳稳的地方。 | **情绪有起伏，人是稳的。**<br>描述成熟、包容的人，能在别人激动的时候保持冷静，常是别人愿意倾诉的对象。 | |
-| King of Cups | EN | **Steady amid the waves.**<br>The fairy sits on a stone throne in the sea while waves rise and fall around her. Even with waves inside, there is a steady place too. | **Steady while feelings rise and fall.**<br>Describes a mature, tolerant person who stays calm when others are upset, and whom people tend to confide in. | |
+| 圣杯皇后<br>`cups-13` | 中 | **体贴别人，也体贴自己。**<br>小花仙坐在海边，安静地看着手里那只精致的杯子。对别人的温柔，也可以留一点给自己。 | （一句不变）<br>温和、善于倾听的一类人：情感细腻，直觉强，容易感受到周围人的情绪。 | |
+| Queen of Cups | EN | **Kind to others, kind to yourself.**<br>The fairy sits by the sea, quietly gazing at the fine cup in her hands. The gentleness you give others can be kept a little for yourself too. | **Kind to others and to yourself.**<br>A gentle person who listens well: emotionally perceptive, intuitive and quick to sense how others feel. | |
+| 圣杯国王<br>`cups-14` | 中 | **情绪起伏里的平稳。**<br>小花仙坐在海中央的石座上，四周浪起浪落。心里有浪的时候，也有一块稳稳的地方。 | **情绪有起伏，人是稳的。**<br>成熟、包容，能在别人激动的时候保持冷静，常是别人愿意倾诉的对象。 | |
+| King of Cups | EN | **Steady amid the waves.**<br>The fairy sits on a stone throne in the sea while waves rise and fall around her. Even with waves inside, there is a steady place too. | **Steady while feelings rise and fall.**<br>A mature, tolerant person who stays calm when others are upset, and whom people tend to confide in. | |
 
 ## 宝剑（9 张）
 
@@ -145,10 +146,10 @@
 | Seven of Swords | EN | **Going around it your own way.**<br>The fairy tiptoes away with an armful of swords, glancing back. When the straight way doesn’t work, a path of your own is fine too. | **Getting around it your own way.**<br>Also concealment, shortcuts or not being fully open: something is left unsaid, or done outside the rules. | |
 | 宝剑侍从<br>`swords-11` | 中 | **好奇地看看四周。**<br>小花仙举着小剑站在风很大的山坡上，望着远处。对什么都想多看两眼，这份好奇很可爱。 | **好奇，多看多想。**<br>代表思维活跃、爱提问的状态：学东西快，说话直。有时也指打听消息，或者保持戒备。 | |
 | Page of Swords | EN | **Curiously looking around.**<br>The fairy holds up a small sword on a windy hillside, gazing into the distance. Wanting a second look at everything is a lovely kind of curiosity. | **Curious and watchful.**<br>A quick, questioning state of mind: fast to learn and blunt in speech. Sometimes it means looking for information or staying on guard. | |
-| 宝剑骑士<br>`swords-12` | 中 | **急着说出口、做出来。**<br>小花仙骑着马迎风冲过来，剑举得高高的。心里急的时候冲得很快，那股急也是一种在乎。 | **急着说出来、做出来。**<br>描述行动快、目标明确、不太顾及别人感受的状态。常和争论、赶进度有关。 | |
-| Knight of Swords | EN | **Rushing to say it, to do it.**<br>The fairy charges in on horseback, sword raised high. When you’re in a hurry you move fast, and that hurry is a way of caring. | **In a hurry to say it and do it.**<br>Describes moving fast with a clear aim and not much regard for others’ feelings. Often linked to arguments or pushing to meet a deadline. | |
-| 宝剑皇后<br>`swords-13` | 中 | **清醒，而且诚实。**<br>小花仙坐在云边，一手举剑，一手向前伸开。看清楚自己真实的感受，也是一种温柔。 | **头脑清楚，说话坦率。**<br>描述一个独立、有原则的人：经历过事情，判断不靠情绪。给人的感觉可能有些距离。 | |
-| Queen of Swords | EN | **Clear and honest.**<br>The fairy sits among the clouds, one hand raising a sword and the other reaching out. Seeing your real feelings clearly is a kind of gentleness. | **Clear-headed and frank.**<br>Describes an independent, principled person who has been through things and does not judge by emotion. Can come across as somewhat distant. | |
+| 宝剑骑士<br>`swords-12` | 中 | **急着说出口、做出来。**<br>小花仙骑着马迎风冲过来，剑举得高高的。心里急的时候冲得很快，那股急也是一种在乎。 | **急着说出来、做出来。**<br>行动快、目标明确，不太顾及别人的感受。常和争论、赶进度有关。 | |
+| Knight of Swords | EN | **Rushing to say it, to do it.**<br>The fairy charges in on horseback, sword raised high. When you’re in a hurry you move fast, and that hurry is a way of caring. | **In a hurry to say it and do it.**<br>Moving fast with a clear aim and not much regard for others’ feelings. Often linked to arguments or pushing to meet a deadline. | |
+| 宝剑皇后<br>`swords-13` | 中 | **清醒，而且诚实。**<br>小花仙坐在云边，一手举剑，一手向前伸开。看清楚自己真实的感受，也是一种温柔。 | **头脑清楚，说话坦率。**<br>独立、有原则，经历过事情，判断不靠情绪。给人的感觉可能有些距离。 | |
+| Queen of Swords | EN | **Clear and honest.**<br>The fairy sits among the clouds, one hand raising a sword and the other reaching out. Seeing your real feelings clearly is a kind of gentleness. | **Clear-headed and frank.**<br>An independent, principled person who has been through things and does not judge by emotion. Can come across as somewhat distant. | |
 | 宝剑国王<br>`swords-14` | 中 | **冷静地看一看。**<br>小花仙坐在高高的椅子上，手里竖着一把剑，椅边停着一只白猫头鹰。先冷静下来再看，事情就清楚一些。 | **冷静地判断。**<br>多指专业、权威的角色，比如法官、老师、顾问。看重逻辑和规则，感情放在其次。 | |
 | King of Swords | EN | **Taking a calm look.**<br>The fairy sits on a high chair holding an upright sword, a white owl perched beside her. Once things calm down, they look a little clearer. | **Judging calmly.**<br>Usually a professional or authoritative role, such as a judge, teacher or adviser. Logic and rules come first, feelings second. | |
 
@@ -176,10 +177,10 @@
 | Ten of Pentacles | EN | **Home, and what slowly builds up.**<br>Under an arch, a family and two dogs stay close, an elder seated beside them. Days slowly gathered together are precious in themselves. | **Home, and what has been built over time.**<br>Concerns matters that span generations, such as family, inheritance and property, and long-term stability and security. | |
 | 星币侍从<br>`pentacles-11` | 中 | **认真学一样新东西。**<br>小花仙站在草地上，双手举着一枚星币仔细端详。认真看一样东西的样子，本身就很好。 | （一句不变）<br>代表学生的状态：有目标，肯花时间，重视实际的结果。也指学业或工作方面的新机会。 | |
 | Page of Pentacles | EN | **Learning something new, carefully.**<br>The fairy stands in a meadow, holding up a pentacle to study it. The look of someone carefully studying something is lovely in itself. | **Studying something new with care.**<br>A student’s state: a goal, time put in, and attention to practical results. It can also mean a new opportunity in study or work. | |
-| 星币骑士<br>`pentacles-12` | 中 | **一步一步，稳稳地走。**<br>小花仙骑着一匹不慌不忙的黑马，停在刚翻过的田边。慢一点没关系，每一步都算数。 | **一步一步，稳稳地做。**<br>描述做事有计划、负责、守时的人。进度不快，也不太愿意改变做法。 | |
-| Knight of Pentacles | EN | **Step by step, steadily.**<br>The fairy sits on an unhurried black horse at the edge of a freshly turned field. Slower is fine; every step counts. | （一句不变）<br>Describes someone who works to a plan, responsibly and on time. Progress is not fast, and there is little wish to change method. | |
-| 星币皇后<br>`pentacles-13` | 中 | **好好照顾日常。**<br>小花仙坐在花园里，膝上捧着一枚星币，脚边有只小兔子。把日常照顾好，就是在照顾自己。 | **把日常照顾好。**<br>描述一个务实、可靠、让人安心的人：擅长打理家和钱，同时兼顾工作。 | |
-| Queen of Pentacles | EN | **Taking good care of the everyday.**<br>The fairy sits in the garden with a pentacle in her lap and a small rabbit at her feet. Taking care of the everyday is taking care of yourself. | **Taking good care of everyday life.**<br>Describes a practical, dependable, reassuring person, good with home and money while also keeping up with work. | |
+| 星币骑士<br>`pentacles-12` | 中 | **一步一步，稳稳地走。**<br>小花仙骑着一匹不慌不忙的黑马，停在刚翻过的田边。慢一点没关系，每一步都算数。 | **一步一步，稳稳地做。**<br>做事有计划、负责、守时。进度不快，也不太愿意改变做法。 | |
+| Knight of Pentacles | EN | **Step by step, steadily.**<br>The fairy sits on an unhurried black horse at the edge of a freshly turned field. Slower is fine; every step counts. | （一句不变）<br>Someone who works to a plan, responsibly and on time. Progress is not fast, and there is little wish to change method. | |
+| 星币皇后<br>`pentacles-13` | 中 | **好好照顾日常。**<br>小花仙坐在花园里，膝上捧着一枚星币，脚边有只小兔子。把日常照顾好，就是在照顾自己。 | **把日常照顾好。**<br>务实、可靠、让人安心的一类人：擅长打理家和钱，同时兼顾工作。 | |
+| Queen of Pentacles | EN | **Taking good care of the everyday.**<br>The fairy sits in the garden with a pentacle in her lap and a small rabbit at her feet. Taking care of the everyday is taking care of yourself. | **Taking good care of everyday life.**<br>A practical, dependable, reassuring person, good with home and money while also keeping up with work. | |
 | 星币国王<br>`pentacles-14` | 中 | **稳稳的掌控感。**<br>小花仙坐在刻着牛头的椅子上，手里扶着一枚星币，脚边趴着一头小牛。日子有条有理的时候，心也跟着安稳。 | **稳定，有把握。**<br>多指事业或财务上已经站稳的人：做事稳重，也愿意照应别人，看重长期的保障。 | |
 | King of Pentacles | EN | **A steady sense of things in hand.**<br>The fairy sits on a chair carved with bulls, a pentacle under her hand and a small bull resting at her feet. When the days are in order, the heart settles too. | **Stable and in control.**<br>Usually someone established in career or finances, steady in what they do and willing to provide for others. Long-term security matters to them. | |
 

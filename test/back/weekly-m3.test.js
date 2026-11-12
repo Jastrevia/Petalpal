@@ -35,7 +35,7 @@ test("第一次: a named word no earlier Event wrote, only after 4 weeks of hist
   const card = sections.find(section => section.kind === "PETAL_CARD");
   assert.equal(sections.find(section => section.kind === "HEADLINE").claim, "第一次写到“面试”");
   assert(INSIGHT_CARDS.FIRST_TIME.includes(card.cardId));
-  assert.match(card.reason, /^这是你第一次写到“面试”。(愚者这张牌讲的是开始。|权杖一这张牌讲的是一个新的想法或开头。)$/u);
+  assert.equal(card.reason, "这是你第一次写到“面试”。");
 });
 
 test("身体信号: one kind of signal in ≥3 entries with one mood in ≥ ⅔ of them, named by kind, never as the owner's words", () => {
