@@ -714,6 +714,16 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     { scale: fit * cameraZoom.value },
   ]);
   useAnimatedReaction(() => cameraTransform.value, () => { noteGardenMotion(); });
+  // The entry hit areas laid over the Garden (pavilion, treehouse, month signs) are invisible, and a finger
+  // that is dragging the Garden cannot press them. Following the camera on every frame of a drag made the
+  // native views lay out and commit each frame, so during a drag or pinch they stay where they were and
+  // catch up in the frame the fingers lift. Camera moves that are not a gesture are followed as before.
+  const panning = useSharedValue(false), pinching = useSharedValue(false);
+  const hitX = useSharedValue(0), hitY = useSharedValue(0), hitZoom = useSharedValue(1);
+  useAnimatedReaction(() => panning.value || pinching.value ? null : { x: cameraX.value, y: cameraY.value, zoom: cameraZoom.value }, now => {
+    if (!now) return;
+    hitX.value = now.x; hitY.value = now.y; hitZoom.value = now.zoom;
+  });
   // The layers that never move, each between things that do. See gardenStaticRuns.ts.
   const staticLayout = __DEV__ ? calibrationLayout : undefined;
   const shoreRun = useMemo(() => <GardenStaticRun cameraTransform={cameraTransform} width={viewport.width} height={viewport.height} order={0}><LandLayer renderPass="shore" layout={staticLayout} /></GardenStaticRun>, [cameraTransform, staticLayout, viewport.width, viewport.height]);
@@ -734,14 +744,14 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const pavilionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (pavilionTimer.current) clearTimeout(pavilionTimer.current); }, []);
   const pavilionEntryStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + pavilionPlacement.x * fit * cameraZoom.value,
-    top: baseY + cameraY.value + pavilionPlacement.y * fit * cameraZoom.value,
-    width: Math.max(44, 1214 * pavilionPlacement.scale * fit * cameraZoom.value),
-    height: Math.max(44, 1295 * pavilionPlacement.scale * fit * cameraZoom.value),
+    left: baseX + hitX.value + pavilionPlacement.x * fit * hitZoom.value,
+    top: baseY + hitY.value + pavilionPlacement.y * fit * hitZoom.value,
+    width: Math.max(44, 1214 * pavilionPlacement.scale * fit * hitZoom.value),
+    height: Math.max(44, 1295 * pavilionPlacement.scale * fit * hitZoom.value),
   }));
   const treehouseEntryStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + (treehousePlacement.x + 870 * treehousePlacement.scale) * fit * cameraZoom.value - 28,
-    top: baseY + cameraY.value + (treehousePlacement.y + 690 * treehousePlacement.scale) * fit * cameraZoom.value - 28,
+    left: baseX + hitX.value + (treehousePlacement.x + 870 * treehousePlacement.scale) * fit * hitZoom.value - 28,
+    top: baseY + hitY.value + (treehousePlacement.y + 690 * treehousePlacement.scale) * fit * hitZoom.value - 28,
     width: 56, height: 56,
   }));
   const fairyBubbleStyle = useAnimatedStyle(() => ({
@@ -781,11 +791,16 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const calendarHighlight = useSharedValue(0);
   const calendarPoint = useSharedValue({ x: 0, y: 0 });
   const calendarReducedMotion = useReducedMotion();
-  const calendarHighlightStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + calendarPoint.value.x * fit * cameraZoom.value - 22,
-    top: baseY + cameraY.value + calendarPoint.value.y * fit * cameraZoom.value - 22,
-    opacity: calendarHighlight.value,
-  }));
+  const calendarHighlightStyle = useAnimatedStyle(() => {
+    // The ring follows the camera while it can be seen; hidden, it waits like the hit areas above.
+    const seen = calendarHighlight.value > 0;
+    const x = seen ? cameraX.value : hitX.value, y = seen ? cameraY.value : hitY.value, zoom = seen ? cameraZoom.value : hitZoom.value;
+    return {
+      left: baseX + x + calendarPoint.value.x * fit * zoom - 22,
+      top: baseY + y + calendarPoint.value.y * fit * zoom - 22,
+      opacity: calendarHighlight.value,
+    };
+  });
   useImperativeHandle(interactionRef,()=>({
     focusFairy:()=>{
       if (activeModeRef.current !== 'normal' || selectedFlower) return;
@@ -1407,13 +1422,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         cancelAnimation(cameraX); cancelAnimation(cameraY); cancelAnimation(cameraZoom);
         startX.value = cameraX.value;
         startY.value = cameraY.value;
+        panning.value = true;
       })
       .onUpdate((event) => {
         const next = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY,
           startX.value + event.translationX, startY.value + event.translationY, cameraZoom.value);
         cameraX.value = next.x;
         cameraY.value = next.y;
-      });
+      })
+      .onFinalize(() => { panning.value = false; });
     const pinch = Gesture.Pinch()
       .onStart((event) => {
         startZoom.value = cameraZoom.value;
@@ -1421,6 +1438,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         startY.value = cameraY.value;
         focalWorldX.value = (event.focalX - baseX - startX.value) / (fit * startZoom.value);
         focalWorldY.value = (event.focalY - baseY - startY.value) / (fit * startZoom.value);
+        pinching.value = true;
       })
       .onUpdate((event) => {
         const nextZoom = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, startZoom.value * event.scale).zoom;
@@ -1430,7 +1448,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           event.focalY - baseY - focalWorldY.value * fit * nextZoom, nextZoom);
         cameraX.value = next.x;
         cameraY.value = next.y;
-      });
+      })
+      .onFinalize(() => { pinching.value = false; });
     const tap = Gesture.Tap()
       .enabled(!((enableFairyWalk || readOnly || activeMode !== 'normal') && Platform.OS === 'web'))
       .maxDuration(250)
@@ -1452,7 +1471,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       }
     }
     return Gesture.Simultaneous(effectivePan, pinch, tap);
-  }, [baseX, baseY, fit, cameraX, cameraY, cameraZoom, focalWorldX, focalWorldY,
+  }, [baseX, baseY, fit, cameraX, cameraY, cameraZoom, focalWorldX, focalWorldY, panning, pinching,
     viewport.width, viewport.height, startX, startY, startZoom, handleGardenTap, enableFairyWalk, readOnly, activeMode, previewMode, calibrationMode, calSubMode, calDragMode, paintInteractionMode, maskPan, paintPan, moveMaskPan]);
   const resetView = useCallback(() => {
     const minimum = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom;
@@ -1792,7 +1811,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       )}
       {!readOnly && activeMode === 'normal' && !selectedFlower && onOpenReflection && <MonthlySignControls {...monthlySigns}
         canEdit={signEditorEnabled} onOpen={onOpenReflection}
-        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={monthlySigns.editing ? cameraX : hitX} cameraY={monthlySigns.editing ? cameraY : hitY} cameraZoom={monthlySigns.editing ? cameraZoom : hitZoom}
         focus={(x,y) => { focusCoords(x,y,2.2); cameraX.value -= viewport.width*.35; }} />}
       {lanternEditorEnabled && <LanternPlacementEditor {...lanterns}
         baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom}
