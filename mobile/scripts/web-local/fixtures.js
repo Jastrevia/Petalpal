@@ -380,12 +380,12 @@
       if (p === '/api/petal-cards/reading' && method === 'POST') {
         if (!petalDrawn) return json({ error: 'Not found' }, 404);
         petalDrawn.reading = { available: true, needsConsent: false, locked: false, freeLeft: 2, status: 'READY', paragraphs: petalZh ? [
-          '桌上的四样东西都还在，只是手在它们之间换来换去。魔术师逆位说的是这种时候：力气有，却散着。',
-          '放到今天来看，也许不用再添新的事，先把已经开了头的那一件拿稳。这周你选了几次平静，那份安静可以带着。',
-          '挑手边最小的一件，只做它一会儿。'] : [
-          'The Magician reversed speaks of power that is there but scattered: the tools are on the table, yet your hands keep moving between them.',
-          `For ${petalDrawn.topicLabel.toLowerCase()}, the card suggests gathering yourself before you begin. Your quiet days this week may be helping you hear what matters.`,
-          'Pick one small thing within reach and give it your whole attention for a while.'] };
+          `逆位魔术师放在${petalDrawn.topicLabel}上，意思是你手上的条件其实够用，但力气用得比较散。想做的事不少，每一件都只推进了一点。`,
+          '你现在可能同时开着好几件事，哪一件都放不下，也容易怀疑自己是不是准备得还不够。需要留意的是，问题多半不在能力，而在注意力被分得太细。',
+          '可以试着今天只选一件已经开了头的事，把它做到一个能停下来的地方。也可以试着把其余的事写在纸上，先放到明天。'] : [
+          `The Magician reversed, for ${petalDrawn.topicLabel.toLowerCase()}, means you have what you need, but your effort is spread thin. Several things are under way and each has moved only a little.`,
+          'You are probably keeping a few things open at once, unwilling to drop any of them, and you may be wondering whether you are prepared enough. The thing to watch is that the difficulty is more likely divided attention than a lack of ability.',
+          'You could try choosing one thing you have already started and taking it to a point where you can stop. You could also try writing the rest down and leaving them for tomorrow.'] };
         return json(petalDrawn.reading, 200, 1500);
       }
       // Redemption codes: any well-formed code works once here (the real codes live on the server).
