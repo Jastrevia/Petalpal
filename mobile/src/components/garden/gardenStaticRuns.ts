@@ -22,6 +22,50 @@ export function sameCamera(a: GardenCamera | null, b: GardenCamera | null) {
   return !!a && !!b && a.x === b.x && a.y === b.y && a.zoom === b.zoom;
 }
 
+// How far a snapshot reaches past each edge of the screen, in whole points, so a drag only slides it along.
+export type SnapshotReach = { left: number; right: number; top: number; bottom: number };
+// A snapshot may be this many screens of pixels. The camera cannot leave the Garden, so no pixel is spent
+// past the place it stops: on a phone at its widest view the whole reachable Garden fits, and no drag
+// there ever draws these layers again. Zoomed in, the same budget is shared out around the screen.
+export const SNAPSHOT_SCREENS = 2.5;
+// `camera` is the scene's own transform (its zoom is the full scale), `bounds` the Garden in world units.
+export function planSnapshotReach(camera: GardenCamera, width: number, height: number,
+  bounds: { x: number; y: number; width: number; height: number }): SnapshotReach {
+  'worklet';
+  // One point more than the camera can travel, so rounding never leaves the last point uncovered.
+  const want = (travel: number) => Math.ceil(Math.max(0, travel)) + 1;
+  const left = want(-bounds.x * camera.zoom - camera.x), right = want(camera.x - (width - (bounds.x + bounds.width) * camera.zoom));
+  const top = want(-bounds.y * camera.zoom - camera.y), bottom = want(camera.y - (height - (bounds.y + bounds.height) * camera.zoom));
+  const area = SNAPSHOT_SCREENS * width * height;
+  let extraX = left + right, extraY = top + bottom;
+  if ((width + extraX) * (height + extraY) > area) {
+    extraY = Math.min(extraY, Math.floor(height * (Math.sqrt(SNAPSHOT_SCREENS) - 1)));
+    extraX = Math.max(0, Math.min(extraX, Math.floor(area / (height + extraY) - width)));
+    extraY = Math.max(0, Math.min(top + bottom, Math.floor(area / (width + extraX) - height)));
+  }
+  // Each side takes its half, and what one side cannot use goes to the other.
+  const share = (first: number, second: number, extra: number) => {
+    const other = Math.min(second, extra - Math.min(first, Math.floor(extra / 2)));
+    return { first: Math.min(first, extra - other), second: other };
+  };
+  const x = share(left, right, extraX), y = share(top, bottom, extraY);
+  return { left: x.first, right: x.second, top: y.first, bottom: y.second };
+}
+// What is left of a snapshot's reach once the camera has slid to `camera`; null when it no longer covers the screen.
+export function snapshotReachAt(taken: GardenCamera, reach: SnapshotReach, camera: GardenCamera): SnapshotReach | null {
+  'worklet';
+  if (taken.zoom !== camera.zoom) return null;
+  const dx = camera.x - taken.x, dy = camera.y - taken.y;
+  const left = reach.left - dx, right = reach.right + dx, top = reach.top - dy, bottom = reach.bottom + dy;
+  // Half a point to spare: the slide lands on whole device pixels.
+  return left >= .5 && right >= .5 && top >= .5 && bottom >= .5 ? { left, right, top, bottom } : null;
+}
+// True when a new snapshot here would reach no further than the one held, so taking it would be wasted work.
+export function snapshotStillBest(left: SnapshotReach | null, plan: SnapshotReach) {
+  'worklet';
+  return !!left && left.left >= plan.left - 1 && left.right >= plan.right - 1 && left.top >= plan.top - 1 && left.bottom >= plan.bottom - 1;
+}
+
 export function createStaticRunHost<Picture>() {
   const runs = new Map<StaticRun<Picture>, Tracked | null>();
   return {
