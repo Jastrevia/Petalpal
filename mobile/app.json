@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PetalPal",
-    "slug": "mobile",
+    "slug": "petalpal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -74,9 +74,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e9d24151-6f26-456f-aec8-4bb714d76ca1"
+        "projectId": "9379c47d-c689-4dee-b5dc-23f36dadce66"
       }
     },
-    "owner": "jeanc66"
+    "owner": "jastrevia"
   }
 }
