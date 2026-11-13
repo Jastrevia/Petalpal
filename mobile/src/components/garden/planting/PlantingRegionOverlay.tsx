@@ -136,7 +136,8 @@ function CalibratedMonthRegion({
   showErasures?: boolean;
   showFinalMask?: boolean;
   screenScale?: SharedValue<number>;
-  /** The owner's planting bed: a soft gold wash with a painted gold edge instead of the cyan editor tint. */
+  /** The owner's planting bed: a warm gold wash with a bright gold edge instead of the cyan editor tint, strong
+   *  enough to read as gold over the night Garden's dark lawns too. */
   gardenTone?: boolean;
 }) {
   const cal = isCalibrating ? requestedCalibration : APPROVED_MASK_CALIBRATION[month];
@@ -150,7 +151,7 @@ function CalibratedMonthRegion({
   const fillPaint = useMemo(() => {
     const paint = Skia.Paint();
     paint.setColorFilter(Skia.ColorFilter.MakeBlend(
-      Skia.Color(gardenTone ? '#F6E3A6' : isThisMonthPainting ? '#00DDEB' : '#06B6D4'), BlendMode.SrcIn
+      Skia.Color(gardenTone ? '#F5D27A' : isThisMonthPainting ? '#00DDEB' : '#06B6D4'), BlendMode.SrcIn
     ));
     // Keep the original baseline overlay strength outside the manual editor.
     paint.setAlphaf(gardenTone ? 0.3 : isThisMonthPainting ? opacity : opacity * 0.9 * (160 / 255));
@@ -160,14 +161,14 @@ function CalibratedMonthRegion({
     const paint = Skia.Paint();
     // Subtract an eroded COPY from the completed coverage to get an inner ring.
     // Erosion affects the outline only, never the mask or planting rules.
-    const radius = (gardenTone ? 3.5 : 2.5) / Math.max(screenScale?.value ?? 1, 0.001);
+    const radius = (gardenTone ? 4 : 2.5) / Math.max(screenScale?.value ?? 1, 0.001);
     paint.setImageFilter(Skia.ImageFilter.MakeBlend(
       BlendMode.DstOut,
       Skia.ImageFilter.MakeOffset(0, 0),
       Skia.ImageFilter.MakeErode(radius, radius)
     ));
-    paint.setColorFilter(Skia.ColorFilter.MakeBlend(Skia.Color(gardenTone ? '#F0D687' : '#006B78'), BlendMode.SrcIn));
-    paint.setAlphaf(gardenTone ? 0.9 : 0.95);
+    paint.setColorFilter(Skia.ColorFilter.MakeBlend(Skia.Color(gardenTone ? '#FFD66B' : '#006B78'), BlendMode.SrcIn));
+    paint.setAlphaf(gardenTone ? 0.92 : 0.95);
     return paint;
   }, [screenScale, gardenTone]);
   if (!image || !meta) return null;

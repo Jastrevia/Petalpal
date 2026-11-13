@@ -28,6 +28,8 @@ const tree = (x: number, y: number, width: number, height: number): Box => ({
   width: width * TREEHOUSE_MAP_SCALE, height: height * TREEHOUSE_MAP_SCALE });
 export const TREEHOUSE_BOX = tree(80, 40, 1260, 990);
 export const MAILBOX_BOX = tree(900, 660, 176, 280);
+// Below the planting banner: the fairy's line about the bed (about four lines of text) and a gap.
+const PLACE_GUIDE_ROOM = 136;
 
 export function OnboardingGardenLayer({ camera, onOpenTreehouse }: { camera: GardenCameraApi; onOpenTreehouse: () => void }) {
   const tour = useOnboarding();
@@ -135,17 +137,19 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
       })();
     }
     return () => { version.current++; };
-  }, [step, camera.fit, camera.viewport.width, camera.viewport.height, plantedFlower?.worldX, plantedFlower?.worldY]);
+  }, [step, camera.fit, camera.viewport.width, camera.viewport.height, camera.resets, plantedFlower?.worldX, plantedFlower?.worldY]);
 
   // Planting the first Flower: the real planting mode, limited to this month's bed and framed on it.
   // Track autoStartedAttemptRef so clicking Cancel exits planting mode cleanly into a retryable state
   // instead of immediately forcing planting mode back on.
   const framedMonth = useRef<number | null>(null);
+  const framedKey = useRef<string | null>(null);
   const autoStartedAttemptRef = useRef<number | null>(null);
   const [plantAttempt, setPlantAttempt] = useState(0);
   useEffect(() => {
     if (step !== 'plant.place') {
       framedMonth.current = null;
+      framedKey.current = null;
       autoStartedAttemptRef.current = null;
       return;
     }
@@ -159,14 +163,29 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
   const plantError = step === 'plant.place' && planting.activeMode === 'normal' ? planting.detailError : '';
   const plantCancelled = step === 'plant.place' && planting.activeMode === 'normal' && autoStartedAttemptRef.current === plantAttempt && !plantError;
 
+  // The month is the owner's own: the Flower's month, which is this month on the phone's local
+  // calendar. The Garden puts its camera back to the whole view whenever its size changes, even for
+  // a moment (an Events sheet closing, the bars making way for planting, a turned phone), so the bed
+  // is framed again after every such reset, not only once: the gold bed is what the tour opens on.
+  const framedFor = `${planting.targetFlower?.month ?? ''}:${camera.viewport.width}x${camera.viewport.height}:${camera.fit}:${camera.resets}`;
   useEffect(() => {
     const month = planting.targetFlower?.month;
-    if (step !== 'plant.place' || !month || framedMonth.current === month) return;
+    if (step !== 'plant.place' || !month || camera.fit <= 0 || framedKey.current === framedFor) return;
+    framedKey.current = framedFor;
     framedMonth.current = month;
-    void camera.animateTo(frameWorldBox(getApprovedMonthWorldBounds(month), camera.viewport, camera.fit, camera.baseX, camera.baseY,
-      { top: (measured ? measured.y + measured.height : insets.top + 130) + 16, bottom: insets.bottom + 110, left: insets.left + 12, right: insets.right + 12 },
-      camera.limits, .92), 1400);
-  }, [step, planting.targetFlower?.month, measured?.height]);
+    // Room above the bed for the planting banner and the fairy's line under it.
+    const top = (measured ? measured.y + measured.height : insets.top + 130) + PLACE_GUIDE_ROOM;
+    const target = frameWorldBox(getApprovedMonthWorldBounds(month), camera.viewport, camera.fit, camera.baseX, camera.baseY,
+      { top, bottom: insets.bottom + 110, left: insets.left + 12, right: insets.right + 12 }, camera.limits, .92);
+    // A move cut short by another camera move (the Garden settling as the Events sheet closes) is tried
+    // again from where the camera stopped, so the tour never leaves the owner looking somewhere else.
+    let tries = 0, gone = false;
+    const glide = (ms: number) => void camera.animateTo(target, ms).then(done => {
+      if (!done && !gone && tries++ < 2 && framedKey.current === framedFor) glide(700);
+    });
+    glide(1400);
+    return () => { gone = true; };
+  }, [step, planting.targetFlower?.month, measured?.height, framedFor]);
 
   const isWorld = spec.target?.startsWith('world.');
   const anchor = isWorld ? (world?.step === step ? world.box : null)
@@ -177,7 +196,7 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
     // No veil: the bed is the stage. Planting's own controls stay in charge of taps.
     return <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.layer]}>
       <PlacementGuide step={step} locale={locale} speaker={speaker} anchor={measured} error={plantError}
-        cancelled={plantCancelled} onRetry={() => { framedMonth.current = null; setPlantAttempt(count => count + 1); }} />
+        cancelled={plantCancelled} onRetry={() => { framedMonth.current = null; framedKey.current = null; setPlantAttempt(count => count + 1); }} />
     </View>;
   }
   if (step === 'plant.months') {

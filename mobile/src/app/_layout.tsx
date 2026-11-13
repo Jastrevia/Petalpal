@@ -80,7 +80,9 @@ function TabLayout() {
         <DevLoginEntranceHost>
         <Stack key={reloadKey}>
           <Stack.Screen name="index" options={{ title: 'Garden', headerShown: false }} />
-          <Stack.Screen name="reflection" options={{ headerShown: false, animation: 'fade' }} />
+          {/* No swipe-back: on iOS 26 a rightward drag anywhere pops the screen, and the pavilion's sideways
+              look-around drag would leave it. The pavilion's own back button still leaves. */}
+          <Stack.Screen name="reflection" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="mailbox" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="journal" options={{ title: 'Events / Flowers' }} />

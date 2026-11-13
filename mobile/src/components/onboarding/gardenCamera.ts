@@ -13,6 +13,9 @@ export interface GardenCameraApi {
   viewport: { width: number; height: number };
   /** Zoom range the camera contract allows at this viewport. */
   limits: { min: number; max: number };
+  /** Counts the Garden putting its camera back to the whole view (its size settling, a new layout); a tour
+   *  step that frames something frames it again when this changes. */
+  resets: number;
   /** Ease to a camera frame; resolves true when it arrived, false if interrupted. */
   animateTo: (frame: CameraFrame, durationMs: number) => Promise<boolean>;
 }
