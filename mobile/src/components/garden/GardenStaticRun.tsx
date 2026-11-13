@@ -4,13 +4,13 @@ import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { PixelRatio, Platform } from 'react-native';
 import { useDerivedValue, useFrameCallback, useSharedValue, type DerivedValue } from 'react-native-reanimated';
 import { LandImages } from './LandLayer';
-import { sameCamera, SETTLE_MS, type GardenCamera } from './gardenStaticRuns';
+import { planSnapshotReach, sameCamera, SETTLE_MS, snapshotReachAt, snapshotStillBest, type GardenCamera, type SnapshotReach } from './gardenStaticRuns';
+import { GARDEN_WORLD_BOUNDS } from './rendering/gardenWorldBounds';
 
-type Snapshot = { picture: SkPicture; image: SkImage; camera: GardenCamera };
-// A snapshot reaches this far past each edge of the screen (a share of its size), so a drag only slides
-// it along and repaints nothing. Past that, or at a new zoom, the layers are drawn as usual until the
-// camera rests again. Slides land on whole device pixels, so the art stays exactly as sharp.
-const MARGIN = .2;
+// A snapshot reaches past each edge of the screen (planSnapshotReach), so a drag only slides it along and
+// repaints nothing. Past that, or at a new zoom, the layers are drawn as usual until the camera rests
+// again. Slides land on whole device pixels, so the art stays exactly as sharp.
+type Snapshot = { picture: SkPicture; image: SkImage; camera: GardenCamera; reach: SnapshotReach };
 type Props = { cameraTransform: DerivedValue<Transforms3d>; width: number; height: number; order: number; children: ReactNode };
 const cameraOf = (transform: Transforms3d): GardenCamera => {
   'worklet';
@@ -34,12 +34,11 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
   const still = useSharedValue<GardenCamera | null>(null), since = useSharedValue(0);
   // Set from the JS thread when the layers change; the UI thread, which made the snapshot, frees it.
   const stale = useSharedValue(false);
-  const marginX = Math.round(width * MARGIN), marginY = Math.round(height * MARGIN);
   const showing = useDerivedValue(() => {
     const held = snapshot.value;
     if (!held || stale.value) return null;
     const camera = cameraOf(cameraTransform.value);
-    return held.camera.zoom === camera.zoom && Math.abs(camera.x - held.camera.x) <= marginX && Math.abs(camera.y - held.camera.y) <= marginY ? held : null;
+    return snapshotReachAt(held.camera, held.reach, camera) ? held : null;
   });
   const transform = useDerivedValue<Transforms3d>(() => {
     const held = showing.value;
@@ -50,8 +49,7 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
   const picture = useDerivedValue<SkPicture>(() => showing.value?.picture ?? world.value ?? empty);
 
   // Only a whole device pixel maps one to one; otherwise these layers simply stay live.
-  const pixelWidth = (width + 2 * marginX) * density, pixelHeight = (height + 2 * marginY) * density;
-  const exact = pixelWidth > 0 && pixelHeight > 0 && Number.isInteger(pixelWidth) && Number.isInteger(pixelHeight);
+  const exact = width > 0 && height > 0 && Number.isInteger(width * density) && Number.isInteger(height * density);
   useFrameCallback(frame => {
     if (stale.value) {
       stale.value = false;
@@ -63,25 +61,30 @@ function SnapshotRun({ cameraTransform, width, height, order, children }: Props)
     const camera = cameraOf(cameraTransform.value);
     if (!sameCamera(still.value, camera)) { still.value = camera; since.value = frame.timestamp; return; }
     // One run per frame: each waits its turn, so taking them never adds up.
-    if (sameCamera(snapshot.value?.camera ?? null, camera) || frame.timestamp - since.value < SETTLE_MS + order * 50) return;
+    if (frame.timestamp - since.value < SETTLE_MS + order * 50) return;
+    const held = snapshot.value, reach = planSnapshotReach(camera, width, height, GARDEN_WORLD_BOUNDS);
+    // A drag that stayed on the snapshot usually leaves it as good as a new one: then nothing is drawn at all.
+    if (held && snapshotStillBest(snapshotReachAt(held.camera, held.reach, camera), reach)) return;
+    const spanX = width + reach.left + reach.right, spanY = height + reach.top + reach.bottom;
+    const pixelWidth = spanX * density, pixelHeight = spanY * density;
     const layers = world.value;
     if (!layers) return;
     const surface = Skia.Surface.MakeOffscreen(pixelWidth, pixelHeight);
     if (!surface) return;
     const canvas = surface.getCanvas();
     canvas.scale(density, density);
-    canvas.translate(camera.x + marginX, camera.y + marginY);
+    canvas.translate(camera.x + reach.left, camera.y + reach.top);
     canvas.scale(camera.zoom, camera.zoom);
     canvas.drawPicture(layers);
     surface.flush();
     const image = surface.makeImageSnapshot();
     surface.dispose();
     const recorder = Skia.PictureRecorder();
-    recorder.beginRecording().drawImageRectOptions(image, Skia.XYWHRect(0, 0, pixelWidth, pixelHeight), Skia.XYWHRect(-marginX, -marginY, width + 2 * marginX, height + 2 * marginY), FilterMode.Nearest, MipmapMode.None);
+    recorder.beginRecording().drawImageRectOptions(image, Skia.XYWHRect(0, 0, pixelWidth, pixelHeight), Skia.XYWHRect(-reach.left, -reach.top, spanX, spanY), FilterMode.Nearest, MipmapMode.None);
     const paste = recorder.finishRecordingAsPicture();
     recorder.dispose();
     const old = snapshot.value;
-    snapshot.value = { picture: paste, image, camera };
+    snapshot.value = { picture: paste, image, camera, reach };
     // A frame being painted may still name the old one: let the next ones replace it first. Hermes
     // would otherwise keep the pixels until some later collection.
     if (old) requestAnimationFrame(() => requestAnimationFrame(() => { old.picture.dispose(); old.image.dispose(); }));

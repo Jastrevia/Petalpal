@@ -24,7 +24,7 @@ function SignHandle({p,props,selected,select}:{p:SignPlacement;props:Props;selec
   const s=props.fit*props.cameraZoom.value,size=SIGN_SIZE*p.scale*s;
   return {left:props.baseX+props.cameraX.value+p.x*s-size*SIGN_ANCHOR.x-7,top:props.baseY+props.cameraY.value+p.y*s-size*SIGN_ANCHOR.y-7,
     width:size+14,height:size+14};
- },[props.baseX,props.baseY,props.fit,p.x,p.y,p.scale]);
+ },[props.baseX,props.baseY,props.fit,props.cameraX,props.cameraY,props.cameraZoom,p.x,p.y,p.scale]);
  if (!props.editing) return <Animated.View pointerEvents="box-none" style={[{position:'absolute'},style]}>
   <Pressable accessibilityRole="button" accessibilityLabel={`Open Pavilion for ${MONTH_LABELS[p.month-1]}`} hitSlop={6}
     onHoverIn={()=>setHovered(true)} onHoverOut={()=>setHovered(false)}

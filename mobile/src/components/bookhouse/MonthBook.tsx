@@ -484,13 +484,22 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
   const tabsScroll = tabsHeight > L.tabHeight;
   const tabView = tabsScroll ? L.tabHeight - 2 * TAB_ARROW : L.tabHeight;
   const tabMax = Math.max(0, tabsHeight - tabView);
+  // Where the rail is scrolled to stays out of React state: a state update on every scroll frame drew the whole
+  // book again. The thumb follows a shared value, and the state changes only where an arrow turns on or off.
   const [tabOffset, setTabOffset] = useState(0);
+  const tabY = useRef(0), tabAt = useSharedValue(0);
+  const thumbHeight = Math.max(18, tabView * tabView / tabsHeight);
+  const thumbStyle = useAnimatedStyle(() => ({ top: (tabView - thumbHeight) * Math.max(0, Math.min(1, tabAt.value / Math.max(1, tabMax))) }), [tabView, thumbHeight, tabMax]);
+  const onTabScroll = (y: number) => {
+    tabY.current = y; tabAt.value = y;
+    setTabOffset(previous => (previous <= 2) !== (y <= 2) || (previous >= tabMax - 2) !== (y >= tabMax - 2) ? y : previous);
+  };
   // Keep the selected bookmark in view.
   const showTab = useCallback((animated: boolean) => {
     tabs.current?.scrollTo({ y: Math.max(0, Math.min(tabMax, index * (TAB_H + TAB_GAP) - tabView / 2 + TAB_H / 2)), animated });
   }, [index, tabMax, tabView]);
   useEffect(() => { showTab(!reducedMotion); }, [showTab, reducedMotion]);
-  const pageTabs = (direction: 1 | -1) => tabs.current?.scrollTo({ y: Math.max(0, Math.min(tabMax, tabOffset + direction * (tabView - TAB_H))), animated: !reducedMotion });
+  const pageTabs = (direction: 1 | -1) => tabs.current?.scrollTo({ y: Math.max(0, Math.min(tabMax, tabY.current + direction * (tabView - TAB_H))), animated: !reducedMotion });
   const target = plan ? plan.to : index;
   const todayIndex = days.findIndex(d => d.localDate === today);
   const shownDay = days[target];
@@ -521,15 +530,14 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
           style={[styles.tabArrow, { top: 1 }, tabOffset <= 2 && styles.tabArrowOff]}><Text style={styles.tabArrowText}>▴</Text></Pressable>}
         <View style={{ position: 'absolute', left: 0, right: 0, top: tabsScroll ? TAB_ARROW : 0, height: tabView, overflow: 'hidden' }}>
           <ScrollView ref={tabs} showsVerticalScrollIndicator={false} accessibilityRole="tablist" accessibilityLabel={tt('Date bookmarks')}
-            onContentSizeChange={() => showTab(false)} scrollEventThrottle={16} onScroll={event => setTabOffset(event.nativeEvent.contentOffset.y)}
+            onContentSizeChange={() => showTab(false)} scrollEventThrottle={16} onScroll={event => onTabScroll(event.nativeEvent.contentOffset.y)}
             scrollEnabled={tabsScroll} bounces={false} overScrollMode="never" decelerationRate="fast"
             contentContainerStyle={{ gap: TAB_GAP, paddingVertical: tabsScroll ? 0 : Math.max(0, (tabView - tabsHeight) / 2) }}>
             {days.map((d, i) => <Bookmark key={d.localDate} day={d} today={d.localDate === today} selected={i === target} ribbon={ribbon} height={TAB_H} onPress={() => turnTo(i)} />)}
           </ScrollView>
           {/* A slim brass scroll indicator along the rail's outer edge. */}
           {tabsScroll && <View pointerEvents="none" style={[styles.tabTrack, { height: tabView }]}>
-            <View style={[styles.tabThumb, { height: Math.max(18, tabView * tabView / tabsHeight),
-              top: (tabView - Math.max(18, tabView * tabView / tabsHeight)) * Math.max(0, Math.min(1, tabOffset / Math.max(1, tabMax))) }]} />
+            <Animated.View style={[styles.tabThumb, { height: thumbHeight }, thumbStyle]} />
           </View>}
         </View>
         {tabsScroll && <Pressable accessibilityRole="button" accessibilityLabel={tt('Later bookmarks')} disabled={tabOffset >= tabMax - 2} onPress={() => pageTabs(1)} hitSlop={{ top: 2, bottom: 6, left: 8, right: 8 }}
