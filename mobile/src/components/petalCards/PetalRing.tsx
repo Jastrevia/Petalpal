@@ -20,7 +20,7 @@ const COPY = {
     failed: "The draw didn't go through. Try again.", chosen: (n: number) => `You chose card ${n}`,
     share: 'Share', preparing: 'Making the picture…', saved: 'Picture saved. Post it to Instagram, Reddit, X, WeChat or RedNote from your photos.',
     shareFailed: "Couldn't share this time. Try again.", ask: 'What’s on your mind today?',
-    askSub: 'One question a day, one card for it.', later: 'Come back later', uses: (_n: number) => 'Today’s card is still face down', usedUp: 'Today’s card is turned. The ring turns again tomorrow.', upright: 'Upright', reversed: 'Reversed',
+    askSub: 'One question a day, one card for it.', later: 'Come back later', uses: (_n: number) => 'Today’s card is still face down', usedUp: 'Today’s card is turned. The ring turns again tomorrow.', notes: 'Notes', upright: 'Upright', reversed: 'Reversed',
     reading: 'Reading', readingWait: 'Reading your card…',
     readingConsent: 'Turn on AI processing in Privacy to see the reading of your card.',
     freeLeft: (n: number) => n === 0 ? 'That was your last free reading.' : `${n} free ${n === 1 ? 'reading' : 'readings'} left.`,
@@ -29,7 +29,7 @@ const COPY = {
     no: '第', turnOver: '翻开它', close: '收起', today: '今日花语卡', drawing: '正在抽牌…',
     failed: '抽牌没有成功，再试一次。', chosen: (n: number) => `你挑了第 ${n} 张`,
     share: '分享', preparing: '正在画分享图……', saved: '图片已保存，可以从相册发到小红书、微信、Instagram、X 或 Reddit。',
-    shareFailed: '这次没有分享成功，再试一次。', ask: '今天，想问问哪件事？', askSub: '一天一问，一问一张牌。', later: '晚一点再来', uses: (_n: number) => '今天的牌还没翻开', usedUp: '今天的牌翻开了。明天，花环会重新转起来。',
+    shareFailed: '这次没有分享成功，再试一次。', ask: '今天，想问问哪件事？', askSub: '一天一问，一问一张牌。', later: '晚一点再来', uses: (_n: number) => '今天的牌还没翻开', usedUp: '今天的牌翻开了。明天，花环会重新转起来。', notes: '注意事项',
     upright: '正位', reversed: '逆位', reading: '牌面解读', readingWait: '正在解读…',
     readingConsent: '在隐私设置里打开 AI 处理，就能看到这张牌的解读。',
     freeLeft: (n: number) => n === 0 ? '这是最后一次免费解读。' : `还可以免费解读 ${n} 次。`,
@@ -69,6 +69,8 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   // The share picture is made once the card faces up (petalShare.ts).
   const [prepared, setPrepared] = useState<PreparedShare | null>(null);
   const [shared, setShared] = useState<ShareOutcome | null>(null);
+  // The small print under a turned card (what petal cards are not, free readings left) stays folded until asked for.
+  const [notesOpen, setNotesOpen] = useState(false);
   useEffect(() => {
     setPrepared(null); setShared(null);
     if (phase !== 'revealed' || !face) return;
@@ -245,14 +247,20 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
           <Image source={JOURNAL_ART.divider} resizeMode="contain" accessible={false} style={styles.sprig} />
           <Text style={styles.readingTitle}>{copy.reading}</Text>
           {reading.paragraphs.map((paragraph, i) => <Text key={i} selectable style={styles.readingText}>{paragraph}</Text>)}
-          {typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
         </View> : null}
         {reading?.available && reading.locked ? <Text style={styles.lockedNote}>{copy.locked}</Text> : null}
         {reading?.available && !reading.needsConsent && !reading.locked && (reading.status === 'NONE' || reading.status === 'GENERATING') ? <View style={styles.waitRow}>
           <ActivityIndicator size="small" color="#E9CF8A" accessible={false} /><Text style={styles.text}>{copy.readingWait}</Text>
         </View> : null}
         {reading?.available && reading.needsConsent ? <Text style={styles.disclaimer}>{copy.readingConsent}</Text> : null}
-        <Text style={styles.disclaimer}>{face.disclaimer}</Text>
+        <Pressable testID="petal-notes" accessibilityRole="button" accessibilityState={{ expanded: notesOpen }} onPress={() => setNotesOpen(open => !open)}
+          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }} style={({ pressed }) => [styles.notesToggle, pressed && styles.pressed]}>
+          <Text style={styles.notesLabel}>{`${copy.notes} ${notesOpen ? '▴' : '▾'}`}</Text>
+        </Pressable>
+        {notesOpen ? <View testID="petal-notes-body">
+          <Text style={styles.disclaimer}>{face.disclaimer}</Text>
+          {reading?.available && reading.status === 'READY' && typeof reading.freeLeft === 'number' ? <Text style={styles.disclaimer}>{copy.freeLeft(reading.freeLeft)}</Text> : null}
+        </View> : null}
         {/* Today's draw is used: said quietly at the foot of the page, after the card and its reading. */}
         <Text testID="petal-used-up" style={styles.usedUp}>{copy.usedUp}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={copy.share} accessibilityState={{ disabled: !prepared }} disabled={!prepared}
@@ -351,4 +359,6 @@ const styles = StyleSheet.create({
   line: { fontFamily: 'serif', fontSize: 17, color: '#F6EDDB', textAlign: 'center' },
   text: { fontFamily: 'serif', fontSize: 14, lineHeight: 22, color: '#D8D0F0', textAlign: 'center' },
   disclaimer: { fontSize: 11, color: '#9F96C8', textAlign: 'center', marginVertical: 4 },
+  notesToggle: { alignSelf: 'center', paddingVertical: 4, paddingHorizontal: 10 },
+  notesLabel: { fontSize: 11, letterSpacing: 0.6, color: '#9F96C8', textAlign: 'center' },
 });

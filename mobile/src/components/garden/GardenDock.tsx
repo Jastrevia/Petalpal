@@ -63,7 +63,7 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
   const phone = width < 600 || (width < 900 && short);
   const size = phone ? Math.max(28, Math.min(short ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;
   const drawn = Boolean(petal?.drawn);
-  const item = (id: string, image: ImageSourcePropType, label: string, a11y: string, onPress: () => void, waiting = false, note?: string, dot = false,
+  const item = (id: string, image: ImageSourcePropType, label: string, a11y: string, onPress: () => void, waiting = false, dot = false,
     ref?: RefObject<View | null>) =>
     <Pressable key={id} testID={`dock-${id}`} accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress}
       style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
@@ -72,15 +72,15 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
         {waiting ? <AttentionGlow key={newcomer ? 'bright' : 'soft'} soft={!newcomer} bright={newcomer} radius={size / 2} spread={newcomer ? 12 : 8} /> : null}
         {dot ? <View testID={`dock-${id}-dot`} style={styles.dot} /> : null}
       </Animated.View>
-      <Text numberOfLines={1} style={styles.label}>{label}{note ? ` ${note}` : ''}</Text>
+      <Text numberOfLines={1} style={styles.label}>{label}</Text>
     </Pressable>;
   return <>
     <View testID="garden-dock" pointerEvents="box-none" style={[styles.dock, { top: insets.top + 78, right: insets.right + 4 }]}>
       {/* Hidden while the server's petal card switch leaves this owner out. */}
-      {petal ? item('tarot', TAROT, copy.tarot, drawn ? copy.tarotUsed : copy.tarot, () => void openRing(), !drawn, drawn ? '1/1' : undefined) : null}
+      {petal ? item('tarot', TAROT, copy.tarot, drawn ? copy.tarotUsed : copy.tarot, () => void openRing(), !drawn) : null}
       {item('letters', LETTER, copy.letters, `${copy.letters}${unreadMail ? copy.unread : ''}`, () => router.push('/mailbox'), unreadMail)}
       {ownerId ? item('collection', CASKET, collectionCopy.dock, `${collectionCopy.dock}${collectionDot ? collectionCopy.waiting : ''}`,
-        () => setCollectionOpen(true), collectionDot, undefined, collectionDot, casketRef) : null}
+        () => setCollectionOpen(true), collectionDot, collectionDot, casketRef) : null}
     </View>
     {ownerId ? <CollectionPanel visible={collectionOpen} locale={chinese ? 'zh-Hans' : 'en'} alerts={alerts} onClose={() => setCollectionOpen(false)} /> : null}
     {ring ? <PetalRing visible today={ring} onClose={() => { setRing(null); setOpens(count => count + 1); }} /> : null}
