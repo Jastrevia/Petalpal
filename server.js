@@ -2,7 +2,7 @@ import { requestAccountDeletion } from './lib/account-deletion-workflow.js';
 import { aiDisclosure, AI_DISCLOSURE_VERSION } from './lib/ai-disclosure.js';
 import { installAiOutputReporting } from './lib/ai-output-reporting.js';
 import { assertContentAllowed, contentSafetyResponse, CONTENT_REJECTED } from './lib/content-safety.js';
-import { COMMUNITY_VERSION, assertSocialContent, requireCommunityAcceptance, installCommunityPolicy } from './lib/community-policy.js';
+import { COMMUNITY_VERSION, assertSocialContent, requireCommunityAcceptance, installCommunityPolicy, socialMessageRejected } from './lib/community-policy.js';
 import { installSocialSafety } from "./lib/social-safety.js";
 import { requireSocialPair, hiddenSocialIds, filterSocialPayload } from "./lib/garden-access.js";
 import { isWebShellRequest } from "./lib/web-shell.js";
@@ -3822,7 +3822,11 @@ app.post("/users/:userId/flowers/:flowerId/support", requireSocialGardenAccess, 
         res.json(filterSocialPayload(socialFlower, await hiddenSocialIds(prisma, visitorUserId)));
   
       } catch (err) {
-        if (err?.code === "CONTENT_REJECTED") return res.status(422).json({error:"Please revise this message to follow the Community Guidelines.",code:err.code});
+        if (err?.code === "CONTENT_REJECTED") {
+          // Said in the writer's own app language; the message itself is never echoed back or logged.
+          const writer = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { preferredLocale: true } }).catch(() => null);
+          return res.status(422).json({ error: socialMessageRejected(writer?.preferredLocale), code: err.code });
+        }
         if (err instanceof FlowerSupportError) return res.status(err.status).json({ error: err.message });
     if (sendSocialError(res, err)) return;
         logServerError("POST /users/:userId/flowers/:flowerId/message error", err, {

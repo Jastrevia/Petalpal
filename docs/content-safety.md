@@ -2,6 +2,20 @@
 
 Policy: `petalpal-content-v1.2` (2026-10-15). Local development candidate only.
 
+## Social text rules — 2026-11-12
+
+Text a friend reads (messages on a friend's Flower, names, fairy names, avatars, visitor names)
+goes through `assertSocialContent` in `lib/community-policy.js`: the Event/Journal rules above,
+then social-only rules for telling someone to die or hurt themselves (`kys`, `go die`, `你去死吧`,
+`死全家`), bullying (`nobody likes you`, `大家都讨厌你`), slurs, sexual harassment (`send nudes`,
+`约炮`, `发张裸照`) and abusive swearing aimed at the reader (`尼玛`, `cnm`, `智障`, `给我滚`).
+A writer's own distress (`我想去死`, `I want to die`) is deliberately not matched: the message
+composer shows its support note instead, so a friend can still be asked for help. A rejected
+message is not saved; the writer sees `SOCIAL_MESSAGE_REJECTED` in their app language
+(`preferredLocale`), and the text is never echoed. Coverage is finite like the rules above:
+homophones, spacing tricks outside the bounded ones, and new slang can escape. Cases live in
+`test/back/social-content.test.js`. Private Events and Journals are unchanged.
+
 ## v1.2 product-policy corrections — 2026-10-15
 
 Prohibited profanity now matches throughout unprotected text, including emotional
