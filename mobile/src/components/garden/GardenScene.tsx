@@ -595,8 +595,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       if (cameraZoom.value !== next.zoom) cameraZoom.value = next.zoom;
     }, [viewport.width, viewport.height, fit, baseX, baseY]);
   const maximumCameraZoom = Math.max(3, fit > 0 ? Math.max(viewport.width / GARDEN_WORLD_BOUNDS.width, viewport.height / GARDEN_WORLD_BOUNDS.height) / fit * 3 : 3);
+  // How many times the camera has been put back to the whole view; the tour frames its target again after each.
+  const [cameraResets, setCameraResets] = useState(0);
   useEffect(() => {
     if (fit <= 0) return;
+    setCameraResets(count => count + 1);
     const minimum = constrainGardenCamera(viewport.width, viewport.height, fit, baseX, baseY, 0, 0, 1).minimumZoom;
     cameraZoom.value = minimum;
     cameraX.value = viewport.width / 2 - baseX - (GARDEN_WORLD_BOUNDS.x + GARDEN_WORLD_BOUNDS.width / 2) * fit * minimum;
@@ -638,7 +641,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   // Eased camera moves for the first-time tour. One progress value drives zoom (geometric) and
   // the world point at the screen centre (linear), and every frame is clamped by the same
   // camera contract as gestures, so a move never fights the clamp or leaves the Garden.
-  const cameraTween = useSharedValue({ active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 });
+  // `id` names the move: a move cut short by a newer one must not end the newer one when its own callback arrives.
+  const cameraTween = useSharedValue({ id: 0, active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 });
+  const cameraMoveId = useRef(0);
   const cameraProgress = useSharedValue(0);
   useAnimatedReaction(() => cameraProgress.value, t => {
     const a = cameraTween.value;
@@ -663,7 +668,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       };
     };
     return {
-      x: cameraX, y: cameraY, zoom: cameraZoom, fit, baseX, baseY, viewport,
+      x: cameraX, y: cameraY, zoom: cameraZoom, fit, baseX, baseY, viewport, resets: cameraResets,
       limits: { min: minimum, max: Math.max(3, minimum * 3) },
       animateTo: (frame, durationMs) => new Promise<boolean>(resolve => {
         if (fit <= 0 || viewport.width <= 0 || viewport.height <= 0 || !Number.isFinite(frame.x) || !Number.isFinite(frame.y) || !Number.isFinite(frame.zoom)) {
@@ -677,16 +682,21 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           return;
         }
         cancelAnimation(cameraX); cancelAnimation(cameraY); cancelAnimation(cameraZoom);
-        cameraTween.value = { active: 1, fromX: from.x, fromY: from.y, fromZ: cameraZoom.value, toX: to.x, toY: to.y, toZ: target.zoom };
+        const id = ++cameraMoveId.current;
+        cameraTween.value = { id, active: 1, fromX: from.x, fromY: from.y, fromZ: cameraZoom.value, toX: to.x, toY: to.y, toZ: target.zoom };
         cameraProgress.value = 0;
         cameraProgress.value = withTiming(1, { duration: reducedCameraMotion ? 0 : durationMs, easing: Easing.inOut(Easing.cubic) },
           finished => {
-            cameraTween.value = { active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 };
+            if (cameraTween.value.id === id) {
+              // A move that ran to its end lands exactly on its frame, even where frames were dropped on the way.
+              if (finished) { cameraX.value = target.x; cameraY.value = target.y; cameraZoom.value = target.zoom; }
+              cameraTween.value = { id, active: 0, fromX: 0, fromY: 0, fromZ: 1, toX: 0, toY: 0, toZ: 1 };
+            }
             runOnJS(resolve)(Boolean(finished));
           });
       }),
     };
-  }, [fit, baseX, baseY, viewport, cameraX, cameraY, cameraZoom, cameraTween, cameraProgress, reducedCameraMotion]);
+  }, [fit, baseX, baseY, viewport, cameraResets, cameraX, cameraY, cameraZoom, cameraTween, cameraProgress, reducedCameraMotion]);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const element = sceneElement.current as unknown as HTMLElement | null;
@@ -1509,6 +1519,29 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     resetView();
   }, [resetView]);
 
+  // The bed the flower may be planted in shows whenever planting is on (not only in DEV). By day it lies on the
+  // land under the flowers; at night it is drawn after the night grade, like the lanterns, so it still reads as gold.
+  const plantingOverlay = <GardenProfile name="Planting overlays" enabled={perf.DebugUI || (activeMode !== 'normal' && Boolean(targetFlower))}><PlantingRegionOverlay
+      screenScale={maskScreenScale}
+      highlightedMonth={activeMode !== 'normal' && targetFlower ? targetFlower.month : null}
+      showAllRegions={showDevPlantingRegions}
+      isCalibrating={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions'}
+      calibrationMap={plantingCalibrationMap}
+      selectedMonth={selectedCalMonth}
+      displayMode={calDisplayMode}
+      opacity={calSubMode === 'mask-paint' ? paintOpacity : calOpacity}
+      showLandBounds={showLandBounds}
+      layout={calibrationLayout}
+      isPaintingMask={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions' && calSubMode === 'mask-paint'}
+      paintingMonth={selectedCalMonth}
+      activeStrokes={paintStrokes}
+      activeOffset={maskOffset}
+      brushCursor={brushCursor}
+      showBaseMask={showBaseMask}
+      showAdditions={showAdditions}
+      showErasures={showErasures}
+      showFinalMask={showFinalMask}
+    /></GardenProfile>;
   const isWaterTopCalibrating = __DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'water-top';
   const topWaterShowWater = true;
   const topWaterShowCliff = !isWaterTopCalibrating || (waterTopPreset !== 'water-only');
@@ -1639,29 +1672,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           {/* 7. LandLayer */}
           {landRun}
           <Group transform={cameraTransform}>
-            {/* Month Planting Region Overlay */}
-            {/* The bed the flower may be planted in shows whenever planting is on (not only in DEV). */}
-            <GardenProfile name="Planting overlays" enabled={perf.DebugUI || (activeMode !== 'normal' && Boolean(targetFlower))}><PlantingRegionOverlay
-              screenScale={maskScreenScale}
-              highlightedMonth={activeMode !== 'normal' && targetFlower ? targetFlower.month : null}
-              showAllRegions={showDevPlantingRegions}
-              isCalibrating={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions'}
-              calibrationMap={plantingCalibrationMap}
-              selectedMonth={selectedCalMonth}
-              displayMode={calDisplayMode}
-              opacity={calSubMode === 'mask-paint' ? paintOpacity : calOpacity}
-              showLandBounds={showLandBounds}
-              layout={calibrationLayout}
-              isPaintingMask={__DEV__ && perf.DebugUI && !previewMode && calibrationMode === 'planting-regions' && calSubMode === 'mask-paint'}
-              paintingMonth={selectedCalMonth}
-              activeStrokes={paintStrokes}
-              activeOffset={maskOffset}
-              brushCursor={brushCursor}
-              showBaseMask={showBaseMask}
-              showAdditions={showAdditions}
-              showErasures={showErasures}
-              showFinalMask={showFinalMask}
-            /></GardenProfile>
+            {/* Month Planting Region Overlay (by day; at night it is drawn after the night grade, below). */}
+            {nightLighting.active ? null : plantingOverlay}
 
           </Group>
           {infrastructureRun}
@@ -1777,6 +1789,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>
           </Group>
           <Group transform={cameraTransform}>
+            {nightLighting.active ? plantingOverlay : null}
             {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
             {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} lotusOccluders={lotusVisible && perf.Lotus ? lotusOccluders : undefined} />}
             {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
