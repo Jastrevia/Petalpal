@@ -28,6 +28,7 @@ import { momentLocale } from '../moments/momentFormat';
 import { timezoneLabel } from '../../services/timezoneLabel';
 import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
 import { useAppLocale, type AppLocale } from '../../services/locale';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 type Feature = typeof GARDEN_FEATURES[number];
 // Panel names in the app language (the catalog keeps the English ids).
@@ -83,7 +84,7 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   }, [feature?.id]);
   if (!feature) return null;
   const title = FEATURE_LABELS[locale][feature.id] ?? feature.label;
-  return <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
       {/* A tap anywhere around the panel closes it, like the × does. */}
       <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={[StyleSheet.absoluteFill, styles.backdrop]} />

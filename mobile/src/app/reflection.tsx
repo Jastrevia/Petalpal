@@ -369,7 +369,7 @@ export default function Reflection() {
 
   useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
   // A phone: each page of the open book fits the screen's width, with a small margin (the spread is two pages wide).
-  const scene = useMemo(() => pavilionScene(width, height, phone ? 2 * (screen.width - 16) : undefined), [width, height, phone, screen.width]);
+  const scene = useMemo(() => pavilionScene(width, height, phone ? 2 * (screen.width - 16) : undefined, insets.bottom), [width, height, phone, screen.width, insets.bottom]);
   const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
   const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
   const instructionTop = scene.art.y + scene.art.height * .63 - 22;

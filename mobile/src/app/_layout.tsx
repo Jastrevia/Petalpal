@@ -83,7 +83,10 @@ function TabLayout() {
           {/* No swipe-back: on iOS 26 a rightward drag anywhere pops the screen, and the pavilion's sideways
               look-around drag would leave it. The pavilion's own back button still leaves. */}
           <Stack.Screen name="reflection" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
-          <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade' }} />
+          {/* The Treehouse stays upright on a phone: its open-journal scene is one tall column (bookcase, desk,
+              journal) that a sideways phone's 390-point height cannot hold. Entering it from a sideways Garden
+              turns the screen upright; leaving turns it back. Its sheets stay upright too (PORTRAIT_MODAL_ORIENTATIONS). */}
+          <Stack.Screen name="bookhouse" options={{ headerShown: false, animation: 'fade', orientation: 'portrait_up' }} />
           <Stack.Screen name="mailbox" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="journal" options={{ title: 'Events / Flowers' }} />
           <Stack.Screen name="garden-history" options={{ title: 'Garden history', headerShown: false, animation: 'fade' }} />

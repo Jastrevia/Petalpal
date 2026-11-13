@@ -4,6 +4,7 @@ import { loadKeepsakeBook, type KeepsakeBook as Book } from '../../services/fair
 import { BOND, bondCopy, type BondLocale } from './bondCopy';
 import { useFairyName } from '../../services/fairyName';
 import { keepsakeArt } from './keepsakeArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 type Filter = 'ALL' | 'COMMON' | 'RARE' | 'MONTHLY';
 type Entry = Book['keepsakes'][number];
@@ -26,7 +27,7 @@ export function KeepsakeBook({ visible, locale, onClose, newIds = [] }: { visibl
   // Today's new keepsakes come first, so they are the first thing seen.
   const shown = (book?.keepsakes.filter(keepsake => filter === 'ALL' || keepsake.rarity === filter) ?? [])
     .sort((a, b) => Number(newIds.includes(b.id) && b.owned) - Number(newIds.includes(a.id) && a.owned));
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={() => (open ? setOpen(null) : onClose())} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={() => (open ? setOpen(null) : onClose())} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.sheet}>
         <View style={styles.header}>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ApiError } from '../../services/api';
 import { loadPets, onPetsChanged, renamePet, type PetId, type PetsSummary } from '../../services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from '../garden/critters/accessoryIcons';
 import { forPet, isWorn, petShelf, SHELVES, type Piece, type Shelf } from '../garden/critters/petRing';
 import { CREAM, GOLD, RING_ICONS, TONES } from '../garden/critters/PetRingMenu';
 import type { BondLocale } from '../bond/bondCopy';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // Pet dress-up in Collection (owner, 2026-11-06): the golden puppy's and Xiaobai's wardrobes, two
 // pieces per part (hats, capes, pendants), each worn, owned or opening at a later Bond level, drawn
@@ -100,7 +101,7 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
   const plate = Math.min(400, width - 24);
   const circle = Math.max(76, Math.min(104, (plate - 96) / 2.6));
 
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal accessibilityLabel={copy.title} testID="pet-wardrobe"
         style={[styles.plate, { width: plate, backgroundColor: ground, boxShadow: `0 10px 30px ${tone.shadow}AA` }]}>
@@ -148,6 +149,8 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
           })}
         </View>
 
+        {/* On a short screen (a phone held sideways) the pieces and the hint scroll under the tabs. */}
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.cards}>
           {!pets && !off && !failed ? <ActivityIndicator color={CREAM} accessibilityLabel={copy.loading} /> : null}
           {off ? <Text style={styles.sub}>{copy.off}</Text> : null}
@@ -168,6 +171,7 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
         </View>
 
         <Text style={[styles.sub, { backgroundColor: tone.shade }]}>{copy.hint}</Text>
+        </ScrollView>
 
         {renaming ? <View style={styles.renameLayer}>
           <View accessibilityViewIsModal style={[styles.renameCard, { backgroundColor: ground }]} testID="wardrobe-rename">
@@ -237,6 +241,8 @@ const styles = StyleSheet.create({
   tabOn: { borderColor: GOLD },
   tabText: { ...text, fontSize: 12.5, opacity: 0.8 },
   tabTextOn: { opacity: 1 },
+  scroll: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 1 },
+  scrollContent: { alignItems: 'center' },
   cards: { flexDirection: 'row', justifyContent: 'center', gap: 18, marginTop: 18, marginBottom: 14, minHeight: 150 },
   card: { alignItems: 'center' },
   cardCircle: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 244, 224, 0.92)', borderWidth: 1.5, borderColor: 'rgba(233, 201, 121, 0.7)' },

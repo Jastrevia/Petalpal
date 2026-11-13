@@ -7,6 +7,7 @@ import { usePanelTheme } from './PanelTheme';
 import { CommunityGuidelines } from './CommunityGuidelines';
 import { DeleteAccountSettings } from './DeleteAccountSettings';
 import { BlockedUsers } from './SafetyActions';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 const COPY={en:{title:'Privacy & support',help:'Send feedback',privacy:'Privacy Policy',terms:'Terms of Use',deletion:'Account & Data Deletion',problem:'Report a problem',guidelines:'Community Guidelines',deleteAccount:'Delete account',groupHelp:'Get help',groupRules:'Rules & policies',groupAccount:'Account',close:'Close',blocked:'Blocked users',groupAbout:'About',thanks:'Acknowledgements',
   thanksBody:['Thank you to our friend Boge Ling, whose petalpal-moments project shared the ideas and early work that helped Fairy Moments grow into the feed your Garden Fairy posts to today.','PetalPal is also built on the work of many open-source communities, including Expo, React Native, React Native Skia and Prisma. We are grateful to everyone who keeps them going.','And thank you to our first beta testers, whose honest notes shape every corner of this Garden.'],
  
@@ -82,7 +83,7 @@ function Group({label,children}:{label:string;children:ReactNode}){
 // Its own dialog over the Me panel; × or a tap outside closes it without doing anything.
 export function Dialog({title,closeLabel,onClose,children}:{title:string;closeLabel:string;onClose:()=>void;children:ReactNode}){
  const {theme}=usePanelTheme();
- return <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+ return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onClose}>
   <View style={dialog.scrim}>
    <Pressable accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={StyleSheet.absoluteFill}/>
    <View accessibilityViewIsModal style={[dialog.card,{backgroundColor:theme.background,borderColor:theme.gold}]}>

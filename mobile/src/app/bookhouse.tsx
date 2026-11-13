@@ -42,6 +42,7 @@ import { preloadBookImages } from '../components/bookhouse/book3d/assets';
 import { preparePapers, retainJournalAssets } from '../components/bookhouse/book3d/usePageFaces';
 import type { Draft } from '../components/bookhouse/book3d/WritingPage';
 import { JournalActions } from '../components/bookhouse/JournalActions';
+import { PORTRAIT_MODAL_ORIENTATIONS } from '../constants/orientation';
 
 const serif = Platform.select({ ios: 'Georgia', web: 'Georgia', default: 'serif' });
 const moodName = (mood: string) => { const word = mood.replace('_BLOOM', '').toLowerCase(); return word.charAt(0).toUpperCase() + word.slice(1); };
@@ -520,7 +521,7 @@ export default function Bookhouse() {
 
 function Sheet({ title, onClose, children, theme, journal = false }: { title: string; onClose: () => void; children: React.ReactNode; theme?: PanelTheme; journal?: boolean }) {
   const insets = useSafeAreaInsets();
-  return <Modal transparent animationType="fade" onRequestClose={onClose}><View style={[s.scrim, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+  return <Modal supportedOrientations={PORTRAIT_MODAL_ORIENTATIONS} transparent animationType="fade" onRequestClose={onClose}><View style={[s.scrim, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
     <View style={[s.sheet, theme && { backgroundColor: theme.background, borderColor: theme.gold }, journal && s.journalSheet]}>{journal && <Image source={require('../../assets/bookhouse/desk.webp')} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: .4 }]} />}<View style={[s.sheetHeader, theme && { borderColor: theme.border }]}><Text style={[s.title, theme && { color: theme.text }, journal && { fontSize: 27, paddingVertical: 14 }]}>{title}{journal ? ' ❧' : ''}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Close ${title}`} onPress={onClose} style={s.smallButton}><Text style={[s.body, theme && { color: theme.text }]}>✕</Text></Pressable></View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 18, gap: 14 }}>{children}</ScrollView>
     </View></View></Modal>;

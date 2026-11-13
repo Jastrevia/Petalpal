@@ -26,7 +26,9 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
   const reduced = useReducedMotion();
   const copy = UI_COPY[locale];
   const compact = screen.height < 640;
-  const heroHeight = Math.min(screen.height * (compact ? .28 : .36), 330);
+  // A phone held sideways is wide but short: she stands beside her card instead of above it.
+  const sideways = screen.height < 520 && screen.width > screen.height;
+  const heroHeight = Math.min(screen.height * (sideways ? .5 : compact ? .28 : .36), 330);
   const heroCanvasHeight = heroHeight / FAIRY_CHARACTER_CANVAS_RATIO;
   const heroCanvasWidth = heroCanvasHeight * FAIRY_CANVAS_ASPECT;
   const heroWidth = heroCanvasWidth;
@@ -109,7 +111,8 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
       {/* Absorb every Garden tap while she introduces herself. */}
       <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => undefined} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[StyleSheet.absoluteFill, { overflow: 'visible' }]} pointerEvents="box-none">
-        <View style={[StyleSheet.absoluteFill, styles.stage, { paddingTop: insets.top + (compact ? 24 : 48), paddingBottom: insets.bottom + 24, overflow: 'visible' }]}>
+        <View style={[StyleSheet.absoluteFill, styles.stage, { paddingTop: insets.top + (sideways ? 12 : compact ? 24 : 48), paddingBottom: insets.bottom + (sideways ? 12 : 24), overflow: 'visible' },
+          sideways && { flexDirection: 'row', paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
           <Animated.View testID="onboarding-hero" style={[{ width: heroCanvasWidth, height: heroCanvasHeight, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }, flyStyle]}>
             <Animated.View pointerEvents="none" style={[styles.glow, { width: heroWidth * 1.6, height: heroHeight * .9, top: heroHeight * .05 }, glowStyle]} />
             <FairyAnimationController
@@ -118,12 +121,12 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
               onAnimationComplete={handleAnimationComplete}
             />
           </Animated.View>
-          {step === 'intro.name' && arrived ? <NamingCard locale={locale} /> : null}
+          {step === 'intro.name' && arrived ? <NamingCard locale={locale} sideways={sideways} /> : null}
           {step === 'intro.celebrate' && celebrated ? (
             <Animated.View
               entering={reduced ? undefined : FadeIn.duration(420)}
               exiting={FadeOut.duration(200)}
-              style={styles.card}
+              style={[styles.card, sideways && styles.cardSideways]}
               accessibilityLiveRegion="polite"
             >
               {fairyName ? <Text style={styles.speaker}>✦ {fairyName}</Text> : null}
@@ -145,7 +148,7 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
   );
 }
 
-function NamingCard({ locale }: { locale: OnboardingLocale }) {
+function NamingCard({ locale, sideways }: { locale: OnboardingLocale; sideways: boolean }) {
   const copy = UI_COPY[locale];
   const reduced = useReducedMotion();
   const [name, setName] = useState('');
@@ -164,7 +167,7 @@ function NamingCard({ locale }: { locale: OnboardingLocale }) {
     catch (err) { setError((err as Error).message || copy.retry); }
     finally { busy.current = false; setSaving(false); }
   }
-  return <Animated.View entering={reduced ? undefined : FadeIn.duration(520)} style={styles.card}>
+  return <Animated.View entering={reduced ? undefined : FadeIn.duration(520)} style={[styles.card, sideways && styles.cardSideways]}>
     <Text accessibilityRole="header" style={styles.line}>{stepLine('intro.name', locale)}</Text>
     <View style={styles.inputRow}>
       <TextInput accessibilityLabel={copy.namePlaceholder} placeholder={copy.namePlaceholder} placeholderTextColor="#9AA89C"
@@ -190,6 +193,7 @@ const styles = StyleSheet.create({
   card: { width: '100%', maxWidth: 400, borderRadius: 22, paddingHorizontal: 20, paddingVertical: 18, gap: 12,
     backgroundColor: PAPER, borderWidth: 1, borderColor: GOLD,
     boxShadow: 'inset 0 0 0 3px #FFFDF6, 0 10px 34px rgba(12, 40, 37, 0.32)' },
+  cardSideways: { width: 'auto', flex: 1 },
   speaker: { fontFamily: serif, fontSize: 12, letterSpacing: .6, color: '#9B7B3C' },
   line: { fontFamily: serif, fontSize: 18, lineHeight: 27, color: INK, textAlign: 'center' },
   inputRow: { borderRadius: 16, borderWidth: 1, borderColor: '#D8C690', backgroundColor: '#FFFDF7',

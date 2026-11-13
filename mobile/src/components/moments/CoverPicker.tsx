@@ -1,6 +1,7 @@
 import { usePanelTheme } from '../features/PanelTheme';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { MOMENT_COVER_IDS, MOMENT_COVERS } from './momentCovers';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // Choose the cover at the top of her Moments. The first tile restores her own photo (null).
 export function CoverPicker({ visible, title, selected, busy = false, error = '', closeLabel, defaultCover, defaultLabel, optionLabel, onSelect, onClose }: {
@@ -11,7 +12,7 @@ export function CoverPicker({ visible, title, selected, busy = false, error = ''
   const tiles = [{ id: null as string | null, source: defaultCover, label: defaultLabel },
     ...MOMENT_COVER_IDS.map((id, i) => ({ id, source: MOMENT_COVERS[id] as ImageSourcePropType, label: optionLabel(i + 1) }))];
   const { theme } = usePanelTheme();
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <Pressable accessibilityLabel={closeLabel} onPress={onClose} style={styles.backdrop}>
       <Pressable accessibilityViewIsModal onPress={() => undefined} style={[styles.sheet, { backgroundColor: theme.surface }]}>
         <View style={styles.header}>

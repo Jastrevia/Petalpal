@@ -8,6 +8,8 @@ import { PETAL_CARD_ART } from './petalCardArt';
 import { prepareShare, sharePrepared, type PreparedShare, type ShareOutcome } from './petalShare';
 import { usePauseGardenWhile } from '../garden/gardenOverlayPause';
 import { JOURNAL_ART } from '../features/journalKit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const BACKS = {
   lilac: require('@/assets/petal-card-backs/lilac.webp'),
@@ -47,12 +49,17 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const { width: vw, height: vh } = useWindowDimensions();
   const locale = today?.locale ?? 'en';
   const copy = COPY[locale];
+  const insets = useSafeAreaInsets();
+  // A phone held sideways is wide but short: the ring lies flatter so the far cards clear the heading
+  // and the near ones stay on the screen, the topics sit two to a row, and the drawn card stands
+  // beside its words instead of above them.
+  const short = vh < 520 && vw > vh;
   const size = useMemo(() => {
-    const cw = Math.round(Math.max(58, Math.min(112, Math.min(vw * 0.19, vh * 0.12))));
+    const cw = Math.round(Math.max(58, Math.min(112, short ? vh * 0.165 : Math.min(vw * 0.19, vh * 0.12))));
     const r = Math.round(Math.max(140, Math.min(420, vw * 0.42)));
     const n = Math.max(8, Math.floor((2 * Math.PI * r) / (cw * 1.5)));
     return { cw, ch: Math.round(cw * 1.55), r, n, step: 360 / n };
-  }, [vw, vh]);
+  }, [vw, vh, short]);
   const deckSize = today?.deckSize ?? 69;
   usePauseGardenWhile(visible);
   // The ring turns on the UI thread: each card reads the shared angle in its own animated style,
@@ -173,42 +180,49 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   }
 
   const back = BACKS[today?.back ?? 'lilac'];
-  const P = size.r * 4.2, tilt = 0.3;
-  const bigW = Math.min(vw * 0.6, vh * 0.34 / 1.55, 260), bigH = bigW * 1.55;
+  const P = size.r * 4.2, tilt = short ? 0.2 : 0.3;
+  const bigW = short ? Math.min(vh * 0.62 / 1.55, 200) : Math.min(vw * 0.6, vh * 0.34 / 1.55, 260), bigH = bigW * 1.55;
+  // Sideways: the card's column is the left 40 % of the screen, its words take the rest.
+  const wordsLeft = Math.round(vw * 0.4);
   const showRing = phase === 'spin' || phase === 'drawing';
   const backFace = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0, 0] });
   const frontFace = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const turn = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '90deg', '0deg'] });
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <GestureHandlerRootView style={{ flex: 1 }}><GestureDetector gesture={pan}>
     <View style={styles.sky}>
       {STARS.map(([x, y, s], i) => <View key={i} pointerEvents="none" style={[styles.star, { left: `${x}%`, top: `${y}%`, width: s, height: s }]} />)}
-      <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={styles.close}>
+      <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose}
+        style={[styles.close, short && { top: 12 }, { right: 16 + insets.right }]}>
         <Text style={styles.closeText}>×</Text>
       </Pressable>
-      {phase === 'topic' ? <View style={styles.topics}>
+      {phase === 'topic' ? <ScrollView style={[styles.topicsScroll, short && { top: 14 }]} showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.topics, { paddingLeft: 24 + insets.left, paddingRight: 24 + insets.right, paddingBottom: 24 + insets.bottom }]}>
         <Text style={styles.title}>{copy.title}</Text>
-        <Text style={styles.ask}>{copy.ask}</Text>
+        <Text style={[styles.ask, short && { marginTop: 4 }]}>{copy.ask}</Text>
         <Text style={styles.sub}>{copy.askSub}</Text>
-        {(today?.topics ?? []).map(item => <Pressable key={item.id} accessibilityRole="button" onPress={() => pickTopic(item.id, item.label)}
-          style={({ pressed }) => [styles.topic, pressed && styles.pressed]}><Text style={styles.topicText}>{item.label}</Text></Pressable>)}
+        <View style={[styles.topicList, short && styles.topicListShort]}>
+          {(today?.topics ?? []).map(item => <Pressable key={item.id} accessibilityRole="button" onPress={() => pickTopic(item.id, item.label)}
+            style={({ pressed }) => [styles.topic, short && styles.topicShort, pressed && styles.pressed]}><Text style={styles.topicText}>{item.label}</Text></Pressable>)}
+        </View>
         <Text testID="petal-uses" style={styles.uses}>{copy.uses(0)}</Text>
         <Pressable testID="petal-later" accessibilityRole="button" onPress={onClose} hitSlop={8} style={({ pressed }) => [styles.later, pressed && styles.pressed]}>
           <Text style={styles.laterText}>{copy.later}</Text>
         </Pressable>
-      </View> : null}
+      </ScrollView> : null}
 
-      {showRing ? <View pointerEvents="none" style={styles.header}>
+      {showRing ? <View pointerEvents="none" style={[styles.header, short && styles.headerShort]}>
         <Text style={styles.title}>{copy.title}</Text>
-        {topic.label ? <Text style={styles.topicTag}>{topic.label}</Text> : null}
-        <Text style={styles.sub}>{copy.sub}</Text>
-        <View style={styles.counter}>
+        {topic.label ? <Text style={[styles.topicTag, short && { marginTop: 4 }]}>{topic.label}</Text> : null}
+        {/* Sideways the same words sit in the middle of the ring (the hint below), so they are not said twice. */}
+        {short ? null : <Text style={styles.sub}>{copy.sub}</Text>}
+        <View style={[styles.counter, short && { marginTop: 6 }]}>
           <Text style={styles.counterText}>{copy.no} <Text style={styles.counterValue}>{frontNo}</Text> / {deckSize}</Text>
         </View>
-        <View style={styles.track}><View style={[styles.fill, { width: `${(frontNo / deckSize) * 100}%` }]} /></View>
+        <View style={[styles.track, short && { marginTop: 6 }]}><View style={[styles.fill, { width: `${(frontNo / deckSize) * 100}%` }]} /></View>
       </View> : null}
 
-      {showRing ? <View style={[styles.ringCenter, { top: vh * 0.47 }]}>
+      {showRing ? <View style={[styles.ringCenter, { top: vh * (short ? 0.5 : 0.47) }]}>
         {Array.from({ length: size.n }, (_, i) => {
           const place = placeOf(i);
           return <RingCard key={i} index={i} place={place} number={mod(place, deckSize) + 1} isFront={place === front}
@@ -216,7 +230,8 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
         })}
       </View> : null}
 
-      {!showRing && phase !== 'topic' ? <Animated.View style={[styles.big, { width: bigW, height: bigH, top: vh * 0.1,
+      {!showRing && phase !== 'topic' ? <Animated.View style={[styles.big, { width: bigW, height: bigH, top: short ? (vh - bigH) / 2 : vh * 0.1 },
+        short && { alignSelf: 'flex-start', left: Math.max(insets.left + 12, (wordsLeft + insets.left - bigW) / 2) }, {
         transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [vh * 0.25, 0] }) },
           { scale: lift.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }) }, { perspective: 1200 }, { rotateY: turn }] }]}>
         <Animated.Image source={back} style={[styles.bigImage, { opacity: backFace }]} />
@@ -227,16 +242,17 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
 
       {phase === 'drawing' ? <ActivityIndicator style={styles.drawing} color="#E9CF8A" accessibilityLabel={copy.drawing} /> : null}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-      {showRing ? <Text pointerEvents="none" style={styles.hint}>{copy.hint}</Text> : null}
+      {showRing ? <Text pointerEvents="none" style={[styles.hint, short && { bottom: 'auto', top: vh * 0.5 - 10 }]}>{copy.hint}</Text> : null}
 
-      {phase === 'chosen' ? <View style={styles.panel}>
+      {phase === 'chosen' ? <View style={[styles.panel, short && { left: wordsLeft, right: 24 + insets.right, bottom: 'auto', top: vh * 0.34 }]}>
         <Text style={styles.panelTitle}>{copy.chosen(chosenNo)}</Text>
         <Pressable accessibilityRole="button" onPress={turnOver} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
           <Text style={styles.primaryText}>{copy.turnOver}</Text>
         </Pressable>
       </View> : null}
 
-      {phase === 'revealed' && face ? <ScrollView style={[styles.reveal, { top: vh * 0.1 + bigH + 12 }]} contentContainerStyle={styles.revealContent}>
+      {phase === 'revealed' && face ? <ScrollView style={[styles.reveal, short ? { top: 0, left: wordsLeft } : { top: vh * 0.1 + bigH + 12 }]}
+        contentContainerStyle={[styles.revealContent, short && { paddingTop: 20, paddingRight: 64 + insets.right, paddingBottom: 20 + insets.bottom }]}>
         <Text style={styles.kicker}>{topic.label ?? copy.today}</Text>
         <Text style={styles.cardName}>{face.name}</Text>
         {face.keywords ? <Text style={styles.orientation}>{`${face.reversed ? copy.reversed : copy.upright} · ${face.keywords.join(locale === 'en' ? ', ' : '、')}`}</Text> : null}
@@ -323,7 +339,12 @@ const styles = StyleSheet.create({
   big: { position: 'absolute', alignSelf: 'center', zIndex: 250 },
   bigImage: { position: 'absolute', width: '100%', height: '100%', borderRadius: 14 },
   upsideDown: { transform: [{ rotate: '180deg' }] },
-  topics: { position: 'absolute', top: 70, left: 24, right: 24, alignItems: 'center', gap: 12, zIndex: 200 },
+  headerShort: { top: 12 },
+  topicsScroll: { position: 'absolute', top: 70, left: 0, right: 0, bottom: 0, zIndex: 200 },
+  topics: { alignItems: 'center', gap: 12 },
+  topicList: { alignSelf: 'stretch', alignItems: 'center', gap: 12 },
+  topicListShort: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  topicShort: { width: '46%' },
   ask: { marginTop: 18, fontFamily: 'serif', fontSize: 22, color: '#F3DFA8', textAlign: 'center' },
   topic: { alignSelf: 'center', maxWidth: 360, width: '100%', minHeight: 48, paddingVertical: 12, borderRadius: 14, alignItems: 'center',
     justifyContent: 'center', borderWidth: 1, borderColor: '#E9CF8A88', backgroundColor: '#1B154088' },

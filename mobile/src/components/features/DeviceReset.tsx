@@ -4,6 +4,7 @@ import { useAuth } from '../../services/auth';
 import { deviceResetSteps, finishDeviceReset, runDeviceReset, useDeviceResetResult } from '../../services/deviceReset';
 import { momentLocale } from '../moments/momentFormat';
 import { useSignedOutLocale } from '../../services/signedOutLocale';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const COPY = {
   en: { reset: 'Reset this device (test build)', confirm: 'Sign out and erase everything PetalPal keeps on this phone? Entries on the server stay with the test account.',
@@ -45,7 +46,7 @@ export function DeviceResetDone() {
   const result = useDeviceResetResult();
   const t = useCopy();
   if (!result) return null;
-  return <Modal visible animationType="fade" statusBarTranslucent onRequestClose={() => undefined}>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} visible animationType="fade" statusBarTranslucent onRequestClose={() => undefined}>
     <View style={styles.done}>
       <Text accessibilityRole="header" style={styles.title}>{result.ok ? t.done : t.failed}</Text>
       {result.ok ? <Text style={styles.body}>{t.close}</Text> : null}

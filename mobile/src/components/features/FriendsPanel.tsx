@@ -14,6 +14,7 @@ import { UserAvatar } from '../avatars/UserAvatar';
 import { GardenVisitLog } from './GardenVisitLog';
 import { subscribeUserRealtime, userRealtimeConnected } from '../../services/userRealtime';
 import { markNewFriendsSeen, noteFriendAcceptedHere, syncFriendAlerts, useFriendAlerts } from '../../services/friendAlerts';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 const ART = {
   banner: { dark: require('@/assets/friends/banner-dark.webp'), light: require('@/assets/friends/banner-light.webp') },
@@ -403,7 +404,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
       <View style={[styles.pathFade, fade('to bottom')]} />
     </View>
 
-    {sentTo ? <Modal transparent visible animationType="fade" onRequestClose={() => setSentTo(null)}>
+    {sentTo ? <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={() => setSentTo(null)}>
       <View style={styles.popupBackdrop}>
         <Pressable accessibilityLabel={copy.closePopup} style={StyleSheet.absoluteFill} onPress={() => setSentTo(null)} />
         <View accessibilityViewIsModal style={styles.popup}>

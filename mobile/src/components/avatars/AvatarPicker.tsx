@@ -1,6 +1,7 @@
 import { usePanelTheme } from '../features/PanelTheme';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { AVATAR_ART, LEGACY_AVATAR_IDS } from './avatarArt';
+import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 
 // Choose a portrait from the avatar library (by default the original eight, as for the Fairy's
 // Moments avatar; the owner's own avatar uses AvatarCollection). `defaultOption` adds a first tile
@@ -18,7 +19,7 @@ export function AvatarPicker({ visible, title, selected, busy = false, error = '
   ];
   const current = selected ?? null;
   const { theme } = usePanelTheme();
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+  return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <Pressable accessibilityLabel={closeLabel} onPress={onClose} style={styles.backdrop}>
       <Pressable accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.surface }]} onPress={() => undefined}>
         <View style={styles.header}>

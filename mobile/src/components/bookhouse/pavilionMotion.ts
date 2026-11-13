@@ -16,8 +16,15 @@ export const PAVILION_CLOTH: Record<PavilionBookId, string> = {
   weekly: '#3E5742', monthly: '#244B70', notes: '#6C4772', collection: '#D9C49D',
 };
 // `maxBookWidth` (a phone): the open spread is no wider than this, so one whole page fits the screen's width.
-export function pavilionScene(width: number, height: number, maxBookWidth = Infinity) {
+// `bottomInset`: the screen's bottom safe-area inset (the home indicator), kept clear under a book that
+// fills the height.
+export function pavilionScene(width: number, height: number, maxBookWidth = Infinity, bottomInset = 0) {
   const compact = width < 640;
+  // A phone held sideways is wide but short. At the wide view's 63 % of the height a page would be
+  // too narrow to read, so the open book takes nearly the whole height there, centred on the screen
+  // and lying over the shelf (the bookmarks keep a strip above it).
+  const short = !compact && height < 520;
+  const shortTop = 34, shortBottom = Math.max(10, bottomInset + 4);
   // Portrait crops toward the shelf, keeping all four books on screen. Wide views
   // contain the entire painting. Both the hit targets and origins use this camera.
   const k = compact ? Math.max(width / PAVILION.width, height / PAVILION.height)
@@ -29,10 +36,12 @@ export function pavilionScene(width: number, height: number, maxBookWidth = Infi
     const r = PAVILION_SLOTS[id];
     return { x: x + r.x * k, y: y + r.y * k, width: r.width * k, height: r.height * k };
   };
-  const bookWidth = Math.min(compact ? width - 24 : artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H, maxBookWidth);
+  const bookWidth = short ? Math.min(width - 24, (height - shortTop - shortBottom) * 2 * SPEC.W / SPEC.H, maxBookWidth)
+    : Math.min(compact ? width - 24 : artWidth * .76, (height * .63) * 2 * SPEC.W / SPEC.H, maxBookWidth);
   const bookHeight = bookWidth * SPEC.H / (2 * SPEC.W);
-  const bookX = compact ? (width - bookWidth) / 2 : x + artWidth * .56 - bookWidth / 2;
-  const bookY = Math.max(slot('weekly').y + slot('weekly').height + 18, Math.min(y + artHeight * .30, height - bookHeight - 42));
+  const bookX = compact || short ? (width - bookWidth) / 2 : x + artWidth * .56 - bookWidth / 2;
+  const bookY = short ? shortTop
+    : Math.max(slot('weekly').y + slot('weekly').height + 18, Math.min(y + artHeight * .30, height - bookHeight - 42));
   const col = slot('collection');
   const rawLanternLeft = x + PAVILION_LANTERN.x * k;
   const rawLanternRight = x + (PAVILION_LANTERN.x + PAVILION_LANTERN.width) * k;

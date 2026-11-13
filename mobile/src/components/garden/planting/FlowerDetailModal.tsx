@@ -24,6 +24,7 @@ import { useAppLocale } from '../../../services/locale';
 import { flowerMeaningText, flowerNameText } from '../../../services/flowerNames';
 import { useMessageReactions } from '../../../services/messageReactions';
 import { PANEL_THEMES, usePanelTheme, type PanelTheme } from '../../features/PanelTheme';
+import { MODAL_ORIENTATIONS } from '../../../constants/orientation';
 
 const MOOD_ZH: Record<string, string> = { SUNNY_BLOOM: '开心', PEACEFUL_BLOOM: '平静', GENTLE_BLOOM: '温柔', WONDER_BLOOM: '好奇', HEALING_BLOOM: '治愈', QUIET_BLOOM: '低落', DRIFTING_BLOOM: '迷茫', FIRE_BLOOM: '愤怒', Unknown: '未知' };
 const COPY = {
@@ -144,7 +145,7 @@ export default function FlowerDetailModal() {
   };
 
   return (
-    <Modal
+    <Modal supportedOrientations={MODAL_ORIENTATIONS}
       transparent
       animationType="fade"
       visible={!!selectedFlower}

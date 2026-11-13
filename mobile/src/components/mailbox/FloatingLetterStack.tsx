@@ -332,7 +332,9 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
 
   // Viewport & vertical positioning constants
 
-  const viewportHeight = Math.max(420, Math.min(540, maxContentHeight || 490));
+  // No taller than the room the page gives: on a short screen (a phone held sideways) the letters
+  // stay between the header and the page arrows instead of running over both.
+  const viewportHeight = Math.min(540, maxContentHeight || 490);
 
   const stackSpan = (letters.length - 1) * (isNarrowMobile ? 32 : 36) + 162;
 
