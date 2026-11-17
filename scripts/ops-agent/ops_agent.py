@@ -180,7 +180,8 @@ def main():
         raise SystemExit("Set ANTHROPIC_API_KEY first (it is read from the environment and never printed).")
 
     from langchain_anthropic import ChatAnthropic
-    model = ChatAnthropic(model=args.model, max_tokens=1024, temperature=0)
+    # No temperature: current Claude models reject it as an unsupported parameter.
+    model = ChatAnthropic(model=args.model, max_tokens=1024)
     data = demo_data() if args.demo else load(args.source)
     result = run_agent(args.question, model, build_tools(data), args.max_steps)
     for step in result["steps"]:
