@@ -12,6 +12,9 @@ a user wrote. Days are **UTC** calendar days (see [time.md](../../time.md), "Ops
 
 `output/` is git-ignored; never commit exported CSVs.
 
+The same export also feeds a monthly AI cost report with budget and invoice checks, and a read-only
+LangChain ops agent: see [COST_REPORT_AND_OPS_AGENT.md](COST_REPORT_AND_OPS_AGENT.md).
+
 ## 1. Export (read-only)
 
 Exporting production data needs the owner's explicit approval each time (WARNING.md §6). The script
