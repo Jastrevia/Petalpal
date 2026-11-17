@@ -76,6 +76,16 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(table.loc["2026-11", "status"], "MISSING_INVOICE")
 
 
+class EmptyExportTest(unittest.TestCase):
+    def test_header_only_export_gives_empty_tables(self):
+        empty = with_month(pd.DataFrame({"date": pd.Series([], dtype=object), "action": [], "provider": [],
+                                         "model": [], "calls": [], "inputTokens": [], "outputTokens": [],
+                                         "estCostUsd": []}))
+        self.assertTrue(empty.empty)
+        self.assertTrue(cost_by_feature(empty).empty)
+        self.assertTrue(monthly_budget(empty, {"ANTHROPIC": 20}).empty)
+
+
 class ReportTest(unittest.TestCase):
     def test_markdown_lists_budget_features_and_reconciliation(self):
         gateway = gateway_fixture()

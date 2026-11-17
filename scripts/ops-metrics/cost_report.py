@@ -29,6 +29,8 @@ def load_gateway(folder):
 
 def with_month(frame):
     frame = frame.copy()
+    # An export with no rows reads the date column as text; coerce it so empty input stays empty.
+    frame["date"] = pd.to_datetime(frame["date"])
     frame["month"] = frame["date"].dt.strftime("%Y-%m")
     return frame
 
@@ -153,7 +155,8 @@ def main():
 
     gateway = demo_gateway() if args.demo else load_gateway(args.source)
     if gateway.empty:
-        raise SystemExit("No AI gateway rows to report.")
+        raise SystemExit("ai_gateway_daily.csv has no rows: this database logged no Claude gateway usage, "
+                         "so there is no cost to report. Check which database you exported.")
     budgets = parse_budgets(args.budget or ["ANTHROPIC=20"])
     features = cost_by_feature(gateway)
     budget = monthly_budget(gateway, budgets)
