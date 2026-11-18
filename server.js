@@ -173,6 +173,7 @@ import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./l
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
 import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
 import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
+import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -3160,6 +3161,31 @@ app.get("/users/:userId/fairy-outfit", async (req, res) => {
   } catch (error) {
     if (sendSocialError(res, error)) return;
     return sendWardrobeError(res, error, "GET /users/:userId/fairy-outfit");
+  }
+});
+
+// Keepsake DIY garden layout (lib/garden-layout.js).
+function sendLayoutError(res, error, context) {
+  if (error instanceof LayoutError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Garden layout unavailable" });
+}
+app.get("/api/garden/layout", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await layoutFor(prisma, req.auth.userId)); }
+  catch (error) { return sendLayoutError(res, error, "GET /api/garden/layout"); }
+});
+app.put("/api/garden/layout", async (req, res) => {
+  try { return res.json(await saveLayout(prisma, req.auth.userId, req.body)); }
+  catch (error) { return sendLayoutError(res, error, "PUT /api/garden/layout"); }
+});
+app.get("/users/:userId/garden-layout", async (req, res) => {
+  try {
+    const layout = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => layoutFor(tx, req.params.userId));
+    return res.json({ placements: layout.placements, world: layout.world });
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendLayoutError(res, error, "GET /users/:userId/garden-layout");
   }
 });
 

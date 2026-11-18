@@ -47,3 +47,24 @@ All need the signed-in token. Locked pieces answer **403** with `code: "VIP_REQU
 
 Drawing: layer `body` → `clothes` → `hair` → `accessory` from each piece's `art`. `complete: false` on a look
 means one of its pieces is locked now; wearing it puts the slot's default there.
+
+## Keepsake DIY garden
+
+Code: [lib/garden-layout.js](../../lib/garden-layout.js). Migration `202611180004_garden_layout`.
+
+- Every fairy keepsake (lib/fairy-keepsakes.js) is also a decoration `deco-<keepsakeId>`, owned by whoever received
+  that keepsake. Receiving the same keepsake 3 times lets the owner place 3 copies (at most 10).
+- A keepsake decoration stays hidden until its decoration art exists: add the keepsake id to `decorationsReady` in
+  the catalog. Other decorations (shop or VIP) are normal catalog entries with `"type": "DECORATION", "slot": "garden"`.
+- Positions are Garden world coordinates (`worldX` 0–2399, `worldY` 0–1799, the same world as flowers). `z` orders
+  overlapping pieces (higher on top), `flip` mirrors the art, `scale` is 0.5–2.
+
+| Route | Body | Returns |
+|---|---|---|
+| `GET /api/items?type=DECORATION` | — | the decoration inventory; each has `copies` (how many can be placed) and `keepsakeId` |
+| `GET /api/garden/layout` | — | `{ placements: [{ itemId, worldX, worldY, z, flip, scale, art }], updatedAt, world, limit }` |
+| `PUT /api/garden/layout` | `{ "placements": [{ "itemId": "deco-dewdrop", "worldX": 812, "worldY": 940, "z": 3, "flip": false, "scale": 1 }] }` | the saved layout (the whole layout is replaced; max 60) |
+| `GET /users/:userId/garden-layout` | — | a friend's placements, for visiting their Garden |
+
+The editor can update the screen first and save in the background (optimistic UI); on an error, reload with
+`GET /api/garden/layout`. A piece the owner can no longer use (lapsed VIP) is simply not returned.

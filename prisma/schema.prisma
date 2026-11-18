@@ -55,6 +55,7 @@ model User {
   appFeedback             AppFeedback[]
   itemOwnerships          ItemOwnership[]
   fairyWardrobe           FairyWardrobe?
+  gardenLayout            GardenLayout?
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -1067,6 +1068,16 @@ model FairyWardrobe {
   equipped  Json     @default("{}")
   looks     Json     @default("[]")
   updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Keepsake DIY (lib/garden-layout.js): decorations placed in the owner's Garden,
+/// [{ itemId, worldX, worldY, z, flip, scale }], at most 60. Replaced whole on each save.
+model GardenLayout {
+  userId     String   @id
+  placements Json     @default("[]")
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
