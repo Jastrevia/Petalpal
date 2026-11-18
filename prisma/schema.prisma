@@ -556,6 +556,8 @@ model PetalCardReading {
   status     String   @db.VarChar(16)
   attempts   Int      @default(1)
   paragraphs Json     @default("[]")
+  /// Memories a deeper (agent) reading drew on: [{ kind, eventDate }], no text (lib/tarot-agent.js).
+  sources    Json     @default("[]")
   model      String?  @db.VarChar(64)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
