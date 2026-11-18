@@ -45,7 +45,14 @@ export const QUERIES = {
   // Only codes matching [A-Z0-9_] leave the database; rows from before codes were stored read UNRECORDED.
   aiJobFailures: `SELECT ${day('"createdAt"')} AS "date", "jobType"::text AS "jobType",
     coalesce(substring("lastError" from '^AI job failed: ([A-Z0-9_]+)$'), 'UNRECORDED') AS "code", count(*)::int AS "jobs"
-    FROM "AIJob" WHERE "status"::text = 'FAILED' GROUP BY 1, 2, 3`
+    FROM "AIJob" WHERE "status"::text = 'FAILED' GROUP BY 1, 2, 3`,
+  // Daily tarot readings (lib/petal-reading.js) live outside AIJob: one row per draw, by the day it was first asked.
+  petalReadings: `SELECT ${day('"createdAt"')} AS "date", "locale", "status", count(*)::int AS "readings",
+    round(avg("attempts")::numeric, 2)::float AS "avgAttempts" FROM "PetalCardReading" GROUP BY 1, 2, 3`,
+  // One row per failed reading attempt with its allowlisted code; anything else reads UNRECORDED.
+  petalReadingFailures: `SELECT ${day('"createdAt"')} AS "date",
+    coalesce(substring("reasonCode" from '^([A-Z0-9_]+)$'), 'UNRECORDED') AS "code", count(*)::int AS "attempts"
+    FROM "AuditEvent" WHERE "eventType" = 'PETAL_READING_FAILED' GROUP BY 1, 2`
 };
 
 const byDate = (a, b) => a.date.localeCompare(b.date);
@@ -94,6 +101,8 @@ export const FILES = {
   "ai_jobs_daily.csv": ["date", "jobType", "status", "jobs", "avgAttempts"],
   "ai_job_failures_daily.csv": ["date", "jobType", "code", "jobs"],
   "ai_reservations_daily.csv": ["date", "action", "provider", "calls", "users"],
+  "petal_readings_daily.csv": ["date", "locale", "status", "readings", "avgAttempts"],
+  "petal_reading_failures_daily.csv": ["date", "code", "attempts"],
   "ops_totals.csv": ["metric", "value"]
 };
 
@@ -108,6 +117,8 @@ export async function exportOpsMetrics(query) {
     "ai_jobs_daily.csv": keyed(rows.aiJobs),
     "ai_job_failures_daily.csv": keyed(rows.aiJobFailures),
     "ai_reservations_daily.csv": keyed(rows.aiReservations),
+    "petal_readings_daily.csv": keyed(rows.petalReadings),
+    "petal_reading_failures_daily.csv": keyed(rows.petalReadingFailures),
     "ops_totals.csv": Object.entries(rows.totals[0] ?? {}).map(([metric, value]) => ({ metric, value }))
   };
   return Object.fromEntries(Object.entries(tables).map(([file, table]) => [file, toCsv(table, FILES[file])]));
