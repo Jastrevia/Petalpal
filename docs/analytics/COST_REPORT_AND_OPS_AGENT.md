@@ -7,7 +7,7 @@ the ops agent's own `ANTHROPIC_API_KEY`. Days are UTC calendar days.
 | Tool | What it answers | Cost |
 |---|---|---|
 | `scripts/ops-metrics/cost_report.py` | What did AI cost per feature each month, are we inside the budget, and does it match the provider's bill? | None, pandas only |
-| `scripts/ops-agent/ops_agent.py` | Plain-language questions such as "why did AI jobs fail last week?", answered by a LangChain agent that can only call four read-only tools | A few Haiku calls per question |
+| `scripts/ops-agent/ops_agent.py` | Plain-language questions such as "why did AI jobs fail last week?", answered by a LangChain agent that can only call five read-only tools | A few Haiku calls per question |
 
 ## Cost report
 
@@ -51,6 +51,15 @@ only these tools, all read-only over the exported aggregates:
 | `job_summary(start_date, end_date)` | succeeded, failed and success rate per job type |
 | `top_failure_codes(start_date, end_date, limit)` | the most common allowlisted failure codes, at most 20 rows |
 | `monthly_ai_cost(month, budget_usd)` | top features and the budget status with projection, from the cost report |
+| `tarot_reading_summary(start_date, end_date)` | daily tarot readings by status and failed attempts by code |
+
+Daily tarot readings are not AI jobs, so they have their own export files:
+`petal_readings_daily.csv` (readings per day, locale and status, from `PetalCardReading`) and
+`petal_reading_failures_daily.csv` (failed attempts per day and code). Each failed attempt writes one
+`PETAL_READING_FAILED` audit row with only its allowlisted code (`lib/petal-reading.js`), with no
+user, draw or card id. Failures from before this change have no row. A failure with no gateway usage
+row on the same day failed before the provider answered (HTTP error, timeout or a rejected response
+shape); `AI_GATEWAY_GROUNDING_FAILED` means the answer arrived but failed the reading's own checks.
 
 Guardrails: the system prompt treats tool results as data, not instructions; an unknown tool name or a
 bad argument goes back to the model as an error result instead of running anything; every result is

@@ -28,7 +28,15 @@ async function fixture(t) {
       ('c1','2026-10-02 10:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
       ('c2','2026-10-02 11:00','AI_COST_RESERVED','bob','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
       ('c3','2026-10-02 12:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'EVENT_EMOTION','1'),
-      ('c4','2026-10-03 09:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'WEEKLY_REPORT','2');
+      ('c4','2026-10-03 09:00','AI_COST_RESERVED','alice','CLOUDFLARE_WORKERS_AI',NULL,'WEEKLY_REPORT','2'),
+      ('p1','2026-10-03 08:00','PETAL_READING_FAILED',NULL,'PETAL_READING',NULL,'PETAL_READING','AI_GATEWAY_PROVIDER_FAILED'),
+      ('p2','2026-10-03 08:05','PETAL_READING_FAILED',NULL,'PETAL_READING',NULL,'PETAL_READING','AI_GATEWAY_PROVIDER_FAILED'),
+      ('p3','2026-10-03 09:00','PETAL_READING_FAILED',NULL,'PETAL_READING',NULL,'PETAL_READING','private text from alice');
+    CREATE TABLE "PetalCardReading" ("id" text PRIMARY KEY, "userId" text, "drawId" text, "locale" text, "status" text,
+      "attempts" int, "paragraphs" jsonb, "createdAt" timestamp(3) NOT NULL);
+    INSERT INTO "PetalCardReading" VALUES ('pr1','alice','d1','zh-Hans','FAILED',2,'[]','2026-10-03 08:00'),
+      ('pr2','bob','d2','en','READY',1,'["private reading text"]','2026-10-03 09:00'),
+      ('pr3','alice','d3','zh-Hans','READY',1,'["private reading text"]','2026-10-04 09:00');
     INSERT INTO "AiInteractionMetadata" VALUES ('m1','alice','EMBEDDING','CLOUDFLARE',400,300,0,true,'2026-10-02 10:00'),
       ('m2','bob','EMBEDDING','CLOUDFLARE',600,200,0,false,'2026-10-02 12:00');
     INSERT INTO "AIJob" VALUES ('j1','alice','EMBEDDING_GENERATION','SUCCEEDED',1,'2026-10-02 10:00',NULL),
@@ -64,6 +72,11 @@ test("exports per-UTC-day aggregates for activity, Claude cost, other AI calls a
   // Stored codes are counted; legacy and free-text lastError values never leave the database.
   assert.deepEqual(files["ai_job_failures_daily.csv"].trim().split("\n"), ["date,jobType,code,jobs",
     "2026-10-02,EMBEDDING_GENERATION,UNRECORDED,1", "2026-10-03,WEEKLY_REPORT,REPORT_NARRATIVE_TIMEOUT,2", "2026-10-03,WEEKLY_REPORT,UNRECORDED,1"]);
+  // Tarot readings by status, and their failed attempts by code; free text never leaves as a code.
+  assert.deepEqual(files["petal_readings_daily.csv"].trim().split("\n"), ["date,locale,status,readings,avgAttempts",
+    "2026-10-03,en,READY,1,1", "2026-10-03,zh-Hans,FAILED,1,2", "2026-10-04,zh-Hans,READY,1,1"]);
+  assert.deepEqual(files["petal_reading_failures_daily.csv"].trim().split("\n"), ["date,code,attempts",
+    "2026-10-03,AI_GATEWAY_PROVIDER_FAILED,2", "2026-10-03,UNRECORDED,1"]);
 });
 
 test("no user ids, emails or written text reach any exported file", async t => {

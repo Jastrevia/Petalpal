@@ -78,6 +78,23 @@ class ToolTest(unittest.TestCase):
         empty = json.loads(tools_by_name()["monthly_ai_cost"].invoke({"month": "2025-01"}))
         self.assertIn("error", empty)
 
+    def test_tarot_reading_summary_counts_statuses_and_codes(self):
+        data = data_fixture()
+        data["readings"] = pd.DataFrame({"date": [D("2026-11-17")] * 2 + [D("2026-10-01")], "locale": ["zh-Hans", "en", "en"],
+                                         "status": ["FAILED", "READY", "READY"], "readings": [1, 2, 5],
+                                         "avgAttempts": [2.0, 1.0, 1.0]})
+        data["reading_failures"] = pd.DataFrame({"date": [D("2026-11-17")] * 2, "code": ["AI_GATEWAY_PROVIDER_FAILED",
+                                                                                       "AI_QUOTA_EXCEEDED"],
+                                                 "attempts": [2, 1]})
+        result = json.loads(tools_by_name(data)["tarot_reading_summary"].invoke(
+            {"start_date": "2026-11-01", "end_date": "2026-11-30"}))
+        self.assertEqual(result["readingsByStatus"], {"FAILED": 1, "READY": 2})
+        self.assertEqual(result["failedAttempts"], 3)
+        self.assertEqual(result["codes"][0], {"code": "AI_GATEWAY_PROVIDER_FAILED", "attempts": 2})
+        # An export from before the tarot files existed: empty, not an error.
+        empty = json.loads(tools_by_name()["tarot_reading_summary"].invoke({"start_date": "2026-11-01", "end_date": "2026-11-30"}))
+        self.assertEqual(empty["failedAttempts"], 0)
+
     def test_bad_dates_raise_clear_errors(self):
         with self.assertRaises(ValueError):
             tools_by_name()["job_summary"].invoke({"start_date": "last week", "end_date": "2026-11-07"})
@@ -94,7 +111,8 @@ class AgentLoopTest(unittest.TestCase):
         self.assertEqual(result["answer"], "Embedding jobs failed 2 of 10 times.")
         self.assertEqual(result["steps"], [{"tool": "job_summary",
                                             "args": {"start_date": "2026-11-01", "end_date": "2026-11-07"}, "ok": True}])
-        self.assertEqual(model.bound, ["data_coverage", "job_summary", "top_failure_codes", "monthly_ai_cost"])
+        self.assertEqual(model.bound, ["data_coverage", "job_summary", "top_failure_codes", "monthly_ai_cost",
+                                       "tarot_reading_summary"])
         tool_result = model.seen[1][-1]
         self.assertIsInstance(tool_result, ToolMessage)
         self.assertIn('"failed": 2', tool_result.content)

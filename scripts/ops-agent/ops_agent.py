@@ -1,7 +1,7 @@
 """Read-only ops agent: ask questions about AI job failures and AI cost in plain language.
 
 A LangChain tool-calling loop over the aggregate CSVs from scripts/export-ops-metrics.mjs
-(UTC calendar days, no user data, no database access). The model can only call the four
+(UTC calendar days, no user data, no database access). The model can only call the five
 read-only tools below; it cannot write, deploy or reach any other system.
 
 Usage:
@@ -29,6 +29,9 @@ FILES = {
                                          "outputTokens", "estCostUsd"]),
     "jobs": ("ai_jobs_daily.csv", ["date", "jobType", "status", "jobs", "avgAttempts"]),
     "failures": ("ai_job_failures_daily.csv", ["date", "jobType", "code", "jobs"]),
+    # Daily tarot readings are not AI jobs: their outcomes and failure codes have files of their own.
+    "readings": ("petal_readings_daily.csv", ["date", "locale", "status", "readings", "avgAttempts"]),
+    "reading_failures": ("petal_reading_failures_daily.csv", ["date", "code", "attempts"]),
 }
 DEFAULT_MODEL = "claude-haiku-5-5"
 MAX_STEPS = 6
@@ -62,7 +65,14 @@ def demo_data():
     codes = ["PROVIDER_TIMEOUT", "SCHEMA_INVALID", "RATE_LIMITED"]
     failures = pd.DataFrame({"date": failed["date"].values, "jobType": failed["jobType"].values,
                              "code": [codes[i % 3] for i in range(len(failed))], "jobs": failed["jobs"].values})
-    return {"gateway": raw["gateway"], "jobs": raw["jobs"], "failures": failures[failures["jobs"] > 0]}
+    return {"gateway": raw["gateway"], "jobs": raw["jobs"], "failures": failures[failures["jobs"] > 0],
+            "readings": _empty("readings"), "reading_failures": _empty("reading_failures")}
+
+
+def _empty(key):
+    frame = pd.DataFrame(columns=FILES[key][1])
+    frame["date"] = pd.to_datetime(frame["date"])
+    return frame
 
 
 def _day(value, name):
@@ -80,7 +90,7 @@ def _window(frame, start_date, end_date):
 
 
 def build_tools(data):
-    """The agent's only abilities: four read-only queries over the aggregates in `data`."""
+    """The agent's only abilities: five read-only queries over the aggregates in `data`."""
 
     @tool
     def data_coverage() -> str:
@@ -130,7 +140,19 @@ def build_tools(data):
                                                  "shareOfMonth"]].to_dict("records"),
                            "budget": budget.to_dict("records")}, default=float)
 
-    return [data_coverage, job_summary, top_failure_codes, monthly_ai_cost]
+    @tool
+    def tarot_reading_summary(start_date: str, end_date: str) -> str:
+        """Daily tarot readings between two dates (inclusive): readings by status and failed attempts by code."""
+        readings = _window(data.get("readings", _empty("readings")), start_date, end_date)
+        failures = _window(data.get("reading_failures", _empty("reading_failures")), start_date, end_date)
+        by_status = {str(k): int(v) for k, v in readings.groupby("status")["readings"].sum().items()}
+        codes = (failures.groupby("code", as_index=False)["attempts"].sum()
+                 .sort_values("attempts", ascending=False).head(MAX_ROWS))
+        return json.dumps({"from": start_date, "to": end_date, "readingsByStatus": by_status,
+                           "failedAttempts": int(failures["attempts"].sum()),
+                           "codes": codes.astype({"attempts": int}).to_dict("records")})
+
+    return [data_coverage, job_summary, top_failure_codes, monthly_ai_cost, tarot_reading_summary]
 
 
 def _text(message):

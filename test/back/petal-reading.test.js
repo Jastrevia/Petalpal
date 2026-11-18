@@ -158,6 +158,20 @@ test("an output that fails the checks gets one more try, then the reading is hid
   assert.equal(f.calls.length, 2);
   assert.equal((await ask(f)).status, "FAILED");
   assert.equal(f.calls.length, 2, "no third call");
+  // Each failed attempt leaves only its code for the ops export: no user, draw or card id.
+  const failures = (await f.pg.query(`SELECT "actorUserId","targetSafeId","reasonCode" FROM "AuditEvent"
+    WHERE "eventType"='PETAL_READING_FAILED'`)).rows;
+  assert.deepEqual(failures, [{ actorUserId: null, targetSafeId: null, reasonCode: "AI_GATEWAY_GROUNDING_FAILED" },
+    { actorUserId: null, targetSafeId: null, reasonCode: "AI_GATEWAY_GROUNDING_FAILED" }]);
+});
+
+test("a provider error is recorded by its code", async (t) => {
+  const f = await fixture(t);
+  await f.draw();
+  f.respond(() => new Response("upstream", { status: 401 }));
+  assert.equal((await ask(f)).status, "NONE");
+  const codes = (await f.pg.query(`SELECT "reasonCode" FROM "AuditEvent" WHERE "eventType"='PETAL_READING_FAILED'`)).rows;
+  assert.deepEqual(codes, [{ reasonCode: "AI_GATEWAY_PROVIDER_AUTH_FAILED" }]);
 });
 
 test("a second try after a failure can succeed", async (t) => {
