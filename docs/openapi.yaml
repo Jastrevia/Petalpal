@@ -594,6 +594,42 @@ paths:
         '401': { description: Wrong or missing Authorization }
         '503': { description: Sync failed; RevenueCat retries }
 
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Send in-app feedback (signed-in accounts; 5 per day)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [category, message]
+              properties:
+                category: { type: string, enum: [bug, feature, general, ai_concern, other] }
+                subject: { type: string, maxLength: 120 }
+                message: { type: string, maxLength: 2000 }
+                email: { type: string, description: Optional reply address the person typed }
+                route: { type: string, example: /journal }
+                clientVersion: { type: string, example: 1.0.0 }
+                platform: { type: string, enum: [ios, android, web] }
+      responses:
+        '201': { description: Saved; returns id and receivedAt }
+        '400': { description: Invalid field }
+        '429': { description: Daily limit reached }
+
+  /moderation/feedback:
+    get:
+      tags: [Moderation]
+      summary: Staff list of feedback, newest first (MODERATOR_FIREBASE_UIDS only)
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [NEW, READ, DONE] } }
+        - { name: before, in: query, schema: { type: string, format: date-time }, description: nextBefore from the previous page }
+      responses:
+        '200': { description: "{ items, counts, nextBefore }" }
+        '403': { description: Not staff }
+
   /reports:
     post:
       tags: [Reports]

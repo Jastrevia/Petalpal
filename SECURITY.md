@@ -1,5 +1,15 @@
 # PetalPal Security
 
+## In-app feedback and the Staff page, 2026-11-18
+
+Local branch `feat/w27-backend`; not deployed.
+
+- `POST /feedback` stores feedback for the signed-in account only (field allowlist, 2,000 characters, 5 per account per day). A reply email is stored only when the person typed one. Rows are deleted with the account (cascade).
+- Staff routes (`GET /moderation/me`, `GET /moderation/feedback`, `POST /moderation/feedback/:id`) sit behind the existing `/moderation` gate (`MODERATOR_FIREBASE_UIDS`, empty denies everyone). The staff list shows display name and PP number, never account email.
+- Team-channel pings (`STAFF_NOTIFY_WEBHOOK_URL`, https only) carry only the kind and category; no user text, identity or ids leave the backend. Failures never fail the user's request.
+- **Open:** the privacy policy should say feedback is stored and read by the team.
+- **Evidence.** `test/back/app-feedback.test.js`; mobile `routePolicy`, `globalFeedbackSystem` tests. Not verified in a running app with a real staff account.
+
 ## VIP billing through RevenueCat, 2026-11-18
 
 Local branch `feat/w27-backend`; not deployed, no provider, store or database touched.

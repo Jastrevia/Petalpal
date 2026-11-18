@@ -40,7 +40,9 @@ const routes = [
   ["POST /leave", "visitorUserId is req.auth.userId"],
   ["POST /analyze-mood", "AI metadata userId is req.auth.userId"],
   ["DELETE /users/:id", "requireOwnUser before transaction; deletion target is token/path-bound"],
-  ["POST /billing/sync", "owner is req.auth.userId; empty body only; reads that owner's own RevenueCat state, at most once per 10 s"]
+  ["POST /billing/sync", "owner is req.auth.userId; empty body only; reads that owner's own RevenueCat state, at most once per 10 s"],
+  ["POST /feedback", "owner is req.auth.userId; field allowlist and length limits; 5 per account per day"],
+  ["POST /moderation/feedback/:feedbackId", "behind the /moderation staff gate (MODERATOR_FIREBASE_UIDS); status/staffNote allowlist"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -51,7 +53,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 37);
+  assert.equal(routes.length, 39);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

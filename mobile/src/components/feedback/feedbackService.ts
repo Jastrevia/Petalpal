@@ -8,6 +8,7 @@
  */
 
 import { Linking, Platform } from 'react-native';
+import { accessToken, apiRequest } from '../../services/api';
 import type {
   FeedbackSubmissionPayload,
   FeedbackSubmissionResult,
@@ -104,7 +105,35 @@ export class EmailFeedbackTransport implements IFeedbackTransport {
   }
 }
 
-let activeTransport: IFeedbackTransport = new EmailFeedbackTransport();
+/**
+ * Server Transport (the default when signed in)
+ *
+ * Saves the feedback with POST /feedback (lib/app-feedback.js), where the team reads it in the staff page.
+ * Guests (no account) still get the email transport. Screenshots are not sent yet.
+ */
+const ROUTE = /^\/[0-9A-Za-z/_\-[\]]{0,119}$/;
+export class ServerFeedbackTransport implements IFeedbackTransport {
+  readonly isRealTransportConfigured = true;
+  readonly transportName = 'PetalPal';
+  readonly supportsAttachments = false;
+  private email = new EmailFeedbackTransport();
+  async submitFeedback(payload: FeedbackSubmissionPayload): Promise<FeedbackSubmissionResult> {
+    if (!(await accessToken())) return this.email.submitFeedback(payload);
+    const platform = Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web' ? Platform.OS : undefined;
+    const result = await apiRequest<{ id: string; receivedAt: string }>('/feedback', 'POST', {
+      category: payload.category,
+      message: payload.message,
+      ...(payload.subject ? { subject: payload.subject } : {}),
+      ...(payload.email ? { email: payload.email } : {}),
+      ...(payload.route && ROUTE.test(payload.route) ? { route: payload.route } : {}),
+      ...(/^[0-9A-Za-z.+-]{1,32}$/.test(payload.clientVersion) ? { clientVersion: payload.clientVersion } : {}),
+      ...(platform ? { platform } : {}),
+    });
+    return { success: true, isRealTransport: true, referenceId: result.id.slice(-6), message: 'RECEIVED', submittedAt: Date.now() };
+  }
+}
+
+let activeTransport: IFeedbackTransport = new ServerFeedbackTransport();
 
 export function getFeedbackTransport(): IFeedbackTransport {
   return activeTransport;

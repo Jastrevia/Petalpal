@@ -171,6 +171,7 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
@@ -3108,6 +3109,40 @@ app.post("/billing/sync", async (req, res) => {
     if (error?.code === "BILLING_NOT_CONFIGURED") return res.status(503).json({ error: "Billing is not available", code: error.code });
     logServerError("POST /billing/sync error", { name: error?.name, code: error?.code, status: error?.status });
     return res.status(502).json({ error: "Billing sync failed", code: "BILLING_PROVIDER_FAILED" });
+  }
+});
+
+// Help & Feedback form (lib/app-feedback.js). Owner is the signed-in account; 5 per day.
+app.post("/feedback", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const row = await createFeedback(prisma, req.auth.userId, req.body);
+    return res.status(201).json({ id: row.id, receivedAt: row.createdAt });
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("POST /feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to send feedback" });
+  }
+});
+
+// Staff page (behind the /moderation gate in lib/social-safety.js: MODERATOR_FIREBASE_UIDS).
+app.get("/moderation/me", (req, res) => res.json({ staff: true }));
+app.get("/moderation/feedback", async (req, res) => {
+  try {
+    return res.json(await listFeedback(prisma, req.query));
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("GET /moderation/feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to load feedback" });
+  }
+});
+app.post("/moderation/feedback/:feedbackId", async (req, res) => {
+  try {
+    return res.json(await updateFeedback(prisma, req.params.feedbackId, req.body));
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("POST /moderation/feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to update feedback" });
   }
 });
 
