@@ -51,6 +51,7 @@ model User {
   aiConsent               AiConsent?
   aiInteractions          AiInteractionMetadata[]
   subscriptionEntitlement SubscriptionEntitlement?
+  billingTrialUses        BillingTrialUse[]
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -1029,10 +1030,33 @@ model SubscriptionEntitlement {
   externalCustomerId     String?            @unique @db.VarChar(191)
   externalSubscriptionId String?            @unique @db.VarChar(191)
   currentPeriodEnd       DateTime?
+  /// VIP plan (lib/billing.js): MONTHLY renews; LIFETIME never expires (currentPeriodEnd null).
+  plan                   VipPlan?
+  productId              String?            @db.VarChar(128)
+  /// False once the owner turned off auto-renew; VIP still lasts until currentPeriodEnd.
+  willRenew              Boolean            @default(false)
+  purchasedAt            DateTime?
+  /// Last successful read of the store state (RevenueCat), server clock.
+  syncedAt               DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// One free trial of a paid feature (lib/billing.js), e.g. an AI-written Weekly for a free account.
+/// periodKey names what the trial was used on (the Weekly's Monday), so one week never uses two.
+model BillingTrialUse {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String   @db.VarChar(32)
+  periodKey String   @db.VarChar(16)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, periodKey])
+  @@index([userId, feature])
 }
 
 enum EmotionSource {
@@ -1059,6 +1083,11 @@ enum ReportStatus {
 enum SubscriptionTier {
   FREE
   PREMIUM
+}
+
+enum VipPlan {
+  MONTHLY
+  LIFETIME
 }
 
 enum SubscriptionStatus {

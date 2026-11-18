@@ -59,7 +59,7 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
       "personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));
     INSERT INTO "AiConsent" VALUES ('alice','synthetic',${aiProcessing},${personalization},false,'2000-01-01'),
       ('bob','synthetic',true,true,true,'2000-01-01');
-    CREATE TABLE "SubscriptionEntitlement" ("userId" text PRIMARY KEY,"tier" text,"status" text);
+    CREATE TABLE "SubscriptionEntitlement" ("userId" text PRIMARY KEY,"tier" text,"status" text,"plan" text,"currentPeriodEnd" timestamp(3));
     CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY,"createdAt" timestamp NOT NULL DEFAULT now(),"eventType" varchar(64),
       "outcome" varchar(32),"actorUserId" varchar(128),"targetClass" varchar(64),"targetSafeId" varchar(128),"actionCode" varchar(64),"reasonCode" varchar(64));
     CREATE TABLE "Event" ("id" text PRIMARY KEY,"ownerId" text,"localDate" text,"primaryGardenMood" text,"content" text);
@@ -87,7 +87,11 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [`d${++ids}`, data.userId, data.localDate, data.position, data.cardId, data.topic, data.reversed])
     },
     petalCardReading: {
-      count: async ({ where }) => (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" WHERE "userId"=$1 AND "status"=$2
+      count: async ({ where }) => where.draw
+        ? (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" r JOIN "PetalCardDraw" d ON d."id"=r."drawId"
+          WHERE r."userId"=$1 AND r."status"=$2 AND r."drawId" <> $3 AND d."localDate" >= $4`,
+          [where.userId, where.status, where.drawId.not, where.draw.localDate.gte])).n
+        : (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" WHERE "userId"=$1 AND "status"=$2
         AND "drawId" <> $3`, [where.userId, where.status, where.drawId.not])).n,
       findUnique: ({ where }) => one(db, `SELECT * FROM "PetalCardReading" WHERE "drawId"=$1`, [where.drawId]),
       create: ({ data }) => one(db, `INSERT INTO "PetalCardReading" ("id","userId","drawId","locale","status","attempts","updatedAt")
@@ -206,8 +210,8 @@ test("everyone gets three free readings, then only unlocked owners; a written re
   await failing.draw("bob", 1, "WORK");
   await ask(failing, enabled, "bob"); await ask(failing, enabled, "bob");
   assert.equal((await petalReadingFor(failing.prisma, { userId: "bob", drawId: (await failing.draw("bob", 1, "WORK")).id, env: enabled, now: NOW })).freeLeft, 3);
-  // Unlocking (Premium, the one-time purchase) lifts the limit; an expired one does not.
-  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED')`);
+  // VIP lifts the free limit; an expired one does not.
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED','LIFETIME',NULL)`);
   assert.equal((await ask(f, enabled, "bob", day(3))).locked, true);
   await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "status"='ACTIVE' WHERE "userId"='bob'`);
   // The cost gate counts calls by the database's real day, where these simulated days all fall.
@@ -215,6 +219,36 @@ test("everyone gets three free readings, then only unlocked owners; a written re
   assert.equal(unlocked.status, "READY");
   assert.equal(unlocked.freeLeft, null);
   assert.equal((await f.reading(fourth.id)).status, "READY");
+});
+
+test("VIP owners get three readings per account-local week; the beta list has no weekly limit", async (t) => {
+  const f = await fixture(t);
+  f.respond(() => Response.json(native(EN)));
+  const env = { ...enabled, AI_PETAL_READING_DAILY_LIMIT: "10" };
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','ACTIVE','MONTHLY','2027-01-01T00:00:00Z')`);
+  // Tuesday 27 to Thursday 29 October 2026 in Vancouver: one week, which starts Monday the 26th.
+  for (const n of [-3, -2, -1]) {
+    await f.draw("bob", n + 4, "WORK", day(n));
+    const reading = await ask(f, env, "bob", day(n));
+    assert.equal(reading.status, "READY");
+    assert.equal(reading.freeLeft, null);
+    assert.equal(reading.weeklyLeft, 2 - (n + 3));
+  }
+  await f.draw("bob", 1, "LOVE", day(0));
+  const calls = f.calls.length;
+  assert.deepEqual(await ask(f, env, "bob", day(0)), { available: true, needsConsent: false, locked: true, freeLeft: null, weeklyLeft: 0, status: "NONE" });
+  assert.equal(f.calls.length, calls, "no model call once the week is used up");
+  // Monday 2 November starts a new week.
+  await f.draw("bob", 2, "LOVE", day(3));
+  assert.equal((await ask(f, env, "bob", day(3))).status, "READY");
+  // An expired monthly plan is not VIP, whatever its status says.
+  await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "currentPeriodEnd"='2026-10-01T00:00:00Z' WHERE "userId"='bob'`);
+  await f.draw("bob", 3, "LOVE", day(4));
+  assert.equal((await ask(f, env, "bob", day(4))).locked, true);
+  // Listed owners keep unlimited readings and never see a weekly count.
+  const listed = await ask(f, { ...env, PETAL_READING_OWNER_IDS: "bob" }, "bob", day(4));
+  assert.equal(listed.status, "READY");
+  assert.equal("weeklyLeft" in listed, false);
 });
 
 test("only with the switches, only with AI Processing", async (t) => {

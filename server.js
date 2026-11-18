@@ -171,6 +171,7 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
 
@@ -420,6 +421,20 @@ app.post("/internal/ai-jobs/:id/execute", async (req, res) => {
     return res.json(result);
   } catch {
     return res.status(503).json({ error: "AI job execution unavailable" });
+  }
+});
+// RevenueCat webhook (docs/billing/BILLING.md). Not a user request: the shared Authorization value is
+// checked first, and the body only names which accounts to re-read; their state always comes from
+// RevenueCat's API, so a forged or replayed body cannot grant VIP. Non-200 makes RevenueCat retry.
+app.post("/billing/webhooks/revenuecat", async (req, res) => {
+  if (!revenueCatWebhookAuthorized(req.get("Authorization"))) return res.status(401).json({ error: "Unauthorized" });
+  const userIds = webhookUserIds(req.body);
+  try {
+    for (const userId of userIds) await syncEntitlement(prisma, userId);
+    return res.json({ ok: true, synced: userIds.length });
+  } catch (error) {
+    logServerError("POST /billing/webhooks/revenuecat error", { name: error?.name, code: error?.code, status: error?.status });
+    return res.status(503).json({ error: "Billing sync unavailable" });
   }
 });
 if (apiDocsEnabled()) {
@@ -2293,7 +2308,7 @@ app.get("/api/flowers/today", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, timezone: true } });
     if (!user) return res.status(404).json({ error: "User not found" });
     const localDate = getLocalDate(normalizeTimezone(user.timezone) || "UTC");
-    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate }));
+    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate, limit: await dailyFlowerLimitFor(prisma, user.id) }));
   } catch (err) {
     logServerError("GET /api/flowers/today error", err);
     res.status(500).json({ error: "Failed to load today's flowers" });
@@ -2555,7 +2570,8 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
     });
     // A third Event in one day is still saved; it just grows no flower (lib/flower-quota.js).
     if (primaryGardenMood && !await database.flower.findUnique({ where: { sourceEventId: event.id } })) {
-      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate });
+      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate,
+        limit: await dailyFlowerLimitFor(database, event.ownerId) });
     }
     if (primaryGardenMood && flowerQuota?.granted !== false) {
       const garden = await ensureGarden(event.ownerId, database);
@@ -3063,6 +3079,38 @@ app.post("/ai/reports/monthly/trigger", aiRateLimit, async (req, res) => {
   }
 });
 
+// VIP state and the free counters for the signed-in owner (lib/billing.js).
+app.get("/billing/me", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    return res.json(await billingSummary(prisma, req.auth.userId));
+  } catch (error) {
+    logServerError("GET /billing/me error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to load billing" });
+  }
+});
+
+// Plans for the paywall: monthly always, lifetime only before BILLING_LIFETIME_OFFER_ENDS_AT.
+app.get("/billing/plans", (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  return res.json(billingPlans());
+});
+
+// Called by the app right after a purchase or restore, so VIP shows without waiting for the webhook.
+// Reads this owner's own state only; at most one RevenueCat read per owner every 10 seconds.
+app.post("/billing/sync", async (req, res) => {
+  if (Object.keys(req.body).length || Object.keys(req.query).length) return res.status(400).json({ error: "Invalid billing sync request" });
+  try {
+    const current = await prisma.subscriptionEntitlement.findUnique({ where: { userId: req.auth.userId }, select: { syncedAt: true } });
+    if (!current?.syncedAt || Date.now() - current.syncedAt.getTime() >= 10_000) await syncEntitlement(prisma, req.auth.userId);
+    return res.json(await billingSummary(prisma, req.auth.userId));
+  } catch (error) {
+    if (error?.code === "BILLING_NOT_CONFIGURED") return res.status(503).json({ error: "Billing is not available", code: error.code });
+    logServerError("POST /billing/sync error", { name: error?.name, code: error?.code, status: error?.status });
+    return res.status(502).json({ error: "Billing sync failed", code: "BILLING_PROVIDER_FAILED" });
+  }
+});
+
 app.get("/users/:userId/subscription", async (req, res) => {
   if (!requireOwnUser(req, res, req.params.userId)) return;
 
@@ -3549,8 +3597,9 @@ const fairyEvent = resolveFairyEvent({
 const position =
   getNonOverlappingPosition(existingFlowers);
 
+const flowerLimit = await dailyFlowerLimitFor(prisma, user.id);
 const createdFlower = await prisma.$transaction(async (tx) => {
-  if (!(await reserveFlowerPlanting(tx, { userId: user.id, localDate })).granted) return null;
+  if (!(await reserveFlowerPlanting(tx, { userId: user.id, localDate, limit: flowerLimit })).granted) return null;
   const checkIn = await tx.dailyCheckIn.create({
     data: {
       userId: user.id,
