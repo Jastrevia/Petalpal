@@ -42,7 +42,11 @@ const routes = [
   ["DELETE /users/:id", "requireOwnUser before transaction; deletion target is token/path-bound"],
   ["POST /billing/sync", "owner is req.auth.userId; empty body only; reads that owner's own RevenueCat state, at most once per 10 s"],
   ["POST /feedback", "owner is req.auth.userId; field allowlist and length limits; 5 per account per day"],
-  ["POST /moderation/feedback/:feedbackId", "behind the /moderation staff gate (MODERATOR_FIREBASE_UIDS); status/staffNote allowlist"]
+  ["POST /moderation/feedback/:feedbackId", "behind the /moderation staff gate (MODERATOR_FIREBASE_UIDS); status/staffNote allowlist"],
+  ["PUT /api/fairy/wardrobe", "owner is req.auth.userId; equipped body field only; each piece checked against lib/items.js access"],
+  ["POST /api/fairy/wardrobe/looks", "owner is req.auth.userId; name body field only; saves the owner's own worn pieces; at most 8"],
+  ["POST /api/fairy/wardrobe/looks/:lookId/wear", "owner is req.auth.userId; empty body; look looked up in the owner's own row"],
+  ["DELETE /api/fairy/wardrobe/looks/:lookId", "owner is req.auth.userId; look looked up in the owner's own row"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -53,7 +57,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 39);
+  assert.equal(routes.length, 43);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

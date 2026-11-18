@@ -171,6 +171,8 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
+import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -3109,6 +3111,55 @@ app.post("/billing/sync", async (req, res) => {
     if (error?.code === "BILLING_NOT_CONFIGURED") return res.status(503).json({ error: "Billing is not available", code: error.code });
     logServerError("POST /billing/sync error", { name: error?.name, code: error?.code, status: error?.status });
     return res.status(502).json({ error: "Billing sync failed", code: "BILLING_PROVIDER_FAILED" });
+  }
+});
+
+// Items and the fairy wardrobe (lib/items.js, lib/fairy-wardrobe.js, docs/items/ITEMS.md).
+const ownerLocale = async userId => (await prisma.user.findUnique({ where: { id: userId }, select: { preferredLocale: true } }))?.preferredLocale === "zh-Hans" ? "zh-Hans" : "en";
+function sendWardrobeError(res, error, context) {
+  if (error instanceof WardrobeError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Wardrobe unavailable" });
+}
+app.get("/api/items", async (req, res) => {
+  const type = req.query.type;
+  if (Object.keys(req.query).some(key => key !== "type") || (type !== undefined && !Object.hasOwn(ITEM_TYPES, type))) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const context = await itemContext(prisma, req.auth.userId);
+    return res.json({ items: catalogFor(context, { type, locale: await ownerLocale(req.auth.userId) }) });
+  } catch (error) { return sendWardrobeError(res, error, "GET /api/items"); }
+});
+app.get("/api/fairy/wardrobe", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await wardrobeFor(prisma, req.auth.userId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "GET /api/fairy/wardrobe"); }
+});
+app.put("/api/fairy/wardrobe", async (req, res) => {
+  if (Object.keys(req.body).some(key => key !== "equipped")) return res.status(400).json({ error: "Send { equipped: { slot: itemId } }" });
+  try { return res.json(await wearPieces(prisma, req.auth.userId, req.body.equipped, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "PUT /api/fairy/wardrobe"); }
+});
+app.post("/api/fairy/wardrobe/looks", async (req, res) => {
+  try { return res.status(201).json(await saveLook(prisma, req.auth.userId, req.body, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "POST /api/fairy/wardrobe/looks"); }
+});
+app.post("/api/fairy/wardrobe/looks/:lookId/wear", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try { return res.json(await wearLook(prisma, req.auth.userId, req.params.lookId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "POST /api/fairy/wardrobe/looks/wear"); }
+});
+app.delete("/api/fairy/wardrobe/looks/:lookId", async (req, res) => {
+  try { return res.json(await deleteLook(prisma, req.auth.userId, req.params.lookId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "DELETE /api/fairy/wardrobe/looks"); }
+});
+// A friend's fairy outfit, for drawing her in their Garden: same rule as reading their Garden.
+app.get("/users/:userId/fairy-outfit", async (req, res) => {
+  try {
+    const equipped = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => outfitFor(tx, req.params.userId));
+    return res.json({ equipped });
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendWardrobeError(res, error, "GET /users/:userId/fairy-outfit");
   }
 });
 

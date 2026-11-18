@@ -53,6 +53,8 @@ model User {
   subscriptionEntitlement SubscriptionEntitlement?
   billingTrialUses        BillingTrialUse[]
   appFeedback             AppFeedback[]
+  itemOwnerships          ItemOwnership[]
+  fairyWardrobe           FairyWardrobe?
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -1041,6 +1043,30 @@ model SubscriptionEntitlement {
   syncedAt               DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Items an account owns outright (lib/items.js): SHOP purchases and GRANT rewards. FREE, VIP and LEVEL
+/// items are checked live and never stored. Kept until the account is deleted.
+model ItemOwnership {
+  userId    String
+  itemId    String   @db.VarChar(48)
+  source    String   @db.VarChar(16)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+}
+
+/// The Garden Fairy's outfit (lib/fairy-wardrobe.js): equipped is { slot: itemId }; looks is a list of
+/// saved outfits [{ id, name, equipped }], at most 8.
+model FairyWardrobe {
+  userId    String   @id
+  equipped  Json     @default("{}")
+  looks     Json     @default("[]")
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
