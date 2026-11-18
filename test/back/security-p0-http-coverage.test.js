@@ -48,7 +48,8 @@ const routes = [
   ["POST /api/fairy/wardrobe/looks/:lookId/wear", "owner is req.auth.userId; empty body; look looked up in the owner's own row"],
   ["DELETE /api/fairy/wardrobe/looks/:lookId", "owner is req.auth.userId; look looked up in the owner's own row"],
   ["PUT /api/garden/layout", "owner is req.auth.userId; placements allowlist; each decoration usable and within its copies; at most 60"],
-  ["PUT /api/fairy/pets/:petId/home", "owner is req.auth.userId; known pet ids only; home body field only, inside the Garden world"]
+  ["PUT /api/fairy/pets/:petId/home", "owner is req.auth.userId; known pet ids only; home body field only, inside the Garden world"],
+  ["PUT /api/weather/location", "owner is req.auth.userId; location body field only; stored as a ~11 km grid point; null deletes it"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -59,7 +60,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 45);
+  assert.equal(routes.length, 46);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

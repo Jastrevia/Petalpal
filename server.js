@@ -176,6 +176,7 @@ import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, 
 import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
 import { deitySummary } from "./lib/flower-deity.js";
 import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
+import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -3223,6 +3224,33 @@ app.get("/users/:userId/pet-homes", async (req, res) => {
   } catch (error) {
     if (sendSocialError(res, error)) return;
     return sendPetHomeError(res, error, "GET /users/:userId/pet-homes");
+  }
+});
+
+// Live garden weather (lib/weather.js): opt-in, ~11 km grid point only; friends see the state, never the place.
+const weatherService = createWeatherService();
+function sendWeatherError(res, error, context) {
+  if (error instanceof WeatherError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Weather unavailable" });
+}
+app.get("/api/weather", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await gardenWeather(prisma, weatherService, req.auth.userId)); }
+  catch (error) { return sendWeatherError(res, error, "GET /api/weather"); }
+});
+app.put("/api/weather/location", async (req, res) => {
+  try {
+    await setWeatherLocation(prisma, req.auth.userId, req.body);
+    return res.json(await gardenWeather(prisma, weatherService, req.auth.userId));
+  } catch (error) { return sendWeatherError(res, error, "PUT /api/weather/location"); }
+});
+app.get("/users/:userId/weather", async (req, res) => {
+  try {
+    return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => gardenWeather(tx, weatherService, req.params.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendWeatherError(res, error, "GET /users/:userId/weather");
   }
 });
 

@@ -1,5 +1,13 @@
 # PetalPal Security
 
+## Garden items, DIY, pet homes and live weather, 2026-11-18
+
+Local branch `feat/w27-backend`; not deployed.
+
+- **Items** (`lib/items.js`): access is decided only on the server (FREE, VIP live, Fairy Bond level, owned SHOP/GRANT rows). Shop items are granted only from RevenueCat's API during billing sync, never from a request body. Every write (`PUT /api/fairy/wardrobe`, looks, `PUT /api/garden/layout`, `PUT /api/fairy/pets/:petId/home`) is scoped to `req.auth.userId` with body allowlists. Friend reads (`/users/:userId/fairy-outfit`, `garden-layout`, `pet-homes`, `weather`) use the same `withSocialAuthorization` rule as the Garden.
+- **Weather location** (`lib/weather.js`): opt-in; only a one-decimal grid point (~11 km) is stored and sent to MET Norway; friends get the weather state, never coordinates; turning it off deletes the row; cascade on account deletion. MET is never called without `WEATHER_USER_AGENT`. **Open:** privacy policy wording.
+- **Evidence.** `test/back/items-wardrobe.test.js`, `garden-layout.test.js`, `deity-pet-homes.test.js`, `weather.test.js`. No live MET call was made.
+
 ## In-app feedback and the Staff page, 2026-11-18
 
 Local branch `feat/w27-backend`; not deployed.

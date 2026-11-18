@@ -56,6 +56,7 @@ model User {
   itemOwnerships          ItemOwnership[]
   fairyWardrobe           FairyWardrobe?
   gardenLayout            GardenLayout?
+  weatherLocation         WeatherLocation?
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -1081,6 +1082,17 @@ model GardenLayout {
   userId     String   @id
   placements Json     @default("[]")
   updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Live garden weather opt-in (lib/weather.js): a ~11 km grid point only (one decimal of lat/lon),
+/// never an exact position. Deleted when the owner turns weather off or deletes the account.
+model WeatherLocation {
+  userId    String   @id
+  lat       Float
+  lon       Float
+  updatedAt DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
