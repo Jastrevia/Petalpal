@@ -179,6 +179,7 @@ import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
 import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
 import { finishTea, startTea, TeaError, teaState } from "./lib/fairy-tea.js";
 import { cancelGathering, createGathering, GatheringError, gardenVisitorLimit, listGatherings, respondToGathering } from "./lib/gatherings.js";
+import { choosePersona, PersonaError, personaSummary } from "./lib/fairy-persona.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -2095,7 +2096,7 @@ app.get("/api/fairy/runtime", async (req, res) => {
     res.json(result);
     if (captionsEnabled) {
       // After the response: a slow or failed caption never delays the garden.
-      void fairyMomentCaptionFiller({ prisma, ownerId: req.auth.userId })
+      void fairyMomentCaptionFiller({ prisma, ownerId: req.auth.userId, gardenContext: () => fairyGardenContext(req.auth.userId) })
         .catch((error) => logServerError("Fairy Moment caption fill failed", error));
     }
   } catch (error) {
@@ -3334,6 +3335,28 @@ app.get("/api/visits/:hostUserId/fairies", async (req, res) => {
     logServerError("GET /api/visits/:hostUserId/fairies error", { name: error?.name, code: error?.code });
     return res.status(500).json({ error: "Visitors unavailable" });
   }
+});
+
+// Fairy persona (lib/fairy-persona.js) and the garden she posts about: today's weather state and the month's deity.
+async function fairyGardenContext(userId) {
+  const [weather, user] = await Promise.all([gardenWeather(prisma, weatherService, userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, createdAt: true } })]);
+  const deity = user ? deitySummary({ timezone: user.timezone, createdAt: user.createdAt }).deity : null;
+  return { weather: weather.enabled ? weather.state : null, deity: deity?.flower ?? null };
+}
+function sendPersonaError(res, error, context) {
+  if (error instanceof PersonaError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Persona unavailable" });
+}
+app.get("/api/fairy/persona", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await personaSummary(prisma, req.auth.userId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendPersonaError(res, error, "GET /api/fairy/persona"); }
+});
+app.put("/api/fairy/persona", async (req, res) => {
+  try { return res.json(await choosePersona(prisma, req.auth.userId, req.body, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendPersonaError(res, error, "PUT /api/fairy/persona"); }
 });
 
 // Help & Feedback form (lib/app-feedback.js). Owner is the signed-in account; 5 per day.

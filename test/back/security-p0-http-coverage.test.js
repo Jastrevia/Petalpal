@@ -54,7 +54,8 @@ const routes = [
   ["POST /api/fairy/tea/:sessionId/finish", "owner is req.auth.userId; empty body; session scoped to the owner; minimum brew time; Bond award keyed by session"],
   ["POST /api/gatherings", "hostId is req.auth.userId; field allowlist; guests must be friends and not blocked; host allows visits; content check on title"],
   ["POST /api/gatherings/:gatheringId/respond", "only the invited req.auth.userId may answer; accept boolean only"],
-  ["POST /api/gatherings/:gatheringId/cancel", "only the host (req.auth.userId) may cancel; empty body"]
+  ["POST /api/gatherings/:gatheringId/cancel", "only the host (req.auth.userId) may cancel; empty body"],
+  ["PUT /api/fairy/persona", "owner's active fairy only (req.auth.userId); personaId allowlist; once per 30 days"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -65,7 +66,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 51);
+  assert.equal(routes.length, 52);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

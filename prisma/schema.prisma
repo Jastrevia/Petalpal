@@ -336,6 +336,9 @@ model UserFairy {
   momentsAvatar String?   @db.VarChar(32)
   /// Cover-library id (lib/moment-covers.js) at the top of her Moments; null = default photo.
   momentsCover  String?   @db.VarChar(32)
+  /// Persona the owner chose (lib/fairy-persona.js); null: picked from the fairy id. Changed at most every 30 days.
+  personaId        String?   @db.VarChar(24)
+  personaChangedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
