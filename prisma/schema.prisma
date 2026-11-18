@@ -57,6 +57,9 @@ model User {
   fairyWardrobe           FairyWardrobe?
   gardenLayout            GardenLayout?
   weatherLocation         WeatherLocation?
+  fairyTeaSessions        FairyTeaSession[]
+  hostedGatherings        Gathering[]
+  gatheringInvites        GatheringInvite[]
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -1095,6 +1098,55 @@ model WeatherLocation {
   updatedAt DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Tea house interaction (lib/fairy-tea.js): STARTED -> FINISHED (after the minimum brew time) or EXPIRED.
+/// localDate is the account-local day the tea was started, for the daily limit.
+model FairyTeaSession {
+  id         String    @id @default(cuid())
+  userId     String
+  drink      String    @db.VarChar(24)
+  localDate  String    @db.VarChar(10)
+  status     String    @db.VarChar(10)
+  startedAt  DateTime
+  finishedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, startedAt])
+  @@index([userId, localDate])
+}
+
+/// A one-hour garden gathering in the host's Garden (lib/gatherings.js). status: SCHEDULED or CANCELED.
+model Gathering {
+  id        String   @id @default(cuid())
+  hostId    String
+  kind      String   @db.VarChar(16)
+  title     String?  @db.VarChar(60)
+  startsAt  DateTime
+  endsAt    DateTime
+  status    String   @default("SCHEDULED") @db.VarChar(12)
+  createdAt DateTime @default(now())
+
+  host    User              @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  invites GatheringInvite[]
+
+  @@index([hostId, endsAt])
+  @@index([endsAt])
+}
+
+/// A friend invited to a gathering: INVITED, ACCEPTED or DECLINED.
+model GatheringInvite {
+  gatheringId String
+  userId      String
+  status      String   @default("INVITED") @db.VarChar(10)
+  updatedAt   DateTime @updatedAt
+
+  gathering Gathering @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([gatheringId, userId])
+  @@index([userId])
 }
 
 /// Feedback sent from the app's Help & Feedback form (lib/app-feedback.js), read by staff in the staff page.

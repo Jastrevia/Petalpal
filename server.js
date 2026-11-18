@@ -177,6 +177,8 @@ import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
 import { deitySummary } from "./lib/flower-deity.js";
 import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
 import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
+import { finishTea, startTea, TeaError, teaState } from "./lib/fairy-tea.js";
+import { cancelGathering, createGathering, GatheringError, gardenVisitorLimit, listGatherings, respondToGathering } from "./lib/gatherings.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -3254,6 +3256,86 @@ app.get("/users/:userId/weather", async (req, res) => {
   }
 });
 
+// Tea house tap-to-interact (lib/fairy-tea.js): server-checked brew time, cooldown and daily limit.
+function sendTeaError(res, error, context) {
+  if (error instanceof TeaError) return res.status(error.status).json({ error: error.message, code: error.code, ...error.extra });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Tea house unavailable" });
+}
+app.get("/api/fairy/tea", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await teaState(prisma, req.auth.userId)); }
+  catch (error) { return sendTeaError(res, error, "GET /api/fairy/tea"); }
+});
+app.post("/api/fairy/tea", async (req, res) => {
+  try { return res.status(201).json({ session: await startTea(prisma, req.auth.userId, req.body) }); }
+  catch (error) { return sendTeaError(res, error, "POST /api/fairy/tea"); }
+});
+app.post("/api/fairy/tea/:sessionId/finish", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try { return res.json(await finishTea(prisma, req.auth.userId, req.params.sessionId)); }
+  catch (error) { return sendTeaError(res, error, "POST /api/fairy/tea/finish"); }
+});
+
+// Garden gatherings (lib/gatherings.js) and everyone's fairies in one Garden.
+function sendGatheringError(res, error, context) {
+  if (error instanceof GatheringError) return res.status(error.status).json({ error: error.message, code: error.code });
+  if (error?.code === CONTENT_REJECTED) return res.status(422).json({ error: "Please choose a different title", code: CONTENT_REJECTED });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Gatherings unavailable" });
+}
+const notifyGathering = gathering => {
+  for (const id of [gathering.host.id, ...gathering.guests.map(guest => guest.id)]) {
+    realtime.to(`user:${id}`).emit("gatheringUpdated", { gatheringId: gathering.id, status: gathering.status });
+  }
+};
+app.get("/api/gatherings", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json({ gatherings: await listGatherings(prisma, req.auth.userId), visitorLimit: gardenVisitorLimit() }); }
+  catch (error) { return sendGatheringError(res, error, "GET /api/gatherings"); }
+});
+app.post("/api/gatherings", async (req, res) => {
+  try {
+    const gathering = await createGathering(prisma, req.auth.userId, req.body, { assertText: assertSocialContent });
+    notifyGathering(gathering);
+    return res.status(201).json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings"); }
+});
+app.post("/api/gatherings/:gatheringId/respond", async (req, res) => {
+  try {
+    const gathering = await respondToGathering(prisma, req.auth.userId, req.params.gatheringId, req.body);
+    notifyGathering(gathering);
+    return res.json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings/respond"); }
+});
+app.post("/api/gatherings/:gatheringId/cancel", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try {
+    const gathering = await cancelGathering(prisma, req.auth.userId, req.params.gatheringId);
+    notifyGathering(gathering);
+    return res.json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings/cancel"); }
+});
+// The host's fairy and every visitor's fairy now in that Garden, dressed, for drawing them together.
+// Only someone allowed in that Garden (the host or a friend) may ask.
+app.get("/api/visits/:hostUserId/fairies", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const fairies = await withSocialAuthorization(prisma, req.params.hostUserId, req.auth.userId, async tx => {
+      const garden = await tx.garden.findUnique({ where: { ownerId: req.params.hostUserId }, select: { id: true } });
+      const visitors = garden ? getActiveVisitors(garden.id) : [];
+      const host = await tx.user.findUnique({ where: { id: req.params.hostUserId }, select: { id: true, name: true, avatar: true } });
+      const people = [{ ...host, role: "HOST" }, ...visitors.map(visitor => ({ id: visitor.visitorId, name: visitor.name, avatar: visitor.avatar, role: "VISITOR", x: visitor.x, y: visitor.y }))];
+      return Promise.all(people.map(async person => ({ ...person, outfit: await outfitFor(tx, person.id) })));
+    });
+    return res.json(filterSocialPayload({ fairies, visitorLimit: gardenVisitorLimit() }, await hiddenSocialIds(prisma, req.auth.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    logServerError("GET /api/visits/:hostUserId/fairies error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Visitors unavailable" });
+  }
+});
+
 // Help & Feedback form (lib/app-feedback.js). Owner is the signed-in account; 5 per day.
 app.post("/feedback", async (req, res) => {
   if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
@@ -4173,6 +4255,8 @@ app.post("/visit", async (req, res) => {
         existing.avatar = visitor.avatar || "🦋";
         existing.name = visitor.name;
       } else {
+        // Garden capacity from the group-visit capacity test (lib/gatherings.js gardenVisitorLimit).
+        if (visitors.length >= gardenVisitorLimit()) throw new SocialAccessError("This Garden is full right now", 409);
         visitors.push({
           visitorId: visitor.id,
           name: visitor.name,

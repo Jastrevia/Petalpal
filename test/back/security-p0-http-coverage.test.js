@@ -49,7 +49,12 @@ const routes = [
   ["DELETE /api/fairy/wardrobe/looks/:lookId", "owner is req.auth.userId; look looked up in the owner's own row"],
   ["PUT /api/garden/layout", "owner is req.auth.userId; placements allowlist; each decoration usable and within its copies; at most 60"],
   ["PUT /api/fairy/pets/:petId/home", "owner is req.auth.userId; known pet ids only; home body field only, inside the Garden world"],
-  ["PUT /api/weather/location", "owner is req.auth.userId; location body field only; stored as a ~11 km grid point; null deletes it"]
+  ["PUT /api/weather/location", "owner is req.auth.userId; location body field only; stored as a ~11 km grid point; null deletes it"],
+  ["POST /api/fairy/tea", "owner is req.auth.userId; drink allowlist; one open session, cooldown and daily limit under an advisory lock"],
+  ["POST /api/fairy/tea/:sessionId/finish", "owner is req.auth.userId; empty body; session scoped to the owner; minimum brew time; Bond award keyed by session"],
+  ["POST /api/gatherings", "hostId is req.auth.userId; field allowlist; guests must be friends and not blocked; host allows visits; content check on title"],
+  ["POST /api/gatherings/:gatheringId/respond", "only the invited req.auth.userId may answer; accept boolean only"],
+  ["POST /api/gatherings/:gatheringId/cancel", "only the host (req.auth.userId) may cancel; empty body"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -60,7 +65,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 46);
+  assert.equal(routes.length, 51);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

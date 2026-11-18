@@ -104,7 +104,8 @@
     { "source": "EVENT", "count": 2, "dailyCap": 3, "points": 10, "pointsEach": 5 },
     { "source": "MOMENT_LIKE", "count": 0, "dailyCap": 3, "points": 0, "pointsEach": 2 },
     { "source": "FAIRY_TAP", "count": 1, "dailyCap": 5, "points": 1, "pointsEach": 1 },
-    { "source": "WEEKLY_READ", "count": 0, "dailyCap": 1, "points": 0, "pointsEach": 15 }
+    { "source": "WEEKLY_READ", "count": 0, "dailyCap": 1, "points": 0, "pointsEach": 15 },
+    { "source": "TEA", "count": 0, "dailyCap": 3, "points": 0, "pointsEach": 3 }
   ],
   "checkIn": { "checkedInToday": true, "streak": 7, "cycleDay": 7, "graceAvailable": true, "checkInsToStreakReward": 7 },
   "monthly": { "month": "2026-10", "checkIns": 7, "needed": 20, "earned": false,
