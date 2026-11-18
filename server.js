@@ -174,6 +174,8 @@ import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
 import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
 import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
 import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
+import { deitySummary } from "./lib/flower-deity.js";
+import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
 import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
@@ -3186,6 +3188,41 @@ app.get("/users/:userId/garden-layout", async (req, res) => {
   } catch (error) {
     if (sendSocialError(res, error)) return;
     return sendLayoutError(res, error, "GET /users/:userId/garden-layout");
+  }
+});
+
+// Monthly flower deity (lib/flower-deity.js) and pet homes (lib/pet-homes.js), by the owner's local clock.
+app.get("/api/garden/deity", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { timezone: true, createdAt: true, preferredLocale: true } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.json(deitySummary({ timezone: user.timezone, createdAt: user.createdAt, locale: user.preferredLocale }));
+  } catch (error) {
+    logServerError("GET /api/garden/deity error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Deity unavailable" });
+  }
+});
+function sendPetHomeError(res, error, context) {
+  if (error instanceof PetHomeError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Pet homes unavailable" });
+}
+app.get("/api/fairy/pets/homes", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await petHomesFor(prisma, req.auth.userId)); }
+  catch (error) { return sendPetHomeError(res, error, "GET /api/fairy/pets/homes"); }
+});
+app.put("/api/fairy/pets/:petId/home", async (req, res) => {
+  try { return res.json(await placePetHome(prisma, req.auth.userId, req.params.petId, req.body)); }
+  catch (error) { return sendPetHomeError(res, error, "PUT /api/fairy/pets/:petId/home"); }
+});
+app.get("/users/:userId/pet-homes", async (req, res) => {
+  try {
+    return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => petHomesFor(tx, req.params.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendPetHomeError(res, error, "GET /users/:userId/pet-homes");
   }
 });
 
