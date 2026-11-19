@@ -8,6 +8,9 @@ COPY package*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 COPY lib/database-isolation.js lib/native-security.js ./lib/
+# onnxruntime-node (an indirect dependency) downloads CUDA GPU binaries from GitHub on Linux x64;
+# that download now 404s and the server only uses the CPU build, so skip it.
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
 # Build-only synthetic URL: generate Prisma, never connect or migrate.
 RUN NODE_ENV=production DATABASE_URL=postgresql://build:build@localhost:5432/petalpal_build npm ci --include=dev --no-audit --no-fund
 COPY lib ./lib
