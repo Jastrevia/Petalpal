@@ -66,6 +66,15 @@
   const petalZh = preferredLocale === 'zh-Hans';
   const petalTopics = [['FORTUNE', 'Today’s guidance', '今日指引'], ['DIRECTION', 'The way ahead', '接下来的方向'], ['LOVE', 'Love', '感情'],
     ['WORK', 'Work & study', '工作与学习'], ['PEOPLE', 'People around you', '人际关系']].map(([id, en, zh]) => ({ id, label: petalZh ? zh : en }));
+  // Synthetic staff data for the Staff page preview.
+  const staffFeedback = [{ id: 'fbpreview0000', kind: 'BUG', subject: 'Swing stops', message: 'The swing stopped moving after I opened the mailbox twice.', replyEmail: null,
+    route: '/', appVersion: '1.0.0', platform: 'ios', status: 'NEW', staffNote: null, createdAt: '2026-11-17T18:20:00.000Z', reviewedAt: null,
+    user: { name: 'Lily', accountId: 'PP20481024' } }];
+  let staffReports = [{ id: 'rpreview01', category: 'HARASSMENT', status: 'PENDING', createdAt: '2026-11-17T21:05:00.000Z', aiOutputKind: null, aiOutputId: null,
+    reportedUserId: 'user_preview_mallory', messageId: 'mpreview01', message: { id: 'mpreview01', text: 'A rude synthetic garden message', author: 'Mallory' },
+    reportedUser: { id: 'user_preview_mallory', name: 'Mallory', accountId: 'PP99990001' } },
+    { id: 'rpreview02', category: 'OTHER', status: 'PENDING', createdAt: '2026-11-18T02:40:00.000Z', aiOutputKind: 'weekly', aiOutputId: 'wpreview01',
+    reportedUserId: null, messageId: null, message: null, reportedUser: null }];
   let redemptions = [];
   // Avatars (lib/avatar-collection.js rules), kept for this tab so a reload keeps them; a new tab
   // starts with the welcome choice. ?bondLevel=N (1–20, default 2) sets the preview Fairy Bond level.
@@ -546,6 +555,34 @@
         }
         return json(tourView(), 200, 150);
       }
+      // Feedback and the team-only Staff page (lib/app-feedback.js). The preview account is staff unless
+      // sessionStorage 'petalpal-preview-staff' is 'off', so both views can be checked.
+      const staffOn = (() => { try { return sessionStorage.getItem('petalpal-preview-staff') !== 'off'; } catch { return true; } })();
+      if (p === '/feedback' && method === 'POST') {
+        const item = { id: `fbpreview${String(staffFeedback.length + 1).padStart(4, '0')}`, kind: String(request.category).toUpperCase(), subject: request.subject || null,
+          message: request.message, replyEmail: request.email || null, route: request.route || null, appVersion: request.clientVersion || null,
+          platform: request.platform || null, status: 'NEW', staffNote: null, createdAt: new Date().toISOString(), reviewedAt: null,
+          user: { name: user.name, accountId: user.accountId } };
+        staffFeedback.unshift(item);
+        return json({ id: item.id, receivedAt: item.createdAt }, 201, 400);
+      }
+      if (p.startsWith('/moderation/') && !staffOn) return json({ error: 'Moderator access required' }, 403);
+      if (p === '/moderation/me') return json({ staff: true });
+      if (p === '/moderation/feedback') {
+        const status = url.searchParams.get('status');
+        const counts = { NEW: 0, READ: 0, DONE: 0 }; staffFeedback.forEach(item => { counts[item.status] += 1; });
+        return json({ items: staffFeedback.filter(item => !status || item.status === status), counts, nextBefore: null });
+      }
+      const feedbackItem = p.match(/^\/moderation\/feedback\/([^/]+)$/);
+      if (feedbackItem && method === 'POST') {
+        const item = staffFeedback.find(row => row.id === feedbackItem[1]);
+        if (!item) return json({ error: 'Feedback not found' }, 404);
+        Object.assign(item, request, request.status ? { reviewedAt: request.status === 'NEW' ? null : new Date().toISOString() } : {});
+        return json({ success: true });
+      }
+      if (p === '/moderation/reports') return json(staffReports);
+      const reportAction = p.match(/^\/moderation\/reports\/([^/]+)$/);
+      if (reportAction && method === 'POST') { staffReports = staffReports.filter(report => report.id !== reportAction[1]); return json({ success: true }); }
       if (method !== 'GET') return json({ ok: true });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
       if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: plantedToday, remaining: Math.max(0, 2 - plantedToday) });

@@ -20,6 +20,9 @@ const COPY = {
       dismiss: 'Dismiss', 'review-ai': 'Reviewed', 'remove-message': 'Remove message', 'restrict-user': 'Restrict player', 'restore-user': 'Restore player'
     } as Record<ReportAction, string>,
     kinds: { BUG: 'Bug', FEATURE: 'Idea', GENERAL: 'General', AI_CONCERN: 'AI concern', OTHER: 'Other' } as Record<string, string>,
+    categories: { HARASSMENT: 'Harassment', HATE_SPEECH: 'Hate speech', SELF_HARM: 'Self-harm', SPAM: 'Spam', PRIVACY: 'Privacy', OTHER: 'Other' } as Record<string, string>,
+    confirm: 'Tap again to confirm',
+    aiKinds: { event: 'Event', emotion: 'Emotion label', weekly: 'Weekly report', monthly: 'Monthly report', yearly: 'Yearly report' } as Record<string, string>,
   },
   'zh-Hans': {
     title: '员工页面', subtitle: '玩家的反馈和举报', close: '关闭', feedback: '反馈', reports: '举报',
@@ -30,6 +33,9 @@ const COPY = {
       dismiss: '驳回', 'review-ai': '已检查', 'remove-message': '删除留言', 'restrict-user': '限制该玩家', 'restore-user': '恢复该玩家'
     } as Record<ReportAction, string>,
     kinds: { BUG: '问题', FEATURE: '建议', GENERAL: '一般', AI_CONCERN: 'AI 问题', OTHER: '其他' } as Record<string, string>,
+    categories: { HARASSMENT: '骚扰', HATE_SPEECH: '仇恨言论', SELF_HARM: '自我伤害', SPAM: '垃圾信息', PRIVACY: '隐私', OTHER: '其他' } as Record<string, string>,
+    confirm: '再点一次确认',
+    aiKinds: { event: '事件', emotion: '情绪标签', weekly: '周报', monthly: '月报', yearly: '年报' } as Record<string, string>,
   },
 };
 type Copy = typeof COPY.en;
@@ -101,6 +107,8 @@ function FeedbackList({ copy, theme, locale }: { copy: Copy; theme: Theme; local
     try {
       await updateFeedback(item.id, update);
       setItems(current => current?.map(row => row.id === item.id ? { ...row, ...update } : row) ?? null);
+      // A status change moves the item between filters and changes the counts: reload this list.
+      if (update.status) await load(filter);
     } catch { setFailed(true); }
   };
   return <View style={styles.list}>
@@ -144,12 +152,21 @@ function ReportList({ copy, theme, locale }: { copy: Copy; theme: Theme; locale:
   const [reports, setReports] = useState<StaffReport[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // Removing a message and restricting a player need a second tap within a few seconds.
+  const [armed, setArmed] = useState<string | null>(null);
   const load = useCallback(async () => {
     setFailed(false);
     try { setReports(await loadReports()); } catch { setFailed(true); }
   }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const act = async (report: StaffReport, action: ReportAction) => {
+    const key = `${report.id}:${action}`;
+    if ((action === 'remove-message' || action === 'restrict-user') && armed !== key) {
+      setArmed(key);
+      setTimeout(() => setArmed(current => current === key ? null : current), 4000);
+      return;
+    }
+    setArmed(null);
     setBusy(report.id);
     try { await actOnReport(report.id, action); setReports(current => current?.filter(row => row.id !== report.id) ?? null); }
     catch { setFailed(true); }
@@ -163,15 +180,16 @@ function ReportList({ copy, theme, locale }: { copy: Copy; theme: Theme; locale:
       const actions: ReportAction[] = report.aiOutputKind ? ['review-ai', 'dismiss']
         : [...(report.messageId ? ['remove-message' as const] : []), 'restrict-user', 'restore-user', 'dismiss'];
       return <View key={report.id} style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.cardHead, { color: theme.text }]}>{report.category} · {when(report.createdAt, locale)}</Text>
-        {report.aiOutputKind ? <Text style={[styles.meta, { color: theme.muted }]}>{copy.ai}: {report.aiOutputKind} · {report.aiOutputId}</Text> : null}
+        <Text style={[styles.cardHead, { color: theme.text }]}>{copy.categories[report.category] ?? report.category} · {when(report.createdAt, locale)}</Text>
+        {report.aiOutputKind ? <Text style={[styles.meta, { color: theme.muted }]}>{copy.ai}: {copy.aiKinds[report.aiOutputKind] ?? report.aiOutputKind} · {report.aiOutputId}</Text> : null}
         {report.reportedUser ? <Text style={[styles.meta, { color: theme.muted }]}>{copy.user}: {report.reportedUser.name ?? '—'} · {report.reportedUser.accountId ?? ''}</Text> : null}
         {report.message ? <>
           <Text style={[styles.meta, { color: theme.muted }]}>{copy.message}</Text>
           <Text selectable style={[styles.body, { color: theme.text }]}>{report.message.text}</Text>
         </> : null}
         <View style={styles.row}>
-          {actions.map(action => <Chip key={action} label={copy.actions[action]} disabled={busy === report.id} onPress={() => void act(report, action)} theme={theme} />)}
+          {actions.map(action => <Chip key={action} label={armed === `${report.id}:${action}` ? copy.confirm : copy.actions[action]}
+            active={armed === `${report.id}:${action}`} disabled={busy === report.id} onPress={() => void act(report, action)} theme={theme} />)}
         </View>
       </View>;
     })}

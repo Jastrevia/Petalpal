@@ -44,7 +44,7 @@ const FORM_COPY = {
     tooBig: 'Image attachment must be smaller than 5 MB.', failed: 'Something went wrong while recording feedback.',
     emailOpened: `Your email app opened with your feedback to ${FEEDBACK_EMAIL}. Press Send there to deliver it. Your draft stays here until you discard it.`,
     viaEmail: `Sent by email to ${FEEDBACK_EMAIL}. To add a screenshot, attach it in your email app.`,
-    viaApp: 'Sent straight to the PetalPal team. Screenshots can not be attached yet.',
+    viaApp: 'Sent straight to the PetalPal team. Screenshots cannot be attached yet.',
     received: (ref?: string) => `Thank you, the team has your feedback${ref ? ` (#${ref})` : ''}.`,
     categories: { bug: 'Bug Report', feature: 'Feature Suggestion', general: 'General Feedback', ai_concern: 'AI Response Concern', other: 'Other' } as Record<string, string> },
   'zh-Hans': { title: '发送反馈', subtitle: '你的想法会让花园长得更好。', back: '‹ 返回', close: '关闭',
