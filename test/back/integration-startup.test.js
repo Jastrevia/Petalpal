@@ -77,4 +77,7 @@ test('integration startup propagates backend failure through npm', () => {
 test('integration startup script is included in the backend image and its allowlisted context', () => {
   assert.match(read('Dockerfile.backend'), /^COPY scripts\/ai-worker\.js scripts\/start-integration-backend\.sh \.\/scripts\/$/m);
   assert.ok(read('Dockerfile.backend.dockerignore').split('\n').includes('!scripts/start-integration-backend.sh'));
+  // lib/items.js reads the item catalog at start-up; without it in the image the server cannot start.
+  assert.match(read('Dockerfile.backend'), /^COPY data\/items\/catalog\.json \.\/data\/items\/catalog\.json$/m);
+  assert.ok(read('Dockerfile.backend.dockerignore').split('\n').includes('!data/items/catalog.json'));
 });

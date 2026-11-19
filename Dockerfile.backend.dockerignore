@@ -13,6 +13,8 @@
 !data/
 !data/flowerDB.js
 !data/mood-model.json
+!data/items/
+!data/items/catalog.json
 !docs/
 !docs/openapi.yaml
 !scripts/
