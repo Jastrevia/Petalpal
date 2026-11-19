@@ -211,6 +211,20 @@ const accountDeletionRateLimit = rateLimit({
   keyGenerator: req => req.auth?.userId || ipKeyGenerator(req.ip || ""),
   handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many attempts. Wait a few minutes, then try again.", code: "RATE_LIMITED" })
 });
+// The RevenueCat webhook sits before user authentication and the app's own admission limiter, so it gets its
+// own per-IP bound. RevenueCat sends few calls and retries on 429.
+const billingWebhookRateLimit = rateLimit({
+  windowMs: 60 * 1000, limit: 120, standardHeaders: false, legacyHeaders: false, validate: false,
+  keyGenerator: req => ipKeyGenerator(req.ip || ""),
+  handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many requests", code: "RATE_LIMITED" })
+});
+// Reads of a friend's Garden data (outfit, layout, pet homes, weather, visiting fairies): per account, on top of
+// the app's own admission and general limiters, in express-rate-limit so code scanning sees the routes are limited.
+const friendGardenReadRateLimit = rateLimit({
+  windowMs: 60 * 1000, limit: 120, standardHeaders: false, legacyHeaders: false, validate: false,
+  keyGenerator: req => req.auth?.userId || ipKeyGenerator(req.ip || ""),
+  handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many requests. Wait a moment, then try again.", code: "RATE_LIMITED" })
+});
 const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit, passwordChange: passwordChangeRateLimit } = rateLimiters();
 
 app.use((req, res, next) => {
@@ -436,7 +450,7 @@ app.post("/internal/ai-jobs/:id/execute", async (req, res) => {
 // RevenueCat webhook (docs/billing/BILLING.md). Not a user request: the shared Authorization value is
 // checked first, and the body only names which accounts to re-read; their state always comes from
 // RevenueCat's API, so a forged or replayed body cannot grant VIP. Non-200 makes RevenueCat retry.
-app.post("/billing/webhooks/revenuecat", async (req, res) => {
+app.post("/billing/webhooks/revenuecat", billingWebhookRateLimit, async (req, res) => {
   if (!revenueCatWebhookAuthorized(req.get("Authorization"))) return res.status(401).json({ error: "Unauthorized" });
   const userIds = webhookUserIds(req.body);
   try {
@@ -3160,7 +3174,7 @@ app.delete("/api/fairy/wardrobe/looks/:lookId", async (req, res) => {
   catch (error) { return sendWardrobeError(res, error, "DELETE /api/fairy/wardrobe/looks"); }
 });
 // A friend's fairy outfit, for drawing her in their Garden: same rule as reading their Garden.
-app.get("/users/:userId/fairy-outfit", async (req, res) => {
+app.get("/users/:userId/fairy-outfit", friendGardenReadRateLimit, async (req, res) => {
   try {
     const equipped = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => outfitFor(tx, req.params.userId));
     return res.json({ equipped });
@@ -3185,7 +3199,7 @@ app.put("/api/garden/layout", async (req, res) => {
   try { return res.json(await saveLayout(prisma, req.auth.userId, req.body)); }
   catch (error) { return sendLayoutError(res, error, "PUT /api/garden/layout"); }
 });
-app.get("/users/:userId/garden-layout", async (req, res) => {
+app.get("/users/:userId/garden-layout", friendGardenReadRateLimit, async (req, res) => {
   try {
     const layout = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => layoutFor(tx, req.params.userId));
     return res.json({ placements: layout.placements, world: layout.world });
@@ -3221,7 +3235,7 @@ app.put("/api/fairy/pets/:petId/home", async (req, res) => {
   try { return res.json(await placePetHome(prisma, req.auth.userId, req.params.petId, req.body)); }
   catch (error) { return sendPetHomeError(res, error, "PUT /api/fairy/pets/:petId/home"); }
 });
-app.get("/users/:userId/pet-homes", async (req, res) => {
+app.get("/users/:userId/pet-homes", friendGardenReadRateLimit, async (req, res) => {
   try {
     return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => petHomesFor(tx, req.params.userId)));
   } catch (error) {
@@ -3248,7 +3262,7 @@ app.put("/api/weather/location", async (req, res) => {
     return res.json(await gardenWeather(prisma, weatherService, req.auth.userId));
   } catch (error) { return sendWeatherError(res, error, "PUT /api/weather/location"); }
 });
-app.get("/users/:userId/weather", async (req, res) => {
+app.get("/users/:userId/weather", friendGardenReadRateLimit, async (req, res) => {
   try {
     return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => gardenWeather(tx, weatherService, req.params.userId)));
   } catch (error) {
@@ -3319,7 +3333,7 @@ app.post("/api/gatherings/:gatheringId/cancel", async (req, res) => {
 });
 // The host's fairy and every visitor's fairy now in that Garden, dressed, for drawing them together.
 // Only someone allowed in that Garden (the host or a friend) may ask.
-app.get("/api/visits/:hostUserId/fairies", async (req, res) => {
+app.get("/api/visits/:hostUserId/fairies", friendGardenReadRateLimit, async (req, res) => {
   if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
   try {
     const fairies = await withSocialAuthorization(prisma, req.params.hostUserId, req.auth.userId, async tx => {
