@@ -13,6 +13,7 @@ RUN NODE_ENV=production DATABASE_URL=postgresql://build:build@localhost:5432/pet
 COPY lib ./lib
 COPY server.js moodClassifier.js ./
 COPY data/flowerDB.js data/mood-model.json ./data/
+COPY data/items/catalog.json ./data/items/catalog.json
 COPY docs/openapi.yaml ./docs/openapi.yaml
 COPY scripts/ai-worker.js scripts/start-integration-backend.sh ./scripts/
 EXPOSE 3000
