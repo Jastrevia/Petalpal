@@ -171,6 +171,17 @@ import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
 import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
+import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
+import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
+import { deitySummary } from "./lib/flower-deity.js";
+import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
+import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
+import { finishTea, startTea, TeaError, teaState } from "./lib/fairy-tea.js";
+import { cancelGathering, createGathering, GatheringError, gardenVisitorLimit, listGatherings, respondToGathering } from "./lib/gatherings.js";
+import { choosePersona, PersonaError, personaSummary } from "./lib/fairy-persona.js";
+import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./lib/app-feedback.js";
+import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
 
@@ -199,6 +210,20 @@ const accountDeletionRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: false, legacyHeaders: false, validate: false,
   keyGenerator: req => req.auth?.userId || ipKeyGenerator(req.ip || ""),
   handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many attempts. Wait a few minutes, then try again.", code: "RATE_LIMITED" })
+});
+// The RevenueCat webhook sits before user authentication and the app's own admission limiter, so it gets its
+// own per-IP bound. RevenueCat sends few calls and retries on 429.
+const billingWebhookRateLimit = rateLimit({
+  windowMs: 60 * 1000, limit: 120, standardHeaders: false, legacyHeaders: false, validate: false,
+  keyGenerator: req => ipKeyGenerator(req.ip || ""),
+  handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many requests", code: "RATE_LIMITED" })
+});
+// Reads of a friend's Garden data (outfit, layout, pet homes, weather, visiting fairies): per account, on top of
+// the app's own admission and general limiters, in express-rate-limit so code scanning sees the routes are limited.
+const friendGardenReadRateLimit = rateLimit({
+  windowMs: 60 * 1000, limit: 120, standardHeaders: false, legacyHeaders: false, validate: false,
+  keyGenerator: req => req.auth?.userId || ipKeyGenerator(req.ip || ""),
+  handler: (_req, res) => res.status(429).set("Cache-Control", "no-store").json({ error: "Too many requests. Wait a moment, then try again.", code: "RATE_LIMITED" })
 });
 const { admission: admissionRateLimit, general: generalRateLimit, auth: authRateLimit, authAccount: authAccountRateLimit, ai: aiRateLimit, newAccount: newAccountRateLimit, passwordLogin: passwordLoginRateLimit, passwordChange: passwordChangeRateLimit } = rateLimiters();
 
@@ -420,6 +445,20 @@ app.post("/internal/ai-jobs/:id/execute", async (req, res) => {
     return res.json(result);
   } catch {
     return res.status(503).json({ error: "AI job execution unavailable" });
+  }
+});
+// RevenueCat webhook (docs/billing/BILLING.md). Not a user request: the shared Authorization value is
+// checked first, and the body only names which accounts to re-read; their state always comes from
+// RevenueCat's API, so a forged or replayed body cannot grant VIP. Non-200 makes RevenueCat retry.
+app.post("/billing/webhooks/revenuecat", billingWebhookRateLimit, async (req, res) => {
+  if (!revenueCatWebhookAuthorized(req.get("Authorization"))) return res.status(401).json({ error: "Unauthorized" });
+  const userIds = webhookUserIds(req.body);
+  try {
+    for (const userId of userIds) await syncEntitlement(prisma, userId);
+    return res.json({ ok: true, synced: userIds.length });
+  } catch (error) {
+    logServerError("POST /billing/webhooks/revenuecat error", { name: error?.name, code: error?.code, status: error?.status });
+    return res.status(503).json({ error: "Billing sync unavailable" });
   }
 });
 if (apiDocsEnabled()) {
@@ -2071,7 +2110,7 @@ app.get("/api/fairy/runtime", async (req, res) => {
     res.json(result);
     if (captionsEnabled) {
       // After the response: a slow or failed caption never delays the garden.
-      void fairyMomentCaptionFiller({ prisma, ownerId: req.auth.userId })
+      void fairyMomentCaptionFiller({ prisma, ownerId: req.auth.userId, gardenContext: () => fairyGardenContext(req.auth.userId) })
         .catch((error) => logServerError("Fairy Moment caption fill failed", error));
     }
   } catch (error) {
@@ -2293,7 +2332,7 @@ app.get("/api/flowers/today", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, timezone: true } });
     if (!user) return res.status(404).json({ error: "User not found" });
     const localDate = getLocalDate(normalizeTimezone(user.timezone) || "UTC");
-    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate }));
+    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate, limit: await dailyFlowerLimitFor(prisma, user.id) }));
   } catch (err) {
     logServerError("GET /api/flowers/today error", err);
     res.status(500).json({ error: "Failed to load today's flowers" });
@@ -2555,7 +2594,8 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
     });
     // A third Event in one day is still saved; it just grows no flower (lib/flower-quota.js).
     if (primaryGardenMood && !await database.flower.findUnique({ where: { sourceEventId: event.id } })) {
-      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate });
+      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate,
+        limit: await dailyFlowerLimitFor(database, event.ownerId) });
     }
     if (primaryGardenMood && flowerQuota?.granted !== false) {
       const garden = await ensureGarden(event.ownerId, database);
@@ -3063,6 +3103,310 @@ app.post("/ai/reports/monthly/trigger", aiRateLimit, async (req, res) => {
   }
 });
 
+// VIP state and the free counters for the signed-in owner (lib/billing.js).
+app.get("/billing/me", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    return res.json(await billingSummary(prisma, req.auth.userId));
+  } catch (error) {
+    logServerError("GET /billing/me error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to load billing" });
+  }
+});
+
+// Plans for the paywall: monthly always, lifetime only before BILLING_LIFETIME_OFFER_ENDS_AT.
+app.get("/billing/plans", (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  return res.json(billingPlans());
+});
+
+// Called by the app right after a purchase or restore, so VIP shows without waiting for the webhook.
+// Reads this owner's own state only; at most one RevenueCat read per owner every 10 seconds.
+app.post("/billing/sync", async (req, res) => {
+  if (Object.keys(req.body).length || Object.keys(req.query).length) return res.status(400).json({ error: "Invalid billing sync request" });
+  try {
+    const current = await prisma.subscriptionEntitlement.findUnique({ where: { userId: req.auth.userId }, select: { syncedAt: true } });
+    if (!current?.syncedAt || Date.now() - current.syncedAt.getTime() >= 10_000) await syncEntitlement(prisma, req.auth.userId);
+    return res.json(await billingSummary(prisma, req.auth.userId));
+  } catch (error) {
+    if (error?.code === "BILLING_NOT_CONFIGURED") return res.status(503).json({ error: "Billing is not available", code: error.code });
+    logServerError("POST /billing/sync error", { name: error?.name, code: error?.code, status: error?.status });
+    return res.status(502).json({ error: "Billing sync failed", code: "BILLING_PROVIDER_FAILED" });
+  }
+});
+
+// Items and the fairy wardrobe (lib/items.js, lib/fairy-wardrobe.js, docs/items/ITEMS.md).
+const ownerLocale = async userId => (await prisma.user.findUnique({ where: { id: userId }, select: { preferredLocale: true } }))?.preferredLocale === "zh-Hans" ? "zh-Hans" : "en";
+function sendWardrobeError(res, error, context) {
+  if (error instanceof WardrobeError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Wardrobe unavailable" });
+}
+app.get("/api/items", async (req, res) => {
+  const type = req.query.type;
+  if (Object.keys(req.query).some(key => key !== "type") || (type !== undefined && !Object.hasOwn(ITEM_TYPES, type))) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const context = await itemContext(prisma, req.auth.userId);
+    return res.json({ items: catalogFor(context, { type, locale: await ownerLocale(req.auth.userId) }) });
+  } catch (error) { return sendWardrobeError(res, error, "GET /api/items"); }
+});
+app.get("/api/fairy/wardrobe", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await wardrobeFor(prisma, req.auth.userId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "GET /api/fairy/wardrobe"); }
+});
+app.put("/api/fairy/wardrobe", async (req, res) => {
+  if (Object.keys(req.body).some(key => key !== "equipped")) return res.status(400).json({ error: "Send { equipped: { slot: itemId } }" });
+  try { return res.json(await wearPieces(prisma, req.auth.userId, req.body.equipped, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "PUT /api/fairy/wardrobe"); }
+});
+app.post("/api/fairy/wardrobe/looks", async (req, res) => {
+  try { return res.status(201).json(await saveLook(prisma, req.auth.userId, req.body, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "POST /api/fairy/wardrobe/looks"); }
+});
+app.post("/api/fairy/wardrobe/looks/:lookId/wear", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try { return res.json(await wearLook(prisma, req.auth.userId, req.params.lookId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "POST /api/fairy/wardrobe/looks/wear"); }
+});
+app.delete("/api/fairy/wardrobe/looks/:lookId", async (req, res) => {
+  try { return res.json(await deleteLook(prisma, req.auth.userId, req.params.lookId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendWardrobeError(res, error, "DELETE /api/fairy/wardrobe/looks"); }
+});
+// A friend's fairy outfit, for drawing her in their Garden: same rule as reading their Garden.
+app.get("/users/:userId/fairy-outfit", friendGardenReadRateLimit, async (req, res) => {
+  try {
+    const equipped = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => outfitFor(tx, req.params.userId));
+    return res.json({ equipped });
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendWardrobeError(res, error, "GET /users/:userId/fairy-outfit");
+  }
+});
+
+// Keepsake DIY garden layout (lib/garden-layout.js).
+function sendLayoutError(res, error, context) {
+  if (error instanceof LayoutError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Garden layout unavailable" });
+}
+app.get("/api/garden/layout", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await layoutFor(prisma, req.auth.userId)); }
+  catch (error) { return sendLayoutError(res, error, "GET /api/garden/layout"); }
+});
+app.put("/api/garden/layout", async (req, res) => {
+  try { return res.json(await saveLayout(prisma, req.auth.userId, req.body)); }
+  catch (error) { return sendLayoutError(res, error, "PUT /api/garden/layout"); }
+});
+app.get("/users/:userId/garden-layout", friendGardenReadRateLimit, async (req, res) => {
+  try {
+    const layout = await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => layoutFor(tx, req.params.userId));
+    return res.json({ placements: layout.placements, world: layout.world });
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendLayoutError(res, error, "GET /users/:userId/garden-layout");
+  }
+});
+
+// Monthly flower deity (lib/flower-deity.js) and pet homes (lib/pet-homes.js), by the owner's local clock.
+app.get("/api/garden/deity", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { timezone: true, createdAt: true, preferredLocale: true } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.json(deitySummary({ timezone: user.timezone, createdAt: user.createdAt, locale: user.preferredLocale }));
+  } catch (error) {
+    logServerError("GET /api/garden/deity error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Deity unavailable" });
+  }
+});
+function sendPetHomeError(res, error, context) {
+  if (error instanceof PetHomeError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Pet homes unavailable" });
+}
+app.get("/api/fairy/pets/homes", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await petHomesFor(prisma, req.auth.userId)); }
+  catch (error) { return sendPetHomeError(res, error, "GET /api/fairy/pets/homes"); }
+});
+app.put("/api/fairy/pets/:petId/home", async (req, res) => {
+  try { return res.json(await placePetHome(prisma, req.auth.userId, req.params.petId, req.body)); }
+  catch (error) { return sendPetHomeError(res, error, "PUT /api/fairy/pets/:petId/home"); }
+});
+app.get("/users/:userId/pet-homes", friendGardenReadRateLimit, async (req, res) => {
+  try {
+    return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => petHomesFor(tx, req.params.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendPetHomeError(res, error, "GET /users/:userId/pet-homes");
+  }
+});
+
+// Live garden weather (lib/weather.js): opt-in, ~11 km grid point only; friends see the state, never the place.
+const weatherService = createWeatherService();
+function sendWeatherError(res, error, context) {
+  if (error instanceof WeatherError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Weather unavailable" });
+}
+app.get("/api/weather", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await gardenWeather(prisma, weatherService, req.auth.userId)); }
+  catch (error) { return sendWeatherError(res, error, "GET /api/weather"); }
+});
+app.put("/api/weather/location", async (req, res) => {
+  try {
+    await setWeatherLocation(prisma, req.auth.userId, req.body);
+    return res.json(await gardenWeather(prisma, weatherService, req.auth.userId));
+  } catch (error) { return sendWeatherError(res, error, "PUT /api/weather/location"); }
+});
+app.get("/users/:userId/weather", friendGardenReadRateLimit, async (req, res) => {
+  try {
+    return res.json(await withSocialAuthorization(prisma, req.params.userId, req.auth.userId, tx => gardenWeather(tx, weatherService, req.params.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    return sendWeatherError(res, error, "GET /users/:userId/weather");
+  }
+});
+
+// Tea house tap-to-interact (lib/fairy-tea.js): server-checked brew time, cooldown and daily limit.
+function sendTeaError(res, error, context) {
+  if (error instanceof TeaError) return res.status(error.status).json({ error: error.message, code: error.code, ...error.extra });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Tea house unavailable" });
+}
+app.get("/api/fairy/tea", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await teaState(prisma, req.auth.userId)); }
+  catch (error) { return sendTeaError(res, error, "GET /api/fairy/tea"); }
+});
+app.post("/api/fairy/tea", async (req, res) => {
+  try { return res.status(201).json({ session: await startTea(prisma, req.auth.userId, req.body) }); }
+  catch (error) { return sendTeaError(res, error, "POST /api/fairy/tea"); }
+});
+app.post("/api/fairy/tea/:sessionId/finish", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try { return res.json(await finishTea(prisma, req.auth.userId, req.params.sessionId)); }
+  catch (error) { return sendTeaError(res, error, "POST /api/fairy/tea/finish"); }
+});
+
+// Garden gatherings (lib/gatherings.js) and everyone's fairies in one Garden.
+function sendGatheringError(res, error, context) {
+  if (error instanceof GatheringError) return res.status(error.status).json({ error: error.message, code: error.code });
+  if (error?.code === CONTENT_REJECTED) return res.status(422).json({ error: "Please choose a different title", code: CONTENT_REJECTED });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Gatherings unavailable" });
+}
+const notifyGathering = gathering => {
+  for (const id of [gathering.host.id, ...gathering.guests.map(guest => guest.id)]) {
+    realtime.to(`user:${id}`).emit("gatheringUpdated", { gatheringId: gathering.id, status: gathering.status });
+  }
+};
+app.get("/api/gatherings", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json({ gatherings: await listGatherings(prisma, req.auth.userId), visitorLimit: gardenVisitorLimit() }); }
+  catch (error) { return sendGatheringError(res, error, "GET /api/gatherings"); }
+});
+app.post("/api/gatherings", async (req, res) => {
+  try {
+    const gathering = await createGathering(prisma, req.auth.userId, req.body, { assertText: assertSocialContent });
+    notifyGathering(gathering);
+    return res.status(201).json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings"); }
+});
+app.post("/api/gatherings/:gatheringId/respond", async (req, res) => {
+  try {
+    const gathering = await respondToGathering(prisma, req.auth.userId, req.params.gatheringId, req.body);
+    notifyGathering(gathering);
+    return res.json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings/respond"); }
+});
+app.post("/api/gatherings/:gatheringId/cancel", async (req, res) => {
+  if (Object.keys(req.body).length) return res.status(400).json({ error: "Empty body only" });
+  try {
+    const gathering = await cancelGathering(prisma, req.auth.userId, req.params.gatheringId);
+    notifyGathering(gathering);
+    return res.json(gathering);
+  } catch (error) { return sendGatheringError(res, error, "POST /api/gatherings/cancel"); }
+});
+// The host's fairy and every visitor's fairy now in that Garden, dressed, for drawing them together.
+// Only someone allowed in that Garden (the host or a friend) may ask.
+app.get("/api/visits/:hostUserId/fairies", friendGardenReadRateLimit, async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const fairies = await withSocialAuthorization(prisma, req.params.hostUserId, req.auth.userId, async tx => {
+      const garden = await tx.garden.findUnique({ where: { ownerId: req.params.hostUserId }, select: { id: true } });
+      const visitors = garden ? getActiveVisitors(garden.id) : [];
+      const host = await tx.user.findUnique({ where: { id: req.params.hostUserId }, select: { id: true, name: true, avatar: true } });
+      const people = [{ ...host, role: "HOST" }, ...visitors.map(visitor => ({ id: visitor.visitorId, name: visitor.name, avatar: visitor.avatar, role: "VISITOR", x: visitor.x, y: visitor.y }))];
+      return Promise.all(people.map(async person => ({ ...person, outfit: await outfitFor(tx, person.id) })));
+    });
+    return res.json(filterSocialPayload({ fairies, visitorLimit: gardenVisitorLimit() }, await hiddenSocialIds(prisma, req.auth.userId)));
+  } catch (error) {
+    if (sendSocialError(res, error)) return;
+    logServerError("GET /api/visits/:hostUserId/fairies error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Visitors unavailable" });
+  }
+});
+
+// Fairy persona (lib/fairy-persona.js) and the garden she posts about: today's weather state and the month's deity.
+async function fairyGardenContext(userId) {
+  const [weather, user] = await Promise.all([gardenWeather(prisma, weatherService, userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, createdAt: true } })]);
+  const deity = user ? deitySummary({ timezone: user.timezone, createdAt: user.createdAt }).deity : null;
+  return { weather: weather.enabled ? weather.state : null, deity: deity?.flower ?? null };
+}
+function sendPersonaError(res, error, context) {
+  if (error instanceof PersonaError) return res.status(error.status).json({ error: error.message, code: error.code });
+  logServerError(`${context} error`, { name: error?.name, code: error?.code });
+  return res.status(500).json({ error: "Persona unavailable" });
+}
+app.get("/api/fairy/persona", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try { return res.json(await personaSummary(prisma, req.auth.userId, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendPersonaError(res, error, "GET /api/fairy/persona"); }
+});
+app.put("/api/fairy/persona", async (req, res) => {
+  try { return res.json(await choosePersona(prisma, req.auth.userId, req.body, { locale: await ownerLocale(req.auth.userId) })); }
+  catch (error) { return sendPersonaError(res, error, "PUT /api/fairy/persona"); }
+});
+
+// Help & Feedback form (lib/app-feedback.js). Owner is the signed-in account; 5 per day.
+app.post("/feedback", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const row = await createFeedback(prisma, req.auth.userId, req.body);
+    return res.status(201).json({ id: row.id, receivedAt: row.createdAt });
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("POST /feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to send feedback" });
+  }
+});
+
+// Staff page (behind the /moderation gate in lib/social-safety.js: MODERATOR_FIREBASE_UIDS).
+app.get("/moderation/me", (req, res) => res.json({ staff: true }));
+app.get("/moderation/feedback", async (req, res) => {
+  try {
+    return res.json(await listFeedback(prisma, req.query));
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("GET /moderation/feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to load feedback" });
+  }
+});
+app.post("/moderation/feedback/:feedbackId", async (req, res) => {
+  try {
+    return res.json(await updateFeedback(prisma, req.params.feedbackId, req.body));
+  } catch (error) {
+    if (error instanceof FeedbackError) return res.status(error.status).json({ error: error.message });
+    logServerError("POST /moderation/feedback error", { name: error?.name, code: error?.code });
+    return res.status(500).json({ error: "Failed to update feedback" });
+  }
+});
+
 app.get("/users/:userId/subscription", async (req, res) => {
   if (!requireOwnUser(req, res, req.params.userId)) return;
 
@@ -3549,8 +3893,9 @@ const fairyEvent = resolveFairyEvent({
 const position =
   getNonOverlappingPosition(existingFlowers);
 
+const flowerLimit = await dailyFlowerLimitFor(prisma, user.id);
 const createdFlower = await prisma.$transaction(async (tx) => {
-  if (!(await reserveFlowerPlanting(tx, { userId: user.id, localDate })).granted) return null;
+  if (!(await reserveFlowerPlanting(tx, { userId: user.id, localDate, limit: flowerLimit })).granted) return null;
   const checkIn = await tx.dailyCheckIn.create({
     data: {
       userId: user.id,
@@ -3947,6 +4292,8 @@ app.post("/visit", async (req, res) => {
         existing.avatar = visitor.avatar || "🦋";
         existing.name = visitor.name;
       } else {
+        // Garden capacity from the group-visit capacity test (lib/gatherings.js gardenVisitorLimit).
+        if (visitors.length >= gardenVisitorLimit()) throw new SocialAccessError("This Garden is full right now", 409);
         visitors.push({
           visitorId: visitor.id,
           name: visitor.name,

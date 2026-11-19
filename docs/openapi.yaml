@@ -525,6 +525,111 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubscriptionEntitlement'
 
+  /billing/me:
+    get:
+      tags: [Billing]
+      summary: VIP state and free counters for the signed-in owner
+      description: See docs/billing/BILLING.md. `benefits.weeklyAiTrialsLeft` is null for VIP.
+      responses:
+        '200':
+          description: Billing summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingSummary'
+
+  /billing/plans:
+    get:
+      tags: [Billing]
+      summary: Plans for the paywall (lifetime only while its offer is on)
+      responses:
+        '200':
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entitlementId: { type: string, example: vip }
+                  plans:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        plan: { type: string, enum: [MONTHLY, LIFETIME] }
+                        productId: { type: string }
+                        referencePriceUsd: { type: number }
+                        period: { type: string, nullable: true, example: P1M }
+                        available: { type: boolean }
+                        endsAt: { type: string, format: date-time, nullable: true }
+
+  /billing/sync:
+    post:
+      tags: [Billing]
+      summary: Re-read the owner's store state after a purchase or restore
+      description: Empty JSON body. Reads RevenueCat at most once per 10 seconds per owner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          description: Billing summary after the sync
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingSummary'
+        '502': { description: RevenueCat request failed (BILLING_PROVIDER_FAILED) }
+        '503': { description: Billing not configured on this server (BILLING_NOT_CONFIGURED) }
+
+  /billing/webhooks/revenuecat:
+    post:
+      tags: [Billing]
+      summary: RevenueCat webhook (server to server, not for the app)
+      security: []
+      description: Authorization header must equal REVENUECAT_WEBHOOK_AUTH. The body only names accounts to re-read.
+      responses:
+        '200': { description: Synced }
+        '401': { description: Wrong or missing Authorization }
+        '503': { description: Sync failed; RevenueCat retries }
+
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Send in-app feedback (signed-in accounts; 5 per day)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [category, message]
+              properties:
+                category: { type: string, enum: [bug, feature, general, ai_concern, other] }
+                subject: { type: string, maxLength: 120 }
+                message: { type: string, maxLength: 2000 }
+                email: { type: string, description: Optional reply address the person typed }
+                route: { type: string, example: /journal }
+                clientVersion: { type: string, example: 1.0.0 }
+                platform: { type: string, enum: [ios, android, web] }
+      responses:
+        '201': { description: Saved; returns id and receivedAt }
+        '400': { description: Invalid field }
+        '429': { description: Daily limit reached }
+
+  /moderation/feedback:
+    get:
+      tags: [Moderation]
+      summary: Staff list of feedback, newest first (MODERATOR_FIREBASE_UIDS only)
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [NEW, READ, DONE] } }
+        - { name: before, in: query, schema: { type: string, format: date-time }, description: nextBefore from the previous page }
+      responses:
+        '200': { description: "{ items, counts, nextBefore }" }
+        '403': { description: Not staff }
+
   /reports:
     post:
       tags: [Reports]
@@ -1048,6 +1153,25 @@ components:
         type: string
 
   schemas:
+    BillingSummary:
+      type: object
+      properties:
+        vip: { type: boolean }
+        plan: { type: string, enum: [MONTHLY, LIFETIME], nullable: true }
+        founder: { type: boolean, description: Lifetime buyers keep a Founding Member badge }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        willRenew: { type: boolean }
+        inGracePeriod: { type: boolean }
+        store: { type: string, nullable: true, example: APP_STORE }
+        enforced: { type: boolean, description: Free-account limits are on (BILLING_ENFORCED) }
+        benefits:
+          type: object
+          properties:
+            weeklyAi: { type: boolean }
+            monthlyAi: { type: boolean }
+            weeklyAiTrialsLeft: { type: integer, nullable: true }
+            dailyFlowers: { type: integer }
+            tarotReadingsPerWeek: { type: integer, nullable: true }
     Error:
       type: object
       required: [error]

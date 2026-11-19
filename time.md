@@ -329,6 +329,27 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   localDate])`, the same `localDateForInstant(now, User.timezone)` rule). The deck order is seeded
   by owner + local date, and the card back alternates by calendar-day number, so both change at
   local midnight. **VERIFIED:** [test/back/petal-card-draw.test.js](test/back/petal-card-draw.test.js).
+- **VIP billing** ([lib/billing.js](lib/billing.js), [docs/billing/BILLING.md](docs/billing/BILLING.md)): VIP is
+  true only while `SubscriptionEntitlement.currentPeriodEnd` (UTC instant from RevenueCat; the billing-retry grace
+  end while in grace) is after the server's `now`; lifetime has no end. The lifetime offer is on sale while `now` is
+  before the instant in `BILLING_LIFETIME_OFFER_ENDS_AT` (an ISO time with zone; unset = not on sale). No local date
+  is involved in either. A VIP owner's **tarot readings** are counted per account-local week: draws whose
+  `PetalCardDraw.localDate` is on or after the Monday of today's local week (`localWeekStart`, calendar arithmetic,
+  so DST never moves it). A free account's **Weekly AI trial** is tied to the Weekly's `periodKey` (its Monday), one
+  trial per week at most. **VERIFIED:** [test/back/billing.test.js](test/back/billing.test.js),
+  the VIP test in [test/back/petal-reading.test.js](test/back/petal-reading.test.js) (Tuesday–Thursday share a week;
+  Monday 2 November 2026 starts the next) and the billing test in [test/back/sonnet-weekly.test.js](test/back/sonnet-weekly.test.js).
+- **Monthly flower deity** ([lib/flower-deity.js](lib/flower-deity.js), `GET /api/garden/deity`): the deity is the
+  one for the account-local calendar month (`localDateForInstant(now, User.timezone)`, first seven characters), so it
+  changes at local midnight on the 1st, the same month boundary as Monthly reports (`periodKey` YYYY-MM). The album
+  lists account-local months from the month of `User.createdAt` to now (newest first, at most 24). **VERIFIED:**
+  [test/back/deity-pet-homes.test.js](test/back/deity-pet-homes.test.js) (00:30 on 1 February in Shanghai is
+  February while UTC is still January).
+- **Pet homes** ([lib/pet-homes.js](lib/pet-homes.js), `GET /api/fairy/pets/homes`): each pet sleeps from 21:30 to
+  07:00 on the account-local wall clock, the n-th pet in `GARDEN_PETS` 12 × n minutes later. Instants come from
+  `localTimeToUtc(today, minutes, User.timezone)`, so a DST day keeps 07:00 on the wall clock. `nextChangeAt` is the
+  UTC instant of the next bedtime or wake-up. **VERIFIED:** [test/back/deity-pet-homes.test.js](test/back/deity-pet-homes.test.js)
+  (fixed-offset Shanghai cases; a Vancouver spring-forward day wakes at 07:00 local).
 - **Beta badge** ([lib/beta-cohort.js](lib/beta-cohort.js)): an account is a beta tester when
   `User.createdAt` (UTC) is before the instant in `BETA_COHORT_ENDS_AT`; unset means the beta is
   still on and every account is one. No local date is involved, so time zones do not move the

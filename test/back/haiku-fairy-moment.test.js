@@ -139,3 +139,32 @@ test("caption validation", () => {
   assert.equal(validFairyMomentCaption("茶有点烫", "en"), false);
   assert.equal(validFairyMomentCaption("same", "en", ["same"]), false);
 });
+
+// Persona mode (lib/fairy-persona.js): stable character, her own earlier posts as memories, today's garden.
+test("persona posts: character, her own memories with a checked reference, and today's garden; a made-up memory keeps the preset", async (t) => {
+  const run = async ref => {
+    const f = await fixture(t);
+    await f.pg.exec(`ALTER TABLE "UserFairy" ADD COLUMN "personaId" text; UPDATE "UserFairy" SET "personaId"='botanist';`);
+    for (let i = 1; i <= 7; i++) {
+      await f.pg.query(`INSERT INTO "FairyMoment" VALUES ($1,'alice','fairy','TEA_TIME',NULL,'CALM','TEA_TIME/1',$2,$3,'AI')`,
+        [`p${i}`, new Date(Date.UTC(2026, 9, i, 20)), `第${"一二三四五六七"[i - 1]}次在茶椅上看到蜗牛`]);
+    }
+    f.respond(() => Response.json({ model: HAIKU_FAIRY_MOMENT_MODEL_ID, type: "message", role: "assistant", stop_reason: "end_turn",
+      content: [{ type: "text", text: JSON.stringify({ c: "那只小蜗牛又回到茶杯边了", ref }) }], usage: { input_tokens: 600, output_tokens: 30 } }));
+    const written = await fillFairyMomentCaptions({ prisma: f.prisma, ownerId: "alice", env: { ...enabled, AI_FAIRY_PERSONA: "true" },
+      fetchImpl: f.fetchImpl, gardenContext: async () => ({ weather: "RAIN", deity: "snowdrop" }) });
+    return { f, written };
+  };
+  const { f, written } = await run("e1");
+  assert.equal(written, 1);
+  assert.deepEqual(await f.moment("new"), { caption: "那只小蜗牛又回到茶杯边了", captionSource: "AI" });
+  const input = JSON.parse(f.calls[0].messages[0].content);
+  assert.equal(input.v.traits.includes("botanist") || input.v.voice.length > 0, true);
+  assert.deepEqual(input.w, { weather: "RAIN", deity: "snowdrop" });
+  assert.ok(input.e.length >= 2 && input.e.every(memory => /^e\d$/.test(memory.id) && !("momentId" in memory)));
+  assert.doesNotMatch(f.calls[0].messages[0].content, /"p[1-7]"/, "database ids never reach the model");
+  assert.ok(f.calls[0].system.includes("Persona mode"));
+  const made = await run("e9");
+  assert.equal(made.written, 0);
+  assert.equal((await made.f.moment("new")).captionSource, "FALLBACK");
+});

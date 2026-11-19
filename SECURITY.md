@@ -1,5 +1,36 @@
 # PetalPal Security
 
+## Garden items, DIY, pet homes and live weather, 2026-11-18
+
+Local branch `feat/w27-backend`; not deployed.
+
+- **Items** (`lib/items.js`): access is decided only on the server (FREE, VIP live, Fairy Bond level, owned SHOP/GRANT rows). Shop items are granted only from RevenueCat's API during billing sync, never from a request body. Every write (`PUT /api/fairy/wardrobe`, looks, `PUT /api/garden/layout`, `PUT /api/fairy/pets/:petId/home`) is scoped to `req.auth.userId` with body allowlists. Friend reads (`/users/:userId/fairy-outfit`, `garden-layout`, `pet-homes`, `weather`) use the same `withSocialAuthorization` rule as the Garden.
+- **Weather location** (`lib/weather.js`): opt-in; only a one-decimal grid point (~11 km) is stored and sent to MET Norway; friends get the weather state, never coordinates; turning it off deletes the row; cascade on account deletion. MET is never called without `WEATHER_USER_AGENT`. **Open:** privacy policy wording.
+- **Evidence.** `test/back/items-wardrobe.test.js`, `garden-layout.test.js`, `deity-pet-homes.test.js`, `weather.test.js`. No live MET call was made.
+
+## In-app feedback and the Staff page, 2026-11-18
+
+Local branch `feat/w27-backend`; not deployed.
+
+- `POST /feedback` stores feedback for the signed-in account only (field allowlist, 2,000 characters, 5 per account per day). A reply email is stored only when the person typed one. Rows are deleted with the account (cascade).
+- Staff routes (`GET /moderation/me`, `GET /moderation/feedback`, `POST /moderation/feedback/:id`) sit behind the existing `/moderation` gate (`MODERATOR_FIREBASE_UIDS`, empty denies everyone). The staff list shows display name and PP number, never account email.
+- Team-channel pings (`STAFF_NOTIFY_WEBHOOK_URL`, https only) carry only the kind and category; no user text, identity or ids leave the backend. Failures never fail the user's request.
+- **Open:** the privacy policy should say feedback is stored and read by the team.
+- **Evidence.** `test/back/app-feedback.test.js`; mobile `routePolicy`, `globalFeedbackSystem` tests. Not verified in a running app with a real staff account.
+
+## VIP billing through RevenueCat, 2026-11-18
+
+Local branch `feat/w27-backend`; not deployed, no provider, store or database touched.
+
+- **No card or receipt data on our server.** Purchases run in the app through the RevenueCat SDK and the stores. The backend reads an owner's state with `GET https://api.revenuecat.com/v1/subscribers/{id}` using `REVENUECAT_SECRET_API_KEY` (server env only) and stores tier, status, plan, product id, period end and store name in `SubscriptionEntitlement`.
+- **Webhook.** `POST /billing/webhooks/revenuecat` sits before user authentication. It requires an `Authorization` header equal to `REVENUECAT_WEBHOOK_AUTH` (constant-time compare; unset or shorter than 16 characters refuses everything). The body is used only to pick account ids (`user_<digits>`, at most 10, accounts that exist); state always comes from RevenueCat's API, so a forged or replayed body cannot grant VIP. Provider error bodies are never parsed or logged.
+- **Rate limits (CodeQL `js/missing-rate-limiting`, PR #209).** The webhook has its own per-IP `express-rate-limit` bound (120/min), since it runs before the app's admission limiter. The five friend-Garden reads (`/users/:userId/fairy-outfit`, `garden-layout`, `pet-homes`, `weather`, `GET /api/visits/:hostUserId/fairies`) add a per-account `express-rate-limit` bound (120/min) on top of the app's own limiters.
+- **`POST /billing/sync`** reads only the caller's own state, empty body only, at most once per 10 s per owner.
+- **Fail closed.** VIP requires an end in the future (or the lifetime plan); a database error counts as free. Sandbox purchases are ignored unless `BILLING_ALLOW_SANDBOX=true` (TEST only). Refunds remove VIP.
+- **Cost safeguards.** With `BILLING_ENFORCED=true`, free accounts' Weekly 2.0 is the code template with no model call and no cost reservation, except two trials; free Monthly is code-only. VIP tarot readings are capped per local week. Existing per-user, global and provider caps are unchanged.
+- **Open:** RevenueCat customer records are not deleted on account deletion yet (owner action or follow-up); the privacy policy must name RevenueCat before launch.
+- **Evidence.** `test/back/billing.test.js`, the VIP test in `test/back/petal-reading.test.js`, the billing test in `test/back/sonnet-weekly.test.js`. Not verified: real RevenueCat responses, store sandbox purchases, hosted TEST.
+
 ## Sign-up without email: name and avatar, 2026-11-02
 
 Local branch `feat/name-only-signup`; not deployed, no provider or database touched.

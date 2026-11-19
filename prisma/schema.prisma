@@ -51,6 +51,15 @@ model User {
   aiConsent               AiConsent?
   aiInteractions          AiInteractionMetadata[]
   subscriptionEntitlement SubscriptionEntitlement?
+  billingTrialUses        BillingTrialUse[]
+  appFeedback             AppFeedback[]
+  itemOwnerships          ItemOwnership[]
+  fairyWardrobe           FairyWardrobe?
+  gardenLayout            GardenLayout?
+  weatherLocation         WeatherLocation?
+  fairyTeaSessions        FairyTeaSession[]
+  hostedGatherings        Gathering[]
+  gatheringInvites        GatheringInvite[]
   fairies                 UserFairy[]
   fairyMonthlyProgress    FairyMonthlyProgress[]
   fairyMoments            FairyMoment[]
@@ -327,6 +336,9 @@ model UserFairy {
   momentsAvatar String?   @db.VarChar(32)
   /// Cover-library id (lib/moment-covers.js) at the top of her Moments; null = default photo.
   momentsCover  String?   @db.VarChar(32)
+  /// Persona the owner chose (lib/fairy-persona.js); null: picked from the fairy id. Changed at most every 30 days.
+  personaId        String?   @db.VarChar(24)
+  personaChangedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -472,6 +484,9 @@ model GardenPetOutfit {
   // The owner's name for the pet (null: its own name) and when it last changed (once per 7 days).
   name          String?   @db.VarChar(24)
   nameChangedAt DateTime?
+  // Where the owner placed this pet's bed (lib/pet-homes.js), Garden world coordinates; null: none yet.
+  homeX     Float?
+  homeY     Float?
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -544,6 +559,8 @@ model PetalCardReading {
   status     String   @db.VarChar(16)
   attempts   Int      @default(1)
   paragraphs Json     @default("[]")
+  /// Memories a deeper (agent) reading drew on: [{ kind, eventDate }], no text (lib/tarot-agent.js).
+  sources    Json     @default("[]")
   model      String?  @db.VarChar(64)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -1029,10 +1046,150 @@ model SubscriptionEntitlement {
   externalCustomerId     String?            @unique @db.VarChar(191)
   externalSubscriptionId String?            @unique @db.VarChar(191)
   currentPeriodEnd       DateTime?
+  /// VIP plan (lib/billing.js): MONTHLY renews; LIFETIME never expires (currentPeriodEnd null).
+  plan                   VipPlan?
+  productId              String?            @db.VarChar(128)
+  /// False once the owner turned off auto-renew; VIP still lasts until currentPeriodEnd.
+  willRenew              Boolean            @default(false)
+  purchasedAt            DateTime?
+  /// Last successful read of the store state (RevenueCat), server clock.
+  syncedAt               DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Items an account owns outright (lib/items.js): SHOP purchases and GRANT rewards. FREE, VIP and LEVEL
+/// items are checked live and never stored. Kept until the account is deleted.
+model ItemOwnership {
+  userId    String
+  itemId    String   @db.VarChar(48)
+  source    String   @db.VarChar(16)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+}
+
+/// The Garden Fairy's outfit (lib/fairy-wardrobe.js): equipped is { slot: itemId }; looks is a list of
+/// saved outfits [{ id, name, equipped }], at most 8.
+model FairyWardrobe {
+  userId    String   @id
+  equipped  Json     @default("{}")
+  looks     Json     @default("[]")
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Keepsake DIY (lib/garden-layout.js): decorations placed in the owner's Garden,
+/// [{ itemId, worldX, worldY, z, flip, scale }], at most 60. Replaced whole on each save.
+model GardenLayout {
+  userId     String   @id
+  placements Json     @default("[]")
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Live garden weather opt-in (lib/weather.js): a ~11 km grid point only (one decimal of lat/lon),
+/// never an exact position. Deleted when the owner turns weather off or deletes the account.
+model WeatherLocation {
+  userId    String   @id
+  lat       Float
+  lon       Float
+  updatedAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Tea house interaction (lib/fairy-tea.js): STARTED -> FINISHED (after the minimum brew time) or EXPIRED.
+/// localDate is the account-local day the tea was started, for the daily limit.
+model FairyTeaSession {
+  id         String    @id @default(cuid())
+  userId     String
+  drink      String    @db.VarChar(24)
+  localDate  String    @db.VarChar(10)
+  status     String    @db.VarChar(10)
+  startedAt  DateTime
+  finishedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, startedAt])
+  @@index([userId, localDate])
+}
+
+/// A one-hour garden gathering in the host's Garden (lib/gatherings.js). status: SCHEDULED or CANCELED.
+model Gathering {
+  id        String   @id @default(cuid())
+  hostId    String
+  kind      String   @db.VarChar(16)
+  title     String?  @db.VarChar(60)
+  startsAt  DateTime
+  endsAt    DateTime
+  status    String   @default("SCHEDULED") @db.VarChar(12)
+  createdAt DateTime @default(now())
+
+  host    User              @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  invites GatheringInvite[]
+
+  @@index([hostId, endsAt])
+  @@index([endsAt])
+}
+
+/// A friend invited to a gathering: INVITED, ACCEPTED or DECLINED.
+model GatheringInvite {
+  gatheringId String
+  userId      String
+  status      String   @default("INVITED") @db.VarChar(10)
+  updatedAt   DateTime @updatedAt
+
+  gathering Gathering @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([gatheringId, userId])
+  @@index([userId])
+}
+
+/// Feedback sent from the app's Help & Feedback form (lib/app-feedback.js), read by staff in the staff page.
+/// replyEmail is kept only when the person typed one to get an answer. Deleted with the account.
+model AppFeedback {
+  id         String    @id @default(cuid())
+  userId     String
+  kind       String    @db.VarChar(16)
+  subject    String?   @db.VarChar(160)
+  message    String    @db.Text
+  replyEmail String?   @db.VarChar(254)
+  route      String?   @db.VarChar(120)
+  appVersion String?   @db.VarChar(32)
+  platform   String?   @db.VarChar(16)
+  status     String    @default("NEW") @db.VarChar(8)
+  staffNote  String?   @db.Text
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+/// One free trial of a paid feature (lib/billing.js), e.g. an AI-written Weekly for a free account.
+/// periodKey names what the trial was used on (the Weekly's Monday), so one week never uses two.
+model BillingTrialUse {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String   @db.VarChar(32)
+  periodKey String   @db.VarChar(16)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, periodKey])
+  @@index([userId, feature])
 }
 
 enum EmotionSource {
@@ -1059,6 +1216,11 @@ enum ReportStatus {
 enum SubscriptionTier {
   FREE
   PREMIUM
+}
+
+enum VipPlan {
+  MONTHLY
+  LIFETIME
 }
 
 enum SubscriptionStatus {

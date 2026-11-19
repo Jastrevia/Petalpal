@@ -2,6 +2,19 @@
 
 Assign a primary and backup moderator before release. Review the queue each staffed day; triage threats, exploitation and privacy exposure first, record decisions, and escalate imminent danger to the appropriate local services when reliable information exists. PetalPal is not an emergency response service. No response-time SLA is verified or promised. Reassess staffing from actual queue age; do not launch without coverage.
 
+## Staff page (2026-11-18)
+
+The app has a team-only **Staff page** (`/staff`, entry under Me → Team). It shows two lists:
+
+- **Feedback**: what players send from Help & Feedback (`POST /feedback`, stored in `AppFeedback`): category, subject, message, page, app version, and a reply email only if they typed one. Mark it Read or Done and keep a team note.
+- **Reports**: the open report queue below, with the same actions.
+
+Who can open it: accounts whose Firebase uid is in `MODERATOR_FIREBASE_UIDS` on Render (comma-separated; add both team members). Everyone else gets 403 and never sees the entry.
+
+New items ping the team channel when `STAFF_NOTIFY_WEBHOOK_URL` is set on Render (a Discord or Slack incoming-webhook URL, https only). The ping says only the kind and category ("新反馈 / New feedback · BUG"), never the text, the person or an id. Read the content in the Staff page.
+
+Guests (no account) still send feedback by email to contact@jastrevia.com.
+
 Authenticated HTTP workflow (small-team tooling, no public dashboard):
 
 1. Operator configures `MODERATOR_FIREBASE_UIDS` with verified staff Firebase UIDs; empty denies everyone. Use verified-email staff accounts and short-lived Firebase ID tokens in an approved API client. Never paste tokens into shell history, logs, tickets or this chat.

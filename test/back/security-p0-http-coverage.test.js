@@ -39,7 +39,23 @@ const routes = [
   ["POST /visit/move", "visitorUserId is req.auth.userId; active visitor is token-scoped"],
   ["POST /leave", "visitorUserId is req.auth.userId"],
   ["POST /analyze-mood", "AI metadata userId is req.auth.userId"],
-  ["DELETE /users/:id", "requireOwnUser before transaction; deletion target is token/path-bound"]
+  ["DELETE /users/:id", "requireOwnUser before transaction; deletion target is token/path-bound"],
+  ["POST /billing/sync", "owner is req.auth.userId; empty body only; reads that owner's own RevenueCat state, at most once per 10 s"],
+  ["POST /feedback", "owner is req.auth.userId; field allowlist and length limits; 5 per account per day"],
+  ["POST /moderation/feedback/:feedbackId", "behind the /moderation staff gate (MODERATOR_FIREBASE_UIDS); status/staffNote allowlist"],
+  ["PUT /api/fairy/wardrobe", "owner is req.auth.userId; equipped body field only; each piece checked against lib/items.js access"],
+  ["POST /api/fairy/wardrobe/looks", "owner is req.auth.userId; name body field only; saves the owner's own worn pieces; at most 8"],
+  ["POST /api/fairy/wardrobe/looks/:lookId/wear", "owner is req.auth.userId; empty body; look looked up in the owner's own row"],
+  ["DELETE /api/fairy/wardrobe/looks/:lookId", "owner is req.auth.userId; look looked up in the owner's own row"],
+  ["PUT /api/garden/layout", "owner is req.auth.userId; placements allowlist; each decoration usable and within its copies; at most 60"],
+  ["PUT /api/fairy/pets/:petId/home", "owner is req.auth.userId; known pet ids only; home body field only, inside the Garden world"],
+  ["PUT /api/weather/location", "owner is req.auth.userId; location body field only; stored as a ~11 km grid point; null deletes it"],
+  ["POST /api/fairy/tea", "owner is req.auth.userId; drink allowlist; one open session, cooldown and daily limit under an advisory lock"],
+  ["POST /api/fairy/tea/:sessionId/finish", "owner is req.auth.userId; empty body; session scoped to the owner; minimum brew time; Bond award keyed by session"],
+  ["POST /api/gatherings", "hostId is req.auth.userId; field allowlist; guests must be friends and not blocked; host allows visits; content check on title"],
+  ["POST /api/gatherings/:gatheringId/respond", "only the invited req.auth.userId may answer; accept boolean only"],
+  ["POST /api/gatherings/:gatheringId/cancel", "only the host (req.auth.userId) may cancel; empty body"],
+  ["PUT /api/fairy/persona", "owner's active fairy only (req.auth.userId); personaId allowlist; once per 30 days"]
 ];
 
 test("authenticated HTTP mutation inventory has an explicit security disposition", () => {
@@ -50,7 +66,7 @@ test("authenticated HTTP mutation inventory has an explicit security disposition
     assert.equal(source.includes(declaration) || multiline, true, `${route} missing from server.js`);
     assert.ok(reason.length > 0);
   }
-  assert.equal(routes.length, 36);
+  assert.equal(routes.length, 52);
 });
 
 test("server-controlled identity and entitlement names are not accepted as generic mutation fields", () => {

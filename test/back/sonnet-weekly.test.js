@@ -994,3 +994,60 @@ test("Weekly 2.0 owner list: one request with the 2.0 contract; a failing insigh
     assert.equal(off.calls[0].body.system, WEEKLY_SHORT_INSTRUCTIONS); assert.equal(off.calls[0].packet.version, WEEKLY_SHORT);
   }
 });
+
+// Billing (lib/billing.js, docs/billing/BILLING.md): with BILLING_ENFORCED a free account's Weekly 2.0 uses the model only
+// on its two trials, each on a week with at least three Events; otherwise it is the code template with no model call.
+test("billing: free Weekly 2.0 spends trials only on written weeks, then the code template; VIP always gets the model", async t => {
+  const settings = { ...enabled, AI_WEEKLY_REFLECTION_CONTRACT: REFLECTION_V2.WEEKLY, AI_WEEKLY_SHORT_OWNER_IDS: "alice",
+    WEEKLY_INSIGHTS_OWNER_IDS: "alice", BILLING_ENFORCED: "true" };
+  const billed = async ({ count = 3, entitlement = null, trials = [] } = {}) => {
+    const f = await fixture(t, { locale: "zh-CN", count });
+    await f.pg.exec(`ALTER TABLE "Event" ADD COLUMN "primaryGardenMood" text; UPDATE "Event" SET "primaryGardenMood"='SUNNY_BLOOM'`);
+    const rows = [...trials];
+    f.db.subscriptionEntitlement = { findUnique: async () => entitlement };
+    f.db.billingTrialUse = {
+      count: async ({ where }) => rows.filter(row => row.userId === where.userId && row.feature === where.feature).length,
+      create: async ({ data }) => { rows.push(data); return data; },
+      deleteMany: async ({ where }) => { const i = rows.findIndex(row => row.periodKey === where.periodKey && row.userId === where.userId); if (i >= 0) rows.splice(i, 1); }
+    };
+    f.respond(packet => {
+      const goods = packet.candidates?.find(candidate => candidate.type === "SMALL_GOODS");
+      return Response.json(native({ version: WEEKLY_2, locale: packet.locale, headline: "这周的晴朗来自小事", question: "下周你想留意哪一件小事？",
+        insights: goods ? [{ id: goods.id, role: "main", text: "这周你记下了这些小事。", evidence_ids: goods.evidence, picks: goods.quotes.slice(0, 2).map(quote => quote.id) }] : [] }));
+    });
+    return { f, rows };
+  };
+  const saved = async f => (await f.rows("WeeklyReport"))[0].document;
+
+  const trial = await billed();
+  assert.equal((await trial.f.run(settings)).succeeded, true);
+  assert.equal(trial.f.calls.length, 1);
+  assert.deepEqual(trial.rows, [{ userId: "alice", feature: "WEEKLY_AI", periodKey: "2026-09-14" }]);
+  assert.equal((await saved(trial.f)).narrativeSections[0].template, false);
+
+  const spent = await billed({ trials: [{ userId: "alice", feature: "WEEKLY_AI", periodKey: "a" }, { userId: "alice", feature: "WEEKLY_AI", periodKey: "b" }] });
+  spent.f.respond(() => assert.fail("no model call without trials"));
+  const spentResult = await spent.f.run(settings);
+  assert.equal(spentResult.succeeded, true, `${spentResult.error?.code} ${spentResult.error?.stack}`);
+  assert.equal(spent.f.calls.length, 0);
+  const template = await saved(spent.f);
+  assert.equal(template.narrativeStatus, "GENERATED");
+  assert.ok(template.narrativeSections.every(section => section.template !== false));
+  assert.equal((await spent.f.rows("AuditEvent")).length, 0, "no cost reservation for a template-only week");
+
+  const thin = await billed({ count: 2 });
+  assert.equal((await thin.f.run(settings)).succeeded, true);
+  assert.equal(thin.f.calls.length, 0, "a week under three Events never spends a trial");
+  assert.deepEqual(thin.rows, []);
+
+  const down = await billed();
+  down.f.respond(() => new Response("unavailable", { status: 500 }));
+  assert.equal((await down.f.run(settings)).succeeded, true);
+  assert.deepEqual(down.rows, [], "a failed call gives the trial back");
+
+  const vip = await billed({ entitlement: { tier: "PREMIUM", status: "ACTIVE", plan: "LIFETIME", currentPeriodEnd: null },
+    trials: [{ userId: "alice", feature: "WEEKLY_AI", periodKey: "a" }, { userId: "alice", feature: "WEEKLY_AI", periodKey: "b" }] });
+  assert.equal((await vip.f.run(settings)).succeeded, true);
+  assert.equal(vip.f.calls.length, 1);
+  assert.equal(vip.rows.length, 2, "VIP never uses trials");
+});

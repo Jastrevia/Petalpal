@@ -59,7 +59,7 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
       "personalization" boolean,"memoryEnabled" boolean,"updatedAt" timestamp(3));
     INSERT INTO "AiConsent" VALUES ('alice','synthetic',${aiProcessing},${personalization},false,'2000-01-01'),
       ('bob','synthetic',true,true,true,'2000-01-01');
-    CREATE TABLE "SubscriptionEntitlement" ("userId" text PRIMARY KEY,"tier" text,"status" text);
+    CREATE TABLE "SubscriptionEntitlement" ("userId" text PRIMARY KEY,"tier" text,"status" text,"plan" text,"currentPeriodEnd" timestamp(3));
     CREATE TABLE "AuditEvent" ("id" text PRIMARY KEY,"createdAt" timestamp NOT NULL DEFAULT now(),"eventType" varchar(64),
       "outcome" varchar(32),"actorUserId" varchar(128),"targetClass" varchar(64),"targetSafeId" varchar(128),"actionCode" varchar(64),"reasonCode" varchar(64));
     CREATE TABLE "Event" ("id" text PRIMARY KEY,"ownerId" text,"localDate" text,"primaryGardenMood" text,"content" text);
@@ -69,7 +69,7 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
     CREATE TABLE "PetalCardDraw" ("id" text PRIMARY KEY,"userId" text,"localDate" text,"position" int,"cardId" text,
       "topic" text,"reversed" boolean,"createdAt" timestamp(3) DEFAULT now(), UNIQUE ("userId","localDate"));
     CREATE TABLE "PetalCardReading" ("id" text PRIMARY KEY,"userId" text,"drawId" text UNIQUE,"locale" text,"status" text,
-      "attempts" int DEFAULT 1,"paragraphs" jsonb DEFAULT '[]',"model" text,"createdAt" timestamp(3) DEFAULT now(),"updatedAt" timestamp(3));`);
+      "attempts" int DEFAULT 1,"paragraphs" jsonb DEFAULT '[]',"sources" jsonb DEFAULT '[]',"model" text,"createdAt" timestamp(3) DEFAULT now(),"updatedAt" timestamp(3));`);
   let ids = 0;
   const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] ?? null;
   const adapt = db => ({
@@ -82,12 +82,18 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
       AND "localDate">=$2 AND "localDate"<=$3 AND "primaryGardenMood" = ANY($4)`,
       [where.ownerId, where.localDate.gte, where.localDate.lte, where.primaryGardenMood.in])).rows },
     petalCardDraw: {
+      findMany: async ({ where, take }) => (await db.query(`SELECT * FROM "PetalCardDraw" WHERE "userId"=$1 AND "localDate"<$2
+        ORDER BY "localDate" DESC LIMIT $3`, [where.userId, where.localDate.lt, take])).rows,
       findUnique: ({ where: { userId_localDate: key } }) => one(db, `SELECT * FROM "PetalCardDraw" WHERE "userId"=$1 AND "localDate"=$2`, [key.userId, key.localDate]),
       create: ({ data }) => one(db, `INSERT INTO "PetalCardDraw" ("id","userId","localDate","position","cardId","topic","reversed")
         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [`d${++ids}`, data.userId, data.localDate, data.position, data.cardId, data.topic, data.reversed])
     },
     petalCardReading: {
-      count: async ({ where }) => (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" WHERE "userId"=$1 AND "status"=$2
+      count: async ({ where }) => where.draw
+        ? (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" r JOIN "PetalCardDraw" d ON d."id"=r."drawId"
+          WHERE r."userId"=$1 AND r."status"=$2 AND r."drawId" <> $3 AND d."localDate" >= $4`,
+          [where.userId, where.status, where.drawId.not, where.draw.localDate.gte])).n
+        : (await one(db, `SELECT count(*)::int AS n FROM "PetalCardReading" WHERE "userId"=$1 AND "status"=$2
         AND "drawId" <> $3`, [where.userId, where.status, where.drawId.not])).n,
       findUnique: ({ where }) => one(db, `SELECT * FROM "PetalCardReading" WHERE "drawId"=$1`, [where.drawId]),
       create: ({ data }) => one(db, `INSERT INTO "PetalCardReading" ("id","userId","drawId","locale","status","attempts","updatedAt")
@@ -95,7 +101,7 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
       update: ({ where, data }) => {
         const keys = Object.keys(data);
         return one(db, `UPDATE "PetalCardReading" SET ${keys.map((key, i) => `"${key}"=$${i + 2}`).join(",")},"updatedAt"=now()
-          WHERE "id"=$1 RETURNING *`, [where.id, ...keys.map(key => key === "paragraphs" ? JSON.stringify(data[key]) : data[key])]);
+          WHERE "id"=$1 RETURNING *`, [where.id, ...keys.map(key => ["paragraphs", "sources"].includes(key) ? JSON.stringify(data[key]) : data[key])]);
       }
     }
   });
@@ -111,7 +117,7 @@ async function fixture(t, { personalization = true, aiProcessing = true, locale 
   const reading = async drawId => one(pg, `SELECT "status","attempts","paragraphs" FROM "PetalCardReading" WHERE "drawId"=$1`, [drawId]);
   return { pg, prisma, calls, fetchImpl, draw, reading, respond: fn => { response = fn; } };
 }
-const ask = (f, env = enabled, userId = "alice", now = NOW) => requestPetalReading(f.prisma, { userId, env, now, fetchImpl: f.fetchImpl });
+const ask = (f, env = enabled, userId = "alice", now = NOW, retrieval) => requestPetalReading(f.prisma, { userId, env, now, fetchImpl: f.fetchImpl, retrieval });
 const day = n => new Date(NOW.getTime() + n * 86_400_000);
 const place = (userId, id) => dailyDeck(userId, "2026-10-30", { heavy: true }).indexOf(id);
 
@@ -120,7 +126,7 @@ test("a listed owner's reading is written once from the card, its orientation, t
   const at = place("alice", "major-13"), drawn = await f.draw("alice", at, "FORTUNE");
   assert.deepEqual(await petalReadingFor(f.prisma, { userId: "alice", drawId: drawn.id, env: enabled, now: NOW }),
     { available: true, needsConsent: false, locked: false, freeLeft: null, status: "NONE" });
-  assert.deepEqual(await ask(f), { available: true, needsConsent: false, locked: false, freeLeft: null, status: "READY", paragraphs: ZH });
+  assert.deepEqual(await ask(f), { available: true, needsConsent: false, locked: false, freeLeft: null, status: "READY", paragraphs: ZH, sources: [] });
   assert.equal(f.calls.length, 1);
   const input = JSON.parse(f.calls[0].messages[0].content);
   assert.deepEqual(input, { l: "zh-Hans", q: "FORTUNE", c: { n: "死神", o: reversedAt("alice", "2026-10-30", at) ? "reversed" : "upright",
@@ -206,8 +212,8 @@ test("everyone gets three free readings, then only unlocked owners; a written re
   await failing.draw("bob", 1, "WORK");
   await ask(failing, enabled, "bob"); await ask(failing, enabled, "bob");
   assert.equal((await petalReadingFor(failing.prisma, { userId: "bob", drawId: (await failing.draw("bob", 1, "WORK")).id, env: enabled, now: NOW })).freeLeft, 3);
-  // Unlocking (Premium, the one-time purchase) lifts the limit; an expired one does not.
-  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED')`);
+  // VIP lifts the free limit; an expired one does not.
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','EXPIRED','LIFETIME',NULL)`);
   assert.equal((await ask(f, enabled, "bob", day(3))).locked, true);
   await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "status"='ACTIVE' WHERE "userId"='bob'`);
   // The cost gate counts calls by the database's real day, where these simulated days all fall.
@@ -215,6 +221,36 @@ test("everyone gets three free readings, then only unlocked owners; a written re
   assert.equal(unlocked.status, "READY");
   assert.equal(unlocked.freeLeft, null);
   assert.equal((await f.reading(fourth.id)).status, "READY");
+});
+
+test("VIP owners get three readings per account-local week; the beta list has no weekly limit", async (t) => {
+  const f = await fixture(t);
+  f.respond(() => Response.json(native(EN)));
+  const env = { ...enabled, AI_PETAL_READING_DAILY_LIMIT: "10" };
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','ACTIVE','MONTHLY','2027-01-01T00:00:00Z')`);
+  // Tuesday 27 to Thursday 29 October 2026 in Vancouver: one week, which starts Monday the 26th.
+  for (const n of [-3, -2, -1]) {
+    await f.draw("bob", n + 4, "WORK", day(n));
+    const reading = await ask(f, env, "bob", day(n));
+    assert.equal(reading.status, "READY");
+    assert.equal(reading.freeLeft, null);
+    assert.equal(reading.weeklyLeft, 2 - (n + 3));
+  }
+  await f.draw("bob", 1, "LOVE", day(0));
+  const calls = f.calls.length;
+  assert.deepEqual(await ask(f, env, "bob", day(0)), { available: true, needsConsent: false, locked: true, freeLeft: null, weeklyLeft: 0, status: "NONE" });
+  assert.equal(f.calls.length, calls, "no model call once the week is used up");
+  // Monday 2 November starts a new week.
+  await f.draw("bob", 2, "LOVE", day(3));
+  assert.equal((await ask(f, env, "bob", day(3))).status, "READY");
+  // An expired monthly plan is not VIP, whatever its status says.
+  await f.pg.exec(`UPDATE "SubscriptionEntitlement" SET "currentPeriodEnd"='2026-10-01T00:00:00Z' WHERE "userId"='bob'`);
+  await f.draw("bob", 3, "LOVE", day(4));
+  assert.equal((await ask(f, env, "bob", day(4))).locked, true);
+  // Listed owners keep unlimited readings and never see a weekly count.
+  const listed = await ask(f, { ...env, PETAL_READING_OWNER_IDS: "bob" }, "bob", day(4));
+  assert.equal(listed.status, "READY");
+  assert.equal("weeklyLeft" in listed, false);
 });
 
 test("only with the switches, only with AI Processing", async (t) => {
@@ -232,4 +268,59 @@ test("nothing drawn today: nothing to read", async (t) => {
   const f = await fixture(t);
   assert.equal(await ask(f), null);
   assert.equal(f.calls.length, 0);
+});
+
+// Deeper VIP reading (lib/tarot-agent.js): a Haiku plan with no owner content, tools run by the server, Opus writes
+// with citations that must come from the tools. Injected responses only.
+test("VIP agent reading: plan, owner-scoped tools, grounded citations; a bad citation falls back to the plain reading", async (t) => {
+  const f = await fixture(t);
+  await f.pg.exec(`INSERT INTO "SubscriptionEntitlement" VALUES ('bob','PREMIUM','ACTIVE','MONTHLY','2027-01-01T00:00:00Z');
+    INSERT INTO "Event" VALUES ('b1','bob','2026-10-29','QUIET_BLOOM','private'), ('b2','bob','2026-10-28','SUNNY_BLOOM','private');`);
+  const env = { ...enabled, AI_PETAL_READING_AGENT: "true", AI_PETAL_READING_DAILY_LIMIT: "10", AI_TAROT_PLAN_DAILY_LIMIT: "10", AI_PETAL_READING_DEEP_DAILY_LIMIT: "10" };
+  const searches = [];
+  const retrieval = { retrieve: async args => { searches.push(args); return [
+    { id: "mem-1", ownerId: "bob", summary: "Finished the poster for the club fair after two late nights.", eventDate: new Date("2026-10-28T19:00:00Z") },
+    { id: "mem-x", ownerId: "alice", summary: "SOMEONE ELSE", eventDate: new Date("2026-10-27T19:00:00Z") }]; } };
+  let cite = ["m1"];
+  f.respond(() => {
+    const body = f.calls.at(-1);
+    const reply = data => Response.json({ model: body.model, type: "message", role: "assistant", stop_reason: "end_turn",
+      content: [{ type: "text", text: JSON.stringify(data) }], usage: { input_tokens: 500, output_tokens: 200 } });
+    if (body.model === "claude-haiku-5-5") return reply({ calls: [
+      { tool: "memory_search", days: 7, query: "work and study", count: 1 }, { tool: "mood_stats", days: 7, query: "", count: 1 },
+      { tool: "past_readings", days: 7, query: "", count: 2 }] });
+    return body.output_config.format.schema.required.includes("s") ? reply({ p: EN, s: cite }) : reply({ p: EN });
+  });
+  await f.draw("bob", 1, "WORK", day(-1));
+  const drawn = await f.draw("bob", 2, "WORK");
+  const result = await ask(f, env, "bob", NOW, retrieval);
+  assert.equal(result.status, "READY");
+  assert.deepEqual(result.sources, [{ kind: "MEMORY", eventDate: "2026-10-28" }]);
+  assert.deepEqual(f.calls.map(call => call.model), ["claude-haiku-5-5", "claude-opus-5-5"]);
+  const [plan, write] = f.calls.map(call => JSON.parse(call.messages[0].content));
+  assert.deepEqual(Object.keys(plan).sort(), ["c", "l", "q", "tools"], "the plan sees only the card, topic and tool list");
+  assert.doesNotMatch(JSON.stringify(f.calls[0]), /poster|private/);
+  assert.deepEqual(searches, [{ identity: { userId: "bob" }, query: "work and study", take: 3 }]);
+  const tools = Object.fromEntries(write.t.map(item => [item.tool, item]));
+  assert.deepEqual(tools.memory_search.memories, [{ id: "m1", s: "Finished the poster for the club fair after two late nights." }], "another owner's memory is dropped");
+  assert.equal(tools.past_readings.past.length, 1);
+  assert.equal(Object.values(tools.mood_stats.moods).reduce((a, b) => a + b, 0), 2);
+  assert.doesNotMatch(JSON.stringify(write), /mem-1|SOMEONE ELSE/, "memory ids and other owners never reach the model");
+  assert.equal((await petalReadingFor(f.prisma, { userId: "bob", drawId: drawn.id, env, now: NOW })).sources.length, 1);
+
+  // Next day: the writer cites a memory the tools never returned, so the plain reading is written instead.
+  cite = ["m9"];
+  await f.draw("bob", 3, "LOVE", day(1));
+  f.calls.length = 0;
+  const fallback = await ask(f, env, "bob", day(1), retrieval);
+  assert.equal(fallback.status, "READY");
+  assert.deepEqual(fallback.sources, []);
+  assert.deepEqual(f.calls.map(call => call.model), ["claude-haiku-5-5", "claude-opus-5-5", "claude-opus-5-5"]);
+
+  // Agent off, or no memory consent: the plain reading only.
+  await f.pg.exec(`UPDATE "AiConsent" SET "memoryEnabled"=false WHERE "userId"='bob'`);
+  await f.draw("bob", 4, "PEOPLE", day(2));
+  f.calls.length = 0;
+  await ask(f, env, "bob", day(2), retrieval);
+  assert.deepEqual(f.calls.map(call => call.model), ["claude-opus-5-5"]);
 });

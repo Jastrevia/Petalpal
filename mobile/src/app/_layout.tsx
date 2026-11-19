@@ -73,7 +73,7 @@ function TabLayout() {
   // Functional Garden routes also need this navigator in exported builds.
   // Other existing preview/tab routes retain their current presentation.
   let content;
-  if (__DEV__ || pathname === '/' || pathname === '/journal' || pathname === '/garden-history' || pathname === '/bookhouse' || pathname === '/mailbox' || pathname === '/reflection' || pathname.startsWith('/feature/') || pathname.startsWith('/visit/')) {
+  if (__DEV__ || pathname === '/' || pathname === '/journal' || pathname === '/garden-history' || pathname === '/staff' || pathname === '/bookhouse' || pathname === '/mailbox' || pathname === '/reflection' || pathname.startsWith('/feature/') || pathname.startsWith('/visit/')) {
     content = (
       <AppNavigationTheme>
         <AnimatedSplashOverlay />
@@ -90,6 +90,8 @@ function TabLayout() {
           <Stack.Screen name="mailbox" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="journal" options={{ title: 'Events / Flowers' }} />
           <Stack.Screen name="garden-history" options={{ title: 'Garden history', headerShown: false, animation: 'fade' }} />
+          {/* Team only: the screen itself asks the backend (MODERATOR_FIREBASE_UIDS) and shows nothing to others. */}
+          <Stack.Screen name="staff" options={{ title: 'Staff', headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="feature/[feature]" options={{ title: 'PetalPal' }} />
           <Stack.Screen name="visit/[ownerId]" options={{ title: 'Friend Garden', headerShown: false }} />
           <Stack.Screen name="garden-test" options={{ title: 'Garden preview' }} />

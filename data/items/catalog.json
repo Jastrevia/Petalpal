@@ -1,0 +1,12 @@
+{
+  "_readme": "PetalPal item catalog (lib/items.js, docs/items/ITEMS.md). One entry per item. id: lower-case letters, digits and dashes, never reused. type: FAIRY_OUTFIT (slot body|hair|clothes|accessory) or DECORATION (slot garden). access: FREE (everyone), VIP (while VIP), LEVEL (Fairy Bond level >= level), SHOP (bought: productId is the store product), GRANT (given by the server: keepsake, event, redeem code). art: the asset key the app uses. placeholder: true until the art exists; placeholder items are hidden from the app. Every fairy keepsake is also a DECORATION deco-<keepsakeId> (lib/items.js keepsakeDecorations); list a keepsake id in decorationsReady once its decoration art exists.",
+  "decorationsReady": [],
+  "items": [
+    { "id": "fairy-body-default", "type": "FAIRY_OUTFIT", "slot": "body", "access": "FREE", "default": true, "art": "fairy/body/default", "name": { "en": "Garden Fairy", "zh-Hans": "花园小花仙" } },
+    { "id": "fairy-hair-default", "type": "FAIRY_OUTFIT", "slot": "hair", "access": "FREE", "default": true, "art": "fairy/hair/default", "name": { "en": "Petal curls", "zh-Hans": "花瓣卷发" } },
+    { "id": "fairy-clothes-default", "type": "FAIRY_OUTFIT", "slot": "clothes", "access": "FREE", "default": true, "art": "fairy/clothes/default", "name": { "en": "Leaf dress", "zh-Hans": "叶子裙" } },
+    { "id": "fairy-hair-rose-braid", "type": "FAIRY_OUTFIT", "slot": "hair", "set": "rose", "access": "LEVEL", "level": 5, "placeholder": true, "art": "fairy/hair/rose-braid", "name": { "en": "Rose braid", "zh-Hans": "玫瑰发辫" } },
+    { "id": "fairy-clothes-rose-gown", "type": "FAIRY_OUTFIT", "slot": "clothes", "set": "rose", "access": "VIP", "placeholder": true, "art": "fairy/clothes/rose-gown", "name": { "en": "Rose gown", "zh-Hans": "玫瑰长裙" } },
+    { "id": "fairy-accessory-dew-crown", "type": "FAIRY_OUTFIT", "slot": "accessory", "access": "SHOP", "productId": "petalpal_item_dew_crown", "placeholder": true, "art": "fairy/accessory/dew-crown", "name": { "en": "Dewdrop crown", "zh-Hans": "露珠花冠" } }
+  ]
+}

@@ -30,6 +30,7 @@ import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
 import { useFeedbackDraft } from './FeedbackDraftContext';
 import { FEEDBACK_EMAIL, getFeedbackTransport } from './feedbackService';
 import { useAppLocale } from '../../services/locale';
+import Constants from 'expo-constants';
 
 // The form in the app language (one language per screen).
 const FORM_COPY = {
@@ -43,6 +44,8 @@ const FORM_COPY = {
     tooBig: 'Image attachment must be smaller than 5 MB.', failed: 'Something went wrong while recording feedback.',
     emailOpened: `Your email app opened with your feedback to ${FEEDBACK_EMAIL}. Press Send there to deliver it. Your draft stays here until you discard it.`,
     viaEmail: `Sent by email to ${FEEDBACK_EMAIL}. To add a screenshot, attach it in your email app.`,
+    viaApp: 'Sent straight to the PetalPal team. Screenshots cannot be attached yet.',
+    received: (ref?: string) => `Thank you, the team has your feedback${ref ? ` (#${ref})` : ''}.`,
     categories: { bug: 'Bug Report', feature: 'Feature Suggestion', general: 'General Feedback', ai_concern: 'AI Response Concern', other: 'Other' } as Record<string, string> },
   'zh-Hans': { title: '发送反馈', subtitle: '你的想法会让花园长得更好。', back: '‹ 返回', close: '关闭',
     category: '类别', subject: '主题（选填）', subjectHint: '想说点什么？', message: '内容',
@@ -54,6 +57,8 @@ const FORM_COPY = {
     tooBig: '图片需要小于 5 MB。', failed: '发送反馈时出了点问题。',
     emailOpened: `已打开你的邮件应用，内容已经写好，收件人是 ${FEEDBACK_EMAIL}。在邮件里点「发送」就能送到我们这里。草稿会一直保留，直到你丢弃它。`,
     viaEmail: `反馈会通过邮件发到 ${FEEDBACK_EMAIL}。如果要附截图，请在邮件应用里添加。`,
+    viaApp: '反馈会直接送到 PetalPal 团队。暂时还不能附截图。',
+    received: (ref?: string) => `谢谢你，团队已经收到你的反馈${ref ? `（#${ref}）` : ''}。`,
     categories: { bug: '问题报告', feature: '功能建议', general: '一般反馈', ai_concern: 'AI 回复的问题', other: '其他' } as Record<string, string> },
 };
 import {
@@ -202,7 +207,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
         })),
         route: currentRoute || (typeof window !== 'undefined' ? window.location?.pathname : undefined),
         timestamp: Date.now(),
-        clientVersion: '1.0.0-dev',
+        clientVersion: Constants.expoConfig?.version || '1.0.0',
       };
 
       const result = await transport.submitFeedback(payload);
@@ -214,11 +219,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
       } else if (result.isRealTransport) {
         // Real backend succeeded
         setSubmissionStatus('success');
-        setSubmissionNotice(
-          result.referenceId
-            ? `Feedback received! Reference ID: #${result.referenceId}`
-            : 'Thank you for helping our garden grow. Your feedback has been received.'
-        );
+        setSubmissionNotice(copy.received(result.referenceId));
         // Clear draft upon confirmed real submission
         clearDraft();
       } else {
@@ -451,7 +452,7 @@ export const SendFeedbackForm = memo(function SendFeedbackForm({
             style={styles.textInput}
           />
           <Text style={styles.fieldHelperText}>{copy.emailHelp}</Text>
-          {transport.supportsAttachments === false ? <Text style={styles.fieldHelperText}>{copy.viaEmail}</Text> : null}
+          {transport.supportsAttachments === false ? <Text style={styles.fieldHelperText}>{transport.transportName === 'Email' ? copy.viaEmail : copy.viaApp}</Text> : null}
         </View>
 
         {/* ── VALIDATION & STATUS NOTICES ── */}
