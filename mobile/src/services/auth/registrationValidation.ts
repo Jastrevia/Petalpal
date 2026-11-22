@@ -3,7 +3,7 @@ import { signedOutLocale } from '../signedOutLocale';
 
 // The server checks all of these too (lib/accounts.js); here they only answer before a round trip.
 export const MIN_PASSWORD_LENGTH = 8;
-export const MAX_PASSWORD_LENGTH = 16;
+export const MAX_PASSWORD_LENGTH = 64;
 export const ACCOUNT_NAME_PATTERN = /^[A-Za-z0-9_]{4,20}$/;
 export const MAX_FAIRY_NAME_LENGTH = 20;
 export function passwordError(password: string, chinese = false): string {
@@ -12,8 +12,15 @@ export function passwordError(password: string, chinese = false): string {
   }
   return '';
 }
+// Says which part of the rule a name missed (App Review 2026-11-22 typed a name the rule refused and
+// read it as a broken sign-up): an email, a space, the length, then any other character.
 export function accountNameError(name: string, chinese = false): string {
-  if (!ACCOUNT_NAME_PATTERN.test(name)) return chinese ? '账号名需要 4–20 位，只能用字母、数字或下划线。' : 'Use 4–20 letters, numbers or underscores.';
+  if (!ACCOUNT_NAME_PATTERN.test(name)) {
+    if (name.includes('@')) return chinese ? '账号名不是邮箱：请用字母、数字或下划线，比如 petal_fan。' : 'An account name isn’t an email. Use letters, numbers or underscores, like petal_fan.';
+    if (/\s/.test(name)) return chinese ? '账号名不能有空格，可以用下划线代替，比如 petal_fan。' : 'No spaces in an account name. Use an underscore instead, like petal_fan.';
+    if (name.length < 4 || name.length > 20) return chinese ? '账号名需要 4–20 位。' : 'Use 4–20 characters for your account name.';
+    return chinese ? '账号名只能用英文字母、数字或下划线。' : 'Use only English letters, numbers or underscores.';
+  }
   if (/^pp\d+$/i.test(name)) return chinese ? '账号名不能像 PP 号。' : 'An account name can’t look like a PP number.';
   return '';
 }

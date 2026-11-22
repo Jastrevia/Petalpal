@@ -50,3 +50,19 @@ test('Firebase refusals read the same in both languages and never echo provider 
   assert.doesNotMatch(authErrorMessage(coded('auth/unknown'), false), /diagnostic/);
   assert.doesNotMatch(authErrorMessage(coded('auth/unknown'), true), /diagnostic/);
 });
+
+test('a refused account name says which part of the rule it missed, and long suggested passwords pass', () => {
+  const { accountNameError, passwordError } = errors;
+  assert.equal(accountNameError('petal_fan'), '');
+  assert.match(accountNameError('review@example.com'), /isn’t an email/);
+  assert.match(accountNameError('App Review'), /No spaces/);
+  assert.match(accountNameError('App Review', true), /不能有空格/);
+  assert.match(accountNameError('abc'), /4–20 characters/);
+  assert.match(accountNameError('dash-name'), /only English letters/);
+  assert.match(accountNameError('PP12345678'), /PP number/);
+  // The iPhone's suggested strong password (20 characters) and a password manager's long one.
+  assert.equal(passwordError('hJkq7m-Ruzdew-fabqo3'), '');
+  assert.equal(passwordError('a1'.repeat(32)), '');
+  assert.match(passwordError('a1'.repeat(32) + 'x'), /8–64/);
+  assert.match(passwordError('onlyletters'), /letters and numbers/);
+});
