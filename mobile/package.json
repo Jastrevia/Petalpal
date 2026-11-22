@@ -58,6 +58,7 @@
     "web:local": "node ./scripts/web-local/start.mjs",
     "web:phone": "node ./scripts/web-local/start.mjs --lan",
     "test:phone": "node ./scripts/phone-smoke.mjs",
+    "test:layout": "node ./scripts/layout-matrix.mjs",
     "lint": "expo lint",
     "test:integration": "node --test test/applicationIntegration.test.mjs",
     "postinstall": "patch-package",

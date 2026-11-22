@@ -17,10 +17,15 @@ export type LayoutClass = {
   compact: boolean;
   medium: boolean;
   expanded: boolean;
+  /** Under 500 tall: a phone held sideways or a short window; chrome should shrink to keep the content in view. */
+  compactHeight: boolean;
+  /** Phone-sized chrome (smaller bottom bar and dock): a compact width, or a short window under 900 wide. */
+  phoneChrome: boolean;
 };
 
 export const COMPACT_MAX = 600;
 export const MEDIUM_MAX = 1024;
+export const COMPACT_HEIGHT_MAX = 500;
 
 export function sizeClassFor(width: number): SizeClass {
   if (width < COMPACT_MAX) return 'compact';
@@ -29,6 +34,7 @@ export function sizeClassFor(width: number): SizeClass {
 
 export function layoutClassFor(width: number, height: number, insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 }): LayoutClass {
   const sizeClass = sizeClassFor(width);
+  const compactHeight = height < COMPACT_HEIGHT_MAX;
   return {
     sizeClass,
     orientation: width > height ? 'landscape' : 'portrait',
@@ -39,5 +45,7 @@ export function layoutClassFor(width: number, height: number, insets: Insets = {
     compact: sizeClass === 'compact',
     medium: sizeClass === 'medium',
     expanded: sizeClass === 'expanded',
+    compactHeight,
+    phoneChrome: sizeClass === 'compact' || (compactHeight && width < 900),
   };
 }

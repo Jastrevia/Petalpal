@@ -2445,7 +2445,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 }
 
 const styles = StyleSheet.create({
-  scene: { flex: 1, backgroundColor: GARDEN_WATER_COLOR },
+  // Clipped: the month signs' tap targets follow the camera past the window edge and, unclipped, widened the web page.
+  scene: { flex: 1, overflow: 'hidden', backgroundColor: GARDEN_WATER_COLOR },
   fairyAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#365b42', alignItems: 'center' },
   fairyActionText: { color: '#fff', fontSize: 14 },
   treehouseHint: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, alignItems: 'center',

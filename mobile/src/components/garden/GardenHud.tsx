@@ -1,7 +1,7 @@
 import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GARDEN_FEATURES, gardenFeature } from '../../services/featureCatalog';
 import { usePanelTheme } from '../features/PanelTheme';
@@ -29,6 +29,7 @@ import { AiConsentPrompt } from '../features/AiConsentPrompt';
 import { zhHans } from './fairy/tapLines';
 import { onOpenGardenPanel } from './gardenPanelBus';
 import { usePauseGardenWhile } from './gardenOverlayPause';
+import { useLayoutClass } from '../../hooks/useLayoutClass';
 
 const MOMENTS_CHECK_MS = 5 * 60_000;
 // One navigation model; only its sizing changes with the viewport.
@@ -37,10 +38,8 @@ const MOMENTS_CHECK_MS = 5 * 60_000;
 export function GardenHud({ onFocusFairy, paused = false }: { onFocusFairy?: () => void; paused?: boolean } = {}) {
   const insets = useSafeAreaInsets();
   const { theme, light } = usePanelTheme();
-  const { width, height } = useWindowDimensions();
-  const phone = width < 600 || (width < 900 && height < 500);
-  const short = height < 500;
-  const iconSize = phone ? Math.max(28, Math.min(short ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;
+  const { width, usableWidth, compactHeight: short, phoneChrome: phone } = useLayoutClass();
+  const iconSize = phone ? Math.max(28, Math.min(short ? 30 : 38, usableWidth / 10)) : 42;
   const { activeMode, selectedFlower, isGardenLoading, gardenError, refreshGarden, isSaving } = usePlanting();
   const [highlightedFeature, setHighlightedFeature] = useState<string>();
   const [openFeature, setOpenFeature] = useState<string>();

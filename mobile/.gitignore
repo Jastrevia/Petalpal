@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# layout matrix screenshots (npm run test:layout)
+layout-matrix/

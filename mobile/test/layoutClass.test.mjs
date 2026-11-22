@@ -30,3 +30,10 @@ test('usable size subtracts safe-area insets and never goes negative', () => {
   assert.equal(layout.usableHeight, 860);
   assert.equal(layoutClassFor(10, 10, { top: 20, right: 20, bottom: 0, left: 0 }).usableWidth, 0);
 });
+
+test('phone chrome keeps the old Garden HUD / dock rule: width < 600, or under 500 tall and under 900 wide', () => {
+  const old = (w, h) => w < 600 || (w < 900 && h < 500);
+  for (const [w, h] of [[375, 667], [440, 956], [844, 390], [956, 440], [744, 1133], [375, 1032], [1180, 820], [1440, 480]]) {
+    assert.equal(layoutClassFor(w, h).phoneChrome, old(w, h), `${w}×${h}`);
+  }
+});

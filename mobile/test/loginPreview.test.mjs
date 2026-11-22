@@ -4,6 +4,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { layoutClassFor } from '../src/hooks/layoutClass.ts';
 
 // Optional roots permit focused checks of a draft without replacing live source.
 // All interaction values below are synthetic and are never included in output.
@@ -114,6 +115,7 @@ function harness({ width = 390, phase = 'idle', platform = 'web', props = {} } =
       if (name === './entranceTimeline') return { ENTRANCE_STILLS: [] };
       if (name === './FairyLoadingExperience') return { FairyLoadingExperience: 'FairyLoadingExperience' };
       if (name === 'expo-router') return { Link: 'Link' };
+      if (name === '../../hooks/useLayoutClass') return { useLayoutClass: () => layoutClassFor(width, 844) };
       // The English | 中文 switch's language (English unless 中文 was picked).
       if (name === '../../services/signedOutLocale') return { useSignedOutLocale: () => 'en' };
       if (/\.(png|jpg|webp)$/.test(name)) return name;
