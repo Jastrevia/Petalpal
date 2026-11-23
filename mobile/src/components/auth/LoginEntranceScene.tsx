@@ -70,6 +70,10 @@ export const LoginEntranceScene = memo(function LoginEntranceScene({
   const archLeft = offsetX + (renderedW - archWidth) / 2;
   const archTop = offsetY + g.archTopRatio * renderedH;
   const archCenterY = archHeight * 0.45;
+  // Transform origins as [x, y, z] arrays, never strings: native React Native reads a string origin with a regex that
+  // only knows whole numbers, so "100.28px" became four values on a sideways iPhone ("Transform origin must have
+  // exactly 3 values", a red-screen crash on the sign-in page) and every decimal origin was wrong on iOS.
+  const at = (x: number | string, y: number) => [typeof x === 'number' ? Math.round(x * 100) / 100 : x, Math.round(y * 100) / 100, 0];
 
   const sceneScale = entranceTrack(progress, 'sceneScale', reduced);
   const cameraLiftY = entranceTrack(progress, 'cameraLiftY', reduced);
@@ -88,7 +92,7 @@ export const LoginEntranceScene = memo(function LoginEntranceScene({
         style={[
           styles.unifiedScene,
           {
-            transformOrigin: `${vanishingX}px ${vanishingY}px`,
+            transformOrigin: at(vanishingX, vanishingY),
             transform: [{ translateY: cameraLiftY }, { scale: sceneScale }],
           },
         ]}
@@ -128,7 +132,7 @@ export const LoginEntranceScene = memo(function LoginEntranceScene({
               top: 0,
               width: '100%',
               height: '100%',
-              transformOrigin: `50% ${archCenterY}px`,
+              transformOrigin: at('50%', archCenterY),
               transform: [
                 { translateY: Animated.multiply(archLiftY, -0.6) },
                 { scale: archScale },
@@ -153,7 +157,7 @@ export const LoginEntranceScene = memo(function LoginEntranceScene({
               top: 0,
               width: '100%',
               height: '100%',
-              transformOrigin: `22% ${archCenterY}px`,
+              transformOrigin: at('22%', archCenterY),
               transform: [
                 { translateX: Animated.multiply(archSlideX, -1) },
                 { scale: archScale },
@@ -169,7 +173,7 @@ export const LoginEntranceScene = memo(function LoginEntranceScene({
               top: 0,
               width: '100%',
               height: '100%',
-              transformOrigin: `78% ${archCenterY}px`,
+              transformOrigin: at('78%', archCenterY),
               transform: [
                 { translateX: archSlideX },
                 { scale: archScale },

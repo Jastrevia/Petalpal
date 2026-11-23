@@ -34,7 +34,8 @@ export function FairyPortrait({ height }: { height: number }) {
   const scale = height / PORTRAIT.height;
   const size = PORTRAIT.canvas * scale;
   const beat = useWingBeat();
-  const origin = `${PORTRAIT.wingPivot.x / PORTRAIT.canvas * 100}% ${PORTRAIT.wingPivot.y / PORTRAIT.canvas * 100}%`;
+  // An array: native React Native cannot parse decimals in a string transform origin.
+  const origin = [`${(PORTRAIT.wingPivot.x / PORTRAIT.canvas * 100).toFixed(2)}%`, `${(PORTRAIT.wingPivot.y / PORTRAIT.canvas * 100).toFixed(2)}%`, 0];
   const left = useAnimatedStyle(() => ({ transform: [{ rotate: `${(beat.value - .5) * 2.2}deg` }] }));
   const right = useAnimatedStyle(() => ({ transform: [{ rotate: `${(.5 - beat.value) * 2.2}deg` }] }));
   const petals = useAnimatedStyle(() => ({ transform: [{ rotate: `${(beat.value - .5) * .5}deg` }] }));

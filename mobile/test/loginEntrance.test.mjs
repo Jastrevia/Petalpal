@@ -110,8 +110,8 @@ function sceneGeometry(width, height) {
   assert.ok(floralArch, 'Floral arch is rendered as the primary entrance landmark');
   const leftArch = flatten(nodes.find(node => node.props.testID === 'left-arch')?.props.style);
   const rightArch = flatten(nodes.find(node => node.props.testID === 'right-arch')?.props.style);
-  assert.equal(leftArch.transformOrigin.startsWith('22%'), true, 'Left arch anchors to left post');
-  assert.equal(rightArch.transformOrigin.startsWith('78%'), true, 'Right arch anchors to right post');
+  assert.equal(leftArch.transformOrigin[0] === '22%', true, 'Left arch anchors to left post');
+  assert.equal(rightArch.transformOrigin[0] === '78%', true, 'Right arch anchors to right post');
   return {
     unifiedScene: flatten(nodes.find(node => node.props.testID === 'unified-scene-container').props.style),
     plane: flatten(nodes.find(node => node.props.testID === 'entrance-plane').props.style),
@@ -129,7 +129,9 @@ for (const [width, height] of [[430, 932], [1365, 900]]) {
     x: offsetX + geom.vanishX * imageScale,
     y: offsetY + geom.vanishY * imageScale,
   };
-  assert.equal(unifiedScene.transformOrigin, `${vanish.x}px ${vanish.y}px`, 'The unified scene container uses the shared camera origin');
+  // An [x, y, z] array rounded to 0.01 px: native React Native cannot parse decimals in a string origin.
+  const round = value => Math.round(value * 100) / 100;
+  assert.equal(JSON.stringify(unifiedScene.transformOrigin), JSON.stringify([round(vanish.x), round(vanish.y), 0]), 'The unified scene container uses the shared camera origin');
   assert.ok(unifiedScene.transform && unifiedScene.transform.some(t => 'scale' in t), 'Unified scene container has scale transform');
   assert.equal(plane.transform, undefined, 'Entrance plane does not have an independent scale transform');
   assert.equal(garden.transform, undefined, 'Garden background does not have an independent scale transform');

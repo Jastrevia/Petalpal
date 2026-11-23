@@ -1840,7 +1840,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
+      {/* left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
