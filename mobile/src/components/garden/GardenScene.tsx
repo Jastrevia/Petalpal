@@ -6,6 +6,7 @@ import { onboardingActive } from '../onboarding/onboardingStore';
 import { onboardingTarget } from '../onboarding/onboardingTargets';
 import MonthlySignLayer from './month-signs/MonthlySignLayer';
 import MonthlySignControls from './month-signs/MonthlySignControls';
+import { GardenImageScope } from './gardenImageScope';
 import { useMonthlySigns } from './month-signs/useMonthlySigns';
 import FireflyLayer from './fireflies/FireflyLayer';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
@@ -1615,6 +1616,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {fit > 0 && (
         <GestureDetector gesture={cameraGesture}>
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
+          {/* One decode per image for this Garden only (gardenImageScope.tsx). */}
+          <GardenImageScope>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
           <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
@@ -1819,6 +1822,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>
           </PlantingProvider>
           </GardenLandResources>
+          </GardenImageScope>
         </Canvas>
         </GestureDetector>
       )}

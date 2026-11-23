@@ -1,5 +1,6 @@
 import { runtimeAudit } from '../performance/runtimeAudit';
-import { ImageShader, Rect, Shader, Skia, useImage } from '@shopify/react-native-skia';
+import { ImageShader, Rect, Shader, Skia } from '@shopify/react-native-skia';
+import { useGardenImage } from '../gardenImageScope';
 import { memo } from 'react';
 import { useDerivedValue } from 'react-native-reanimated';
 import { GARDEN_WORLD_HEIGHT, GARDEN_WORLD_WIDTH } from '../gardenMapLayout';
@@ -76,8 +77,8 @@ function SurfaceRippleLayer({ active, enabled = true, opacity = 0.35,
   width = GARDEN_WORLD_WIDTH, height = GARDEN_WORLD_HEIGHT,
   softWorldEdges = false, flow: sharedFlow }: SurfaceRippleLayerProps) {
   runtimeAudit.render('SurfaceRippleLayer');
-  const mask = useImage(require('./assets/water-surface-mask.png'));
-  const shoreline = useImage(require('./assets/garden-shore-distance.png'));
+  const mask = useGardenImage(require('./assets/water-surface-mask.png'));
+  const shoreline = useGardenImage(require('./assets/garden-shore-distance.png'));
   const standalone = useWaterTopFlow(active && !sharedFlow, enabled && !sharedFlow);
   const flow = sharedFlow ?? standalone;
   const uniforms = useDerivedValue(() => ({

@@ -24,6 +24,7 @@ test('new sprite, terrain and water shaders compile in the pinned CanvasKit with
     if(cache.has(file))return cache.get(file).exports;
     const module={exports:{}};cache.set(file,module);
     const requireLocal=q=>{
+      if(q.endsWith('/gardenImageScope'))return{useGardenImage:()=>null,GardenImageScope:({children})=>children};
       if(q.startsWith('@/'))return path.join(mobile,q.slice(2));
       if(q.startsWith('.')){
         let resolved=path.resolve(path.dirname(file),q);
@@ -167,6 +168,7 @@ test('new lotus ripples use the shared water clock and retain phase across pause
     const module={exports:{}};cache.set(file,module);
     const requireLocal=q=>{
       if(q==='react')return{memo:fn=>fn,useMemo:fn=>fn()};
+      if(q.endsWith('/gardenImageScope'))return{useGardenImage:()=>null,GardenImageScope:({children})=>children};
       if(q==='react/jsx-runtime')return{jsx,jsxs:jsx};
       if(q==='react-native')return{Platform:{OS:'web'}};
       if(q==='react-native-reanimated')return{useSharedValue:value=>slots[cursor++]??(slots[cursor-1]={value}),useAnimatedReaction:(prepare,react)=>{reaction=()=>react(prepare());}};

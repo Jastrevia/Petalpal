@@ -1,5 +1,6 @@
 import { runtimeAudit } from '../performance/runtimeAudit';
-import { Image, ImageShader, Rect, Shader, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
+import { Image, ImageShader, Rect, Shader, Skia, type SkImage } from '@shopify/react-native-skia';
+import { useGardenImage } from '../gardenImageScope';
 import { Platform } from 'react-native';
 import { useDerivedValue } from 'react-native-reanimated';
 import { useWaterTopFlow, type WaterTopFlow } from './WaterTopAssembly';
@@ -174,10 +175,10 @@ export default function GardenWaterField({ image, active, animated = true, flow 
   image: SkImage; active: boolean; animated?: boolean; flow?: WaterTopFlow;
 }) {
   runtimeAudit.render('GardenWaterField');
-  const material = useImage(require('./assets/painterly-water-base.png'));
-  const floor = useImage(require('./assets/ornamental-water-floor.png'));
-  const shore = useImage(require('./assets/garden-shore-distance.png'));
-  const wet = useImage(require('./assets/water-surface-mask.png'));
+  const material = useGardenImage(require('./assets/painterly-water-base.png'));
+  const floor = useGardenImage(require('./assets/ornamental-water-floor.png'));
+  const shore = useGardenImage(require('./assets/garden-shore-distance.png'));
+  const wet = useGardenImage(require('./assets/water-surface-mask.png'));
   const standalone = useWaterTopFlow(active && !flow, animated && !flow);
   const clock = flow ?? standalone;
   const displayP3 = Platform.OS === 'web' ? 1 : 0;
