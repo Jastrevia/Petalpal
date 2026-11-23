@@ -14,6 +14,7 @@ export type LayoutClass = {
   /** Window size minus the safe-area insets (notch, home indicator, status bar). */
   usableWidth: number;
   usableHeight: number;
+  insets: Insets;
   compact: boolean;
   medium: boolean;
   expanded: boolean;
@@ -42,6 +43,7 @@ export function layoutClassFor(width: number, height: number, insets: Insets = {
     height,
     usableWidth: Math.max(0, width - insets.left - insets.right),
     usableHeight: Math.max(0, height - insets.top - insets.bottom),
+    insets,
     compact: sizeClass === 'compact',
     medium: sizeClass === 'medium',
     expanded: sizeClass === 'expanded',
