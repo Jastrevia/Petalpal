@@ -20,7 +20,12 @@ backend with the 8–64 password rule is live on Render; the review account exis
 
 ## Owner steps, in order
 
-1. Push and merge `fix/review-placeholder-copy` (one PR into `main`).
+0. Confirm production migrations (W27 added 10 on 2026-11-18; Petal Tarot reads a column one of them adds). In your
+   own terminal, with DATABASE_URL copied from Render PetalPal_v2:
+   `cd ~/dev/Petalpal && read -s DBURL && NODE_ENV=production DATABASE_URL="$DBURL" npx prisma migrate status`
+   "Database schema is up to date" = fine. Otherwise back up (`pg_dump -Fc`) and run `migrate deploy` the same way.
+1. Push and merge `fix/review-placeholder-copy` (one PR into `main`): no "coming soon" text, no "Beta tester"
+   badge, and no "Redeem a code" on iOS (Guideline 3.1.1).
 2. Set build number 3:
    `cd ~/dev/Petalpal/mobile && npx eas-cli env:update production --variable-name PETALPAL_IOS_BUILD_NUMBER --value 3`
 3. Build and upload: `git checkout main && git pull`, then
@@ -31,7 +36,8 @@ backend with the 8–64 password rule is live on Render; the review account exis
 5. App Store Connect → 1.0 → select build 1.0 (3).
 6. App Review Information: Sign-in required; User name = the review **account name** (not an email); Password = its
    password; Notes = the text below.
-7. Screenshots: 13-inch iPad (2064 × 2752 or 2752 × 2064) are now required because the app runs on iPad.
+7. Screenshots: 13-inch iPad (2752 × 2064) are now required because the app runs on iPad. Four ready ones are in
+   `docs/release/app-store-ipad13/` (Garden, Events, Our Bond, Mailbox; not committed).
 8. Reply in Resolution Center (text below), then Submit for Review.
 
 ## Review notes (paste into App Review Information → Notes)
