@@ -176,3 +176,32 @@ Found, not changed:
 - Pavilion look-around (`reflection.tsx`): PanResponder with a JS-driven `Animated.Value`, so each move goes UI thread → JS → UI thread (no React render during the drag; nothing else runs on the JS thread there). Moving it to the UI thread means replacing the PanResponder with a gesture-handler pan, which must be tried on a phone against the nested page swipes and the petal ring's own pan. Not attempted without a device.
 - The app is capped at 60 Hz on purpose (`CADisableMinimumFrameDurationOnPhone: false`, b4aec18f: the Garden could not finish 120), while system scrolling on the same phone runs at 120 Hz. A Garden drag will not feel like a system scroll until the Garden can hold 120.
 - A long drag while zoomed in still leaves the snapshot and draws the land live.
+
+## 8. Web: record only the frames a resting Garden paints (2026-11-22, `feat/layout-size-class`)
+
+Open item from #169: on the web Skia's animation mapper recorded a whole new picture on every animation frame (about 60 a second) while a Garden left alone painted only 30, so half the recordings were thrown away. Recording (replaying the whole command list into a picture) is the main script cost at rest.
+
+Change: `patches/@shopify+react-native-skia+2.6.2.patch` now also patches `lib/module/sksg/Container.web.js` (and `src/sksg/Container.web.ts`) to ask `globalThis.__skiaWebFrameGate` before recording, as the native container already asks `__skiaFrameGate` before painting. `GardenCanvas.web.tsx` installs the same gate (`createFrameGate`, moved to `gardenFrameGate.ts` and shared with native), touched by the same pointer events, and paints a picture the gate let through at once. A held frame is recorded on the next animation frame with the newest values, so the last frame is never lost. Nothing about resolution, sampling, detail or the 30 fps resting / full-speed touched cadence changed.
+
+Measured in headless Chrome (fake-data preview, 440×956, 1x, signed in, Garden untouched for 9 s, 10 s window; three runs each, same machine and session):
+
+| | pictures recorded / s | main-thread script ms / s | task ms / s |
+| --- | --- | --- | --- |
+| before | 48.9, 60.4, 59.6 | 573, 515, 476 | 639, 578, 551 |
+| after | 30.4, 31.2, 30.4 | 369, 370, 362 | 409, 412, 402 |
+
+While a finger drags the Garden it still records about 61 a second, and it returns to 30 a few seconds after release. Layout matrix with flows (iPhone SE, iPad Air landscape) after the change: 44/44, no preview errors. Not measured: a real phone browser, battery or temperature; GPU paint cost is unchanged by design (it was already 30 a second).
+
+## 9. Loading: one decode per image per Garden (2026-11-22, `feat/layout-size-class`)
+
+Production web export (fake config, local server, cold cache, 440×956): the guest Garden's first load made 124 requests, 88.2 MB (textures about 72 MB: lossless WebP about 58 MB, PNG about 13 MB; JS 7.9 MB and canvaskit.wasm 7.7 MB uncompressed). Ready (loading screen gone) after 4.0–4.4 s unthrottled, about 59 s on emulated 4G (9 Mbit/s, 40 ms): the first visit is bandwidth-bound. Hashed assets are already `immutable` on Cloudflare, so a repeat visit downloads almost nothing.
+
+Found: the same image was fetched and decoded several times. The water field, submerged rocks and ripples each called `useImage` for the shore-distance and wet masks (3×), and every lotus cluster for its own copy (up to 4×). `gardenImageScope.tsx` adds `useGardenImage`, a drop-in for `useImage` that shares one decode within a Garden scene (provider inside the Garden canvas, so never across Gardens: a Garden root's unmount releases its images, `webNativeHandles.ts`). Outside a scope it is Skia's `useImage`. Result, three interleaved runs: 124 → 113 requests, 88.2 → 87.8 MB, ready time unchanged within noise (before 4.0, 4.4, 4.4 s; after 4.3, 4.8, 4.3 s). The gain is fewer decodes and resident textures, not load time. Remaining duplicates (bridges, stairs, swing frame, tree base) are drawn by both a static-run root and the live root; sharing across roots is unsafe for the same release reason, so they were left.
+
+Checked and rejected: re-encoding the first-load lossless WebPs at maximum effort (`cwebp -lossless -z 9 -exact`) gave the same sizes (already maximal). Open, not done: PNG → lossless WebP is bit-exact (0 differing pixels) and about a third smaller (water floor 2.90 → 1.94 MB; about 4 MB of the 13 MB first-load PNGs) but changes asset names on both platforms; and loading the water and island textures that gate the loading screen before everything else would show the Garden much sooner on slow networks, but details (landmarks, flowers) would then appear after the loading screen lifts — an owner decision.
+
+## 10. Lossless WebP copies of the Garden's PNG artwork (2026-11-22, `feat/layout-size-class`)
+
+36 PNGs on the guest Garden's first load (water surface and floor, koi atlas, shore and wet masks, treehouse, swing, tea set and moon-bed overlays, lanterns, mailbox, month signs, lotus) now have a lossless WebP beside them (`cwebp -lossless -z 9 -exact -metadata none`), and the app requires the WebP. Every copy decodes to the PNG's exact pixels, alpha included (ImageMagick AE 0 at conversion; `mobile/test/runtimeWebpCopies.test.mjs` checks all WebP/PNG pairs with CanvasKit and that runtime code requires no PNG that has a copy). The PNGs carried only sRGB/gAMA chunks (8-bit, no ICC), so colours are unchanged. The PNG stays the source: asset pipelines and their hash baselines under `Resources/` read it. Registered infrastructure art (`nativeRegisteredArtwork.ts`, keyed by the web asset id) was left as PNG. The onboarding fairy sheet now uses its existing identical `poses.webp`, the same file the Garden's mailbox fairy loads.
+
+10.59 MB of PNG became 7.10 MB. Production export, interleaved cold loads: first-load PNG 12.8 → 1.9 MB, total about 88.0 → 84.6 MB; emulated 4G ready 59.3 → 56.8 s (one run each); unthrottled ready within noise. Layout matrix with flows on the export: 22/22.

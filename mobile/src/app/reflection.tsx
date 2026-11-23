@@ -370,9 +370,6 @@ export default function Reflection() {
   useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
   // A phone: each page of the open book fits the screen's width, with a small margin (the spread is two pages wide).
   const scene = useMemo(() => pavilionScene(width, height, phone ? 2 * (screen.width - 16) : undefined, insets.bottom), [width, height, phone, screen.width, insets.bottom]);
-  const instructionLeft = Math.max(12, scene.art.x + scene.art.width * .105);
-  const instructionWidth = Math.min(width - 12, scene.art.x + scene.art.width * .96) - instructionLeft;
-  const instructionTop = scene.art.y + scene.art.height * .63 - 22;
   // A phone frames the painting to fill its screen (scene.compact crops toward the shelf), and the
   // book opens on the desk as the same two-page spread a wide screen shows (owner, 2026-11-08).
   const compact = false, wide = false;
@@ -391,6 +388,12 @@ export default function Reflection() {
   const clampPan = (value: number) => Math.min(panning.current.max, Math.max(panning.current.min, value));
   const shelf = { left: scene.slot('weekly').x, right: scene.slot('collection').x + scene.slot('collection').width };
   const shelfFrame = clampPan(screen.width / 2 - (shelf.left + shelf.right) / 2);
+  // The carved "Select a book…" stays inside what the shelf view shows: on a phone the painting is wider than the
+  // screen, and the line ran past both edges (its letters shrink to the width it is given).
+  const seenLeft = phone ? -shelfFrame + 12 : 12, seenRight = phone ? -shelfFrame + screen.width - 12 : width - 12;
+  const instructionLeft = Math.max(seenLeft, scene.art.x + scene.art.width * .105);
+  const instructionWidth = Math.min(seenRight, scene.art.x + scene.art.width * .96) - instructionLeft;
+  const instructionTop = scene.art.y + scene.art.height * .63 - 22;
   const bookFrame = clampPan(12 - scene.table.x);
   const framing = phone ? (open ? bookFrame : shelfFrame) : 0;
   useEffect(() => {

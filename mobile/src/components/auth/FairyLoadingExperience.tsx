@@ -492,7 +492,7 @@ const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperie
             style={[
               StyleSheet.absoluteFill,
               {
-                transformOrigin: `${(778 / 1040) * 100}% ${(510 / 783) * 100}%`,
+                transformOrigin: [`${((778 / 1040) * 100).toFixed(2)}%`, `${((510 / 783) * 100).toFixed(2)}%`, 0], // an array: native cannot parse decimals in a string origin
                 transform: [{ rotate: `${frame.headTiltDeg}deg` }],
               } as any,
             ]}

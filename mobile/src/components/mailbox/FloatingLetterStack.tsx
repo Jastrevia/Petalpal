@@ -352,7 +352,11 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
 
   const stackTop = isWide ? 18 : 28;
 
-  const stackStep = isWide ? 120 : previewEnvelopeHeight - 14;
+  // The waiting envelopes overlap more on a short screen (a phone held sideways), so the last one still ends
+  // inside the stack's room instead of running past the bottom of the screen.
+  const roomForFan = viewportHeight - stackTop - previewEnvelopeHeight;
+  const stackStep = Math.max(24, Math.min(isWide ? 120 : previewEnvelopeHeight - 14,
+    backgroundLetters.length > 1 ? roomForFan / (backgroundLetters.length - 1) : Infinity));
 
   const peekingFanOffsets = backgroundLetters.map((_, i) => ({
 

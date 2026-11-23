@@ -1,4 +1,5 @@
 import { PrivacyLinks } from './features/PrivacyAndSupport';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COMMUNITY_VERSION, COMMUNITY_TEXT, COMMUNITY_TEXT_ZH } from './features/CommunityGuidelines';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -36,6 +37,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
   // Signed out, the sign-in page comes first ("You’re always welcome here"); its Create account opens the create page.
   const [mode, setMode] = useState<Mode>('signIn');
+  // The sign-in page's corner buttons clear the status bar (on an iPad they sat on the clock and battery).
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -112,8 +115,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }}
       onForgotPassword={auth.resetPassword}
       authError={auth.error} authMessage={auth.message} footer={<><PrivacyLinks />{devVariant ? <DeviceResetButton /> : null}</>} />
-      {backToGarden ? <View style={styles.signInBack}>{backToGarden}</View> : null}
-      <View style={styles.signInLanguage}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} /></View></View>);
+      {backToGarden ? <View style={[styles.signInBack, { top: insets.top + 12, left: insets.left + 12 }]}>{backToGarden}</View> : null}
+      <View style={[styles.signInLanguage, { top: insets.top + 12, right: insets.right + 12 }]}><LanguageSwitch value={chosenLocale} onChange={chooseLocale} /></View></View>);
   }
   // Restoring the session can't be measured, so the bar waits (pulsing dots, bird over the start); the Garden's own
   // loading screen takes over in the same place with measured progress once it mounts.

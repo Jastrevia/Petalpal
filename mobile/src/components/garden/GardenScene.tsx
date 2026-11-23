@@ -6,6 +6,7 @@ import { onboardingActive } from '../onboarding/onboardingStore';
 import { onboardingTarget } from '../onboarding/onboardingTargets';
 import MonthlySignLayer from './month-signs/MonthlySignLayer';
 import MonthlySignControls from './month-signs/MonthlySignControls';
+import { GardenImageScope } from './gardenImageScope';
 import { useMonthlySigns } from './month-signs/useMonthlySigns';
 import FireflyLayer from './fireflies/FireflyLayer';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
@@ -1615,6 +1616,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {fit > 0 && (
         <GestureDetector gesture={cameraGesture}>
         <Canvas ref={canvasRef} style={styles.scene} active={worldActive}>
+          {/* One decode per image for this Garden only (gardenImageScope.tsx). */}
+          <GardenImageScope>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
           <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
@@ -1819,6 +1822,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>
           </PlantingProvider>
           </GardenLandResources>
+          </GardenImageScope>
         </Canvas>
         </GestureDetector>
       )}
@@ -1834,13 +1838,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           cameraX.value -= viewport.width * 0.3;
           cameraY.value += viewport.height * 0.25;
         }} />}
-      {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
+      {/* 39: under the bottom navigation (layer 40), which stays above every Garden layer (a5c98513). */}
+      {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 39 }]}>
         <PetRingMenu key={petRing.id} petId={petRing.id} pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
           onAction={kind => gardenPets.current?.act(petRing.id, kind) ?? 0} />
       </View>}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
+      {/* left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
+      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
@@ -2445,7 +2451,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 }
 
 const styles = StyleSheet.create({
-  scene: { flex: 1, backgroundColor: GARDEN_WATER_COLOR },
+  // Clipped: the month signs' tap targets follow the camera past the window edge and, unclipped, widened the web page.
+  scene: { flex: 1, overflow: 'hidden', backgroundColor: GARDEN_WATER_COLOR },
   fairyAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#365b42', alignItems: 'center' },
   fairyActionText: { color: '#fff', fontSize: 14 },
   treehouseHint: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, alignItems: 'center',

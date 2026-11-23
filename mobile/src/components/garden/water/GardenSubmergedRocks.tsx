@@ -1,4 +1,5 @@
-import { BlurStyle, Image, ImageShader, Rect, Shader, Skia, TileMode, useImage } from '@shopify/react-native-skia';
+import { BlurStyle, Image, ImageShader, Rect, Shader, Skia, TileMode } from '@shopify/react-native-skia';
+import { useGardenImage } from '../gardenImageScope';
 import { memo, useMemo } from 'react';
 import { useDerivedValue } from 'react-native-reanimated';
 import { type WaterTopFlow } from './WaterTopAssembly';
@@ -159,8 +160,8 @@ function GardenSubmergedRocks({ flow }: { flow: WaterTopFlow }) {
   // the images it drew, so a module-wide copy shared with a friend's Garden was
   // deleted under the still-mounted home Garden when the visitor returned.
   const floor = useMemo(makeFloor, []);
-  const shore=useImage(require('./assets/garden-shore-distance.png'));
-  const wet=useImage(require('./assets/water-surface-mask.png'));
+  const shore=useGardenImage(require('./assets/garden-shore-distance.webp'));
+  const wet=useGardenImage(require('./assets/water-surface-mask.webp'));
   const uniforms=useDerivedValue(() => ({
     seconds: flow.enabled ? flow.seconds.value : 0,
   }), [flow.enabled, flow.seconds]);

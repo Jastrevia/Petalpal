@@ -140,6 +140,7 @@ function controls(planting) {
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' }, useAnimatedStyle: fn => fn() },
     './PlantingContext': { usePlanting: () => planting },
     '../../../services/locale': { useAppLocale: () => 'en' },
+    '../../../hooks/useLayoutClass': { useLayoutClass: () => ({ compactHeight: false, width: 390, insets: { top: 0, right: 0, bottom: 0, left: 0 } }) },
   });
   const Controls = load('PlantingPlacementControls').default;
   const camera = { x: shared(10), y: shared(20), zoom: shared(2), baseX: 5, baseY: 7, fit: 0.5 };

@@ -360,9 +360,9 @@ export default function SwingEntity({
 
   const frame = useProductionImage(require('@/assets/garden/landmarks/swing/frame-static.webp'));
   const decor = useProductionImage(require('@/assets/garden/landmarks/swing/hanging-decor.webp'));
-  const lanterns = useProductionImage(require('@/assets/garden/landmarks/swing/lanterns.png'));
+  const lanterns = useProductionImage(require('@/assets/garden/landmarks/swing/lanterns.webp'));
   const movingBack = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-back.webp'));
-  const movingFront = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-front.png'));
+  const movingFront = useProductionImage(require('@/assets/garden/landmarks/swing/swing-moving-front.webp'));
   const foreground = useProductionImage(require('@/assets/garden/landmarks/swing/foreground-overlay.webp'));
   const layers = [frame, decor, lanterns, movingBack, movingFront, foreground];
   const names = SWING_LAYER_NAMES.filter((name) =>

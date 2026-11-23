@@ -3,7 +3,8 @@ import { useWaterTopFlow, type WaterTopFlow } from './WaterTopAssembly';
 import type { DerivedValue, SharedValue } from 'react-native-reanimated';
 import {runtimeAudit} from '../performance/runtimeAudit';
 import GardenLotusContact from './GardenLotusContact';
-import { Group, Image, useImage, type SkImage, type Transforms3d } from '@shopify/react-native-skia';
+import { Group, Image, type SkImage, type Transforms3d } from '@shopify/react-native-skia';
+import { useGardenImage } from '../gardenImageScope';
 import { memo, useMemo } from 'react';
 import {
   cancelAnimation,
@@ -257,7 +258,7 @@ const LotusClusterItem = memo(function LotusClusterItem({
   onOccluder,
 }: LotusClusterItemProps) {
   const asset = LOTUS_CLUSTER_ASSETS[placement.variant];
-  const staticImg = useImage(asset.static);
+  const staticImg = useGardenImage(asset.static);
 
   const reducedMotion = useReducedMotion();
   const swayPhaseVal = useSharedValue(placement.swayPhase ?? 0);

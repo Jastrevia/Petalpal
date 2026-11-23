@@ -13,6 +13,7 @@ import { MONTH_REGION_METAS } from './plantingRegionData';
 import { clusterFootprintRadius } from './flowerClusters';
 import { useAppLocale } from '../../../services/locale';
 import { flowerNameText } from '../../../services/flowerNames';
+import { useLayoutClass } from '../../../hooks/useLayoutClass';
 
 /** The Garden camera, to keep the ✓ under the ghost while the view moves. */
 export interface PlantingCamera {
@@ -91,6 +92,9 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
     placementNotice,
   } = usePlanting();
   const zh = useAppLocale() === 'zh-Hans';
+  // Below the status bar / Dynamic Island; on a phone held sideways only the essentials, so the card does not
+  // cover the top of the bed being planted (it hid a third of the screen there).
+  const { compactHeight, insets, width } = useLayoutClass();
 
   if (activeMode === 'normal' || !targetFlower) {
     return null;
@@ -114,12 +118,14 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
       {/* Top Guidance Banner */}
-      <View {...onboardingTarget('planting.banner')} style={styles.topBanner}>
-        <View style={styles.badgeContainer}>
+      {/* At most 640 wide: on a desktop or iPad in landscape the card no longer spans the whole screen. */}
+      <View {...onboardingTarget('planting.banner')} style={[styles.topBanner, { marginTop: insets.top + (compactHeight ? 6 : 16),
+        width: Math.min(width - 32, 640) }, compactHeight && styles.topBannerCompact]}>
+        {compactHeight ? null : <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {zh ? '🌱 正在种花' : '🌱 PLANTING FLOWER'}
           </Text>
-        </View>
+        </View>}
         <Text style={styles.titleText}>
           {targetFlower.flowerName ? `${zh ? flowerNameText(targetFlower.flowerName, 'zh-Hans') : targetFlower.flowerName.toUpperCase()} — ` : ''}
           {zh ? `${monthName}花园` : `${monthName} Garden`}
@@ -141,12 +147,12 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
             {feedback}
           </Text>
         </View>
-        <Text style={styles.foreverText}>
+        {compactHeight && !(previewCoords && !isValid) ? null : <Text style={styles.foreverText}>
           {previewCoords && !isValid
             // A tap outside the bed never drops the flower: it waits, with its Event, until it is planted.
             ? (zh ? '只能种在发着柔光的花床里。你的 Event 和这朵花都还在，选好位置再点 ✓。' : 'Only the glowing bed can take it. Your Event and flower are kept; pick a spot there, then tap ✓.')
             : (zh ? '种下以后，位置就不能再改了。' : 'Once planted, it stays in this spot for good.')}
-        </Text>
+        </Text>}
 
         {showPlacementDebug && previewCoords && (
           <Text style={styles.debugText}>
@@ -199,7 +205,7 @@ const styles = StyleSheet.create({
   },
   topBanner: {
     alignItems: 'center',
-    marginHorizontal: 16,
+    alignSelf: 'center',
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -213,6 +219,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  topBannerCompact: { paddingVertical: 6 },
   badgeContainer: {
     paddingHorizontal: 8,
     paddingVertical: 2,

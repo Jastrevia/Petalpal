@@ -122,9 +122,9 @@ export default function TreehouseEntity({
   const treeBase = useProductionImage(require('@/assets/garden/landmarks/treehouse/tree-base.webp'));
   const canopy = useProductionImage(require('@/assets/garden/landmarks/treehouse/canopy-overlay.webp'));
   const wisteria = useProductionImage(require('@/assets/garden/landmarks/treehouse/wisteria-overlay.webp'));
-  const mailbox = useProductionImage(require('@/assets/garden/landmarks/treehouse/mailbox.png'));
-  const warmLight = useProductionImage(require('@/assets/garden/landmarks/treehouse/warmlight.png'));
-  const foreground = useProductionImage(require('@/assets/garden/landmarks/treehouse/foreground-overlay.png'));
+  const mailbox = useProductionImage(require('@/assets/garden/landmarks/treehouse/mailbox.webp'));
+  const warmLight = useProductionImage(require('@/assets/garden/landmarks/treehouse/warmlight.webp'));
+  const foreground = useProductionImage(require('@/assets/garden/landmarks/treehouse/foreground-overlay.webp'));
 
   const layers = [treeBase, canopy, wisteria, mailbox, warmLight, foreground];
   const status = __DEV__ ? layers.map(({ image, error }, index) =>

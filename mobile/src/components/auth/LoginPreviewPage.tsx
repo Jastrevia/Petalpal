@@ -11,7 +11,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +23,7 @@ import { ENTRANCE_STILLS } from './entranceTimeline';
 import { FairyLoadingExperience } from './FairyLoadingExperience';
 import { Link } from 'expo-router';
 import { useSignedOutLocale } from '../../services/signedOutLocale';
+import { useLayoutClass } from '../../hooks/useLayoutClass';
 const INVITATION_MATERIALS = require('../../../assets/auth/invitation_materials_repaired.webp');
 
 // Top Botanical Sprout Fleuron above PetalPal brand title
@@ -236,7 +236,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   const live = !!onSignIn;
   const LOGIN_COPY = LOGIN_COPIES[useSignedOutLocale() === 'zh-Hans' ? 'zh' : 'en'];
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, usableWidth } = useLayoutClass();
 
   // Form interactive state (Layer C)
   const [email, setEmail] = useState('');
@@ -457,7 +457,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   // The invitation's size in points, not '100%' + maxWidth + aspectRatio: on iOS and Android the height came
   // from the full width before the cap, so on an iPad the card stood far taller than the art and the fields
   // sat above the paper (App Review 2026-11-22). The web was right either way.
-  const envelopeWidth = Math.max(0, Math.min(440, windowWidth - 36 - insets.left - insets.right));
+  const envelopeWidth = Math.max(0, Math.min(440, usableWidth - 36));
   const envelopeSize = { width: envelopeWidth, height: envelopeWidth * 792 / 608 };
   const handoffOpacity = entranceTrack(entrance.progress, 'handoffOpacity', entrance.reduced);
 

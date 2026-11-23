@@ -13,6 +13,10 @@ const images=new Map(), values=[], cleanups=[];
 const react={memo:f=>f,useMemo:f=>f(),useEffect:fn=>{const cleanup=fn();if(cleanup)cleanups.push(cleanup);}};
 const reanimated={useSharedValue:value=>{const shared={value};values.push(shared);return shared;},
   useDerivedValue:fn=>({get value(){return fn();}}),useReducedMotion:()=>false,useAnimatedReaction:()=>{},cancelAnimation:()=>{},withTiming:value=>value,withRepeat:value=>value,Easing:{linear:t=>t}};
+function decodeAsset(asset){
+  if(!images.has(asset)) images.set(asset,ck.MakeImageFromEncoded(fs.readFileSync(path.join(root,asset.replace('@/','')))));
+  return images.get(asset);
+}
 const load=loadPlantingModules(undefined,react,undefined,true,{
   'react-native-reanimated':reanimated,
   './WaterTopAssembly':{useWaterTopFlow:()=>({seconds:clock,enabled:true})},
@@ -21,10 +25,8 @@ const load=loadPlantingModules(undefined,react,undefined,true,{
   '../performance/runtimeAudit':{runtimeAudit:{render:()=>{}}},
   '@shopify/react-native-skia':{Group:'Group',Paint:'Paint',Mask:'Mask',Rect:'Rect',Image:'Image',ColorMatrix:'ColorMatrix',Shader:'Shader',ImageShader:'ImageShader',
     Skia:{RuntimeEffect:{Make:source=>ck.RuntimeEffect.Make(source,message=>{throw new Error(message);})}},
-    useImage:asset=>{
-      if(!images.has(asset)) images.set(asset,ck.MakeImageFromEncoded(fs.readFileSync(path.join(root,asset.replace('@/','')))));
-      return images.get(asset);
-    }},
+    useImage:decodeAsset},
+  '../gardenImageScope':{useGardenImage:decodeAsset},
 });
 const {Otter}=load('../spirits/MemoryOtter');
 const clock={value:0}, network={nodes:[{x:600,y:1450,links:[1]},{x:800,y:1450,links:[0]}],bounds:{}};

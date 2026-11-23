@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCollectionAlerts } from '../../services/collectionAlerts';
 import { useNewcomerGlow } from '../../services/newcomerTime';
@@ -10,6 +10,7 @@ import { onKeepsakeLanded, registerCollectionIcon } from '../collection/collecti
 import { AttentionGlow } from '../features/AttentionGlow';
 import { useUnreadMail } from '../mailbox/mailboxReadState';
 import { PetalRing } from '../petalCards/PetalRing';
+import { useLayoutClass } from '../../hooks/useLayoutClass';
 
 // Under the calendar, against the right edge: single painted icons, no bar around them (the bar at
 // the bottom keeps Events, Friends, Fairy and Me). From the top: Petal Tarot, Letters, Collection.
@@ -28,7 +29,7 @@ const FRESH_MS = 1500;
 
 export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { usableWidth, compactHeight: short, phoneChrome: phone } = useLayoutClass();
   const copy = COPY[chinese ? 'zh-Hans' : 'en'], collectionCopy = COLLECTION_COPY[chinese ? 'zh-Hans' : 'en'];
   const unreadMail = useUnreadMail();
   const newcomer = useNewcomerGlow(ownerId);
@@ -58,10 +59,8 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
     opening.current = false;
     setRing(fresh ?? petal);
   }
-  const short = height < 500;
   // The same size as the bottom bar's icons, so the Garden stays in view.
-  const phone = width < 600 || (width < 900 && short);
-  const size = phone ? Math.max(28, Math.min(short ? 30 : 38, (width - insets.left - insets.right) / 10)) : 42;
+  const size = phone ? Math.max(28, Math.min(short ? 30 : 38, usableWidth / 10)) : 42;
   const drawn = Boolean(petal?.drawn);
   const item = (id: string, image: ImageSourcePropType, label: string, a11y: string, onPress: () => void, waiting = false, dot = false,
     ref?: RefObject<View | null>) =>

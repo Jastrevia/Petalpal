@@ -72,7 +72,7 @@ const SPEED = { subtle:.65, normal:1, strong:1.45 };
 
 function FishLayer({ active, enabled=true, opacity=1, motionPreset='normal', density='normal' }:FishLayerProps) {
   runtimeAudit.render('FishLayer');
-  const image = useImage(require('./terrain/koi-atlas-v2.png'));
+  const image = useImage(require('./terrain/koi-atlas-v2.webp'));
   const reducedMotion = useReducedMotion();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   useEffect(() => {
