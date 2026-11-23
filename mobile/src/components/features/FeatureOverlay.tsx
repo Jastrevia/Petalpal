@@ -226,7 +226,8 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
     <View style={styles.badges}>
       {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
         <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
-      <RedeemCodeChip />
+      {/* Not on iOS: App Review 3.1.1 allows no unlocks outside In-App Purchase, and its gift is not made yet (2.1). */}
+      {Platform.OS === 'ios' ? null : <RedeemCodeChip />}
     </View>
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
     {/* Me → My avatars (Avatar System V1.0): how many are owned and what waits, the same screen as Collection. */}
