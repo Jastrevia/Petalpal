@@ -4,6 +4,7 @@ import { useGardenLoadState, type GardenLoadStore } from './gardenReadiness';
 import { WakingFlowerFacts } from '../../loading/WakingFlowerFacts';
 import { PigeonLoadingScreen } from '../../loading/PigeonLoadingExperience';
 import { useAppLocale } from '../../../services/locale';
+import { useLayoutClass } from '../../../hooks/useLayoutClass';
 
 // Covers the canvas until the water base and land textures decode. After
 // 30 s it shrinks to a small banner so a slow or failed image never hides the
@@ -15,6 +16,8 @@ import { useAppLocale } from '../../../services/locale';
 export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore; title?: string }) {
   const zh = useAppLocale() === 'zh-Hans';
   const load = useGardenLoadState(store);
+  // A phone held sideways has no room for the flower fact under the bar: it ran off the screen behind the bottom icons.
+  const { compactHeight } = useLayoutClass();
   const ready = load.water === 'ready' && load.landsLoaded >= load.landsTotal;
   const [elapsed, setElapsed] = useState(0);
   // Ready, and the loading screen has faded: nothing left to cover.
@@ -59,7 +62,7 @@ export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore;
       {failures ? reload : null}
       {elapsed >= 12_000 ? <Text style={gardenLoadingStyles.hint}>{zh ? '网络较慢时，第一次打开可能要一分钟。' : 'The first visit can take up to a minute on a slow connection.'}</Text> : null}
     </>}>
-    <WakingFlowerFacts delayMs={4000} showNote={false} />
+    {compactHeight ? null : <WakingFlowerFacts delayMs={4000} showNote={false} />}
   </PigeonLoadingScreen>;
 }
 

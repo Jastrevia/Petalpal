@@ -131,8 +131,9 @@ const results = [];
 async function shoot(page, size, screen, { scrolls = false } = {}) {
   if (SCREENS && !SCREENS.includes(screen)) return;
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: path.join(OUT, `${size}--${screen}.png`) });
-  const problems = await overflow(page, { scrolls });
+  // A busy machine can stall one screenshot; record it and go on rather than end the run.
+  const shot = await page.screenshot({ path: path.join(OUT, `${size}--${screen}.png`), timeout: 30_000 }).then(() => null, error => error);
+  const problems = shot ? [`screenshot failed: ${String(shot.message).split('\n')[0]}`] : await overflow(page, { scrolls }).catch(error => [`check failed: ${String(error.message).split('\n')[0]}`]);
   results.push({ size, screen, problems });
   console.log(`  ${problems.length ? '✗' : '✓'} ${screen}${problems.length ? '' : ''}`);
   for (const problem of problems) console.log(`      ${problem}`);
@@ -159,7 +160,10 @@ try {
       await fresh.route('**/*', route => new URL(route.request().url()).hostname === new URL(BASE).hostname ? route.continue() : route.abort());
       return fresh;
     };
-    let context = await newContext();
+    let context = null;
+    // One size going wrong (a crash, a stuck page) is reported and the run moves on to the next size.
+    try {
+    context = await newContext();
 
     // Signed out: the guest Garden, then the account pages a guest reaches from it.
     let page = await context.newPage();
@@ -249,7 +253,11 @@ try {
       } else for (const screen of ['garden', 'events', 'me']) await missed(size, screen, 'no sign-in form');
       await page.close();
     }
-    await context.close();
+    } catch (error) {
+      results.push({ size, screen: '(run)', problems: [`stopped early: ${String(error.message).split('\n')[0]}`] });
+      console.log(`  ✗ stopped early: ${String(error.message).split('\n')[0]}`);
+    }
+    await context?.close().catch(() => {});
   }
 } finally {
   await browser.close();

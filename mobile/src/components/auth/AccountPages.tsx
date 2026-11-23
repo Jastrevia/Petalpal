@@ -77,7 +77,8 @@ export function AccountFrame({ title, subtitle, left, right, children, fairyAt, 
       accessibilityIgnoresInvertColors />
     <View style={styles.veil} pointerEvents="none" />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.page, { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 28 }]}>
+      {/* Keyed by the page: Create account → Welcome opened scrolled down to where the button was, title out of view. */}
+      <ScrollView key={title} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.page, { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 28 }]}>
         <View style={[styles.card, { width: card }]} testID="account-card">
           <View style={styles.cardInset} pointerEvents="none" />
           <View style={styles.ornament}><Icon name="fleuron" size={26} color={GOLD} /></View>
