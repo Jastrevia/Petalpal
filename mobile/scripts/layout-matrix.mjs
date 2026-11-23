@@ -92,7 +92,7 @@ async function overflow(page, { scrolls }) {
       return true;
     };
     // The Garden's month signs are world objects that pan with the camera; off-screen is where they belong.
-    const worldObject = /^(Open Pavilion for|Move|Enter Treehouse) /;
+    const worldObject = /^(Open Pavilion for|Move|Enter Treehouse|Enter Reflection) /;
     const controls = document.querySelectorAll('[role="button"],button,input,textarea,[role="radio"],[role="checkbox"],[role="link"],a[href]');
     const cut = [];
     for (const element of controls) {
@@ -140,9 +140,12 @@ const visible = locator => locator.isVisible().catch(() => false);
 const appears = (locator, timeout = 10_000) => locator.waitFor({ timeout }).then(() => true, () => false);
 async function backToGarden(page) {
   for (let step = 0; step < 4 && !(await visible(page.getByTestId('hud-events'))); step++) {
-    const close = page.getByRole('button', { name: /^(Close|Back to Garden|Back|Return to My Garden)$/ }).last();
-    if (await visible(close)) await close.click({ force: true, timeout: 5000 }).catch(() => {});
-    else await page.goBack().catch(() => {});
+    // Never history back: the app is one page, and back from its first entry leaves it (a blank tab).
+    // A letter first folds back; then the page's own close. Pressed in the page (element.click), since the local
+    // preview's banner sits over the top-left ✕ and would take a pointer click there.
+    const close = page.getByRole('button', { name: /^(Fold letter back into envelope|Close Mailbox|Close calendar|Close|Back to Garden|Back|Return to My Garden|Cancel)$/ }).first();
+    if (await visible(close)) await close.evaluate(element => element.click()).catch(() => close.click({ force: true, timeout: 5000 }).catch(() => {}));
+    else await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(1500);
   }
   await page.getByRole('button', { name: 'Close' }).last().click({ force: true, timeout: 3000 }).catch(() => {});
@@ -177,9 +180,18 @@ async function playGarden(page, size) {
     if (!(await appears(plant, 45_000))) return 'no Plant button after saving';
     await shoot(page, size, 'event-saved', { scrolls: true });
     await plant.click({ force: true });
-    const confirm = page.getByTestId('planting-confirm-button');
-    if (!(await appears(confirm, 20_000))) return 'planting mode did not open';
+    // Planting mode frames the month's glowing bed and waits for a tap in it; the ✓ shows after that tap.
+    if (!(await appears(page.getByText(/Tap the spot in the glowing/).first(), 20_000))) return 'planting mode did not open';
+    await page.waitForTimeout(2500);
     await shoot(page, size, 'planting');
+    const confirm = page.getByTestId('planting-confirm-button');
+    const view = page.viewportSize();
+    for (const [fx, fy] of [[0.5, 0.5], [0.42, 0.48], [0.58, 0.55], [0.5, 0.42]]) {
+      if (await visible(confirm)) break;
+      await page.mouse.click(view.width * fx, view.height * fy);
+      await page.waitForTimeout(1500);
+    }
+    if (!(await visible(confirm))) { await missed(size, 'planted', 'no spot in the bed took the tap'); return; }
     if (await confirm.isEnabled().catch(() => false)) {
       await confirm.click({ force: true });
       await page.waitForTimeout(5000);
@@ -247,8 +259,10 @@ async function playGarden(page, size) {
   await backToGarden(page);
 
   await step('calendar', async () => {
-    await page.locator('[aria-label^="Open Garden calendar"]').first().click({ force: true });
-    await page.waitForTimeout(3000);
+    const opener = page.locator('[aria-label^="Open Garden calendar"]').first();
+    await opener.evaluate(element => element.click()).catch(() => opener.click({ force: true }));
+    if (!(await appears(page.getByRole('button', { name: 'Close calendar' }).first(), 8000))) return 'the calendar did not open';
+    await page.waitForTimeout(1500);
     await shoot(page, size, 'calendar', { scrolls: true });
   });
   await backToGarden(page);
@@ -264,8 +278,9 @@ async function playGarden(page, size) {
 }
 
 const results = [];
+const wanted = screen => !SCREENS || SCREENS.includes(screen) || (FLOWS && FLOW_SCREENS.includes(screen));
 async function shoot(page, size, screen, { scrolls = false } = {}) {
-  if (SCREENS && !SCREENS.includes(screen)) return;
+  if (!wanted(screen)) return;
   await page.waitForTimeout(1200);
   // A busy machine can stall one screenshot; record it and go on rather than end the run.
   const shot = await page.screenshot({ path: path.join(OUT, `${size}--${screen}.png`), timeout: 30_000 }).then(() => null, error => error);
@@ -275,7 +290,7 @@ async function shoot(page, size, screen, { scrolls = false } = {}) {
   for (const problem of problems) console.log(`      ${problem}`);
 }
 async function missed(size, screen, why) {
-  if (SCREENS && !SCREENS.includes(screen)) return;
+  if (!wanted(screen)) return;
   results.push({ size, screen, problems: [`could not reach the screen: ${why}`] });
   console.log(`  ✗ ${screen} — could not reach it: ${why}`);
 }
