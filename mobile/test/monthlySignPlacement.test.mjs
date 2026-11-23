@@ -8,7 +8,11 @@ const plain=x=>JSON.parse(JSON.stringify(x));
 test('exactly one valid sign per existing monthly Land, with original supplied PNGs',()=>{
  assert.deepEqual(plain(initial.map(p=>p.month)),Array.from({length:12},(_,i)=>i+1));
  for(const p of initial){assert.ok(valid(p),`month ${p.month}`);}
- const files=fs.readdirSync(new URL('../assets/garden/month-signs/',import.meta.url));assert.equal(files.length,12);
+ // 12 PNG sources and, beside each, the lossless WebP copy the app loads (runtimeWebpCopies.test.mjs checks the pixels).
+ const all=fs.readdirSync(new URL('../assets/garden/month-signs/',import.meta.url));
+ const files=all.filter(f=>f.endsWith('.png'));assert.equal(files.length,12);
+ assert.deepEqual(all.filter(f=>f.endsWith('.webp')).sort(),files.map(f=>f.replace(/\.png$/,'.webp')).sort());
+ assert.equal(all.length,24);
  for(const file of files)assert.ok(fs.readFileSync(new URL(`../assets/garden/month-signs/${file}`,import.meta.url)).subarray(1,4).equals(Buffer.from('PNG')));
 });
 test('save and reload preserve each independent placement and the fixed roster',()=>{

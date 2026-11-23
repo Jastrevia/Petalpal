@@ -175,10 +175,10 @@ export default function GardenWaterField({ image, active, animated = true, flow 
   image: SkImage; active: boolean; animated?: boolean; flow?: WaterTopFlow;
 }) {
   runtimeAudit.render('GardenWaterField');
-  const material = useGardenImage(require('./assets/painterly-water-base.png'));
-  const floor = useGardenImage(require('./assets/ornamental-water-floor.png'));
-  const shore = useGardenImage(require('./assets/garden-shore-distance.png'));
-  const wet = useGardenImage(require('./assets/water-surface-mask.png'));
+  const material = useGardenImage(require('./assets/painterly-water-base.webp'));
+  const floor = useGardenImage(require('./assets/ornamental-water-floor.webp'));
+  const shore = useGardenImage(require('./assets/garden-shore-distance.webp'));
+  const wet = useGardenImage(require('./assets/water-surface-mask.webp'));
   const standalone = useWaterTopFlow(active && !flow, animated && !flow);
   const clock = flow ?? standalone;
   const displayP3 = Platform.OS === 'web' ? 1 : 0;

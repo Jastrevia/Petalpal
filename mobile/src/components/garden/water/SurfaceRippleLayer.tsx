@@ -77,8 +77,8 @@ function SurfaceRippleLayer({ active, enabled = true, opacity = 0.35,
   width = GARDEN_WORLD_WIDTH, height = GARDEN_WORLD_HEIGHT,
   softWorldEdges = false, flow: sharedFlow }: SurfaceRippleLayerProps) {
   runtimeAudit.render('SurfaceRippleLayer');
-  const mask = useGardenImage(require('./assets/water-surface-mask.png'));
-  const shoreline = useGardenImage(require('./assets/garden-shore-distance.png'));
+  const mask = useGardenImage(require('./assets/water-surface-mask.webp'));
+  const shoreline = useGardenImage(require('./assets/garden-shore-distance.webp'));
   const standalone = useWaterTopFlow(active && !sharedFlow, enabled && !sharedFlow);
   const flow = sharedFlow ?? standalone;
   const uniforms = useDerivedValue(() => ({

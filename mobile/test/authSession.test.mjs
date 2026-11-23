@@ -328,7 +328,7 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
     './features/AccountRecovery': { ConnectEmailScreen: 'ConnectEmailScreen' },
     '../constants/theme': { Fonts: { sans: 'sans', rounded: 'rounded' }, Spacing: { two: 8, three: 16, four: 24 } },
     '../constants/orientation': { MODAL_ORIENTATIONS: ['portrait', 'portrait-upside-down', 'landscape'] },
-    'react-native-safe-area-context': { SafeAreaInsetsContext: { _currentValue: null } },
+    'react-native-safe-area-context': { SafeAreaInsetsContext: { _currentValue: null }, useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) },
     'expo-splash-screen': { hideAsync: async () => {} },
     'expo-router': { router: { replace: (path) => replaced.push(path) }, usePathname: () => '/' },
     '../services/guest': { GuestContext: { Provider: 'GuestProvider' } },

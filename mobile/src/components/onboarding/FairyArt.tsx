@@ -64,7 +64,7 @@ export function FairyGlide({ height }: { height: number }) {
 export function FairyReach({ height }: { height: number }) {
   const scale = height / REACH.height;
   return <View pointerEvents="none" style={{ width: REACH.width * scale, height, overflow: 'hidden' }}>
-    <Image source={require('@/assets/garden/fairy/mailbox-v1/poses.png')} accessible={false} resizeMode="stretch"
+    <Image source={require('@/assets/garden/fairy/mailbox-v1/poses.webp')} accessible={false} resizeMode="stretch"
       style={{ position: 'absolute', left: -REACH.x * scale, top: -REACH.y * scale, width: REACH.atlas * scale, height: REACH.atlas * scale }} />
   </View>;
 }

@@ -86,9 +86,9 @@ export default function TeaSetEntity({
   const leftBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-chair-base.webp'));
   const rightBase = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-chair-base.webp'));
   const table = useProductionImage(require('@/assets/garden/landmarks/tea-set/tea-table.webp'));
-  const leftOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-occluder.png'));
-  const rightOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-occluder.png'));
-  const leftOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-overlay.png'));
+  const leftOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-occluder.webp'));
+  const rightOccluder = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-occluder.webp'));
+  const leftOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/left-overlay.webp'));
   const rightOverlay = useProductionImage(require('@/assets/garden/landmarks/tea-set/right-overlay.webp'));
   const layers = [leftBase, rightBase, table, leftOccluder, rightOccluder, leftOverlay, rightOverlay];
   const mode = __DEV__ ? debugMode : 'all';

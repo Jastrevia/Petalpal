@@ -160,8 +160,8 @@ function GardenSubmergedRocks({ flow }: { flow: WaterTopFlow }) {
   // the images it drew, so a module-wide copy shared with a friend's Garden was
   // deleted under the still-mounted home Garden when the visitor returned.
   const floor = useMemo(makeFloor, []);
-  const shore=useGardenImage(require('./assets/garden-shore-distance.png'));
-  const wet=useGardenImage(require('./assets/water-surface-mask.png'));
+  const shore=useGardenImage(require('./assets/garden-shore-distance.webp'));
+  const wet=useGardenImage(require('./assets/water-surface-mask.webp'));
   const uniforms=useDerivedValue(() => ({
     seconds: flow.enabled ? flow.seconds.value : 0,
   }), [flow.enabled, flow.seconds]);
