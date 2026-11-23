@@ -54,10 +54,13 @@ function Divider() {
 }
 
 // ---- The frame both pages share ----
-export function AccountFrame({ title, subtitle, left, right, children, fairyAt }: {
+export function AccountFrame({ title, subtitle, left, right, children, fairyAt, beside }: {
   title: string; subtitle: string; left?: ReactNode; right?: ReactNode; children: ReactNode;
   /** How far down the card the fairy leans in (beside the fields), in points; none: no fairy. */
   fairyAt?: number;
+  /** What stands beside the fairy (narrow fields). The children after it start below her, at any card width,
+   *  so a full-width block such as the avatar grid is never covered (App Review 2026-11-22, iPad). */
+  beside?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -66,6 +69,9 @@ export function AccountFrame({ title, subtitle, left, right, children, fairyAt }
   const side = Math.max(width, height);
   const offsetX = Math.min(0, Math.max(width - side, (width - side) * 0.36));
   const fairyWidth = Math.round(card * (width < 420 ? 0.5 : 0.46));
+  const fairyHeight = Math.round(fairyWidth * FAIRY_RATIO);
+  // A short left-aligned label may sit beside the bottom of her (her hands rest on the card's edge there).
+  const FAIRY_FOOT_ROOM = 40;
   return <View style={styles.root}>
     <Image source={BACKGROUND} resizeMode="cover" style={{ position: 'absolute', width: side, height: side, left: offsetX, top: Math.min(0, (height - side) / 2) }}
       accessibilityIgnoresInvertColors />
@@ -83,7 +89,8 @@ export function AccountFrame({ title, subtitle, left, right, children, fairyAt }
           <View>
             {fairyAt !== undefined ? <View pointerEvents="none" style={{ position: 'absolute', right: -40, top: fairyAt }}>
               <Image source={FAIRY} resizeMode="contain" accessibilityIgnoresInvertColors
-                style={{ width: fairyWidth, height: Math.round(fairyWidth * FAIRY_RATIO) }} /></View> : null}
+                style={{ width: fairyWidth, height: fairyHeight }} /></View> : null}
+            {beside !== undefined ? <View style={{ minHeight: (fairyAt ?? 0) + fairyHeight - FAIRY_FOOT_ROOM }}>{beside}</View> : null}
             {children}
           </View>
         </View>

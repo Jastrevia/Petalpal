@@ -171,10 +171,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const corner = profile || auth.identity?.email ? null : <CornerButton label={connect ? `✓ ${connect.email}` : copy.connect} icon="envelope"
       onPress={() => setConnecting(true)} testID="connect-email" />;
     return overGarden(<AccountFrame title={copy.welcomeTitle} subtitle={copy.welcomeBody} fairyAt={8}
-      left={profile ? null : <CornerButton label={copy.back} icon="back" onPress={() => go('register')} />} right={corner}>
-      {profile ? <Field label={copy.accountName} icon="person" narrow value={name} onChangeText={setName} editable={!working} maxLength={20}
+      left={profile ? null : <CornerButton label={copy.back} icon="back" onPress={() => go('register')} />} right={corner}
+      beside={profile ? <Field label={copy.accountName} icon="person" narrow value={name} onChangeText={setName} editable={!working} maxLength={20}
         autoComplete="username-new" placeholder={copy.namePlaceholder} note={copy.nameNote} />
-        : <Field label={copy.accountName} icon="person" narrow fixedValue={name} note={copy.nameNote} />}
+        : <Field label={copy.accountName} icon="person" narrow fixedValue={name} note={copy.nameNote} />}>
       <AvatarChoice label={copy.avatar} value={avatar} onChange={setAvatar} disabled={working} />
       <Check checked={communityAccepted} label={copy.accept} onPress={() => setCommunityAccepted(!communityAccepted)}
         link={copy.guidelines} onLink={() => setGuidelinesOpen(true)} />
@@ -233,7 +233,7 @@ const COPY = {
     retryBody: 'Your garden didn’t open. Try again.',
     accountName: 'Account Name', namePlaceholder: 'Account name', nameRule: '4–20 characters. Letters, numbers, or underscores.',
     nameNote: 'This is your sign-in name. Nobody else can have it.',
-    password: 'Password', passwordPlaceholder: 'Password', passwordRule: '8–16 characters. Include letters and numbers.',
+    password: 'Password', passwordPlaceholder: 'Password', passwordRule: '8–64 characters. Include letters and numbers.',
     confirm: 'Confirm Password', confirmPlaceholder: 'Once more', mismatch: 'The two passwords don’t match.',
     avatar: 'Choose Your Avatar',
     accept: 'I accept the', guidelines: 'Community Guidelines', close: 'Close',
@@ -254,7 +254,7 @@ const COPY = {
     retryBody: '花园没有打开，再试一次。',
     accountName: '账号名', namePlaceholder: '输入你的账号名', nameRule: '4–20 位，可以用字母、数字或下划线。',
     nameNote: '这是你的登录名，只属于你。',
-    password: '密码', passwordPlaceholder: '输入密码', passwordRule: '8–16 位，同时包含字母和数字。',
+    password: '密码', passwordPlaceholder: '输入密码', passwordRule: '8–64 位，同时包含字母和数字。',
     confirm: '确认密码', confirmPlaceholder: '再输入一次密码', mismatch: '两次输入的密码不一样。',
     avatar: '选择你的头像',
     accept: '我接受', guidelines: '社区准则', close: '关闭',

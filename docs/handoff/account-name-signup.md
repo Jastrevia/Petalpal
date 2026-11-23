@@ -29,7 +29,7 @@ Started by Claude Code (2026-11-06), finished by Kiro the same night.
   (frame, fields, buttons; background and leaning fairy in `mobile/assets/auth/signup/`, painted by
   Claude from the mock-ups). Name and password rules are checked on the first page
   (`registrationValidation.ts`: 4–20 letters, numbers or underscores, not shaped like a PP number;
-  password 8–16 with a letter and a number); a taken name comes back from the server on the welcome page.
+  password 8–64 with a letter and a number; was 8–16 until App Review 2026-11-22); a taken name comes back from the server on the welcome page.
 - Server `POST /auth/register` (`server.js`) takes name, password, fairy name and avatar, checks them
   all again, and writes the account, its password hash (`AccountPassword`), its starter fairy with
   that name and its 8 original portraits (so it never sees the avatar welcome) in one create, then

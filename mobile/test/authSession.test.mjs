@@ -309,7 +309,8 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
   let auth = { phase: 'initializing', loading: true, session: null, identity: null, error: '', message: '' };
   const replaced = [];
   const hooks = hookHarness(); const nodes = (tree) => Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object'
-    ? [tree, ...nodes(tree.props?.children)] : [];
+    // AccountFrame's `beside` (the field next to the fairy) is part of the page too.
+    ? [tree, ...nodes(tree.props?.beside), ...nodes(tree.props?.children)] : [];
   const text = (tree) => nodes(tree).filter((n) => n.type === 'Text').map((n) => n.props.children).flat().join(' ');
   const field = (tree, label) => nodes(tree).find((n) => n.type === 'Field' && n.props.label === label);
   const byId = (tree, id) => nodes(tree).find((n) => n.props?.testID === id);
@@ -318,7 +319,7 @@ test('Phase 1 auth gate: guest Garden, create account (name and password), welco
     '../services/auth': { useAuth: () => auth },
     '../services/auth/registrationValidation': {
       accountNameError: (name) => (/^[A-Za-z0-9_]{4,20}$/.test(name) && !/^pp\d+$/i.test(name) ? '' : 'Use 4–20 letters, numbers or underscores.'),
-      passwordError: (password) => (/^(?=.*[A-Za-z])(?=.*\d).{8,16}$/.test(password) ? '' : 'Use 8–16 characters with letters and numbers.'),
+      passwordError: (password) => (/^(?=.*[A-Za-z])(?=.*\d).{8,64}$/.test(password) ? '' : 'Use 8–64 characters with letters and numbers.'),
     },
     './auth/LoginPreviewPage': { LoginPreviewPage: 'LoginPreviewPage' },
     './auth/AccountPages': { AccountFrame: 'AccountFrame', AvatarChoice: 'AvatarChoice', Check: 'Check', CornerButton: 'CornerButton', Field: 'Field',

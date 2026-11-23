@@ -158,13 +158,13 @@ test("registration refuses a bad profile and needs the Community Guidelines", as
   assert.equal((await send(url, "/auth/register", "POST", profile({ email: "a@b.co" }))).status, 400);
 });
 
-test("an account name is 4–20 letters, numbers or underscores; a new password 8–16 with letters and numbers", () => {
+test("an account name is 4–20 letters, numbers or underscores; a new password 8–64 with letters and numbers", () => {
   for (const name of ["Bloom", "bloom_23", "ABCD", "a".repeat(20), "PPL_fan"]) assert.equal(accountNameProblem(name), null, name);
   for (const name of [" ", "", "abc", "Two Words", "小花小花", "a".repeat(21), "PP12345678", "pp123", "me@x.co", "dash-name", 7, null]) {
     assert.ok(accountNameProblem(name), String(name));
   }
-  for (const password of ["garden12", "a1b2c3d4", "Abcdefgh1234567x"]) assert.equal(validNewPassword(password), true, password);
-  for (const password of [undefined, "", "short1", "onlyletters", "12345678", "abcdefgh12345678x", 12345678]) {
+  for (const password of ["garden12", "a1b2c3d4", "Abcdefgh1234567x", "abcdefgh12345678x", "hJkq7m-Ruzdew-fabqo3", "a1".repeat(32)]) assert.equal(validNewPassword(password), true, password);
+  for (const password of [undefined, "", "short1", "onlyletters", "12345678", "a1".repeat(32) + "x", 12345678]) {
     assert.equal(validNewPassword(password), false, String(password));
   }
 });

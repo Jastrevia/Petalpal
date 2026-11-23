@@ -454,6 +454,11 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
     : { type: authError ? 'warning' as const : 'info' as const, title: authError ? 'Couldn’t open the garden' : 'PetalPal', message: authText });
 
   const isWide = windowWidth > 740;
+  // The invitation's size in points, not '100%' + maxWidth + aspectRatio: on iOS and Android the height came
+  // from the full width before the cap, so on an iPad the card stood far taller than the art and the fields
+  // sat above the paper (App Review 2026-11-22). The web was right either way.
+  const envelopeWidth = Math.max(0, Math.min(440, windowWidth - 36 - insets.left - insets.right));
+  const envelopeSize = { width: envelopeWidth, height: envelopeWidth * 792 / 608 };
   const handoffOpacity = entranceTrack(entrance.progress, 'handoffOpacity', entrance.reduced);
 
   return (
@@ -539,6 +544,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
               pointerEvents={entrance.active ? "none" : "auto"}
               style={[
                 styles.envelopeCard,
+                envelopeSize,
                 {
                   opacity: entranceTrack(entrance.progress, "envelopeOpacity"),
                   transform: [
@@ -1002,9 +1008,7 @@ const styles = StyleSheet.create({
 
   // LAYER B: Formal Botanical Invitation Card Assembly (Strictly matching Image 2)
   envelopeCard: {
-    width: '100%',
-    maxWidth: 440,
-    aspectRatio: 608 / 792,
+    // Width and height come from envelopeSize (608 x 792 art, at most 440 wide).
     position: 'relative',
   },
   invitationLayerImage: {

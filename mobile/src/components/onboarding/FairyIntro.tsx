@@ -12,6 +12,10 @@ import { dispatchOnboarding, saveFairyName } from './onboardingStore';
 import { FAIRY_NAME_MAX_LENGTH, fairyNameProblem } from './onboardingSteps';
 
 const EASE = Easing.inOut(Easing.cubic);
+// The Garden's bottom bar with its gap (GardenHud: about 76 high, 24 above the bottom on a tablet).
+const DOCK_ROOM = 100;
+// The naming / celebration card's usual height, for the room check above.
+const INTRO_CARD_HEIGHT = 240;
 
 // Deterministic cinematic onboarding opening sequence:
 // 1. Fly V1 arrival (full 5.04s flight arc from high-right to visitor view)
@@ -28,8 +32,15 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
   const compact = screen.height < 640;
   // A phone held sideways is wide but short: she stands beside her card instead of above it.
   const sideways = screen.height < 520 && screen.width > screen.height;
-  const heroHeight = Math.min(screen.height * (sideways ? .5 : compact ? .28 : .36), 330);
+  // A landscape tablet or desktop window is short for its width: a slightly smaller fairy leaves room below her card.
+  const landscape = screen.width > screen.height;
+  const heroHeight = Math.min(screen.height * (sideways ? .5 : compact ? .28 : landscape ? .3 : .36), 330);
   const heroCanvasHeight = heroHeight / FAIRY_CHARACTER_CANVAS_RATIO;
+  // The Garden's bottom bar stays visible under the veil. When the screen has the height, the card stays above
+  // it (App Review 2026-11-22: on an iPad held sideways the naming card covered the bar).
+  const padTop = insets.top + (sideways ? 12 : compact ? 24 : 48);
+  const free = screen.height - padTop - insets.bottom - 24 - heroCanvasHeight - 18 - INTRO_CARD_HEIGHT;
+  const dockRoom = sideways ? 0 : Math.min(DOCK_ROOM, Math.max(0, free));
   const heroCanvasWidth = heroCanvasHeight * FAIRY_CANVAS_ASPECT;
   const heroWidth = heroCanvasWidth;
 
@@ -111,7 +122,7 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
       {/* Absorb every Garden tap while she introduces herself. */}
       <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => undefined} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[StyleSheet.absoluteFill, { overflow: 'visible' }]} pointerEvents="box-none">
-        <View style={[StyleSheet.absoluteFill, styles.stage, { paddingTop: insets.top + (sideways ? 12 : compact ? 24 : 48), paddingBottom: insets.bottom + (sideways ? 12 : 24), overflow: 'visible' },
+        <View style={[StyleSheet.absoluteFill, styles.stage, { paddingTop: padTop, paddingBottom: insets.bottom + (sideways ? 12 : 24) + dockRoom, overflow: 'visible' },
           sideways && { flexDirection: 'row', paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }]}>
           <Animated.View testID="onboarding-hero" style={[{ width: heroCanvasWidth, height: heroCanvasHeight, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }, flyStyle]}>
             <Animated.View pointerEvents="none" style={[styles.glow, { width: heroWidth * 1.6, height: heroHeight * .9, top: heroHeight * .05 }, glowStyle]} />

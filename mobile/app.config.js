@@ -6,7 +6,7 @@ module.exports=({config})=>{
  const dev=appVariant(env)==='dev';
  // iOS 27 needs the scene life cycle at launch (plugins/withIosSceneLifecycle.js).
  return {...config,plugins:[...(config.plugins||[]),'./plugins/withIosSceneLifecycle.js'],name:dev?'PetalPal Dev':'PetalPal',...(dev?{scheme:'petalpal-dev'}:{}),
-  ios:{...config.ios,...(dev?{bundleIdentifier:devBundleId(env)}:env.PETALPAL_IOS_BUNDLE_ID?{bundleIdentifier:env.PETALPAL_IOS_BUNDLE_ID}:{}),...(env.PETALPAL_IOS_BUILD_NUMBER?{buildNumber:env.PETALPAL_IOS_BUILD_NUMBER}:{}),supportsTablet:false},
+  ios:{...config.ios,...(dev?{bundleIdentifier:devBundleId(env)}:env.PETALPAL_IOS_BUNDLE_ID?{bundleIdentifier:env.PETALPAL_IOS_BUNDLE_ID}:{}),...(env.PETALPAL_IOS_BUILD_NUMBER?{buildNumber:env.PETALPAL_IOS_BUILD_NUMBER}:{}),supportsTablet:true},
   android:{...config.android,...(env.PETALPAL_ANDROID_PACKAGE?{package:env.PETALPAL_ANDROID_PACKAGE}:{}),...(env.PETALPAL_ANDROID_VERSION_CODE?{versionCode:Number(env.PETALPAL_ANDROID_VERSION_CODE)}:{})},
  };
 };
