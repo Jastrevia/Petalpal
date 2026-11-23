@@ -14,7 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const mobile = path.resolve(here, '..');
 const PORT = Number(process.env.LOCAL_PREVIEW_PORT || 8081);
 const BASE = process.argv.find(arg => arg.startsWith('http')) ?? `http://localhost:${PORT}`;
-const ONLY = process.argv.find(arg => arg.startsWith('--only='))?.slice(7);
+const ONLY = process.argv.find(arg => arg.startsWith('--only='))?.slice(7).split(',');
 const SCREENS = process.argv.find(arg => arg.startsWith('--screens='))?.slice(10).split(',');
 const OUT = path.join(mobile, 'layout-matrix');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -107,6 +107,26 @@ async function overflow(page, { scrolls }) {
   }, scrolls);
 }
 
+// First-open cards that stand between sign-in and the screens to capture. Never a panel's own controls.
+const FIRST_RUN = /^(Keep it|Into the garden|Come back later|Not now|Later|Maybe later|Got it)$/;
+// The Petal Ring is mounted more than once (the daily check-in and the dock), so only a visible copy counts.
+const ringLater = page => page.locator('text="Come back later" >> visible=true').first();
+const ringOpen = page => ringLater(page).isVisible().catch(() => false);
+const firstRunCard = page => page.getByRole('button', { name: FIRST_RUN }).first().isVisible().catch(() => false)
+  .then(async shown => shown || ringOpen(page));
+const DEBUG = Boolean(process.env.LAYOUT_DEBUG);
+async function settle(page) {
+  for (let round = 0; round < 8 && await firstRunCard(page); round++) {
+    if (DEBUG) console.log('    settle:', await page.getByRole('button', { name: FIRST_RUN }).allInnerTexts().catch(() => []), 'ring', await ringOpen(page),
+      await page.locator('text="Come back later"').count());
+    // The top card first: the Petal Ring covers the AI question's buttons.
+    if (await ringOpen(page)) await ringLater(page).click({ force: true, timeout: 5000 }).catch(() => {});
+    else await page.getByRole('button', { name: FIRST_RUN }).first().click({ timeout: 5000 })
+      .catch(() => page.getByRole('button', { name: FIRST_RUN }).first().click({ force: true, timeout: 5000 }).catch(() => {}));
+    await page.waitForTimeout(2500);
+  }
+}
+
 const results = [];
 async function shoot(page, size, screen, { scrolls = false } = {}) {
   if (SCREENS && !SCREENS.includes(screen)) return;
@@ -123,16 +143,23 @@ async function missed(size, screen, why) {
   console.log(`  ✗ ${screen} — could not reach it: ${why}`);
 }
 
-rmSync(OUT, { recursive: true, force: true });
+// A partial run (--only / --screens) keeps the other sizes' screenshots.
+if (!ONLY && !SCREENS) rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(existsSync(CHROME) ? { executablePath: CHROME } : {}),
   args: ['--use-gl=angle', '--enable-gpu-rasterization', '--ignore-gpu-blocklist'] });
 try {
-  for (const [size, width, height] of SIZES.filter(([name]) => !ONLY || name.includes(ONLY))) {
+  for (const [size, width, height] of SIZES.filter(([name]) => !ONLY || ONLY.some(part => name.includes(part)))) {
     console.log(`\n${size} (${width}×${height})`);
     const touch = !desktop(size);
-    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch });
-    await context.route('**/*', route => new URL(route.request().url()).hostname === new URL(BASE).hostname ? route.continue() : route.abort());
+    const newContext = async () => {
+      const fresh = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch });
+      fresh.setDefaultTimeout(15_000); // no single step may hang the run
+      // The preview never calls the real internet; anything else is refused.
+      await fresh.route('**/*', route => new URL(route.request().url()).hostname === new URL(BASE).hostname ? route.continue() : route.abort());
+      return fresh;
+    };
+    let context = await newContext();
 
     // Signed out: the guest Garden, then the account pages a guest reaches from it.
     let page = await context.newPage();
@@ -164,10 +191,12 @@ try {
         }
       } else await missed(size, 'create-account', 'Create account did not open the page');
     } else await missed(size, 'sign-in', 'no sign-in form');
-    await page.close();
+    await context.close();
 
-    // Signed in with the preview account: Events and Me over the Garden.
-    if (!SCREENS || SCREENS.some(name => ['garden', 'events', 'me'].includes(name))) {
+    // Signed in with the preview account: Events and Me over the Garden. A fresh context: the create-account
+    // pages above leave a new preview account behind, which would sign in to a first-time welcome instead.
+    if (!SCREENS || SCREENS.some(name => ['first-avatar', 'first-avatar-gift', 'first-open-card', 'garden', 'events', 'me'].includes(name))) {
+      context = await newContext();
       page = await context.newPage();
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 240_000 });
       await page.getByTestId('guest-navigation').getByRole('button').first().click({ timeout: 150_000 }).catch(() => {});
@@ -179,12 +208,41 @@ try {
         const events = page.getByTestId('hud-events');
         if (await events.waitFor({ timeout: 90_000 }).then(() => true, () => false)) {
           await page.waitForTimeout(6000); // the daily check-in card settles into the calendar
+          // A first sign-in asks for the first avatar before the Garden; capture it, then take the first one.
+          const begin = page.getByRole('button', { name: 'Begin with this one' });
+          if (await begin.isVisible().catch(() => false)) {
+            await shoot(page, size, 'first-avatar', { scrolls: true });
+            await page.getByRole('radio').first().click({ force: true, timeout: 10_000 }).catch(() => {});
+            await begin.click({ force: true, timeout: 10_000 }).catch(() => {});
+            const done = page.getByRole('button', { name: 'Into the garden' });
+            if (await done.waitFor({ timeout: 15_000 }).then(() => true, () => false)) {
+              await shoot(page, size, 'first-avatar-gift', { scrolls: true });
+              await done.click({ force: true, timeout: 10_000 }).catch(() => {});
+            }
+            await page.waitForTimeout(3000);
+          }
+          // Then the day's first-open cards (a keepsake, the Petal Ring, the AI question): capture one, close them all.
+          if (await firstRunCard(page)) await shoot(page, size, 'first-open-card', { scrolls: true });
+          await settle(page);
           await shoot(page, size, 'garden');
           for (const [id, screen] of [['events', 'events'], ['profile', 'me']]) {
-            await page.getByTestId(`hud-${id}`).click({ timeout: 10_000 }).catch(() => {});
-            await page.waitForTimeout(1500);
-            await shoot(page, size, screen, { scrolls: true });
-            await page.getByRole('button', { name: 'Close' }).last().click().catch(() => {});
+            // force: the newcomer glow keeps the icons moving, so they never count as "stable". A waiting
+            // card (a level-up) can take the first tap instead of the panel, so tap again after closing it.
+            // The panel's own content, not just a Close: the Petal Ring (also with a Close) can open over it.
+            const marker = id === 'events' ? page.getByText('Choose your mood').first() : page.getByText('Garden Privacy').first();
+            for (let tap = 0; tap < 5 && !(await marker.isVisible().catch(() => false)); tap++) {
+              await settle(page);
+              await page.getByTestId(`hud-${id}`).click({ force: true, timeout: 10_000 }).catch(() => {});
+              await page.waitForTimeout(2500);
+              if (DEBUG) console.log(`    tapped ${id}: ring`, await ringOpen(page), 'marker', await marker.isVisible().catch(() => false));
+              await settle(page);
+            }
+            if (await marker.isVisible().catch(() => false)) await shoot(page, size, screen, { scrolls: true });
+            else {
+              await page.screenshot({ path: path.join(OUT, `${size}--${screen}-missing.png`) }).catch(() => {});
+              await missed(size, screen, `the ${id} panel did not open`);
+            }
+            await page.getByRole('button', { name: 'Close' }).last().click({ force: true, timeout: 5000 }).catch(() => {});
             await page.waitForTimeout(800);
           }
         } else for (const screen of ['garden', 'events', 'me']) await missed(size, screen, 'the signed-in Garden did not open');
