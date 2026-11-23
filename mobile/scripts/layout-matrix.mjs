@@ -185,13 +185,17 @@ async function playGarden(page, size) {
     await page.waitForTimeout(2500);
     await shoot(page, size, 'planting');
     const confirm = page.getByTestId('planting-confirm-button');
+    // Look for a free spot: a grid over the middle of the screen, until the ✓ turns on (a taken or outside spot
+    // keeps it off). Stops at the first spot that takes the flower.
     const view = page.viewportSize();
-    for (const [fx, fy] of [[0.5, 0.5], [0.42, 0.48], [0.58, 0.55], [0.5, 0.42]]) {
-      if (await visible(confirm)) break;
+    const spots = [];
+    for (const fy of [0.5, 0.42, 0.58, 0.35, 0.65]) for (const fx of [0.5, 0.38, 0.62, 0.28, 0.72, 0.2, 0.8]) spots.push([fx, fy]);
+    for (const [fx, fy] of spots) {
+      if (await confirm.isEnabled().catch(() => false) && await visible(confirm)) break;
       await page.mouse.click(view.width * fx, view.height * fy);
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(700);
     }
-    if (!(await visible(confirm))) { await missed(size, 'planted', 'no spot in the bed took the tap'); return; }
+    if (!(await visible(confirm)) || !(await confirm.isEnabled().catch(() => false))) { await missed(size, 'planted', 'no free spot in the bed took the tap'); return; }
     if (await confirm.isEnabled().catch(() => false)) {
       await confirm.click({ force: true });
       await page.waitForTimeout(5000);
@@ -255,6 +259,9 @@ async function playGarden(page, size) {
     await page.waitForTimeout(3000);
     await settle(page);
     await shoot(page, size, 'fairy', { scrolls: true });
+    // The fairy panel has no ✕: its own button closes it again.
+    await page.getByTestId('hud-fairy').click({ force: true }).catch(() => {});
+    await page.waitForTimeout(1200);
   });
   await backToGarden(page);
 

@@ -94,7 +94,7 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   const zh = useAppLocale() === 'zh-Hans';
   // Below the status bar / Dynamic Island; on a phone held sideways only the essentials, so the card does not
   // cover the top of the bed being planted (it hid a third of the screen there).
-  const { compactHeight, insets } = useLayoutClass();
+  const { compactHeight, insets, width } = useLayoutClass();
 
   if (activeMode === 'normal' || !targetFlower) {
     return null;
@@ -118,8 +118,9 @@ export default function PlantingPlacementControls({ camera }: { camera?: Plantin
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
       {/* Top Guidance Banner */}
-      <View {...onboardingTarget('planting.banner')} style={[styles.topBanner, { marginTop: insets.top + (compactHeight ? 6 : 16) },
-        compactHeight && styles.topBannerCompact]}>
+      {/* At most 640 wide: on a desktop or iPad in landscape the card no longer spans the whole screen. */}
+      <View {...onboardingTarget('planting.banner')} style={[styles.topBanner, { marginTop: insets.top + (compactHeight ? 6 : 16),
+        width: Math.min(width - 32, 640) }, compactHeight && styles.topBannerCompact]}>
         {compactHeight ? null : <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>
             {zh ? '🌱 正在种花' : '🌱 PLANTING FLOWER'}
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
   },
   topBanner: {
     alignItems: 'center',
-    marginHorizontal: 16,
+    alignSelf: 'center',
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  topBannerCompact: { paddingVertical: 6, alignSelf: 'center', maxWidth: 560 },
+  topBannerCompact: { paddingVertical: 6 },
   badgeContainer: {
     paddingHorizontal: 8,
     paddingVertical: 2,

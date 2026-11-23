@@ -1834,7 +1834,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           cameraX.value -= viewport.width * 0.3;
           cameraY.value += viewport.height * 0.25;
         }} />}
-      {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 40 }]}>
+      {/* 39: under the bottom navigation (layer 40), which stays above every Garden layer (a5c98513). */}
+      {petRing && <View style={[StyleSheet.absoluteFill, { zIndex: 39 }]}>
         <PetRingMenu key={petRing.id} petId={petRing.id} pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
           onAction={kind => gardenPets.current?.act(petRing.id, kind) ?? 0} />
       </View>}
