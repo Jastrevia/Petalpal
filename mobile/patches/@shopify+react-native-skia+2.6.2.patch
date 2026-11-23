@@ -16,10 +16,31 @@ index dd79e2a..e613e9b 100644
 +  const uint64_t floorBytes = 512ull * 1024 * 1024, ceilingBytes = 1536ull * 1024 * 1024;
 +  _directContext->setResourceCacheLimit((size_t)MIN(ceilingBytes, MAX(floorBytes, quarter)));
  }
+diff --git a/node_modules/@shopify/react-native-skia/lib/module/sksg/Container.web.js b/node_modules/@shopify/react-native-skia/lib/module/sksg/Container.web.js
+index 728bc58..b825f75 100644
+--- a/node_modules/@shopify/react-native-skia/lib/module/sksg/Container.web.js
++++ b/node_modules/@shopify/react-native-skia/lib/module/sksg/Container.web.js
+@@ -62,7 +62,14 @@ class ReanimatedContainer extends Container {
+       this.mapperId = Rea.startMapper(() => {
+         "worklet";
+ 
+-        drawOnscreen(Skia, nativeId, recording);
++        // PetalPal: a Garden left alone records only the frames it paints (gardenNativeFrames.ts).
++        const paint = () => {
++          "worklet";
++
++          drawOnscreen(Skia, nativeId, recording);
++        };
++        const gate = globalThis.__skiaWebFrameGate;
++        if (!gate || !gate.hold(nativeId, paint)) paint();
+       }, Array.from(animationValues));
+     }
+     Rea.runOnUI(() => {
 diff --git a/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts b/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
+index 08c16a9..19543bb 100644
 --- a/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
 +++ b/node_modules/@shopify/react-native-skia/src/sksg/Container.native.ts
-@@ -61,7 +61,13 @@
+@@ -61,7 +61,13 @@ class NativeReanimatedContainer extends Container {
        this.mapperId = Rea.startMapper(() => {
          "worklet";
          sharedRecorder.applyUpdates(sharedValues);
@@ -34,3 +55,22 @@ diff --git a/node_modules/@shopify/react-native-skia/src/sksg/Container.native.t
        }, sharedValues);
      }
    }
+diff --git a/node_modules/@shopify/react-native-skia/src/sksg/Container.web.ts b/node_modules/@shopify/react-native-skia/src/sksg/Container.web.ts
+index d71fc97..de1d89c 100644
+--- a/node_modules/@shopify/react-native-skia/src/sksg/Container.web.ts
++++ b/node_modules/@shopify/react-native-skia/src/sksg/Container.web.ts
+@@ -59,7 +59,13 @@ class ReanimatedContainer extends Container {
+     if (animationValues.size > 0) {
+       this.mapperId = Rea.startMapper(() => {
+         "worklet";
+-        drawOnscreen(Skia, nativeId, recording!);
++        // PetalPal: a Garden left alone records only the frames it paints (gardenNativeFrames.ts).
++        const paint = () => {
++          "worklet";
++          drawOnscreen(Skia, nativeId, recording!);
++        };
++        const gate = (globalThis as any).__skiaWebFrameGate;
++        if (!gate || !gate.hold(nativeId, paint)) paint();
+       }, Array.from(animationValues));
+     }
+     Rea.runOnUI(() => {

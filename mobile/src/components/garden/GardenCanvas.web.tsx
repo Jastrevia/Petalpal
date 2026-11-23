@@ -9,6 +9,7 @@ import { afterNextFrames, createStaticRunHost, StaticRunContext } from './garden
 import { GardenWebRenderer } from './gardenWebRenderer';
 import { GardenQualitySelector, frameSample, qualityMode, type QualitySignals, restingFrameSkipped } from './gardenRenderQuality';
 import { ownGardenWebView } from './webCanvasCache';
+import { createFrameGate } from './gardenFrameGate';
 
 type WebApi = {
   registerView(id: string, view: unknown): void;
@@ -76,6 +77,14 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       cores: navigator.hardwareConcurrency || undefined,
       memoryGB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
     });
+    // Skia records a whole new picture each time an animated value changes, 60 times a second, though a Garden
+    // left alone paints only 30 of them: half the recordings were thrown away, and recording is the main script
+    // cost at rest. Our patch to Skia's web container asks this gate first (patches/@shopify+react-native-skia),
+    // as the native one does; a held frame is recorded on the next animation frame, with the newest values.
+    const gate = createFrameGate(nativeId, () => performance.now(), run => { requestAnimationFrame(run); });
+    const gates = globalThis as unknown as { __skiaWebFrameGate?: typeof gate };
+    gates.__skiaWebFrameGate = gate;
+    let gated = false;
     const redraw = () => { dirty = true; };
     // Explicit input redraws sample the current shared values immediately.
     // The animation mapper continues to record at its existing RAF cadence.
@@ -87,15 +96,17 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     const drawLatest = () => {
       if (disposed || !dirty || !picture || awaitingPicture || !activeRef.current || document.visibilityState !== 'visible') return;
       const start = performance.now();
-      // The next animation frame picks up what is skipped here.
-      if (restingFrameSkipped(start, lastTouch, lastPaint, pointers.size > 0)) return;
+      // The next animation frame picks up what is skipped here. A picture the gate let through was already
+      // spaced by it, so it is painted now (a second check a few ms later could hold it back a whole frame).
+      if (!gated && restingFrameSkipped(start, lastTouch, lastPaint, pointers.size > 0)) return;
+      gated = false;
       const painted = renderer.draw(picture);
       if (!painted) return;
       dirty = false;
       lastPaint = start;
       if (!pointers.size) draws.push(performance.now() - start);
     };
-    api.registerView(String(nativeId), { setPicture(value: SkPicture) { picture = value; awaitingPicture = false; redraw();
+    api.registerView(String(nativeId), { setPicture(value: SkPicture) { picture = value; awaitingPicture = false; redraw(); gated = gates.__skiaWebFrameGate === gate;
       // Skia's web animation mapper already runs on RAF. Paint its newest
       // recording in this turn instead of displaying it one RAF later. Coalesce
       // synchronous commits without dropping animation frames or changing cadence.
@@ -108,8 +119,8 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
       makeImageSnapshot: (rect?: SkRect) => { if (picture) renderer.draw(picture); return renderer.makeImageSnapshot(rect); } });
     const releaseView = ownGardenWebView(api, nativeId);
     const resize = () => { if (!disposed && !pointers.size && activeRef.current && document.visibilityState === 'visible') { renderer.resize(tier, signals()); redraw(); } };
-    const pointerDown = (event: PointerEvent) => { lastTouch = performance.now(); pointers.add(event.pointerId); selector.resetSamples(); frames = []; draws = []; previous = 0; };
-    const pointerUp = (event: PointerEvent) => { lastTouch = performance.now(); pointers.delete(event.pointerId); if (!pointers.size) resize(); };
+    const pointerDown = (event: PointerEvent) => { lastTouch = performance.now(); gate.touch(true); pointers.add(event.pointerId); selector.resetSamples(); frames = []; draws = []; previous = 0; };
+    const pointerUp = (event: PointerEvent) => { lastTouch = performance.now(); pointers.delete(event.pointerId); gate.touch(pointers.size > 0); if (!pointers.size) resize(); };
     const resetTiming = () => { frames = []; draws = []; previous = 0; windowStart = performance.now(); selector.resetSamples(); pointers.clear(); };
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
@@ -145,6 +156,7 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     return () => {
       // Retain the proven root/view ordering: gate late pictures, then root releases images.
       void root.unmount(); releaseView(); disposed = true;
+      if (gates.__skiaWebFrameGate === gate) gates.__skiaWebFrameGate = undefined;
       runs.snapshotter.current = null; renderer.onSurfaceChanged = undefined;
       picture = null; redrawRef.current = () => {};
       cancelAnimationFrame(request); observer.disconnect(); renderer.dispose();

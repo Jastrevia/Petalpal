@@ -176,3 +176,18 @@ Found, not changed:
 - Pavilion look-around (`reflection.tsx`): PanResponder with a JS-driven `Animated.Value`, so each move goes UI thread → JS → UI thread (no React render during the drag; nothing else runs on the JS thread there). Moving it to the UI thread means replacing the PanResponder with a gesture-handler pan, which must be tried on a phone against the nested page swipes and the petal ring's own pan. Not attempted without a device.
 - The app is capped at 60 Hz on purpose (`CADisableMinimumFrameDurationOnPhone: false`, b4aec18f: the Garden could not finish 120), while system scrolling on the same phone runs at 120 Hz. A Garden drag will not feel like a system scroll until the Garden can hold 120.
 - A long drag while zoomed in still leaves the snapshot and draws the land live.
+
+## 8. Web: record only the frames a resting Garden paints (2026-11-22, `feat/layout-size-class`)
+
+Open item from #169: on the web Skia's animation mapper recorded a whole new picture on every animation frame (about 60 a second) while a Garden left alone painted only 30, so half the recordings were thrown away. Recording (replaying the whole command list into a picture) is the main script cost at rest.
+
+Change: `patches/@shopify+react-native-skia+2.6.2.patch` now also patches `lib/module/sksg/Container.web.js` (and `src/sksg/Container.web.ts`) to ask `globalThis.__skiaWebFrameGate` before recording, as the native container already asks `__skiaFrameGate` before painting. `GardenCanvas.web.tsx` installs the same gate (`createFrameGate`, moved to `gardenFrameGate.ts` and shared with native), touched by the same pointer events, and paints a picture the gate let through at once. A held frame is recorded on the next animation frame with the newest values, so the last frame is never lost. Nothing about resolution, sampling, detail or the 30 fps resting / full-speed touched cadence changed.
+
+Measured in headless Chrome (fake-data preview, 440×956, 1x, signed in, Garden untouched for 9 s, 10 s window; three runs each, same machine and session):
+
+| | pictures recorded / s | main-thread script ms / s | task ms / s |
+| --- | --- | --- | --- |
+| before | 48.9, 60.4, 59.6 | 573, 515, 476 | 639, 578, 551 |
+| after | 30.4, 31.2, 30.4 | 369, 370, 362 | 409, 412, 402 |
+
+While a finger drags the Garden it still records about 61 a second, and it returns to 30 a few seconds after release. Layout matrix with flows (iPhone SE, iPad Air landscape) after the change: 44/44, no preview errors. Not measured: a real phone browser, battery or temperature; GPU paint cost is unchanged by design (it was already 30 a second).
