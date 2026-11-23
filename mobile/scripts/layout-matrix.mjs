@@ -16,6 +16,13 @@ const PORT = Number(process.env.LOCAL_PREVIEW_PORT || 8081);
 const BASE = process.argv.find(arg => arg.startsWith('http')) ?? `http://localhost:${PORT}`;
 const ONLY = process.argv.find(arg => arg.startsWith('--only='))?.slice(7).split(',');
 const SCREENS = process.argv.find(arg => arg.startsWith('--screens='))?.slice(10).split(',');
+// --flows: also play the Garden after signing in (an Event and its flower, the Treehouse, letters, the
+// collection, the Petal Ring, a friend's Garden, the fairy, the calendar, the Reflection pavilion).
+const FLOWS = process.argv.includes('--flows');
+const SIGNED_OUT = ['guest-garden', 'sign-in', 'create-account', 'welcome'];
+const SIGNED_IN = ['first-avatar', 'first-avatar-gift', 'first-open-card', 'garden', 'events', 'me'];
+const FLOW_SCREENS = ['event-saved', 'planting', 'planted', 'treehouse', 'mailbox', 'collection', 'petal-ring', 'friends', 'friend-garden',
+  'fairy', 'calendar', 'reflection'];
 const OUT = path.join(mobile, 'layout-matrix');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -127,6 +134,135 @@ async function settle(page) {
   }
 }
 
+// The Garden after signing in, one feature at a time; each step reports a screen or why it could not get there,
+// then returns to the Garden so the next one starts from the same place.
+const visible = locator => locator.isVisible().catch(() => false);
+const appears = (locator, timeout = 10_000) => locator.waitFor({ timeout }).then(() => true, () => false);
+async function backToGarden(page) {
+  for (let step = 0; step < 4 && !(await visible(page.getByTestId('hud-events'))); step++) {
+    const close = page.getByRole('button', { name: /^(Close|Back to Garden|Back|Return to My Garden)$/ }).last();
+    if (await visible(close)) await close.click({ force: true, timeout: 5000 }).catch(() => {});
+    else await page.goBack().catch(() => {});
+    await page.waitForTimeout(1500);
+  }
+  await page.getByRole('button', { name: 'Close' }).last().click({ force: true, timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(800);
+  await settle(page);
+}
+async function playGarden(page, size) {
+  const step = async (screen, run) => {
+    if (SCREENS && !FLOWS && !SCREENS.includes(screen)) return;
+    const why = await run().catch(error => String(error.message).split('\n')[0]);
+    if (typeof why === 'string') {
+      await page.screenshot({ path: path.join(OUT, `${size}--${screen}-missing.png`) }).catch(() => {});
+      await missed(size, screen, why);
+    }
+  };
+  const tapHud = async (id, marker) => {
+    for (let tap = 0; tap < 4 && !(await visible(marker)); tap++) {
+      await settle(page);
+      await page.getByTestId(id).click({ force: true, timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+    }
+    return visible(marker);
+  };
+
+  // An Event, its flower and planting it.
+  await step('event-saved', async () => {
+    if (!(await tapHud('hud-events', page.getByText('Choose your mood').first()))) return 'the Events panel did not open';
+    await page.getByRole('textbox', { name: /^What happened/ }).fill('Layout matrix: a quiet walk by the water.');
+    await page.getByRole('radiogroup', { name: 'Choose your mood' }).getByRole('radio').first().click({ force: true });
+    await page.getByRole('button', { name: 'Save & Analyze' }).click({ force: true });
+    const plant = page.getByRole('button', { name: /^Plant( without analysis)?$/ }).first();
+    if (!(await appears(plant, 45_000))) return 'no Plant button after saving';
+    await shoot(page, size, 'event-saved', { scrolls: true });
+    await plant.click({ force: true });
+    const confirm = page.getByTestId('planting-confirm-button');
+    if (!(await appears(confirm, 20_000))) return 'planting mode did not open';
+    await shoot(page, size, 'planting');
+    if (await confirm.isEnabled().catch(() => false)) {
+      await confirm.click({ force: true });
+      await page.waitForTimeout(5000);
+      await settle(page);
+      await shoot(page, size, 'planted');
+    } else await missed(size, 'planted', 'the suggested spot could not be planted');
+  });
+  await backToGarden(page);
+
+  await step('treehouse', async () => {
+    const door = page.getByRole('button', { name: 'Enter Treehouse Bookhouse' });
+    // The door is a Garden object; on a small screen it can sit just past the edge, so press it where it is.
+    await door.evaluate(element => element.click()).catch(() => door.click({ force: true }));
+    if (!(await appears(page.getByRole('button', { name: 'Back to Garden' }).first(), 30_000))) return 'the Treehouse did not open';
+    await page.waitForTimeout(3000);
+    await shoot(page, size, 'treehouse', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('mailbox', async () => {
+    await page.getByTestId('dock-letters').click({ force: true });
+    await page.waitForTimeout(4000);
+    if (await visible(page.getByTestId('hud-events'))) return 'the mailbox did not open';
+    await shoot(page, size, 'mailbox', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('collection', async () => {
+    await page.getByTestId('dock-collection').click({ force: true });
+    await page.waitForTimeout(3000);
+    if (!(await visible(page.getByRole('button', { name: 'Close' }).last()))) return 'the collection did not open';
+    await shoot(page, size, 'collection', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('petal-ring', async () => {
+    const tarot = page.getByTestId('dock-tarot');
+    if (!(await visible(tarot))) return 'no Petal Tarot in the dock today';
+    await tarot.click({ force: true });
+    await page.waitForTimeout(3000);
+    await shoot(page, size, 'petal-ring', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('friends', async () => {
+    const visit = page.getByRole('button', { name: /^Visit .*Garden$/ }).first();
+    if (!(await tapHud('hud-friends', visit))) return 'the friends list did not show a Garden to visit';
+    await shoot(page, size, 'friends', { scrolls: true });
+    await visit.click({ force: true });
+    if (!(await appears(page.getByRole('button', { name: 'Return to My Garden' }).first(), 60_000))) return 'the friend\'s Garden did not open';
+    await page.waitForTimeout(5000);
+    await shoot(page, size, 'friend-garden');
+    await page.getByRole('button', { name: 'Return to My Garden' }).first().click({ force: true });
+    await page.waitForTimeout(4000);
+  });
+  await backToGarden(page);
+
+  await step('fairy', async () => {
+    await settle(page);
+    await page.getByTestId('hud-fairy').click({ force: true });
+    await page.waitForTimeout(3000);
+    await settle(page);
+    await shoot(page, size, 'fairy', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('calendar', async () => {
+    await page.locator('[aria-label^="Open Garden calendar"]').first().click({ force: true });
+    await page.waitForTimeout(3000);
+    await shoot(page, size, 'calendar', { scrolls: true });
+  });
+  await backToGarden(page);
+
+  await step('reflection', async () => {
+    const pavilion = page.getByRole('button', { name: 'Enter Reflection pavilion' });
+    await pavilion.evaluate(element => element.click()).catch(() => pavilion.click({ force: true }));
+    await page.waitForTimeout(5000);
+    if (await visible(page.getByTestId('hud-events'))) return 'the Reflection pavilion did not open';
+    await shoot(page, size, 'reflection', { scrolls: true });
+  });
+  await backToGarden(page);
+}
+
 const results = [];
 async function shoot(page, size, screen, { scrolls = false } = {}) {
   if (SCREENS && !SCREENS.includes(screen)) return;
@@ -166,7 +302,9 @@ try {
     context = await newContext();
 
     // Signed out: the guest Garden, then the account pages a guest reaches from it.
-    let page = await context.newPage();
+    let page = null;
+    if (!SCREENS || SCREENS.some(name => SIGNED_OUT.includes(name))) {
+    page = await context.newPage();
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 240_000 });
     const guestBar = page.getByTestId('guest-navigation');
     if (await guestBar.waitFor({ timeout: 150_000 }).then(() => true, () => false)) {
@@ -195,11 +333,12 @@ try {
         }
       } else await missed(size, 'create-account', 'Create account did not open the page');
     } else await missed(size, 'sign-in', 'no sign-in form');
+    }
     await context.close();
 
     // Signed in with the preview account: Events and Me over the Garden. A fresh context: the create-account
     // pages above leave a new preview account behind, which would sign in to a first-time welcome instead.
-    if (!SCREENS || SCREENS.some(name => ['first-avatar', 'first-avatar-gift', 'first-open-card', 'garden', 'events', 'me'].includes(name))) {
+    if (!SCREENS || FLOWS || SCREENS.some(name => SIGNED_IN.includes(name) || FLOW_SCREENS.includes(name))) {
       context = await newContext();
       page = await context.newPage();
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 240_000 });
@@ -249,6 +388,7 @@ try {
             await page.getByRole('button', { name: 'Close' }).last().click({ force: true, timeout: 5000 }).catch(() => {});
             await page.waitForTimeout(800);
           }
+          if (FLOWS) await playGarden(page, size);
         } else for (const screen of ['garden', 'events', 'me']) await missed(size, screen, 'the signed-in Garden did not open');
       } else for (const screen of ['garden', 'events', 'me']) await missed(size, screen, 'no sign-in form');
       await page.close();
