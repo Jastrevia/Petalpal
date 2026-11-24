@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ApiError, apiRequest } from './api';
-import { foxReason, localDateOf, type FoxReason, type SilktailState } from '../components/garden/critters/silktailDays';
+import { foxReason, localDateOf, type FoxReason, type HolidayId, type SilktailState } from '../components/garden/critters/silktailDays';
 
 // The Silktail Fox's milestone state (GET /api/garden/silktail, lib/silktail.js). A server from
 // before the route (404), a guest or no network: no milestone, holidays still count.
@@ -38,5 +38,15 @@ export function useSilktailReason(active: boolean, signedIn: boolean) {
   }, [active, signedIn, changes]);
   // A milestone answer from an earlier day no longer counts.
   const milestone = state && state.today === date ? state : null;
-  return { reason: foxReason(milestone, date), date } as { reason: FoxReason | null; date: string };
+  return { reason: previewReason() ?? foxReason(milestone, date), date } as { reason: FoxReason | null; date: string };
+}
+
+// Dev web only, to see the fox on any day: ?silktail=milestone (14 days) or ?silktail=<holiday id>
+// (christmas, springFestival ...). Release builds never read it.
+const HOLIDAY_IDS: readonly HolidayId[] = ['newYear', 'valentines', 'halloween', 'christmas', 'springFestival', 'lantern', 'dragonBoat', 'qixi', 'midAutumn'];
+function previewReason(): FoxReason | null {
+  if (!__DEV__ || typeof window === 'undefined' || !window.location?.search) return null;
+  const value = new URLSearchParams(window.location.search).get('silktail');
+  if (value === 'milestone') return { kind: 'milestone', days: 14 };
+  return value && (HOLIDAY_IDS as readonly string[]).includes(value) ? { kind: 'holiday', holiday: value as HolidayId } : null;
 }

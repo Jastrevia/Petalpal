@@ -16,6 +16,7 @@ import {
 } from './critterVisits';
 import { dogHouse, doorSpot } from '../dogHouseState';
 import type { FoxReason } from './silktailDays';
+import { useGardenLoadState, type GardenLoadStore } from '../loading/gardenReadiness';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
@@ -187,8 +188,9 @@ function comeOut(key: number, id: 'puppy' | 'maltese', now: number): Visit {
 
 // The Silktail Fox comes a few seconds after the Garden opens on its days (`fox`, silktailDays.ts).
 const FOX_DELAY_MS = 6000;
-export default memo(function GardenCritters({ clock, active, pets, shelter = false, fox = null, onFoxArrive }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean;
-  fox?: FoxReason | null; onFoxArrive?: (reason: FoxReason) => void }) {
+const NO_LOAD_STORE: GardenLoadStore = { publishLandsLoaded() {}, publishWater() {}, reportFailure() {}, subscribe: () => () => {}, getState: () => ({ landsLoaded: 1, landsTotal: 1, water: 'ready', failures: [] }) };
+export default memo(function GardenCritters({ clock, active, pets, shelter = false, fox = null, onFoxArrive, loadStore }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean;
+  fox?: FoxReason | null; onFoxArrive?: (reason: FoxReason) => void; loadStore?: GardenLoadStore }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
@@ -198,8 +200,12 @@ export default memo(function GardenCritters({ clock, active, pets, shelter = fal
   const foxRef = useRef(fox); foxRef.current = fox;
   const foxArrived = useRef(onFoxArrive); foxArrived.current = onFoxArrive;
   const foxKey = fox ? (fox.kind === 'milestone' ? `m${fox.days}` : fox.holiday) : null;
+  // It arrives only once the Garden is painted on screen (water and every island loaded), so its
+  // arrival is seen, not played behind the loading veil.
+  const load = useGardenLoadState(loadStore ?? NO_LOAD_STORE);
+  const shown = !loadStore || (load.water === 'ready' && load.landsLoaded >= load.landsTotal);
   useEffect(() => {
-    if (!active) return;
+    if (!active || (foxKey && !shown)) return;
     const here = visitsRef.current.find(v => v.id === 'silktail' && !v.leaving);
     if (!foxKey) {
       if (here) { visitsRef.current = visitsRef.current.map(v => (v === here ? leaveVisit(v, clock.value) : v)); setVisits(visitsRef.current); }
@@ -217,7 +223,7 @@ export default memo(function GardenCritters({ clock, active, pets, shelter = fal
       foxArrived.current?.(reason);
     }, FOX_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [active, foxKey, clock]);
+  }, [active, foxKey, clock, shown]);
   useEffect(() => { dogHouse.clock = clock; }, [clock]);
   // The rain starts: the pair (if here) run home; with neither here they are simply indoors. The
   // rain stops: whoever is indoors comes out of the door.
@@ -536,6 +542,15 @@ export default memo(function GardenCritters({ clock, active, pets, shelter = fal
       // to what the server says).
       dress: (to?: PuppyLook) => setDressed(to),
       unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
+      // The Silktail Fox arrives again now, where it is told (world units) or on a free path crossing.
+      arrive: (at?: Point) => {
+        const others = visitsRef.current.filter(v => v.id !== 'silktail').map(v => { const pose = visitPose(v, clock.value); return { x: pose.x, y: pose.y }; });
+        const visit = planFoxArrival({ key: ++keyRef.current, now: clock.value, network: WALK_NETWORK, edges: EDGES, random: Math.random, others });
+        if (!visit) return null;
+        if (at) visit.path = [at, ...visit.path.slice(1)];
+        visitsRef.current = [...visitsRef.current.filter(v => v.id !== 'silktail'), visit]; setVisits(visitsRef.current);
+        return visit.path[0];
+      },
       spawn: (id: CritterId) => {
         if (id === 'maltese') {
           const friend = planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random });

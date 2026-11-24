@@ -1807,7 +1807,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 set (static-front pass) still draw above her. */}
             {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} loadStore={loadStore} />}
             {/* In rain or snow the bluebird and the butterfly keep under cover. */}
             {showLandmarks && !weatherSheltering && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && !weatherSheltering && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
