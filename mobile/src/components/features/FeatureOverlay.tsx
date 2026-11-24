@@ -193,10 +193,10 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
 
 const PROFILE_COPY = {
   en: { change: 'Change avatar', title: 'Choose your avatar', option: (n: number) => `Avatar ${n}`, close: 'Close',
-    failed: 'Your avatar was not saved. Please try again.', beta: 'Beta tester', betaHint: 'One of the first to grow a PetalPal garden',
+    failed: 'Your avatar was not saved. Please try again.', beta: 'Early gardener', betaHint: 'One of the first to grow a PetalPal garden',
     online: 'Online', offline: 'Offline' },
   'zh-Hans': { change: '更换头像', title: '选择你的头像', option: (n: number) => `头像 ${n}`, close: '关闭',
-    failed: '头像没有保存成功，请再试一次。', beta: '内测用户', betaHint: '最早种下 PetalPal 花园的人之一',
+    failed: '头像没有保存成功，请再试一次。', beta: '首批花园主', betaHint: '最早种下 PetalPal 花园的人之一',
     online: '在线', offline: '离线' },
 };
 
@@ -226,7 +226,8 @@ function ProfileHero({ theme }: { theme: PanelTheme }) {
     <View style={styles.badges}>
       {experience?.user.betaTester ? <View accessibilityLabel={`${copy.beta}. ${copy.betaHint}`} style={styles.betaBadge}>
         <Text style={styles.betaText}>✿ {copy.beta}</Text></View> : null}
-      <RedeemCodeChip />
+      {/* Not on iOS: App Review 3.1.1 allows no unlocks outside In-App Purchase, and its gift is not made yet (2.1). */}
+      {Platform.OS === 'ios' ? null : <RedeemCodeChip />}
     </View>
     <Text style={[ui.caption, { color: theme.muted }]}>{timezoneLabel(profile?.timezone, locale)}</Text>
     {/* Me → My avatars (Avatar System V1.0): how many are owned and what waits, the same screen as Collection. */}

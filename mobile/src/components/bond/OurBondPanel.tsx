@@ -147,14 +147,16 @@ export function OurBondPanel({ visible, locale, summary, loading, onClose }: {
               <Section styles={styles} title={copy.levels}>
                 <Text style={styles.avatarNote}>✦ {avatarWords.milestoneNote}</Text>
                 {BOND_TIERS.map((item, index) => {
-                  const unlock = summary.unlocks.find(entry => entry.level === item.level);
+                  // Only rewards that work today: one not built yet is not announced (App Review 2.1: no
+                  // "coming soon" features).
+                  const unlock = summary.unlocks.find(entry => entry.level === item.level && entry.status !== 'coming_soon');
                   const reached = summary.level >= item.level;
                   return <View key={item.level} style={[styles.levelItem, index > 0 && styles.rowRule]}>
                     <Text style={[styles.levelNumber, reached && styles.goldText]}>Lv {item.level}</Text>
                     <View style={styles.rowText}>
                       <Text style={styles.rowTitle}>{item.en}</Text>
                       {zh ? <Text style={styles.small}>{item.zh}</Text> : null}
-                      {unlock ? <Text style={styles.tiny}>{copy.unlocks[unlock.key] ?? unlock.key}{unlock.status === 'coming_soon' ? ` · ${copy.comingSoon}` : ''}</Text> : null}
+                      {unlock ? <Text style={styles.tiny}>{copy.unlocks[unlock.key] ?? unlock.key}</Text> : null}
                       <Text style={[styles.tiny, styles.avatarMark]}>✦ {avatarWords.milestoneAvatar(item.level)}{reached && avatars?.pending.some(reward => reward.level === item.level && reward.eligible > 0) ? ` · ${avatarWords.milestoneWaiting}` : ''}</Text>
                     </View>
                     <Text style={[styles.levelState, reached && styles.goldText]}>{reached ? copy.reached : copy.levelLocked}</Text>
