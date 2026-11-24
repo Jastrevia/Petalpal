@@ -18,7 +18,8 @@ const walk = dir => { for (const e of fs.readdirSync(dir, { withFileTypes: true 
 } };
 walk(src);
 
-const HOOK = /\b(useDerivedValue|useAnimatedStyle|useAnimatedReaction|useAnimatedProps|useFrameCallback)\(/g;
+// Gesture callbacks (Gesture.Pan().onUpdate(...)) run on the UI thread too.
+const HOOK = /(\buseDerivedValue|\buseAnimatedStyle|\buseAnimatedReaction|\buseAnimatedProps|\buseFrameCallback|\.onBegin|\.onStart|\.onUpdate|\.onChange|\.onEnd|\.onFinalize|\.onTouchesDown|\.onTouchesMove|\.onTouchesUp|\.onTouchesCancelled)\(/g;
 function balanced(text, open) {
   let depth = 0;
   for (let i = open; i < text.length; i++) {
@@ -53,6 +54,11 @@ test('every own function called from a UI-thread callback is a worklet', () => {
       }
     }
     for (const m of text.matchAll(HOOK)) {
+      // A gesture built with .runOnJS(true) runs its callbacks on the JS thread.
+      if (m[1].startsWith('.')) {
+        const start = text.lastIndexOf('Gesture.', m.index), end = text.indexOf(';', m.index);
+        if (start >= 0 && /\.runOnJS\(true\)/.test(text.slice(start, end < 0 ? undefined : end))) continue;
+      }
       const body = balanced(text, m.index + m[0].length - 1);
       for (const call of body.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)) {
         const imported = imports.get(call[1]);
