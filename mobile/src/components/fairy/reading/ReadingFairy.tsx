@@ -1,21 +1,19 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle,
+} from 'react-native';
 
 import {
-  createReadingFairyController, READING_TIMING, readingFrameCues, resolveReadingFrame,
-  type ReadingSession, type ReadingSnapshot, type ReadingTiming,
+  createReadingFairyController, READING_SHEET, READING_TIMING, readingArt, readingMotion,
+  type ReadingEasing, type ReadingSession, type ReadingSnapshot, type ReadingTiming,
 } from './readingFairyController';
 
-// Six poses from the reading storyboard, registered on one shared frame: the face, hair, wings and
-// room all come from the reading pose, and only the arm, hand, book and page area changes.
-export const READING_FRAMES = [
-  require('@/assets/garden/fairy/reading-v1/reading_01.webp'),
-  require('@/assets/garden/fairy/reading-v1/reading_02.webp'),
-  require('@/assets/garden/fairy/reading-v1/reading_03.webp'),
-  require('@/assets/garden/fairy/reading-v1/reading_04.webp'),
-  require('@/assets/garden/fairy/reading-v1/reading_05.webp'),
-  require('@/assets/garden/fairy/reading-v1/reading_06.webp'),
-];
+// The reading pose (whole scene) and a strip of 42 frames of the area that moves: arm, hand, book
+// and page. Face, hair, wings and room are always the reading pose underneath.
+export const READING_ART = {
+  base: require('@/assets/garden/fairy/reading-v1/reading_01.webp'),
+  sheet: require('@/assets/garden/fairy/reading-v1/reading_sheet.webp'),
+};
 
 // One controller per mounted companion. The timing is read once; remount (key) to change it.
 export function useReadingFairy(session: ReadingSession, timing: ReadingTiming = READING_TIMING) {
@@ -28,16 +26,43 @@ export function useReadingFairy(session: ReadingSession, timing: ReadingTiming =
 
 // The Fairy reading beside you during a study or work session. `session` comes from the session
 // that owns the timer: 'active' while it runs, 'paused' while it is paused, 'idle' otherwise.
-export function ReadingFairy({ session, timing, frames, style }: {
-  session: ReadingSession; timing?: ReadingTiming; frames?: readonly unknown[]; style?: StyleProp<ViewStyle>;
+export function ReadingFairy({ session, timing, art, style }: {
+  session: ReadingSession; timing?: ReadingTiming; art?: { base?: unknown; sheet?: unknown }; style?: StyleProp<ViewStyle>;
 }) {
   const { snapshot } = useReadingFairy(session, timing);
-  return <ReadingFairyView snapshot={snapshot} frames={frames} style={style} />;
+  return <ReadingFairyView snapshot={snapshot} art={art} style={style} />;
+}
+
+const EASING: Record<ReadingEasing, (value: number) => number> = {
+  in: Easing.in(Easing.sin), out: Easing.out(Easing.sin), linear: Easing.linear, inOut: Easing.inOut(Easing.sin),
+};
+const { columns, frames, size, crop } = READING_SHEET;
+// Tile edges are the reading pose in every frame; trimming them avoids sampling a neighbouring tile.
+const TRIM = 2;
+const STEP = 0.001;
+
+// Step functions over the fractional strip position: which tile each of the two layers shows, and
+// how far the upper (next) frame has faded in.
+function stripRanges(scale: number) {
+  const input: number[] = [], lowerX: number[] = [], lowerY: number[] = [], upperX: number[] = [], upperY: number[] = [], fade: number[] = [];
+  const tileX = (frame: number) => -((frame % columns) * crop.width + TRIM) * scale;
+  const tileY = (frame: number) => -(Math.floor(frame / columns) * crop.height + TRIM) * scale;
+  for (let frame = 0; frame < frames; frame += 1) {
+    const next = Math.min(frame + 1, frames - 1);
+    const points = frame === frames - 1 ? [frame] : [frame, frame + 1 - STEP];
+    points.forEach((point, index) => {
+      input.push(point);
+      lowerX.push(tileX(frame)); lowerY.push(tileY(frame));
+      upperX.push(tileX(next)); upperY.push(tileY(next));
+      fade.push(index === 0 ? 0 : 1);
+    });
+  }
+  return { input, lowerX, lowerY, upperX, upperY, fade };
 }
 
 // Draws a controller snapshot (for owners that hold the controller themselves).
-export function ReadingFairyView({ snapshot, frames = READING_FRAMES, style }: {
-  snapshot: ReadingSnapshot; frames?: readonly unknown[]; style?: StyleProp<ViewStyle>;
+export function ReadingFairyView({ snapshot, art = READING_ART, style }: {
+  snapshot: ReadingSnapshot; art?: { base?: unknown; sheet?: unknown }; style?: StyleProp<ViewStyle>;
 }) {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -46,52 +71,56 @@ export function ReadingFairyView({ snapshot, frames = READING_FRAMES, style }: {
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
     return () => { active = false; subscription.remove(); };
   }, []);
+  const [width, setWidth] = useState(0);
+  const progress = useRef(new Animated.Value(0)).current;
+  const mode = readingArt(art);
 
-  const opacity = useRef(frames.map((_, index) => new Animated.Value(index === 0 ? 1 : 0))).current;
-  const shown = useRef(0);
-  const fade = useRef<Animated.CompositeAnimation | null>(null);
-  const [layers, setLayers] = useState<{ top: number; under: number | null }>({ top: 0, under: null });
-
-  // Crossfade: the new pose fades in over the current one, which is hidden once it is covered.
-  const show = useCallback((target: number, fadeMs: number) => {
-    const frame = resolveReadingFrame(target, frames);
-    if (frame === null || frame === shown.current) return;
-    fade.current?.stop();
-    const from = shown.current;
-    opacity.forEach((value, index) => { if (index !== from) value.setValue(0); });
-    opacity[from].setValue(1);
-    shown.current = frame;
-    setLayers({ top: frame, under: from });
-    const animation = Animated.timing(opacity[frame], { toValue: 1, duration: fadeMs, easing: Easing.inOut(Easing.quad),
-      useNativeDriver: Platform.OS !== 'web' });
-    fade.current = animation;
-    animation.start(({ finished }) => {
-      if (!finished || shown.current !== frame) return;
-      opacity[from].setValue(0);
-      setLayers({ top: frame, under: null });
-    });
-  }, [frames, opacity]);
-
-  // Each state's poses are cued from when the state began, so a re-render never replays them.
+  // Each state's movement starts from wherever the strip is, so a re-render never replays it and
+  // an interrupted movement continues smoothly instead of jumping.
   useEffect(() => {
-    const since = Date.now() - snapshot.enteredAt;
-    const handles = readingFrameCues(snapshot.state, snapshot.durationMs).map(cue =>
-      setTimeout(() => show(reduced ? 0 : cue.frame, reduced ? 0 : cue.fadeMs), Math.max(0, cue.atMs - since)));
-    return () => handles.forEach(clearTimeout);
-  }, [snapshot.state, snapshot.enteredAt, snapshot.durationMs, reduced, show]);
-  useEffect(() => () => fade.current?.stop(), []);
+    let cancelled = false;
+    progress.stopAnimation(at => {
+      if (cancelled) return;
+      const motion = reduced ? { to: 0, durationMs: 0, easing: 'linear' as const } : readingMotion(snapshot.state, snapshot.durationMs, at);
+      if (!motion) return;
+      const duration = Math.max(0, motion.durationMs - Math.max(0, Date.now() - snapshot.enteredAt));
+      if (duration === 0) return progress.setValue(motion.thenJumpTo ?? motion.to);
+      Animated.timing(progress, { toValue: motion.to, duration, easing: EASING[motion.easing], useNativeDriver: Platform.OS !== 'web' })
+        .start(({ finished }) => { if (finished && !cancelled && motion.thenJumpTo !== undefined) progress.setValue(motion.thenJumpTo); });
+    });
+    return () => { cancelled = true; };
+  }, [snapshot.state, snapshot.enteredAt, snapshot.durationMs, reduced, progress]);
+  useEffect(() => () => progress.stopAnimation(), [progress]);
 
-  if (resolveReadingFrame(0, frames) === null) return null;
+  const layers = useMemo(() => {
+    if (!width) return null;
+    const scale = width / size, ranges = stripRanges(scale);
+    const at = (output: number[]) => progress.interpolate({ inputRange: ranges.input, outputRange: output, extrapolate: 'clamp' });
+    return {
+      window: { left: (crop.x + TRIM) * scale, top: (crop.y + TRIM) * scale, width: (crop.width - TRIM * 2) * scale, height: (crop.height - TRIM * 2) * scale },
+      sheet: { width: columns * crop.width * scale, height: READING_SHEET.rows * crop.height * scale },
+      lower: [{ translateX: at(ranges.lowerX) }, { translateY: at(ranges.lowerY) }],
+      upper: [{ translateX: at(ranges.upperX) }, { translateY: at(ranges.upperY) }],
+      fade: at(ranges.fade),
+    };
+  }, [width, progress]);
+
+  if (!mode) return null;
   return <View accessible accessibilityRole="image" accessibilityLabel="The Fairy is reading her book beside you"
-    style={[styles.frame, style]}>
-    {frames.map((source, index) => source ? <Animated.View key={index} pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { opacity: opacity[index], zIndex: index === layers.top ? 2 : index === layers.under ? 1 : 0 }]}>
-      <Image source={source as number} fadeDuration={0} resizeMode="cover" style={styles.image} />
-    </Animated.View> : null)}
+    onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)} style={[styles.frame, style]}>
+    <Image source={art.base as number} fadeDuration={0} resizeMode="cover" style={styles.fill} />
+    {mode === 'animated' && layers ? <View pointerEvents="none" style={[styles.window, layers.window]}>
+      <Animated.Image source={art.sheet as number} fadeDuration={0} resizeMode="stretch"
+        style={[styles.sheet, layers.sheet, { transform: layers.lower }]} />
+      <Animated.Image source={art.sheet as number} fadeDuration={0} resizeMode="stretch"
+        style={[styles.sheet, layers.sheet, { opacity: layers.fade, transform: layers.upper }]} />
+    </View> : null}
   </View>;
 }
 
 const styles = StyleSheet.create({
   frame: { width: '100%', aspectRatio: 1, overflow: 'hidden', borderRadius: 18, backgroundColor: '#3A2C3F' },
-  image: { width: '100%', height: '100%' },
+  fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
+  window: { position: 'absolute', overflow: 'hidden' },
+  sheet: { position: 'absolute', left: 0, top: 0 },
 });
