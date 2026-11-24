@@ -1,4 +1,5 @@
 import { dispatchOnboarding, onboardingActive } from '../components/onboarding/onboardingSignals';
+import { silktailChanged } from '../services/silktail';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, usePathname } from 'expo-router';
 import { apiRequest } from '../services/api';
@@ -90,6 +91,8 @@ export function useEventJournal(onGardenChanged?: () => void) {
       await refresh();
       // The first-time tour links its first Event (and the Flower it grew) to the real records.
       dispatchOnboarding({ type: 'eventSaved', eventId: created.event.id, flowerId: created.flower?.id ?? null });
+      // This Event may make 14 days: the Silktail Fox then comes at once.
+      silktailChanged();
       if (!mounted.current) return;
       onGardenChanged?.();
     } catch (err) { if (mounted.current) setError((err as Error).message); }

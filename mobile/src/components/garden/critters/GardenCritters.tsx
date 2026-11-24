@@ -1,4 +1,4 @@
-import { BlurMask, Group, Image, Oval, Path, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
+import { BlurMask, Circle, Group, Image, Oval, Path, RadialGradient, Skia, useImage, vec, type SkImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
 import { usePetOutfits } from '@/services/gardenPets';
@@ -11,10 +11,11 @@ export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, planFoxArrival, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit, FADE_SECONDS, MALTESE_RUN_SPEED, pathLength, RISE_SECONDS, RUN_SPEED, travelSeconds,
 } from './critterVisits';
 import { dogHouse, doorSpot } from '../dogHouseState';
+import type { FoxReason } from './silktailDays';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
@@ -24,8 +25,10 @@ import { dogHouse, doorSpot } from '../dogHouseState';
 // A flight: `fps`, played in time. `rest`: frames of settling down (same cells), played while it
 // rests between legs (`always`, or when the leg `sits`), and backwards as far as `rise`
 // (standing) to get up again. `run`: a running stride (same cells), for a leg that `chase`s.
-// `trail`: a painted petal it sheds behind it while it moves.
+// `trail`: a painted petal it sheds behind it while it moves. `arrive`: frames of it taking
+// shape (same cells), played at REST_FPS over a leg's first `arrive` seconds (planFoxArrival).
 type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number;
+  arrive?: { source: number; count: number };
   rest?: { source: number; count: number; rise: number; always?: boolean };
   run?: { source: number; columns: number; count: number; loop: number;
     // A run in bigger cells than the walk's (a gallop stretches past them): their size, and where
@@ -115,9 +118,12 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   maltese: { source: MALTESE_LOOKS.bare.source, w: 293, h: 220, frames: MALTESE_LOOKS.bare },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
-  // from that same running pose), and gets up again (back to its standing frame, 24).
+  // from that same running pose), and gets up again (back to its standing frame, 24). It arrives
+  // out of a swirl of petals and silk ribbons (oil-motion, 2026-11-23, ending on the sit sheet's
+  // last frame; ~/dev/petalpal-motion/silktail/arrive, scripts/critters/pack-arrival.py).
   silktail: { source: require('@/assets/garden/spirits/silktail-run.webp'), w: 240, h: 180,
     frames: { columns: 8, count: 47, ground: 167, loop: 394, trail: require('@/assets/garden/spirits/silktail-petal.webp'),
+      arrive: { source: require('@/assets/garden/spirits/silktail-arrive.webp'), count: 62 },
       rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24, always: true } } },
 };
 const REST_FPS = 12;
@@ -179,11 +185,39 @@ function comeOut(key: number, id: 'puppy' | 'maltese', now: number): Visit {
     duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[id]) };
 }
 
-export default memo(function GardenCritters({ clock, active, pets, shelter = false }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean }) {
+// The Silktail Fox comes a few seconds after the Garden opens on its days (`fox`, silktailDays.ts).
+const FOX_DELAY_MS = 6000;
+export default memo(function GardenCritters({ clock, active, pets, shelter = false, fox = null, onFoxArrive }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean;
+  fox?: FoxReason | null; onFoxArrive?: (reason: FoxReason) => void }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
   const shelterRef = useRef(shelter); shelterRef.current = shelter;
+  // The Silktail Fox's day: it arrives (out of petals) a moment after the Garden opens and stays
+  // all day, walking the paths like the others; when its day is over it fades out where it is.
+  const foxRef = useRef(fox); foxRef.current = fox;
+  const foxArrived = useRef(onFoxArrive); foxArrived.current = onFoxArrive;
+  const foxKey = fox ? (fox.kind === 'milestone' ? `m${fox.days}` : fox.holiday) : null;
+  useEffect(() => {
+    if (!active) return;
+    const here = visitsRef.current.find(v => v.id === 'silktail' && !v.leaving);
+    if (!foxKey) {
+      if (here) { visitsRef.current = visitsRef.current.map(v => (v === here ? leaveVisit(v, clock.value) : v)); setVisits(visitsRef.current); }
+      return;
+    }
+    // (Checked when the timer fires, not now: coming back after AWAY_SECONDS empties the Garden
+    // just after this runs, and the fox then arrives again.)
+    const timer = setTimeout(() => {
+      const reason = foxRef.current;
+      if (!reason || visitsRef.current.some(v => v.id === 'silktail' && !v.leaving)) return;
+      const others = visitsRef.current.map(v => { const pose = visitPose(v, clock.value); return { x: pose.x, y: pose.y }; });
+      const visit = planFoxArrival({ key: ++keyRef.current, now: clock.value, network: WALK_NETWORK, edges: EDGES, random: Math.random, others });
+      if (!visit) return;
+      visitsRef.current = [...visitsRef.current, visit]; setVisits(visitsRef.current);
+      foxArrived.current?.(reason);
+    }, FOX_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [active, foxKey, clock]);
   useEffect(() => { dogHouse.clock = clock; }, [clock]);
   // The rain starts: the pair (if here) run home; with neither here they are simply indoors. The
   // rain stops: whoever is indoors comes out of the door.
@@ -288,7 +322,8 @@ export default memo(function GardenCritters({ clock, active, pets, shelter = fal
     let timer: ReturnType<typeof setTimeout>;
     const arrive = () => {
       const indoors = shelterRef.current || dogHouse.get().phase !== 'out';
-      const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
+      // (The fox, a spirit, takes no visitor's place.)
+      const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current.filter(v => v.id !== 'silktail'),
         network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: indoors ? [...excluded.current, 'puppy'] : excluded.current });
       if (visit) setVisits(current => [...current, visit]);
       // The puppy's friend follows it in now and then.
@@ -659,11 +694,25 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
   // Resting between legs (with a rest sheet): settling down, sitting, then getting up again; or,
   // getting up only (`rising`, before a chase).
   const restSheet = useImage(frames.rest?.source ?? null);
-  const loaded = (!frames.run || !!runSheet) && (!frames.rest || !!restSheet);
+  const arriveSheet = useImage(frames.arrive?.source ?? null);
+  const loaded = (!frames.run || !!runSheet) && (!frames.rest || !!restSheet) && (!frames.arrive || !!arriveSheet);
   useEffect(() => { if (loaded) onReady?.(); }, [loaded, onReady]);
+  // Arriving (the Silktail Fox): its arrival clip, then sitting where it appeared until it gets up.
+  // With motion reduced it is simply sitting there.
+  const arriveFrame = useDerivedValue(() => {
+    const arrive = frames.arrive, e = clock.value - visit.start;
+    if (!arrive || !visit.arrive || reduced || e < 0 || e >= visit.arrive) return -1;
+    return Math.min(arrive.count - 1, Math.floor(e * REST_FPS));
+  }, [visit, frames, reduced]);
   const restFrame = useDerivedValue(() => {
     const rest = frames.rest, e = clock.value - visit.start;
     if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
+    if (visit.arrive) {
+      if (arriveFrame.value >= 0) return -1;
+      const rise = (rest.count - rest.rise) / REST_FPS;
+      if (!reduced && e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
+      return rest.count - 1;
+    }
     if (visit.rising) return Math.max(rest.rise, rest.count - 1 - Math.floor(e / visit.lead * (rest.count - rest.rise)));
     if (!rest.always && !visit.sits) return -1;
     if (reduced) return rest.count - 1;
@@ -671,7 +720,7 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     if (e < settle) return Math.floor(e * REST_FPS);
     if (e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
     return rest.count - 1;
-  }, [visit, frames, reduced]);
+  }, [visit, frames, reduced, arriveFrame]);
   // Eating or being patted (held, sitting): its clip over the sitting frame, fading in and out
   // over ACTION_FADE (its first and last frames are the sitting pose; the bowl comes and goes).
   const actionShown = useDerivedValue(() => {
@@ -681,7 +730,13 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     if (e < 0 || e >= length) return 0;
     return Math.min(1, e / ACTION_FADE, (length - e) / ACTION_FADE);
   }, [visit, actions]);
-  const walkOpacity = useDerivedValue(() => (restFrame.value < 0 ? 1 : 0), [restFrame]);
+  const walkOpacity = useDerivedValue(() => (restFrame.value < 0 && arriveFrame.value < 0 ? 1 : 0), [restFrame, arriveFrame]);
+  const arriveOpacity = useDerivedValue(() => (arriveFrame.value < 0 ? 0 : 1), [arriveFrame]);
+  const arriveCell = useDerivedValue(() => Math.max(0, arriveFrame.value), [arriveFrame]);
+  // While it takes shape: no shadow until it has a body, and a soft warm light where it appears.
+  const arrivalT = useDerivedValue(() => (visit.arrive && !reduced ? (clock.value - visit.start) / visit.arrive : 1), [visit, reduced]);
+  const shadowOpacity = useDerivedValue(() => Math.min(1, Math.max(0, (arrivalT.value - 0.45) / 0.3)), [arrivalT]);
+  const glowOpacity = useDerivedValue(() => { const t = arrivalT.value; return t <= 0 || t >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.9; }, [arrivalT]);
   const restOpacity = useDerivedValue(() => (restFrame.value < 0 ? 0 : 1 - actionShown.value), [restFrame, actionShown]);
   const restCell = useDerivedValue(() => Math.max(0, restFrame.value), [restFrame]);
   const shadow = useDerivedValue(() => {
@@ -689,7 +744,12 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     return [{ translateX: pose.x }, { translateY: pose.y }];
   }, [visit]);
   return <Group opacity={opacity}>
-    {fade ? null : <Group transform={shadow}>
+    {visit.arrive ? <Group transform={shadow} opacity={glowOpacity}>
+      <Circle cx={0} cy={-spec.size * 0.38} r={spec.size * 0.75}>
+        <RadialGradient c={vec(0, -spec.size * 0.38)} r={spec.size * 0.75} colors={['rgba(255, 241, 208, 0.62)', 'rgba(255, 226, 214, 0.22)', 'rgba(255, 226, 214, 0)']} />
+      </Circle>
+    </Group> : null}
+    {fade ? null : <Group transform={shadow} opacity={shadowOpacity}>
       <Oval x={-spec.size * 0.4} y={-spec.size * 0.06} width={spec.size * 0.8} height={spec.size * 0.12} color="rgba(30, 44, 26, 0.22)">
         <BlurMask blur={3} style="normal" />
       </Oval>
@@ -702,6 +762,7 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
           : <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />)
         : <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />}</Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
+      {arriveSheet && frames.arrive && visit.arrive ? <Group opacity={arriveOpacity}><SheetFrame sheet={arriveSheet} frame={arriveCell} columns={frames.columns} count={frames.arrive.count} w={w} h={h} /></Group> : null}
       {actions ? (['eat', 'pat'] as const).map(kind => <ActionClip key={kind} kind={kind} spec={actions[kind]} visit={visit} clock={clock} shown={actionShown} w={w} ground={frames.ground} />) : null}
     </Group>
   </Group>;

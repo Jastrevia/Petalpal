@@ -133,6 +133,9 @@ import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
 import Butterfly from './critters/Butterfly';
 import GardenCritters, { type GardenPetsHandle } from './critters/GardenCritters';
+import { SilktailNote } from './SilktailNote';
+import type { FoxReason } from './critters/silktailDays';
+import { useSilktailReason } from '../../services/silktail';
 import PetRingMenu from './critters/PetRingMenu';
 import type { PetSpot } from './critters/petRing';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
@@ -576,6 +579,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const overlayPaused = useGardenPausedByOverlay();
   const worldActive = gardenActive && foreground && !overlayPaused;
+  // The Silktail Fox's days (14 days of Events, holidays) in the owner's own Garden only.
+  const foxGarden = enableFairyWalk && !readOnly;
+  const { reason: foxToday, date: foxDate } = useSilktailReason(foxGarden && worldActive, true);
+  const [foxArrival, setFoxArrival] = useState<{ reason: FoxReason; date: string; at: number } | null>(null);
+  const onFoxArrive = useCallback((reason: FoxReason) => setFoxArrival({ reason, date: foxDate, at: Date.now() }), [foxDate]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
@@ -1799,7 +1807,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 set (static-front pass) still draw above her. */}
             {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} />}
             {/* In rain or snow the bluebird and the butterfly keep under cover. */}
             {showLandmarks && !weatherSheltering && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && !weatherSheltering && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
@@ -1970,6 +1978,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
         </View>
       )}
+      {foxGarden && activeMode === 'normal' && <SilktailNote arrival={foxArrival} locale={zhHans(locale) ? 'zh-Hans' : 'en'} />}
       {lawnNote && activeMode === 'normal' && !selectedFlower && (
         <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
           <Text accessibilityRole="alert" style={styles.lawnNoteText}>{zhHans(locale)

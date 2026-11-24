@@ -6,8 +6,9 @@
 // path points high above them, so nobody ever stands in the pond.
 import { distance, type Network, type Point } from '../fairy/walkNetwork';
 
-// `silktail`, the Silktail Fox spirit, walks like the others but is not a random visitor: it comes
-// for a Journal milestone (when exactly is still to be designed), so it is left out of CRITTER_IDS.
+// `silktail`, the Silktail Fox spirit, walks like the others but is not a random visitor: it spends
+// a whole day in the Garden on a Journal milestone or a holiday (silktailDays.ts; it arrives with
+// planFoxArrival), so it is left out of CRITTER_IDS.
 // Nor are the bluebird and the butterfly any more: they live on the Garden's perches and stones
 // (spirits/Bluebird.tsx, Butterfly.tsx).
 export type CritterId = 'butterfly' | 'bluebird' | 'rabbit' | 'hedgehog' | 'puppy' | 'silktail' | 'maltese';
@@ -95,6 +96,9 @@ export type Visit = {
   // Drawn with its run (the Maltese running in a game or catching up); `inScene`: part of a pair
   // scene (tug-of-war, a hug) shown as one clip from `start` to `end` (planScene).
   running?: boolean; inScene?: { start: number; end: number };
+  // The Silktail Fox's arrival: for its first `arrive` seconds it takes shape out of petals and
+  // sparkles (its arrival clip), then sits where it appeared until the leg's lead is over.
+  arrive?: number;
   // Rain (dogHouseState.ts): the pair hurrying home to their house door (`going`), then sitting
   // there (`arrived`) until both are in place and the house's clip takes them inside.
   homing?: 'going' | 'arrived';
@@ -227,7 +231,7 @@ export function chooseLawn(id: CritterId, lawns: Lawns, random: () => number) {
 // Fades out where it stands (its lawn has flowers now, or someone else's turn).
 export function leaveVisit(visit: Visit, now: number): Visit {
   const here = visitPose(visit, now);
-  return { ...visit, path: [{ x: here.x, y: here.y }, { x: here.x, y: here.y }], start: now, lead: 0, duration: FADE_SECONDS, fadeIn: false, leaving: true,
+  return { ...visit, path: [{ x: here.x, y: here.y }, { x: here.x, y: here.y }], start: now, lead: 0, duration: FADE_SECONDS, fadeIn: false, leaving: true, arrive: undefined,
     walked: visit.walked + visitDistance(visit, now) };
 }
 
@@ -319,7 +323,8 @@ export function planNextLeg({ visit, now, network, edges, points, random, lawns 
 }): Visit | null {
   const spec = CRITTERS[visit.id], gone = visitDistance(visit, visit.start + visit.duration);
   // After a chase the puppy sits a while where it caught up, then walks on at its own pace.
-  const after = visit.chase ? { sits: true, chase: false, rising: false, speed: spec.speed, rhythm: RHYTHMS[visit.id] } : { sits: false, rising: false };
+  // (A leg after the fox's arrival plays no arrival.)
+  const after = visit.chase ? { sits: true, chase: false, rising: false, arrive: undefined, speed: spec.speed, rhythm: RHYTHMS[visit.id] } : { sits: false, rising: false, arrive: undefined };
   const rest = () => (visit.chase ? between(SIT_SECONDS, random) : between(REST[visit.id], random));
   if (visit.lawn !== undefined && lawns) {
     // On its lawn: stroll on from where it stopped; a planted lawn is left (leaveVisit).
@@ -650,4 +655,27 @@ export function sceneShown(scene: { start: number; end: number } | undefined, t:
   'worklet';
   if (!scene || t <= scene.start || t >= scene.end) return 0;
   return Math.min(1, (t - scene.start) / SCENE_FADE, (scene.end - t) / SCENE_FADE);
+}
+// The Silktail Fox arrives (silktailDays.ts says when): on a path crossing well clear of the other
+// animals (`others`, where they stand now), it takes shape there out of petals and sparkles over
+// FOX_ARRIVE_SECONDS, sits a while (FOX_SITS_AFTER), then gets up and sets off along the paths.
+// Its arrival clip: 62 frames at 12 a second (GardenCritters ART.silktail.arrive, REST_FPS).
+export const FOX_ARRIVE_SECONDS = 62 / 12;
+export const FOX_SITS_AFTER: [number, number] = [8, 14];
+export const FOX_CLEARANCE = 160;
+export function planFoxArrival({ key, now, network, edges, random, others = [] }: {
+  key: number; now: number; network: Network; edges: Network['edges']; random: () => number; others?: readonly Point[];
+}): Visit | null {
+  const linked = new Set(edges.flatMap(edge => [edge.a, edge.b]));
+  const nodes = network.nodes.map((node, i) => ({ node, i })).filter(({ i }) => linked.has(i));
+  const clear = nodes.filter(({ node }) => others.every(other => distance(node, other) >= FOX_CLEARANCE));
+  const choices = clear.length ? clear : nodes;
+  if (!choices.length) return null;
+  const from = choices[Math.min(choices.length - 1, Math.floor(random() * choices.length))].i;
+  const path = planWalk(network, edges, random, undefined, from);
+  if (!path || path.length < 2) return null;
+  const spec = CRITTERS.silktail, rhythm = RHYTHMS.silktail;
+  const lead = FOX_ARRIVE_SECONDS + between(FOX_SITS_AFTER, random);
+  return { key, id: 'silktail', path, start: now, lead, duration: lead + travelSeconds(pathLength(path) / spec.speed, rhythm),
+    speed: spec.speed, rhythm, fadeIn: false, walked: 0, arrive: FOX_ARRIVE_SECONDS };
 }

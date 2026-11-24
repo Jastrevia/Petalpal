@@ -174,6 +174,7 @@ import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
 import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
 import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
 import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
+import { silktailFor } from "./lib/silktail.js";
 import { deitySummary } from "./lib/flower-deity.js";
 import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
 import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
@@ -3194,6 +3195,18 @@ app.get("/api/garden/layout", async (req, res) => {
   if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
   try { return res.json(await layoutFor(prisma, req.auth.userId)); }
   catch (error) { return sendLayoutError(res, error, "GET /api/garden/layout"); }
+});
+// The Silktail Fox's milestone visit (lib/silktail.js): the owner's own distinct Event days and
+// whether today (account local date) is the day the latest 14th was reached. Read-only; no content.
+app.get("/api/garden/silktail", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const state = await silktailFor(prisma, req.auth.userId);
+    return state ? res.json(state) : res.status(404).json({ error: "User not found" });
+  } catch (error) {
+    logServerError("GET /api/garden/silktail error", error);
+    return res.status(500).json({ error: "Failed to load the Silktail Fox" });
+  }
 });
 app.put("/api/garden/layout", async (req, res) => {
   try { return res.json(await saveLayout(prisma, req.auth.userId, req.body)); }
