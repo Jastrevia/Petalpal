@@ -10,6 +10,8 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const seeded = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
 const edges = visits.walkableEdges(WALK_NETWORK, isGardenGroundBlocked, (a, b) => safeSegment(a, b, isGardenGroundBlocked));
 const points = WALK_NETWORK.nodes.filter(node => !isGardenGroundBlocked(node));
+// Everyone but `id`, so planVisit can only bring `id` (the puppy otherwise always comes first).
+const others = id => visits.CRITTER_IDS.filter(other => other !== id);
 
 test('walkers only use connected dry paths and never stand in the pond', () => {
   assert.ok(edges.length > 10, 'the Garden has dry paths to walk');
@@ -51,7 +53,7 @@ test('at most MAX_VISITORS visitors, never the same one twice at once', () => {
 test('a visitor fades in, travels its whole path in its rhythm, and stays in sight', () => {
   for (const id of visits.CRITTER_IDS) {
     let visit = null;
-    for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 1, now: 100, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed) });
+    for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 1, now: 100, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), excluded: others(id) });
     const start = plain(visits.visitPose(visit, 100)), mid = plain(visits.visitPose(visit, 100 + visit.duration / 2));
     const end = plain(visits.visitPose(visit, 100 + visit.duration));
     assert.equal(start.opacity, 0, `${id} starts invisible`);
@@ -106,7 +108,7 @@ test('visitors stay: each leg rests where the last one stopped, then sets off on
   const walkable = new Set(edges.map(edge => `${Math.min(edge.a, edge.b)}-${Math.max(edge.a, edge.b)}`));
   for (const id of visits.CRITTER_IDS) {
     let visit = null;
-    for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 7, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed) });
+    for (let seed = 1; !visit || visit.id !== id; seed++) visit = visits.planVisit({ key: 7, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), excluded: others(id) });
     const random = seeded(99);
     for (let leg = 0; leg < 12; leg++) {
       const end = visit.start + visit.duration, stop = plain(visits.visitPose(visit, end));
@@ -171,7 +173,7 @@ test('one animal to a lawn; planted lawns are off limits; with none left they wa
   // Every lawn planted: a lawn animal walks the paths instead.
   let onPaths = null;
   for (let seed = 1; !onPaths; seed++) {
-    const v = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: lawnsWith([]) });
+    const v = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: lawnsWith([]), excluded: ['puppy'] });
     if (v && v.id === 'rabbit') onPaths = v;
   }
   assert.equal(onPaths.lawn, undefined);
@@ -181,6 +183,41 @@ test('one animal to a lawn; planted lawns are off limits; with none left they wa
     const v = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: full });
     assert.ok(!v || (v.id !== 'rabbit' && v.id !== 'hedgehog'), 'no lawn for it, so it does not come');
   }
+});
+
+test('the golden puppy lives here: it comes first, and again first after the Garden has been away', () => {
+  assert.equal(visits.RESIDENT, 'puppy');
+  assert.deepEqual([...visits.CRITTER_IDS].sort(), ['hedgehog', 'puppy', 'rabbit'], 'the rabbit and the hedgehog stay the random visitors');
+  for (let seed = 1; seed <= 40; seed++) {
+    const first = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed) });
+    assert.equal(first?.id, 'puppy', `seed ${seed}: the puppy arrives first`);
+    assert.ok(first.fadeIn && first.path.length >= 2);
+    // With lawns to play on too, the puppy still comes first and walks the paths.
+    const onLawns = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(seed), lawns: lawnsWith([2, 9]) });
+    assert.equal(onLawns?.id, 'puppy');
+    assert.equal(onLawns.lawn, undefined);
+    // Once it is in, the next visitor is the rabbit or the hedgehog, never a second puppy.
+    const next = visits.planVisit({ key: 2, now: 5, active: [first], network: WALK_NETWORK, edges, points, random: seeded(seed) });
+    assert.ok(next && ['rabbit', 'hedgehog'].includes(next.id), `seed ${seed}: then a random visitor`);
+  }
+  // Both random visitors turn up over many sessions.
+  const seen = new Set(), random = seeded(23);
+  for (let session = 0; session < 40; session++) {
+    const first = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random });
+    seen.add(visits.planVisit({ key: 2, now: 5, active: [first], network: WALK_NETWORK, edges, points, random }).id);
+  }
+  assert.deepEqual([...seen].sort(), ['hedgehog', 'rabbit']);
+  // The Maltese follows the puppy in, as before; it never comes without it.
+  const puppy = visits.planVisit({ key: 1, now: 0, active: [], network: WALK_NETWORK, edges, points, random: seeded(3) });
+  assert.equal(visits.planFriendVisit({ key: 2, now: 1, active: [], network: WALK_NETWORK, edges, random: seeded(3) }), null);
+  assert.equal(visits.planFriendVisit({ key: 2, now: 1, active: [puppy], network: WALK_NETWORK, edges, random: seeded(3) })?.id, 'maltese');
+  // After AWAY_SECONDS away the Garden starts empty again: the puppy is first once more, even
+  // with the rabbit's lawn free and the hedgehog excluded this session.
+  const back = visits.planVisit({ key: 9, now: 700, active: [], network: WALK_NETWORK, edges, points, random: seeded(17), lawns: lawnsWith([4]), excluded: ['hedgehog'] });
+  assert.equal(back?.id, 'puppy');
+  // A full Garden takes no one, the puppy included.
+  const full = [{ id: 'rabbit' }, { id: 'hedgehog' }, { id: 'maltese' }];
+  assert.equal(visits.planVisit({ key: 3, now: 0, active: full, network: WALK_NETWORK, edges, points, random: seeded(1) }), null);
 });
 
 test('a lawn animal whose lawn gets flowers fades out where it stands', () => {

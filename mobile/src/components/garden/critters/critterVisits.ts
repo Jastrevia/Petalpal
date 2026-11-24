@@ -1,5 +1,5 @@
-// Garden visitors: a butterfly, a bluebird, a rabbit, a hedgehog and a puppy drop by now
-// and then and stay: each wanders one route (a leg), rests where it ended, and sets off again.
+// Garden visitors: the golden puppy lives here (it comes first, RESIDENT); a rabbit and a hedgehog
+// drop by now and then. All stay: each wanders one route (a leg), rests where it ended, and sets off again.
 // They go home only once the Garden has been away (closed, in the background) for AWAY_SECONDS.
 // At most two at a time; each leg is planned here (pure, seeded by the caller's random) and
 // drawn by GardenCritters.tsx from the Garden clock. Walkers only use connected dry paths of the walk network; flyers hop between
@@ -51,7 +51,7 @@ export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
 };
 // (The Maltese is not one of them: it comes with the puppy, planFriendVisit.)
 export const CRITTER_IDS = (Object.keys(CRITTERS) as CritterId[]).filter(id => id !== 'silktail' && id !== 'bluebird' && id !== 'butterfly' && id !== 'maltese');
-// The rabbit, the hedgehog and the puppy can all be in at once (and the puppy's friend, the Maltese).
+// The puppy and the rabbit and/or the hedgehog can be in at once (the Maltese counts too).
 export const MAX_VISITORS = 3;
 // Seconds between one visitor arriving and the next.
 export const VISIT_GAP: [number, number] = [10, 35];
@@ -283,8 +283,14 @@ export function planFlight(points: readonly Point[], spec: CritterSpec, random: 
   return path;
 }
 
+// The golden puppy lives in the Garden: whenever it is not here (the Garden has just opened, or
+// it has been away AWAY_SECONDS) it is the next to come, and it stays. The rabbit and the hedgehog
+// are the random visitors. (The Maltese follows the puppy in: planFriendVisit.)
+export const RESIDENT = 'puppy' satisfies CritterId;
+
 // The next visitor: someone not already in the Garden (nor `excluded`), with a route and how
-// long it lasts. A lawn animal needs a free unplanted lawn while any lawn is unplanted.
+// long it lasts: the puppy first, else one picked at random. A lawn animal needs a free
+// unplanted lawn while any lawn is unplanted.
 export function planVisit({ key, now, active, network, edges, points, random, lawns, excluded = [] }: {
   key: number; now: number; active: readonly Visit[]; network: Network; edges: Network['edges'];
   points: readonly Point[]; random: () => number; lawns?: Lawns; excluded?: readonly CritterId[];
@@ -293,7 +299,7 @@ export function planVisit({ key, now, active, network, edges, points, random, la
   const free = CRITTER_IDS.filter(id => !excluded.includes(id) && !active.some(visit => visit.id === id)
     && !(lawns && LAWN_ANIMALS.includes(id) && lawns.unplanted.length && chooseLawn(id, lawns, () => 0) === null));
   if (!free.length) return null;
-  const id = pick(free, random), spec = CRITTERS[id];
+  const id = free.includes(RESIDENT) ? RESIDENT : pick(free, random), spec = CRITTERS[id];
   const lawn = lawns && LAWN_ANIMALS.includes(id) && lawns.unplanted.length ? chooseLawn(id, lawns, random) : null;
   const path = lawn !== null && lawns ? planLawnWalk(lawn, lawns, random)
     : spec.kind === 'walker' ? planWalk(network, edges, random) : planFlight(points, spec, random);

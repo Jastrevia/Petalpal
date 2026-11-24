@@ -1,4 +1,6 @@
-# Resubmitting PetalPal 1.0 (3) to App Review
+# Resubmitting PetalPal 1.0 (4) to App Review
+
+Build 1.0 (3) was uploaded on 2026-11-23 but not submitted: on TestFlight it closed on every tap on a pet's Feed or Dress up (a Reanimated callback called a plain function, `arcOffset`). Build 1.0 (4) fixes that and makes the golden puppy live in the Garden. Use 4 wherever this file says 3.
 
 Status 2026-11-23. Both causes of the 1.0 (2) rejection are fixed and merged (`main` b9f24e7b, PRs #212 and #213); the
 backend with the 8–64 password rule is live on Render; the review account exists in production and signs in on the web.
@@ -26,14 +28,14 @@ backend with the 8–64 password rule is live on Render; the review account exis
    "Database schema is up to date" = fine. Otherwise back up (`pg_dump -Fc`) and run `migrate deploy` the same way.
 1. Push and merge `fix/review-placeholder-copy` (one PR into `main`): no "coming soon" text, no "Beta tester"
    badge, and no "Redeem a code" on iOS (Guideline 3.1.1).
-2. Set build number 3:
-   `cd ~/dev/Petalpal/mobile && npx eas-cli env:update production --variable-name PETALPAL_IOS_BUILD_NUMBER --value 3`
+2. Set build number 4:
+   `cd ~/dev/Petalpal/mobile && npx eas-cli env:set production --name PETALPAL_IOS_BUILD_NUMBER --value 4 --visibility plaintext --non-interactive`
 3. Build and upload: `git checkout main && git pull`, then
    `npx eas-cli build --platform ios --profile production --auto-submit`
 4. TestFlight on a real iPad and iPhone (10 minutes): create a new account with **Fill Strong Password**; sign out;
-   sign in with the review account; rotate the sign-in page; write an Event and plant it; open Events, Friends,
+   sign in with the review account; rotate the sign-in page; write an Event and plant it; tap the puppy and Xiaobai, open Feed and Dress up for each; open the calendar and check in; open Events, Friends,
    Fairy, Me; Me → delete account flow opens.
-5. App Store Connect → 1.0 → select build 1.0 (3).
+5. App Store Connect → 1.0 → select build 1.0 (4).
 6. App Review Information: Sign-in required; User name = the review **account name** (not an email); Password = its
    password; Notes = the text below.
 7. Screenshots: 13-inch iPad (2752 × 2064) are now required because the app runs on iPad. Four ready ones are in
@@ -62,9 +64,9 @@ Thank you for the review, and sorry for the trouble.
 
 1. Demo account: the account in our previous submission did not exist on our production server. A working account is now in App Review Information. PetalPal signs in with an account name, not an email address.
 
-2. "Error creating account": on iPad, iOS offered "Fill Strong Password", which creates a 20-character password. Build 1.0 (2) allowed at most 16 characters, so the form was refused on the device before it was sent. Build 1.0 (3) accepts 8–64 characters, and our server was updated to match. We tested account creation with a strong password and sign-in on iPad and iPhone.
+2. "Error creating account": on iPad, iOS offered "Fill Strong Password", which creates a 20-character password. Build 1.0 (2) allowed at most 16 characters, so the form was refused on the device before it was sent. Build 1.0 (4) accepts 8–64 characters, and our server was updated to match. We tested account creation with a strong password and sign-in on iPad and iPhone.
 
-3. Build 1.0 (3) also runs natively on iPad in landscape and portrait instead of iPhone compatibility mode.
+3. Build 1.0 (4) also runs natively on iPad in landscape and portrait instead of iPhone compatibility mode.
 
 Best regards,
 PetalPal team
