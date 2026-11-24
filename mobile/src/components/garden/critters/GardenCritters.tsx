@@ -11,7 +11,7 @@ export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
+  AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
   type CritterId, type Lawns, type Visit,
 } from './critterVisits';
 
@@ -146,8 +146,8 @@ export type GardenPetsHandle = {
   act: (id: CritterId, kind: PuppyAction) => number;
 };
 
-// Schedules the visitors: one now and then until MAX_VISITORS are here, only while the Garden is
-// active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
+// Schedules the visitors: the puppy (RESIDENT) a moment after the Garden opens, then one now and
+// then until MAX_VISITORS are here, only while the Garden is active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
 // gone. The rabbit and the hedgehog keep to unplanted lawns (critterVisits.ts): when only one is
 // left, just one of them comes this session, picked when the Garden opens.
 export default memo(function GardenCritters({ clock, active, pets }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null> }) {
@@ -234,10 +234,12 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       // The puppy's friend follows it in now and then.
       const friend = Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
       if (friend) setVisits(current => (current.some(v => v.id === 'maltese') ? current : [...current, friend]));
-      timer = setTimeout(arrive, nextGap(Math.random) * 1000);
+      // Until the puppy is in (the Garden still loading, or no route this time) it is asked again soon.
+      const residentIn = visit?.id === RESIDENT || visitsRef.current.some(v => v.id === RESIDENT);
+      timer = setTimeout(arrive, residentIn ? nextGap(Math.random) * 1000 : 1000);
     };
-    // The first visitor comes a few seconds after the Garden opens.
-    timer = setTimeout(arrive, visitsRef.current.length ? nextGap(Math.random) * 1000 : 4000 + Math.random() * 6000);
+    // The puppy comes a moment after the Garden opens (or after it has been away AWAY_SECONDS).
+    timer = setTimeout(arrive, visitsRef.current.some(v => v.id === RESIDENT) ? nextGap(Math.random) * 1000 : 2000 + Math.random() * 2000);
     // A visitor whose leg is over rests and sets off again (checked often, so a flyer, which
     // does not rest, flies straight on). A lawn animal whose lawn now has flowers (or the
     // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
@@ -432,7 +434,8 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
           return !!friend;
         }
         for (let attempt = 0; attempt < 40; attempt++) {
-          const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current });
+          const visit = planVisit({ key: ++keyRef.current, now: clock.value, active: [], network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current,
+            excluded: CRITTER_IDS.filter(other => other !== id) });
           if (visit?.id === id) {
             setVisits(current => [...current, visit]);
             return true;
