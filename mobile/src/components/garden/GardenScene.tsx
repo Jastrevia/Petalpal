@@ -9,6 +9,15 @@ import MonthlySignControls from './month-signs/MonthlySignControls';
 import { GardenImageScope } from './gardenImageScope';
 import { useMonthlySigns } from './month-signs/useMonthlySigns';
 import FireflyLayer from './fireflies/FireflyLayer';
+import RainLayer from './weather/RainLayer';
+import { readWeatherPreview } from './weather/weatherPreview';
+import { composeColorMatrix } from './weather/rainGrade';
+import { flashMatrix, lookFor, nightSnowMatrix, needsGrade, useWeatherClock, useWeatherLook, weatherMatrix, FLOWER_WIND, LOOKS } from './weather/gardenWeather';
+import { CloudShadowLayer, MistLayer } from './weather/SkyLayers';
+import { SnowFlakesLayer, SnowGroundCover, SnowProvider, Snowy } from './weather/SnowLayer';
+import { LeavesLayer } from './weather/LeavesLayer';
+import { useLightning } from './weather/lightning';
+import WeatherPreviewControls from './weather/WeatherPreviewControls';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
 import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
 import ExistingWindowLights from './lanterns/ExistingWindowLights';
@@ -105,6 +114,7 @@ import NativeLandCalibrationEditor from './NativeLandCalibrationEditor';
 import SwingCalibrationEditor, { type SwingMapPlacement } from './SwingCalibrationEditor';
 import MoonBedMapCalibrationEditor, { type MoonBedMapPlacement } from './MoonBedMapCalibrationEditor';
 import StaticLandmarkCalibrationEditor from './StaticLandmarkCalibrationEditor';
+import DogHousePlacer, { placingDogHouse, savedDogHousePlacement } from './DogHousePlacer';
 import TeaSetMapCalibrationEditor, { type TeaSetMapPlacement } from './TeaSetMapCalibrationEditor';
 import WaterfallMapCalibrationEditor from './WaterfallMapCalibrationEditor';
 import { INITIAL_WATERFALL_PLACEMENT } from './waterfallMapPlacement';
@@ -412,7 +422,34 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
   const worldTime = useWorldTime();
+  const [weather, setWeather] = useState(readWeatherPreview);
+  const weatherPreview = __DEV__ && weather.preview;
   const nightLighting = useNightLighting(worldTime.isTreehouseLightingTime);
+  // The weather as one eased description every layer reads (weather/gardenWeather.ts).
+  const { look: weatherLook, shown: weatherShown } = useWeatherLook(weather);
+  const raining = weatherShown.rain > 0;
+  // Rain or snow falling: small flying creatures (fireflies, the butterfly, the bluebird) shelter.
+  const weatherSheltering = lookFor(weather).rain > 0 || lookFor(weather).flakes > 0;
+  const weatherGraded = needsGrade(weatherShown);
+  const lightning = useLightning(weather.state === 'STORM');
+  const dayLight = useDerivedValue(() => 1 - nightLighting.amount.value);
+  const nightAmount = nightLighting.amount;
+  // The weather re-lights the whole painting first, then night, then any lightning, in the scene's one colour layer.
+  const nightMatrix = nightLighting.matrix;
+  const nightOn = nightLighting.active;
+  const sceneMatrix = useDerivedValue(() => {
+    let m = weatherGraded ? weatherMatrix(weatherLook.value) : null;
+    if (nightOn) m = m ? composeColorMatrix(m, nightMatrix.value) : nightMatrix.value;
+    if (m && nightOn && weatherLook.value.snow > 0) m = composeColorMatrix(m, nightSnowMatrix(weatherLook.value.snow, nightAmount.value));
+    if (lightning.value > 0.001) m = m ? composeColorMatrix(m, flashMatrix(lightning.value)) : flashMatrix(lightning.value);
+    return m ?? [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0];
+  }, [weatherGraded, nightOn, nightMatrix]);
+  const weatherRain = useDerivedValue(() => Math.min(1, weatherLook.value.rain / LOOKS.RAIN.rain));
+  const weatherWind = useDerivedValue(() => Math.max(0, weatherLook.value.wind - LOOKS.CLEAR.wind));
+  const waterWeather = useMemo(() => ({
+    rain: weatherRain, wind: weatherWind, flash: lightning,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [lightning]);
   const lanternPathname = usePathname();
   const fireflyPreview = __DEV__ && lanternPathname === '/firefly-preview';
   const [fireflySettings, setFireflySettings] = useState(DEFAULT_FIREFLIES);
@@ -511,6 +548,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [gardenArchPlacement, setGardenArchPlacement] = useState<StaticLandmarkMapPlacement>(
     () => ({ ...CHECKED_IN_GARDEN_ARCH }),
   );
+  // Dev placing mode for the dog house (?place=doghouse): starts from the last confirmed spot in this browser.
+  const [placingDogHouseMode] = useState(placingDogHouse);
+  const [dogHousePlacement, setDogHousePlacement] = useState<StaticLandmarkMapPlacement>(
+    () => (placingDogHouseMode && savedDogHousePlacement()) || { ...STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse });
   const [pavilionPlacement, setPavilionPlacement] = useState<StaticLandmarkMapPlacement>(
     () => ({ ...CHECKED_IN_PAVILION }),
   );
@@ -725,6 +766,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     { scale: fit * cameraZoom.value },
   ]);
   useAnimatedReaction(() => cameraTransform.value, () => { noteGardenMotion(); });
+  // For weather layers drawn inside a group that already carries the camera.
+  const identityTransform = useSharedValue<Transforms3d>([{ translateX: 0 }]);
+  // Weather that moves on its own (clouds, mist, snow, leaves, bending flowers) runs on one clock.
+  const weatherMoving = weatherShown.clouds > 0 || weatherShown.fog > 0 || weatherShown.flakes > 0 || weatherShown.wind > FLOWER_WIND;
+  const weatherClock = useWeatherClock(worldActive && weatherMoving, weatherLook);
   // The entry hit areas laid over the Garden (pavilion, treehouse, month signs) are invisible, and a finger
   // that is dragging the Garden cannot press them. Following the camera on every frame of a drag made the
   // native views lay out and commit each frame, so during a drag or pinch they stay where they were and
@@ -1620,7 +1666,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           <GardenImageScope>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
-          <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
+          <SnowProvider value={weatherShown.snow > 0 ? weatherLook : null}>
+          {/* While the weather can change on screen, this layer must stay put: adding or removing it mid-session
+              dropped the islands' static snapshot on web (the land vanished until reload). */}
+          <Group layer={nightLighting.active || weatherGraded || weatherPreview ? <Paint><ColorMatrix matrix={sceneMatrix} /></Paint> : undefined}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
             {/* 1. Solid fallback, only while the water field is not drawn: the field fills this same rectangle opaquely
@@ -1629,7 +1678,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
             {/* 2. Calm water base */}
             {perf.Water && waterBaseVisible && calmBaseImage && (
-              <GardenProfile name="Water field" enabled={perf.Water}><GardenWaterField flow={surfaceFlow} image={calmBaseImage} active={worldActive && perf.WaterAnimation} animated={waterRipplesVisible && perf.WaterAnimation} /></GardenProfile>
+              <GardenProfile name="Water field" enabled={perf.Water}><GardenWaterField flow={surfaceFlow} weather={waterWeather} image={calmBaseImage} active={worldActive && perf.WaterAnimation} animated={waterRipplesVisible && perf.WaterAnimation} /></GardenProfile>
             )}
 
             {/* Approved receiving-water floor/contact, below fish and all terrain. */}
@@ -1722,6 +1771,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 moonBedPlacement={moonBedPlacement}
                 gardenArchPlacement={gardenArchPlacement}
                 pavilionPlacement={pavilionPlacement}
+                dogHousePlacement={dogHousePlacement}
                 teaSetPlacement={teaSetPlacement}
                 waterfallPlacement={waterfallPlacement}
                 waterfallActive={worldActive && perf.WaterAnimation}
@@ -1742,14 +1792,17 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
             {/* Ground and entrance slabs belong below the walking fairy. */}
             {infrastructureEnabled && showLandmarks && <GardenRoadApproachLayer />}
+            {/* Lying snow on everything painted so far; later artwork carries its own (weather/SnowLayer.tsx). */}
+            {weatherShown.snow > 0 && <SnowGroundCover look={weatherLook} cameraTransform={identityTransform} />}
             {/* Planted flowers & placement preview sit below the walking fairy, so PPL standing on a
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
             {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
             {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} />}
-            {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
-            {showLandmarks && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {/* In rain or snow the bluebird and the butterfly keep under cover. */}
+            {showLandmarks && !weatherSheltering && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && !weatherSheltering && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
@@ -1781,6 +1834,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 moonBedPlacement={moonBedPlacement}
                 gardenArchPlacement={gardenArchPlacement}
                 pavilionPlacement={pavilionPlacement}
+                dogHousePlacement={dogHousePlacement}
                 teaSetPlacement={teaSetPlacement}
                 waterfallPlacement={waterfallPlacement}
                 waterfallActive={worldActive && perf.WaterAnimation}
@@ -1809,17 +1863,30 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
           </Group>
+          {/* Wind-blown leaves, graded with the painting. */}
+          {weatherShown.wind > 0.32 && <LeavesLayer look={weatherLook} seconds={weatherClock.seconds} day={dayLight} cameraTransform={cameraTransform} />}
           </Group>
           <Group transform={cameraTransform}>
             {nightLighting.active ? plantingOverlay : null}
             {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
             {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} lotusOccluders={lotusVisible && perf.Lotus ? lotusOccluders : undefined} />}
             {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
-            {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
+            {nightLighting.active && worldActive && !weatherSheltering && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
               <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
             {monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
-            <LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
+            <Snowy cap={3}><LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount}
+              nightMatrix={weatherGraded ? sceneMatrix : nightLighting.matrix} graded={weatherGraded} waterFlow={surfaceFlow} /></Snowy>
           </Group>
+          {/* Cloud shadows fall on everything on the ground, lanterns included (only by day). */}
+          {weatherShown.clouds > 0 && <CloudShadowLayer look={weatherLook} seconds={weatherClock.seconds} travel={weatherClock.travel}
+            cameraTransform={cameraTransform} day={dayLight} />}
+          {/* Mist hangs in front of everything on the ground, lanterns and their glow included; it carries its own night tint. */}
+          {weatherShown.fog > 0 && <MistLayer look={weatherLook} seconds={weatherClock.seconds} travel={weatherClock.travel} cameraTransform={cameraTransform} night={nightAmount} />}
+          {raining && <RainLayer width={viewport.width} height={viewport.height}
+            cameraTransform={cameraTransform} clock={surfaceFlow.enabled ? surfaceFlow.seconds : undefined} active={worldActive} night={worldTime.phase !== 'day'}
+            look={weatherLook} flash={lightning} />}
+          {weatherShown.flakes > 0 && <SnowFlakesLayer seconds={weatherClock.seconds} look={weatherLook} cameraTransform={cameraTransform} night={nightAmount} />}
+          </SnowProvider>
           </PlantingProvider>
           </GardenLandResources>
           </GardenImageScope>
@@ -1843,7 +1910,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <PetRingMenu key={petRing.id} petId={petRing.id} pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
           onAction={kind => gardenPets.current?.act(petRing.id, kind) ?? 0} />
       </View>}
+      {__DEV__ && placingDogHouseMode && fit > 0 && <DogHousePlacer placement={dogHousePlacement}
+        initial={STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse} onChange={setDogHousePlacement}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom} />}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
+      {weatherPreview && <WeatherPreviewControls weather={weather} onChange={setWeather} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
       {/* left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
       <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>

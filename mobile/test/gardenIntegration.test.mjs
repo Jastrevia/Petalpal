@@ -244,6 +244,9 @@ test('Garden hydration renderers draw canonical historical art without sourceEve
     '../flower-visuals/BotanicalFlowerImage': { BotanicalFlowerImage: 'BotanicalImage' },
     '../flower-mood-effects/GardenMoodEffects': { GardenMoodEffectsLayer: 'MoodEffects' },
     './ProductionGrowthLayer': { ProductionGrowthLayer: 'GrowthLayer' },
+    'react-native-reanimated': { useDerivedValue: fn => fn() },
+    '../weather/SnowLayer': { Snowy: ({ children }) => children },
+    '../weather/gardenWeather': { gardenWeatherSeconds: { value: 0 }, gardenWind: { value: 0 }, useWindBendsFlowers: () => false, windGust: () => 0 },
     './productionGrowth': { gardenSpecies: () => null,
       productionGrowth: parents => [{ month: 9, growth: {}, unresolved: parents }] },
   });

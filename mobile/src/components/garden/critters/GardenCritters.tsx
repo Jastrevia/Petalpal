@@ -12,8 +12,9 @@ import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy
 import SheetFrame from '../SheetFrame';
 import {
   AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
-  type CritterId, type Lawns, type Visit,
+  type CritterId, type Lawns, type Visit, FADE_SECONDS, MALTESE_RUN_SPEED, pathLength, RISE_SECONDS, RUN_SPEED, travelSeconds,
 } from './critterVisits';
+import { dogHouse, doorSpot } from '../dogHouseState';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
@@ -150,10 +151,68 @@ export type GardenPetsHandle = {
 // then until MAX_VISITORS are here, only while the Garden is active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
 // gone. The rabbit and the hedgehog keep to unplanted lawns (critterVisits.ts): when only one is
 // left, just one of them comes this session, picked when the Garden opens.
-export default memo(function GardenCritters({ clock, active, pets }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null> }) {
+// Rain: the pair run home to their house door (a step short of it, then onto it from the left, so
+// they sit facing the door as in the house's clip) and sit there; the clip then takes them in.
+const RUNNING_HOME = { cycle: 0, moving: 1 };
+const HANDOFF_SECONDS = 1.6;
+const HOLD_AT_DOOR = 3600;
+function goHome(visit: Visit, now: number): Visit {
+  const id = visit.id === 'maltese' ? 'maltese' : 'puppy';
+  const spot = doorSpot(id), before = { x: spot.x - 10, y: spot.y };
+  const pose = visitPose(visit, now), here = { x: pose.x, y: pose.y };
+  const way = pathTo(here, before);
+  const path = way ? [...way, spot] : [here, before, spot];
+  const speed = id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED;
+  const rising = Boolean(visit.sits) && now < visit.start + visit.lead;
+  const lead = rising ? RISE_SECONDS : 0.15;
+  return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + visitDistance(visit, now), homing: 'going',
+    held: false, action: undefined, sits: false, rising, chase: id === 'puppy', running: id === 'maltese', play: false, following: false,
+    inScene: undefined, lawn: undefined, speed, rhythm: RUNNING_HOME, duration: lead + pathLength(path) / speed };
+}
+// Rain over: each comes out of the door (fading in there) and strolls to the nearest path point.
+function comeOut(key: number, id: 'puppy' | 'maltese', now: number): Visit {
+  const spot = doorSpot(id), spec = CRITTERS[id];
+  const node = WALK_NETWORK.nodes.filter(n => safeSegment(spot, n, isGardenGroundBlocked))
+    .sort((a, b) => Math.hypot(a.x - spot.x, a.y - spot.y) - Math.hypot(b.x - spot.x, b.y - spot.y))[0];
+  const path = node ? [spot, node] : [{ x: spot.x - 1e-3, y: spot.y }, spot];
+  return { key, id, path, start: now, lead: FADE_SECONDS, fadeIn: true, walked: 0, speed: spec.speed, rhythm: RHYTHMS[id],
+    duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[id]) };
+}
+
+export default memo(function GardenCritters({ clock, active, pets, shelter = false }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
+  const shelterRef = useRef(shelter); shelterRef.current = shelter;
+  useEffect(() => { dogHouse.clock = clock; }, [clock]);
+  // The rain starts: the pair (if here) run home; with neither here they are simply indoors. The
+  // rain stops: whoever is indoors comes out of the door.
+  useEffect(() => {
+    if (!active) return;
+    const now = clock.value;
+    const isPair = (v: Visit) => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving;
+    if (shelter) {
+      if (dogHouse.get().phase !== 'out') return;
+      if (!visitsRef.current.some(isPair)) { dogHouse.set({ phase: 'inside', since: now }); return; }
+      visitsRef.current = visitsRef.current.map(v => (isPair(v) && !v.homing ? goHome(v, now) : v));
+      setVisits(visitsRef.current);
+      return;
+    }
+    // Still on their way, or sitting at the door: they simply carry on with their day.
+    if (visitsRef.current.some(v => v.homing)) {
+      visitsRef.current = visitsRef.current.map(v => {
+        if (!v.homing) return v;
+        const elapsed = Math.max(0, now - v.start), lead = Math.min(v.lead, elapsed + 1.2);
+        return { ...v, homing: undefined, lead, duration: v.duration - v.lead + lead };
+      });
+      setVisits(visitsRef.current);
+    }
+    if (dogHouse.get().phase === 'out') return;
+    dogHouse.set({ phase: 'out', since: now });
+    const out = (['puppy', 'maltese'] as const).filter(id => !visitsRef.current.some(v => v.id === id));
+    visitsRef.current = [...visitsRef.current, ...out.map(id => comeOut(++keyRef.current, id, now))];
+    setVisits(visitsRef.current);
+  }, [shelter, active, clock]);
   const awaySince = useRef<number | null>(null);
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
@@ -228,14 +287,16 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     if (left) { visitsRef.current = []; setVisits([]); }
     let timer: ReturnType<typeof setTimeout>;
     const arrive = () => {
+      const indoors = shelterRef.current || dogHouse.get().phase !== 'out';
       const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
-        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: excluded.current });
+        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: indoors ? [...excluded.current, 'puppy'] : excluded.current });
       if (visit) setVisits(current => [...current, visit]);
       // The puppy's friend follows it in now and then.
-      const friend = Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
+      const friend = !indoors && Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
       if (friend) setVisits(current => (current.some(v => v.id === 'maltese') ? current : [...current, friend]));
-      // Until the puppy is in (the Garden still loading, or no route this time) it is asked again soon.
-      const residentIn = visit?.id === RESIDENT || visitsRef.current.some(v => v.id === RESIDENT);
+      // Until the puppy is in (the Garden still loading, or no route this time) it is asked again
+      // soon. Sheltering in its house counts as in: the others then keep their usual gaps.
+      const residentIn = indoors || visit?.id === RESIDENT || visitsRef.current.some(v => v.id === RESIDENT);
       timer = setTimeout(arrive, residentIn ? nextGap(Math.random) * 1000 : 1000);
     };
     // The puppy comes a moment after the Garden opens (or after it has been away AWAY_SECONDS).
@@ -245,10 +306,20 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
     const legs = setInterval(() => {
       const now = clock.value;
+      // Both sitting at the door for a moment: the house's clip takes them in from here.
+      if (shelterRef.current && dogHouse.get().phase === 'out') {
+        const pairNow = visitsRef.current.filter(v => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving);
+        if (!pairNow.length || pairNow.every(v => v.homing === 'arrived' && now - v.start >= HANDOFF_SECONDS)) {
+          visitsRef.current = visitsRef.current.filter(v => !pairNow.includes(v));
+          setVisits(visitsRef.current);
+          dogHouse.set({ phase: pairNow.length ? 'entering' : 'inside', since: now });
+          return;
+        }
+      }
       if (now >= pair.current.until) pair.current = { leader: pickLeader(Math.random), until: now + leadSpell(Math.random) };
       // Whoever follows breaks off a walk of its own to go after the other.
       const follower = pair.current.leader === 'maltese' ? 'puppy' : 'maltese';
-      if (visitsRef.current.some(v => v.id === 'maltese' && !v.leaving) && visitsRef.current.some(v => v.id === 'puppy' && !v.leaving)) {
+      if (!shelterRef.current && visitsRef.current.some(v => v.id === 'maltese' && !v.leaving) && visitsRef.current.some(v => v.id === 'puppy' && !v.leaving)) {
         const lagging = visitsRef.current.find(v => v.id === follower), other = visitsRef.current.find(v => v.id !== follower && (v.id === 'puppy' || v.id === 'maltese'));
         // Never inside each other: one walking into the other makes the follower step aside.
         const a = lagging && visitPose(lagging, now), b = other && visitPose(other, now);
@@ -266,7 +337,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           lastTry.current = { check: true, busyM: !!busy(maltese), busyP: !!busy(puppy), gap: Math.round(Math.hypot(m.x - p.x, m.y - p.y)) };
         }
-        if (maltese && puppy && !lookPending.current && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
+        if (!shelterRef.current && maltese && puppy && !lookPending.current && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           const here = { x: m.x, y: m.y }, mate = { x: p.x, y: p.y };
           if (distance(here, mate) <= PLAY_NEAR * 1.6) {
@@ -311,6 +382,9 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         let visit = original;
         if (now < visit.start + visit.duration) return [visit];
         if (visit.leaving) return [];
+        // Home at the door: sit down there facing it and wait for the other.
+        if (visit.homing === 'going') return [{ ...sitDown(visit, now, HOLD_AT_DOOR), homing: 'arrived' as const }];
+        if (visit.homing === 'arrived') return [visit];
         const lawn = visit.lawn;
         if (lawn !== undefined && (!lawns.current.unplanted.includes(lawn) || lawns.current.taken(visit.id).includes(lawn))) return [leaveVisit(visit, now)];
         // In a pair scene: stay put until it is over (the clip shows them both meanwhile).
@@ -352,7 +426,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     chase.current = (to: Point) => {
       const now = clock.value, goal = belowPerch(to);
       setVisits(current => current.map(visit => {
-        if (visit.id !== 'puppy' || visit.leaving || visit.held || lookPending.current || visit.fadeIn && now < visit.start + visit.lead) return visit;
+        if (visit.id !== 'puppy' || visit.homing || visit.leaving || visit.held || lookPending.current || visit.fadeIn && now < visit.start + visit.lead) return visit;
         const pose = visitPose(visit, now);
         return planChase({ visit, now, path: route({ x: pose.x, y: pose.y }, goal, isGardenGroundBlocked) }) ?? visit;
       }));

@@ -95,6 +95,9 @@ export type Visit = {
   // Drawn with its run (the Maltese running in a game or catching up); `inScene`: part of a pair
   // scene (tug-of-war, a hug) shown as one clip from `start` to `end` (planScene).
   running?: boolean; inScene?: { start: number; end: number };
+  // Rain (dogHouseState.ts): the pair hurrying home to their house door (`going`), then sitting
+  // there (`arrived`) until both are in place and the house's clip takes them inside.
+  homing?: 'going' | 'arrived';
 };
 
 // The puppy chases the bluebird about half the times it takes off: it runs (its painted gallop,

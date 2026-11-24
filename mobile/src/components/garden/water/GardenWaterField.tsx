@@ -2,7 +2,7 @@ import { runtimeAudit } from '../performance/runtimeAudit';
 import { Image, ImageShader, Rect, Shader, Skia, type SkImage } from '@shopify/react-native-skia';
 import { useGardenImage } from '../gardenImageScope';
 import { Platform } from 'react-native';
-import { useDerivedValue } from 'react-native-reanimated';
+import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { useWaterTopFlow, type WaterTopFlow } from './WaterTopAssembly';
 import { WATER_WAVE_SKSL } from './waterWaveShader';
 import { GARDEN_WATER_COLOR } from '../gardenMapLayout';
@@ -16,7 +16,49 @@ uniform shader shoreDistance;
 uniform shader openWater;
 uniform float displayP3;
 uniform float seconds;
+uniform float rain;
+uniform float wind;
+uniform float flash;
 ${WATER_WAVE_SKSL}
+// Rain arrives in slow sweeping bands (curtains); RainLayer uses the same formula for its drops,
+// so heavier falling rain and denser rings on the water pass over the Garden together.
+float rainGust(float2 p,float t) {
+  return clamp(0.5+0.35*sin((p.x*0.82+p.y*0.57)*0.0021-t*0.42)+
+    0.2*sin((p.y*0.9-p.x*0.4)*0.0047+t*0.27),0.12,1.0);
+}
+// Raindrops striking the surface: one ring per cell at most, re-seeded every cycle, each with its
+// own size and speed, squashed for the Garden's three-quarter view. Returns a sampling offset (xy)
+// and a crest amount (z). The rings bend the painted floor seen through the water, so they belong
+// to the surface instead of sitting on it.
+float3 rainRipples(float2 p,float t) {
+  float2 q=p*float2(1.0,1.26)/30.0;
+  float2 cell=floor(q);
+  float2 offset=float2(0);
+  float crest=0.0;
+  float density=0.3+0.55*rainGust(p,t);
+  for(int j=-1;j<=1;j++) {
+    for(int i=-1;i<=1;i++) {
+      float2 c=cell+float2(float(i),float(j));
+      float h=wwHash(c*1.37+11.0);
+      float h2=wwHash(c*2.11+3.7);
+      float cycle=t*(0.75+h2*0.65)+h*7.0;
+      float n=floor(cycle);
+      float life=fract(cycle);
+      float seed=wwHash(c+float2(5.3,9.1)+n*0.731);
+      float alive=step(seed,density);
+      float2 center=c+0.5+(float2(wwHash(c+n*1.913),wwHash(c.yx+n*0.557))-0.5)*0.9;
+      float reach=mix(0.45,1.3,wwHash(c*0.71+n*2.37));
+      float2 d=q-center;
+      float r=length(d);
+      float x=(r-life*reach)*10.5;
+      float env=exp(-x*x*0.3)*pow(1.0-life,1.4)*alive*mix(0.55,1.0,reach-0.45);
+      float wave=sin(x*1.7);
+      offset+=d/max(r,0.001)*wave*env;
+      crest+=max(wave,0.0)*env;
+    }
+  }
+  return float3(offset,crest);
+}
 float3 linearize(float3 c) {
   return mix(c/12.92,pow((c+0.055)/1.055,float3(2.4)),step(float3(0.04045),c));
 }
@@ -122,6 +164,21 @@ half4 main(float2 p) {
 
   float refractionMask=openWater.eval(p).r*smoothstep(14.0,62.0,distance);
   float2 refracted=p+waterRefraction(p,seconds)*refractionMask;
+  float rainMask=rain>0.0?openWater.eval(p).r*smoothstep(6.0,30.0,distance):0.0;
+  float3 drops=rainMask>0.0?rainRipples(p,seconds):float3(0);
+  refracted+=drops.xy*7.0*rain*rainMask;
+  // Wind: gusts darken the water in moving patches of fine, wind-driven ripples ("cat's paws") that
+  // travel downwind; the same gust bands bend the flowers and lift the leaves on land.
+  float ruffle=0.0,ruffleWave=0.0;
+  if(wind>0.0) {
+    float2 heading=float2(0.97,0.24);
+    float along=dot(p,heading),across=dot(p,float2(-heading.y,heading.x));
+    float gust=clamp(0.5+0.34*sin(along*0.0024-seconds*0.9)+0.18*sin((p.y*0.8-p.x*0.35)*0.005+seconds*0.53),0.0,1.0);
+    float patches=floorNoise((p-heading*seconds*(30.0+90.0*wind))/170.0+float2(3.7,1.9));
+    ruffle=smoothstep(0.45,0.85,gust*0.65+patches*0.55)*wind*openWater.eval(p).r*smoothstep(10.0,40.0,distance);
+    ruffleWave=sin(along*0.21-seconds*(4.0+5.0*wind)+floorNoise(p/16.0)*5.0)*(0.6+0.4*sin(across*0.08+floorNoise(p/41.0)*3.0));
+    refracted+=heading*ruffleWave*4.0*ruffle;
+  }
   float2 q=float2(refracted.x*0.932-refracted.y*0.362,refracted.x*0.362+refracted.y*0.932)*0.64+drift*80.0;
   // One coherent painted bed: overlapping two displaced textures had softened
   // distinct mineral edges into clouds. Only deeper water softens this sample.
@@ -161,7 +218,15 @@ half4 main(float2 p) {
   float neighbor=dot(mineralFloor.eval(q+float2(181,95)).rgb,float3(0.2126,0.7152,0.0722));
   float edge=smoothstep(0.035,0.13,neighbor-luminance)*smoothstep(0.60,0.78,luminance);
   float glint=edge*smoothstep(0.50,0.76,floorNoise(p/97.0+19.7))*shelf;
-  rgb=mix(rgb,float3(0.78,0.90,0.86),glint*0.18);
+  rgb=mix(rgb,float3(0.78,0.90,0.86),glint*0.18*(1.0-rain*0.8));
+  // Rain: a broken surface reflects the grey sky and hides some of the floor; ring crests catch it.
+  rgb=mix(rgb,float3(0.36,0.47,0.51),0.24*rain);
+  rgb+=float3(0.60,0.68,0.70)*min(drops.z,1.0)*0.26*rain*rainMask;
+  // A ruffled patch shows less floor and more broken sky: darker, with small bright crests.
+  rgb=mix(rgb,float3(0.27,0.43,0.49),ruffle*0.26);
+  rgb+=float3(0.55,0.64,0.66)*max(ruffleWave,0.0)*ruffle*0.14;
+  // Lightning flares on the open water, which mirrors the sky.
+  rgb+=float3(0.55,0.62,0.72)*flash*0.32*openWater.eval(p).r;
   if(displayP3>0.5) {
     float3 c=linearize(rgb);
     rgb=encode(float3(dot(c,float3(0.822593,0.177534,0)),
@@ -171,8 +236,10 @@ half4 main(float2 p) {
 }
 `);
 
-export default function GardenWaterField({ image, active, animated = true, flow }: {
-  image: SkImage; active: boolean; animated?: boolean; flow?: WaterTopFlow;
+export default function GardenWaterField({ image, active, animated = true, flow, rain = 0, weather }: {
+  image: SkImage; active: boolean; animated?: boolean; flow?: WaterTopFlow; rain?: number;
+  /** Live rain, wind (0..1, beyond the calm breeze) and lightning flash for the surface; overrides `rain`. */
+  weather?: { rain: SharedValue<number>; wind: SharedValue<number>; flash: SharedValue<number> };
 }) {
   runtimeAudit.render('GardenWaterField');
   const material = useGardenImage(require('./assets/painterly-water-base.webp'));
@@ -183,8 +250,9 @@ export default function GardenWaterField({ image, active, animated = true, flow 
   const clock = flow ?? standalone;
   const displayP3 = Platform.OS === 'web' ? 1 : 0;
   const uniforms = useDerivedValue(() => ({
-    displayP3, seconds: clock.enabled ? clock.seconds.value : 0,
-  }), [displayP3, clock.enabled, clock.seconds]);
+    displayP3, seconds: clock.enabled ? clock.seconds.value : 0, rain: weather ? weather.rain.value : rain,
+    wind: weather ? weather.wind.value : 0, flash: weather ? weather.flash.value : 0,
+  }), [displayP3, clock.enabled, clock.seconds, rain, weather]);
   const base = material ?? image;
   // While the field's textures load: the solid water colour under the base painting, as the scene drew before.
   if (!FIELD || !floor || !shore || !wet) return <>

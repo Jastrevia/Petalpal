@@ -30,8 +30,10 @@ function LotusReflection({ flow, seed }: { flow: WaterTopFlow; seed: number }) {
 }
 
 /** Unchanged sprites/anchors; localized emission is composited after the scene grade. */
-export default function LanternLayer({ placements, lit, light, nightMatrix, waterFlow }: {
+export default function LanternLayer({ placements, lit, light, nightMatrix, waterFlow, graded = false }: {
   placements: LanternPlacement[]; lit: boolean; light: SharedValue<number>; nightMatrix: SharedValue<number[]>; waterFlow: WaterTopFlow;
+  /** The weather is re-lighting the Garden: the lanterns take the same grade by day as well (nightMatrix carries it). */
+  graded?: boolean;
 }) {
   const ground = useImage(require('@/assets/garden/lanterns/ground.webp'));
   const lotus = useImage(require('@/assets/garden/lanterns/lotus.webp'));
@@ -48,7 +50,7 @@ export default function LanternLayer({ placements, lit, light, nightMatrix, wate
       </Group>}
       {isGround && <Oval x={-20} y={-4} width={40} height={9} color="rgba(36,31,38,0.18)" />}
       {sprite && <Image image={sprite} x={-50} y={top} width={100} height={height} fit="fill">
-        {lit ? <ColorMatrix matrix={nightMatrix} /> : null}
+        {lit || graded ? <ColorMatrix matrix={nightMatrix} /> : null}
       </Image>}
       {/* By day nothing below shows, so it is not drawn at all. */}
       {lit && <Group opacity={light}>
