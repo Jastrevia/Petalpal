@@ -73,7 +73,10 @@ export const ringArc = (layout: RingLayout) => ({ start: layout.side === 1 ? -60
 
 // Along the panel's middle arc (radius `r`), how far from the centre sideways a card sits whose
 // middle is `dy` above or below it.
-export const arcOffset = (r: number, dy: number) => Math.sqrt(Math.max(0, r * r - dy * dy));
+export const arcOffset = (r: number, dy: number) => {
+  'worklet';
+  return Math.sqrt(Math.max(0, r * r - dy * dy));
+};
 
 // ---- The wardrobe ----
 
