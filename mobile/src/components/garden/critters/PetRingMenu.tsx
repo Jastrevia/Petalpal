@@ -5,6 +5,7 @@ import Reanimated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useReducedM
 import { ApiError } from '@/services/api';
 import { dressPet, feedPet, loadPets, petsChanged, type PetId, type PetsSummary } from '@/services/gardenPets';
 import { ACCESSORY_ICONS, OWN_PIECE_ICONS } from './accessoryIcons';
+import { FOOD_ICONS, FOOD_TIPS, NEVER_FEED, NEVER_FEED_NOTE, NEVER_FEED_TITLE } from './foodArt';
 import {
   arcOffset, forPet, isWorn, malteseHiddenPieces, outfitWith, petShelf, puppyHiddenPieces, ringArc, ringLayout, ringPoint, ringSpot, RING_ACTIONS, SHELVES,
   type Piece, type PetSpot, type RingAction, type RingLayout, type Shelf, type Viewport,
@@ -38,8 +39,6 @@ const COPY = {
 };
 type Copy = typeof COPY.en;
 
-// No painted food yet: each food shows as a small picture in a round card.
-const FOOD_ICONS: Record<string, string> = { 'berry-tart': '🥧', 'flower-cookies': '🍪', 'fish-biscuit': '🐟', 'honey-seeds': '🍯' };
 // The ring's painted icons (the owner's friend's designs, 2026-11-06; cut out in
 // ~/dev/petalpal-motion/icons-ring): a bowl of kibble for Feed, a capelet on a hanger for Dress up,
 // and for Pat the pet itself being patted (the golden's from the design; Xiaobai's painted to match).
@@ -80,6 +79,8 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
   const layout = useMemo(() => ringLayout(pet, viewport, panel), [pet, viewport, panel]);
   const [pets, setPets] = useState<PetsSummary | null | undefined>(undefined);
   const [note, setNote] = useState<string | null>(null);
+  // After feeding: how to serve that food to a real dog (foodArt.ts FOOD_TIPS), in the note's place.
+  const [tip, setTip] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hearts, setHearts] = useState(0);
   // While a clip plays the menu steps aside (the hand comes in where it stands) and comes back
@@ -110,7 +111,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
     if (action === 'pat') { perform('pat'); return; }
     setMode(action);
   };
-  const back = () => { setNote(null); setMode('ring'); };
+  const back = () => { setNote(null); setTip(null); setMode('ring'); };
   // Taps that miss every button: inside the ring or panel they do nothing (the ring's own
   // segments answer anywhere on them), outside it they close it.
   const onBackdrop = (event: GestureResponderEvent) => {
@@ -124,11 +125,13 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
   const feed = async (foodId: string) => {
     if (busy) return;
     if (pets && !(petId in pets.outfits)) { setNote(copy.notYet); return; }
-    setBusy(true); setNote(null);
+    setBusy(true); setNote(null); setTip(null);
     try {
       const { count } = await feedPet(petId, foodId);
       if (!live.current) return;
       setPets(current => current && { ...current, foods: current.foods.map(food => (food.id === foodId ? { ...food, count } : food)) });
+      // How to serve it to a real dog (foodArt.ts).
+      setTip(FOOD_TIPS[foodId]?.[locale] ?? null);
       perform('eat');
     } catch (error) {
       if (!live.current) return;
@@ -164,7 +167,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
       {mode === 'ring' ? <CloseButton layout={layout} viewport={viewport} label={copy.closeShort} a11y={copy.close} onPress={onClose} /> : null}
       {mode === 'ring'
         ? RING_ACTIONS.map((action, i) => <RingButton key={action} layout={layout} index={i} label={copy[action]} icon={iconOf(petId, action)} onPress={() => act(action)} />)
-        : <Panel layout={layout} viewport={viewport} copy={copy} locale={locale} mode={mode} pets={pets} petId={petId} busy={busy} note={note} onBack={back} onFeed={feed} onDress={dress} />}
+        : <Panel layout={layout} viewport={viewport} copy={copy} locale={locale} mode={mode} pets={pets} petId={petId} busy={busy} note={note} tip={tip} onBack={back} onFeed={feed} onDress={dress} />}
       {note && !panel ? <View pointerEvents="none" style={[styles.note, { top: Math.min(viewport.height - 130, layout.cy + layout.outer * 0.87 + 8),
         left: Math.max(8, Math.min(viewport.width - 248, layout.cx + layout.side * layout.outer * 0.5 - 120)) }]}>
         <Text style={styles.noteText}>{note}</Text></View> : null}
@@ -254,11 +257,13 @@ function RingButton({ layout, index, label, icon, onPress }: { layout: RingLayou
 
 // The wide arc: a title (and, for the wardrobe, its three shelves) above it, the back button at
 // the top left, the cards along its middle arc, and arrows with page dots on its outer edge.
-function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, onBack, onFeed, onDress }: {
-  layout: RingLayout; viewport: Viewport; copy: Copy; locale: 'en' | 'zh-Hans'; mode: 'feed' | 'dress'; pets: PetsSummary | null | undefined; petId: PetId; busy: boolean; note: string | null;
+function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, tip = null, onBack, onFeed, onDress }: {
+  layout: RingLayout; viewport: Viewport; copy: Copy; locale: 'en' | 'zh-Hans'; mode: 'feed' | 'dress'; pets: PetsSummary | null | undefined; petId: PetId; busy: boolean; note: string | null; tip?: string | null;
   onBack: () => void; onFeed: (foodId: string) => void; onDress: (piece: Piece) => void;
 }) {
   const [shelf, setShelf] = useState<Shelf>('hat');
+  // The feed panel's "never give dogs" card (foodArt.ts NEVER_FEED), opened from its chip.
+  const [never, setNever] = useState(false);
   const { cx, cy, side, inner, outer } = layout;
   const headerWidth = 268;
   const headerLeft = Math.max(8, Math.min(viewport.width - headerWidth - 8, cx + side * outer * 0.5 - headerWidth / 2));
@@ -278,7 +283,7 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
         a11y: `${piece.name}${worn ? `, ${copy.worn}` : ''}${piece.unlocked ? '' : `, ${copy.lockedShort}`}`, onPress: known ? () => onDress(piece) : undefined };
     });
   const empty = pets && mode === 'feed' && pets.foods.every(food => food.count === 0) ? copy.noFood : null;
-  const sub = note ?? (pets === null ? copy.off : !known ? copy.notYet : empty) ?? (mode === 'dress' && pets ? (outfit && (outfit.hat || outfit.collar || outfit.pendant) ? copy.takeOff : copy.locked) : null);
+  const sub = note ?? tip ?? (pets === null ? copy.off : !known ? copy.notYet : empty) ?? (mode === 'dress' && pets ? (outfit && (outfit.hat || outfit.collar || outfit.pendant) ? copy.takeOff : copy.locked) : null);
   return <>
     <View style={[styles.header, { left: headerLeft, top: headerTop, width: headerWidth }]}>
       {/* Back sits on the panel itself, beside its title: one step back to the ring (then × closes it). */}
@@ -301,11 +306,21 @@ function Panel({ layout, viewport, copy, locale, mode, pets, petId, busy, note, 
           </Pressable>;
         })}
       </View> : null}
+      {mode === 'feed' ? <Pressable onPress={() => setNever(open => !open)} accessibilityRole="button" accessibilityState={{ expanded: never }} testID="pet-never-feed"
+        hitSlop={8} style={({ pressed }) => [styles.tab, styles.neverChip, { backgroundColor: tone.shade }, pressed && styles.pressed]}>
+        <Text style={styles.tabText}>{NEVER_FEED_TITLE[locale]}</Text>
+      </Pressable> : null}
     </View>
     {pets === undefined ? <ActivityIndicator color={CREAM} style={{ position: 'absolute', left: cx + side * (inner + outer) / 2 - 10, top: cy - 10 }} accessibilityLabel={copy.loading} />
       : <ArcList key={`${mode}-${shelf}`} layout={layout} cards={cards} busy={busy} copy={copy} />}
     {sub ? <View style={[styles.sub, { top: cy + outer * 0.87 + 6, left: headerLeft, width: headerWidth }]}>
       <Text style={[styles.subText, { backgroundColor: tone.shade }, sub === note && styles.subNote]}>{sub}</Text></View> : null}
+    {mode === 'feed' && never ? <Pressable onPress={() => setNever(false)} accessibilityRole="button" accessibilityLabel={`${NEVER_FEED_TITLE[locale]}. ${NEVER_FEED.map(item => item[locale]).join(', ')}. ${NEVER_FEED_NOTE[locale]}`}
+      testID="pet-never-feed-card" style={[styles.never, { left: headerLeft, top: headerTop + 76, width: headerWidth, backgroundColor: tone.fill }]}>
+      <Text style={styles.neverTitle}>{NEVER_FEED_TITLE[locale]}</Text>
+      {NEVER_FEED.map(item => <Text key={item.en} style={styles.neverItem}>· {item[locale]}</Text>)}
+      <Text style={styles.neverNote}>{NEVER_FEED_NOTE[locale]}</Text>
+    </Pressable> : null}
   </>;
 }
 
@@ -410,6 +425,11 @@ const styles = StyleSheet.create({
   tabOn: { backgroundColor: 'rgba(124, 88, 140, 0.92)', borderColor: GOLD },
   tabText: { ...text, fontSize: 11, opacity: 0.8 },
   tabTextOn: { opacity: 1 },
+  neverChip: { marginTop: 6 },
+  never: { position: 'absolute', zIndex: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: GOLD, gap: 2 },
+  neverTitle: { ...text, fontSize: 13, letterSpacing: 0.5, marginBottom: 4, textAlign: 'center' },
+  neverItem: { ...text, fontSize: 11.5, lineHeight: 16 },
+  neverNote: { ...text, fontSize: 10, lineHeight: 14, opacity: 0.85, marginTop: 6 },
   cardRow: { height: ITEM_H, width: CARD + 24 },
   card: { width: CARD + 24, height: ITEM_H, alignItems: 'center' },
   cardCircle: { width: CARD, height: CARD, borderRadius: CARD / 2, alignItems: 'center', justifyContent: 'center',
