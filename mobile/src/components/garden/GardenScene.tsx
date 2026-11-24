@@ -1916,13 +1916,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
       {weatherPreview && <WeatherPreviewControls weather={weather} onChange={setWeather} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      {/* left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
+      {/* A phone zooms with two fingers, so it shows no − and + (the same phone rule as the Garden's
+          navigation); the onboarding zoom step then shows its card on its own (its copy says pinch).
+          left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
+      {viewport.width < 600 || (viewport.width < 900 && viewport.height < 500) ? null : <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>+</Text></Pressable>
-      </View>
+      </View>}
       {isDev && __DEV__ && <GardenRuntimePanel flags={perfFlags} onFlags={setPerfFlags} count={perfCount} onCount={setPerfCount}
         canChangeFixture={activeMode==='normal'} metadata={{realParentCount:placements.length,renderedParentCount:drawnPlanting.placements.length,
           viewport,waterfallVersion,growthV11:useMonthlyGrowth,previewMode,environmentEnabled,worldPhase:worldTime.phase}}/>}
