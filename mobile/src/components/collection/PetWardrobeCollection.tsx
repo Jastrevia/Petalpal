@@ -52,10 +52,15 @@ export function usePetsSummary(enabled: boolean) {
   const [state, setState] = useState<{ pets: PetsSummary | null; off: boolean; failed: boolean }>({ pets: null, off: false, failed: false });
   const [changes, setChanges] = useState(0);
   useEffect(() => onPetsChanged(() => setChanges(count => count + 1)), []);
+  // A new load (opened again, or an outfit changed) clears the failure while rendering; the effect only asks.
+  const [loadFor, setLoadFor] = useState({ enabled, changes });
+  if (loadFor.enabled !== enabled || loadFor.changes !== changes) {
+    setLoadFor({ enabled, changes });
+    if (enabled) setState(current => ({ ...current, failed: false }));
+  }
   useEffect(() => {
     if (!enabled) return;
     let live = true;
-    setState(current => ({ ...current, failed: false }));
     loadPets().then(pets => { if (live) setState({ pets, off: !pets, failed: false }); })
       .catch(() => { if (live) setState(current => ({ ...current, failed: true })); });
     return () => { live = false; };
@@ -69,7 +74,9 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
   const [pet, setPet] = useState<'puppy' | 'maltese'>('puppy');
   const [shelf, setShelf] = useState<Shelf>('hat');
   const { pets, off, failed, retry } = usePetsSummary(visible);
-  useEffect(() => { if (visible) { setPet('puppy'); setShelf('hat'); } }, [visible]);
+  // Each opening starts on the puppy's hats (state adjusted while rendering).
+  const [openFor, setOpenFor] = useState(visible);
+  if (openFor !== visible) { setOpenFor(visible); if (visible) { setPet('puppy'); setShelf('hat'); } }
   // The Garden's Dress up panel, as a card: the puppy's mauve plate or Xiaobai's forest green,
   // the gold rim, the hanger title, its three shelves as tabs and the same cream cards.
   const tone = pet === 'maltese' ? TONES.forest : TONES.mauve;
@@ -81,12 +88,14 @@ export function PetWardrobeCollection({ visible, locale, onClose }: { visible: b
   // Names: the owner's (Collection → pencil), else the pet's own. A pet renamed in the last 7 days waits.
   const nameOf = (id: 'puppy' | 'maltese') => pets?.petNames?.[id]?.name || copy.pets[id];
   const nextRename = pets?.petNames?.[pet]?.nextRenameAt ? new Date(pets.petNames[pet]!.nextRenameAt!) : null;
+  // eslint-disable-next-line react-hooks/purity -- the 7-day rename wait compares with the clock
   const renameLocked = Boolean(nextRename && nextRename.getTime() > Date.now());
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState('');
-  useEffect(() => { setRenaming(false); setProblem(''); }, [pet, visible]);
+  const [renameFor, setRenameFor] = useState({ pet, visible });
+  if (renameFor.pet !== pet || renameFor.visible !== visible) { setRenameFor({ pet, visible }); setRenaming(false); setProblem(''); }
   const openRename = () => { setDraft(pets?.petNames?.[pet]?.name ?? ''); setProblem(''); setRenaming(true); };
   const saveName = async () => {
     const clean = draft.normalize('NFKC').replace(/\s+/g, ' ').trim();

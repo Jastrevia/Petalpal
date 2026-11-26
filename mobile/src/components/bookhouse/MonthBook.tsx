@@ -162,7 +162,7 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
   // Held (1): the camera stays pulled back and the book comes from / goes to `deskOrigin`, its slot in the bookcase seen
   // from the desk — switching months. Otherwise (0) the camera's pull-back follows the book's own timeline (and runs
   // backwards with it when the book closes) and the book's slot recedes with the shelf.
-  const heldOpen = useRef(!!(scene.held && scene.deskRect)).current;
+  const heldOpen = useState(() => !!(scene.held && scene.deskRect))[0];
   const held = useSharedValue(heldOpen ? 1 : 0);
   const deskOrigin = useSharedValue<ShelfOrigin | null>(heldOpen && scene.deskRect ? toOrigin(scene.deskRect) : null);
   useAnimatedReaction(() => t.value, v => { if (held.value !== 1) pull.value = pullOf(v); }, [pull]);

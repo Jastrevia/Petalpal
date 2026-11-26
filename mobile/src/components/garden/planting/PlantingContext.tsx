@@ -134,6 +134,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const placements = useMemo(() => records.filter(p => !awaitsPlanting(p)), [records]);
   const unplantedFlowers = useMemo(() => records.filter(awaitsPlanting), [records]);
   // Read by startPlanting without making it change identity on every Garden refresh.
+  // eslint-disable-next-line react-hooks/refs -- Garden: startPlanting reads the latest placements without changing identity on every Garden refresh
   const plantedRef = useRef(placements); plantedRef.current = placements;
   const [placementNotice, setPlacementNotice] = useState<PlacementNotice | null>(null);
   const [isGardenLoading, setIsGardenLoading] = useState(true);
@@ -195,6 +196,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   }, [refreshGarden]));
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: a supplied session is taken as is; the effect's stale-load guard stays as it was
     if (suppliedSession) { setSession(suppliedSession); return; }
     let mounted = true;
     loadFlowerSession().then((loaded) => {
@@ -208,6 +210,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   useEffect(() => {
     detailVersion.current++;
     detailWorking.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: another account or Garden drops the open flower detail, with its version guard
     setSelectedFlower(null); setFlowerDetailSource(null);
     setIsDetailLoading(false); setIsDetailWorking(false); setDetailError('');
   }, [suppliedSession?.user.id, session?.user.id, gardenOwnerUserId]);
@@ -219,6 +222,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     let mounted = true;
     const version = detailVersion.current;
     const refreshBase = flowerDetailSource;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: shows loading for the request this effect starts (version-guarded)
     setIsDetailLoading(true);
     loadFlowerSource(ownerId, selectedFlower.flowerId).then((source) => {
       if (mounted && version === detailVersion.current) {
