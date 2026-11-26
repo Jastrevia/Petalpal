@@ -78,8 +78,12 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const [shared, setShared] = useState<ShareOutcome | null>(null);
   // The small print under a turned card (what petal cards are not, free readings left) stays folded until asked for.
   const [notesOpen, setNotesOpen] = useState(false);
+  // A new card, phase or language drops the old share picture at once (state adjusted while rendering).
+  const [shareFor, setShareFor] = useState({ phase, face, locale });
+  if (shareFor.phase !== phase || shareFor.face !== face || shareFor.locale !== locale) {
+    setShareFor({ phase, face, locale }); setPrepared(null); setShared(null);
+  }
   useEffect(() => {
-    setPrepared(null); setShared(null);
     if (phase !== 'revealed' || !face) return;
     let active = true;
     void prepareShare(face, PETAL_CARD_ART[face.id], locale).then(result => {
@@ -95,6 +99,7 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   // Opening: show today's card straight away if it was drawn already, else ask for today's topic.
   useEffect(() => {
     if (!visible) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the ring each time it opens, with its Animated values
     lift.setValue(0); flip.setValue(0); setError('');
     if (today?.drawn?.card) {
       setFace(today.drawn.card); setChosenNo(mod(today.drawn.position, deckSize) + 1); setPhase('revealed');
@@ -150,21 +155,24 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const degPerPx = 180 / (Math.PI * size.r);
   // A drag ends with a release over some card; that release must not count as choosing it.
   const lastDrag = useRef(0);
+  // eslint-disable-next-line react-hooks/purity -- runs from the drag gesture (runOnJS), never while rendering
   const noteDrag = () => { lastDrag.current = Date.now(); };
   const ringActive = phase === 'spin' || phase === 'drawing';
   const pan = useMemo(() => Gesture.Pan().enabled(ringActive).activeOffsetX([-6, 6]).failOffsetY([-14, 14])
-    .onBegin(() => { dragging.value = true; velocity.value = 0; lastX.value = 0; })
+    .onBegin(() => { dragging.set(true); velocity.set(0); lastX.set(0); })
+    // eslint-disable-next-line react-hooks/refs -- gesture callback, runs after render
     .onStart(() => { runOnJS(noteDrag)(); })
-    .onUpdate(e => { angle.value += (e.translationX - lastX.value) * degPerPx; lastX.value = e.translationX; })
-    .onEnd(e => { velocity.value = (e.velocityX / 60) * degPerPx; runOnJS(noteDrag)(); })
-    .onFinalize(() => { dragging.value = false; }), [ringActive, degPerPx, angle, velocity, dragging, lastX]);
+    .onUpdate(e => { angle.set(angle.value + (e.translationX - lastX.value) * degPerPx); lastX.set(e.translationX); })
+    // eslint-disable-next-line react-hooks/refs -- gesture callback, runs after render
+    .onEnd(e => { velocity.set((e.velocityX / 60) * degPerPx); runOnJS(noteDrag)(); })
+    .onFinalize(() => { dragging.set(false); }), [ringActive, degPerPx, angle, velocity, dragging, lastX]);
 
   const placeOf = (i: number) => i + size.n * Math.round((front - i) / size.n);
   const frontNo = mod(front, deckSize) + 1;
 
   async function choose(place: number) {
     if (phase !== 'spin' || !topic.id || Date.now() - lastDrag.current < 350) return;
-    if (place !== front) { velocity.value = 0; angle.value = -place * size.step; return; }
+    if (place !== front) { velocity.set(0); angle.set(-place * size.step); return; }
     setPhase('drawing'); setError('');
     try {
       const result = await drawPetalCard(mod(place, deckSize), topic.id);

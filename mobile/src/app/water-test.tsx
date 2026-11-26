@@ -87,36 +87,36 @@ export default function WaterTestScreen() {
     const pan = Gesture.Pan()
       .maxPointers(1)
       .onStart(() => {
-        startX.value = cameraX.value;
-        startY.value = cameraY.value;
+        startX.set(cameraX.value);
+        startY.set(cameraY.value);
       })
       .onUpdate((event) => {
-        cameraX.value = startX.value + event.translationX;
-        cameraY.value = startY.value + event.translationY;
+        cameraX.set(startX.value + event.translationX);
+        cameraY.set(startY.value + event.translationY);
       });
 
     const pinch = Gesture.Pinch()
       .onStart((event) => {
-        startZoom.value = cameraZoom.value;
-        startX.value = cameraX.value;
-        startY.value = cameraY.value;
-        focalWorldX.value = (event.focalX - baseX - startX.value) / (fit * startZoom.value);
-        focalWorldY.value = (event.focalY - baseY - startY.value) / (fit * startZoom.value);
+        startZoom.set(cameraZoom.value);
+        startX.set(cameraX.value);
+        startY.set(cameraY.value);
+        focalWorldX.set((event.focalX - baseX - startX.value) / (fit * startZoom.value));
+        focalWorldY.set((event.focalY - baseY - startY.value) / (fit * startZoom.value));
       })
       .onUpdate((event) => {
         const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, startZoom.value * event.scale));
-        cameraZoom.value = nextZoom;
-        cameraX.value = event.focalX - baseX - focalWorldX.value * fit * nextZoom;
-        cameraY.value = event.focalY - baseY - focalWorldY.value * fit * nextZoom;
+        cameraZoom.set(nextZoom);
+        cameraX.set(event.focalX - baseX - focalWorldX.value * fit * nextZoom);
+        cameraY.set(event.focalY - baseY - focalWorldY.value * fit * nextZoom);
       });
 
     return Gesture.Simultaneous(pan, pinch);
   }, [baseX, baseY, fit, cameraX, cameraY, cameraZoom, focalWorldX, focalWorldY, startX, startY, startZoom]);
 
   const resetCamera = () => {
-    cameraX.value = 0;
-    cameraY.value = 0;
-    cameraZoom.value = 1;
+    cameraX.set(0);
+    cameraY.set(0);
+    cameraZoom.set(1);
   };
 
   // Dev-only screen: the hooks above always run, so hook order is the same in every build.

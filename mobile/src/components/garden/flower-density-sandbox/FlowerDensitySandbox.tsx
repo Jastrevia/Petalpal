@@ -54,7 +54,8 @@ function TuningField({ label, value, step, min, max, onChange }: {
   label: string; value: number; step: number; min: number; max: number; onChange: (value: number) => void;
 }) {
   const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
+  const [draftFor, setDraftFor] = useState(value);
+  if (draftFor !== value) { setDraftFor(value); setDraft(String(value)); }
   const normalized = (number: number) => Math.max(min, Math.min(max, Math.round(number * 100) / 100));
   return <View style={styles.field}>
     <Text style={styles.fieldLabel}>{label}</Text>
@@ -186,29 +187,29 @@ export default function FlowerDensitySandbox({ onClose }: { onClose: () => void 
     if (!viewport.width || !viewport.height) return;
     const b = region.bounds;
     const nextScale = Math.min(viewport.width / (b.width + 140), viewport.height / (b.height + 140), 4);
-    scale.value = nextScale;
-    cameraX.value = viewport.width / 2 - (b.x + b.width / 2) * nextScale;
-    cameraY.value = viewport.height / 2 - (b.y + b.height / 2 - 12) * nextScale;
+    scale.set(nextScale);
+    cameraX.set(viewport.width / 2 - (b.x + b.width / 2) * nextScale);
+    cameraY.set(viewport.height / 2 - (b.y + b.height / 2 - 12) * nextScale);
   }, [region, viewport, scale, cameraX, cameraY]);
   useEffect(fitRegion, [fitRegion]);
   const zoom = (factor: number) => {
     const next = Math.max(0.12, Math.min(10, scale.value * factor));
     const ratio = next / scale.value;
-    cameraX.value = viewport.width / 2 - (viewport.width / 2 - cameraX.value) * ratio;
-    cameraY.value = viewport.height / 2 - (viewport.height / 2 - cameraY.value) * ratio;
-    scale.value = next;
+    cameraX.set(viewport.width / 2 - (viewport.width / 2 - cameraX.value) * ratio);
+    cameraY.set(viewport.height / 2 - (viewport.height / 2 - cameraY.value) * ratio);
+    scale.set(next);
   };
   const wholeGarden = () => {
     const next = Math.min(viewport.width / GARDEN_WORLD_WIDTH, viewport.height / GARDEN_WORLD_HEIGHT) * 0.95;
-    scale.value = next;
-    cameraX.value = (viewport.width - GARDEN_WORLD_WIDTH * next) / 2;
-    cameraY.value = (viewport.height - GARDEN_WORLD_HEIGHT * next) / 2;
+    scale.set(next);
+    cameraX.set((viewport.width - GARDEN_WORLD_WIDTH * next) / 2);
+    cameraY.set((viewport.height - GARDEN_WORLD_HEIGHT * next) / 2);
   };
   const pan = Gesture.Pan().maxPointers(1).onStart(() => {
     panX.value = cameraX.value; panY.value = cameraY.value;
   }).onUpdate((event) => {
-    cameraX.value = panX.value + event.translationX;
-    cameraY.value = panY.value + event.translationY;
+    cameraX.set(panX.value + event.translationX);
+    cameraY.set(panY.value + event.translationY);
   });
   const pinch = Gesture.Pinch().onStart((event) => {
     pinchScale.value = scale.value;
@@ -216,9 +217,9 @@ export default function FlowerDensitySandbox({ onClose }: { onClose: () => void 
     pinchWorldY.value = (event.focalY - cameraY.value) / scale.value;
   }).onUpdate((event) => {
     const next = Math.max(0.12, Math.min(10, pinchScale.value * event.scale));
-    scale.value = next;
-    cameraX.value = event.focalX - pinchWorldX.value * next;
-    cameraY.value = event.focalY - pinchWorldY.value * next;
+    scale.set(next);
+    cameraX.set(event.focalX - pinchWorldX.value * next);
+    cameraY.set(event.focalY - pinchWorldY.value * next);
   });
   const growthTap = Gesture.Tap().runOnJS(true).onEnd((event, success) => {
     if(success && growthActive)setSelectedGrowthId(primaryHitTarget(growthRecords,(event.x-cameraX.value)/scale.value,(event.y-cameraY.value)/scale.value));

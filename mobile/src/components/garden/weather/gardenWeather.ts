@@ -94,10 +94,10 @@ export function useWeatherLook(weather: GardenWeather) {
   useEffect(() => {
     if (first.current) { first.current = false; return; }
     const next = lookFor(weather);
-    from.value = look.value;
-    to.value = next;
-    t.value = 0;
-    t.value = withTiming(1, { duration: reduced ? 0 : TRANSITION_MS });
+    from.set(look.value);
+    to.set(next);
+    t.set(0);
+    t.set(withTiming(1, { duration: reduced ? 0 : TRANSITION_MS }));
     setShown(previous => {
       const both = { ...next };
       KEYS.forEach(k => { both[k] = Math.max(previous[k], next[k]); });

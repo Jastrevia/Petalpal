@@ -32,10 +32,10 @@ export default function GardenStaticRun({ cameraTransform, children }: { cameraT
 
   const run = useMemo(() => {
     const drop = (held: Snapshot | null) => { if (held) afterNextFrames(() => { held.picture.dispose(); held.image.dispose(); }); };
-    const invalidate = () => { const held = snapshot.value; snapshot.value = null; drop(held); return !!held; };
+    const invalidate = () => { const held = snapshot.value; snapshot.set(null); drop(held); return !!held; };
     return {
       camera: () => cameraOf(cameraTransform.value), picture: () => world.value, snapshotCamera: () => snapshot.value?.camera ?? null, invalidate,
-      setWorld(next: SkPicture) { world.value = next; invalidate(); },
+      setWorld(next: SkPicture) { world.set(next); invalidate(); },
       capture(from: SkPicture, camera: GardenCamera) {
         const made = context?.snapshot(from, camera);
         if (!made) return;
@@ -46,7 +46,7 @@ export default function GardenStaticRun({ cameraTransform, children }: { cameraT
         const paste = recorder.finishRecordingAsPicture();
         recorder.dispose();
         const held = snapshot.value;
-        snapshot.value = { picture: paste, image: made.image, camera };
+        snapshot.set({ picture: paste, image: made.image, camera });
         drop(held);
       },
     };
