@@ -19,6 +19,7 @@ import { EventIllustration } from './EventIllustration';
 import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
 import { GardenWeatherSettings } from './GardenWeatherSettings';
+import { VipSettings } from './VipMembership';
 import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { avatarCopy } from '../avatars/avatarCopy';
@@ -147,6 +148,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
   // Me: the profile and every setting on one page (no separate Settings step).
   if (feature.id === 'profile' || feature.id === 'settings') return <View style={ui.body}>
     <ProfileHero theme={theme} />
+    <VipSettings key={`vip-${session?.user.id}`} />
     <FeatureSection title={copy.language}>
       <ReportLanguageSettings key={session?.user.id} />
     </FeatureSection>

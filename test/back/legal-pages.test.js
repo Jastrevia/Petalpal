@@ -13,7 +13,7 @@ test("published policies are final: owners, contact, adult audience, no draft ma
     assert.match(html, /^<!doctype html>/i, name);
     assert.match(html, /Xingran Ma and Jinyin Cao/, name);
     assert.match(html, /contact@jastrevia\.com/, name);
-    assert.match(html, { terms: /Effective October 22, 2026/, "account-deletion": /Effective October 23, 2026/, privacy: /Effective November 26, 2026/ }[name], name);
+    assert.match(html, /Effective November 26, 2026/, name);
     assert.doesNotMatch(html, /\[(?:OWNER|LEGAL|APPROVED|VERIFY)|draft|not been published|<script/i, name);
     for (const other of pages.filter(page => page !== name)) assert.ok(html.includes(`href="${other}.html"`), `${name} links ${other}`);
   }
@@ -25,6 +25,12 @@ test("published policies are final: owners, contact, adult audience, no draft ma
   assert.match(read("privacy"), /MET Norway/);
   assert.match(read("privacy"), /never uses location in the background/);
   assert.match(read("privacy"), /Turning Garden weather off, or deleting your account, deletes the saved point/);
+  // PetalPal VIP (2026-11-26): Apple takes the payment, RevenueCat is named, renewal and cancelling are explained,
+  // and deleting the account says it does not cancel the subscription.
+  assert.match(read("privacy"), /RevenueCat/);
+  assert.match(read("terms"), /renews automatically every month/);
+  assert.match(read("terms"), /Founding Member/);
+  assert.match(read("account-deletion"), /does not cancel your App Store subscription/);
   for (const name of ["privacy", "account-deletion"]) {
     assert.match(read(name), /no more than 30 days/, name);
     assert.match(read(name), /never used to restore a deleted account|never to restore a deleted account/, name);

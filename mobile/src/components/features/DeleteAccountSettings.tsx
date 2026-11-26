@@ -12,14 +12,16 @@ const COPY={en:{title:'Delete Account',warning:'Deleting your account permanentl
   confirmPassword:'To make sure it’s you, enter your password, then tap the button again.',passwordLabel:'Your password',
   wrongPassword:'That isn’t your password. Try again.',
   signInAgain:'This account signs in with its email: sign out, sign in again and come back here within five minutes.',
-  deleting:'Deleting…',delete:'Permanently delete my account',policy:'Read the full deletion policy'},
+  deleting:'Deleting…',delete:'Permanently delete my account',policy:'Read the full deletion policy',
+  subscription:'Have Monthly VIP? Deleting your account does not cancel it: cancel it first in your App Store account settings.'},
  'zh-Hans':{title:'删除账号',warning:'删除账号后，你的所有数据都会被永久删除，无法撤销，也无法恢复。',
   what:'将删除你的账号、私人日记和照片、事件、记忆、回顾、你的花园和花、好友和留言。少量安全与费用记录、删除重试记录、备份和服务商副本可能会按各自的保留政策继续保存一段时间。别人已经保存的内容无法收回。',
   phrase:'删除账号',typeLabel:(phrase:string)=>`请在下面输入「${phrase}」确认。`,
   confirmPassword:'为了确认是你本人，请输入你的密码，再点一次下面的按钮。',passwordLabel:'你的密码',
   wrongPassword:'密码不对，请再试一次。',
   signInAgain:'这个账号是用邮箱登录的：请先退出、重新登录，五分钟内回到这里删除。',
-  deleting:'正在删除…',delete:'永久删除我的账号',policy:'查看完整的删除政策'}};
+  deleting:'正在删除…',delete:'永久删除我的账号',policy:'查看完整的删除政策',
+  subscription:'订阅了按月会员？删除账号不会取消订阅，请先在 App Store 账户设置里取消。'}};
 // `embedded`: inside the Me support list (its row is the title); `onPolicy` opens the published policy.
 export function DeleteAccountSettings({embedded=false,onPolicy}:{embedded?:boolean;onPolicy?:()=>void}={}){
  const {deleteAccount}=useAuth();const copy=COPY[useAppLocale()];const {theme}=usePanelTheme();
@@ -29,6 +31,7 @@ export function DeleteAccountSettings({embedded=false,onPolicy}:{embedded?:boole
  const confirmed=typed.trim()===copy.phrase;
  return <View style={{gap:10}}>{embedded?null:<Text accessibilityRole="header" style={[ui.title,{color:theme.text}]}>{copy.title}</Text>}
  <Text accessibilityRole="alert" style={[ui.text,{color:theme.text,fontWeight:'700'}]}>{copy.warning}</Text>
+ <Text style={[ui.text,{color:theme.text}]}>{copy.subscription}</Text>
  <Text style={[ui.text,{color:theme.text}]}>{copy.what}</Text>
  {onPolicy?<Text accessibilityRole="link" onPress={onPolicy} style={[ui.caption,{color:theme.text,textDecorationLine:'underline'}]}>{copy.policy}</Text>:null}
  <Text style={[ui.text,{color:theme.text}]}>{copy.typeLabel(copy.phrase)}</Text>
