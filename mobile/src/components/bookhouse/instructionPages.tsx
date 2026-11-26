@@ -66,13 +66,13 @@ export function buildInstructionPages(
 ): {
   pages: InstructionPageData[];
   chapterPageMap: Record<string, number>;
-  chapterRanges: Array<{ id: string; startPage: number; endPage: number }>;
+  chapterRanges: { id: string; startPage: number; endPage: number }[];
 } {
   const isZh = lang === 'zh-Hans';
   const localeKey = isZh ? 'zh-Hans' : 'en';
   const pages: InstructionPageData[] = [];
   const chapterPageMap: Record<string, number> = {};
-  const chapterRanges: Array<{ id: string; startPage: number; endPage: number }> = [];
+  const chapterRanges: { id: string; startPage: number; endPage: number }[] = [];
 
   const sections = (instructionManualJson.sections as any[]) || [];
 

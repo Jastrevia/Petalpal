@@ -108,7 +108,7 @@ export function PavilionBookReader({
       case 'monthly': {
         const detail = selectedReport ? details[selectedReport.id] ?? null : null;
         const twoPointO = !!detail && (bookId === 'monthly' ? !!monthly2(detail) : !!shortWeekly(detail)?.version2);
-        const parts: Array<'left' | 'right' | 'all'> = compact ? ['all'] : ['left', 'right'];
+        const parts: ('left' | 'right' | 'all')[] = compact ? ['all'] : ['left', 'right'];
         const report = selectedReport;
         const book = twoPointO && reportPage && report
           ? parts.map((part, i) => ({ pageNumber: i + 1, ownPager: true, render: (interactive: boolean) => reportPage(report, part, interactive) }))
@@ -132,7 +132,7 @@ export function PavilionBookReader({
         right: page,
       }));
     }
-    const result: Array<{ spreadNumber: number; left: PageData | null; right: PageData | null }> = [];
+    const result: { spreadNumber: number; left: PageData | null; right: PageData | null }[] = [];
     for (let i = 0; i < pages.length; i += 2) {
       result.push({
         spreadNumber: Math.floor(i / 2),

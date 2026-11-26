@@ -73,7 +73,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   }, [canMark, reportId, cardIndex, cardId]);
   async function keep(index: number) {
     if (!reportId) return;
-    const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); on ? copy.add(index) : copy.delete(index); return copy; });
+    const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); if (on) copy.add(index); else copy.delete(index); return copy; });
     flip(next); setLoopNote(null);
     try { await keepSection(reportId, index, next); } catch { flip(!next); setLoopNote({ index, text: copy.feedbackFailed }); }
   }

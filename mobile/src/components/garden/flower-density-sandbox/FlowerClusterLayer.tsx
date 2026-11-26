@@ -86,7 +86,7 @@ function transparentArtwork(source: SkImage | null, name: string): SkImage | nul
   }
 }
 
-function polygon(points: ReadonlyArray<readonly [number, number]>): SkPath {
+function polygon(points: readonly (readonly [number, number])[]): SkPath {
   const path = Skia.Path.Make();
   path.moveTo(points[0][0], points[0][1]);
   for (let index = 1; index < points.length; index += 1) path.lineTo(points[index][0], points[index][1]);

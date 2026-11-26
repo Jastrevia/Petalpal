@@ -5,7 +5,7 @@ import {runtimeAudit} from '../performance/runtimeAudit';
 import GardenLotusContact from './GardenLotusContact';
 import { Group, Image, type SkImage, type Transforms3d } from '@shopify/react-native-skia';
 import { useGardenImage } from '../gardenImageScope';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import {
   cancelAnimation,
   useDerivedValue,
@@ -16,7 +16,6 @@ import {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
 import {
   LOTUS_CLUSTER_ASSETS,
   type LotusClusterVariant,

@@ -108,7 +108,7 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
       </> : <View accessibilityViewIsModal style={{ gap: 12 }}>
         <BookhouseArt index={14} width={56} height={60} />
         <Text accessibilityRole="header" style={styles.confirmTitle}>Delete this journal?</Text>
-        <Text style={styles.confirmBody}>Your {date} journal will be removed from the Treehouse. This can't be undone.</Text>
+        <Text style={styles.confirmBody}>Your {date} journal will be removed from the Treehouse. This can&apos;t be undone.</Text>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Keep journal" disabled={state === 'deleting'} onPress={() => setState('menu')}

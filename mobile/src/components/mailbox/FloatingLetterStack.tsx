@@ -932,7 +932,7 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
 
                   >
 
-                    "{activeLetter.snippet}"
+                    &quot;{activeLetter.snippet}&quot;
 
                   </Text>
 

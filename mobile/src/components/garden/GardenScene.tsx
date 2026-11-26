@@ -1,4 +1,15 @@
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  cancelAnimation,
+  Easing,
+  useAnimatedReaction,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
@@ -47,17 +58,6 @@ import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel
 import {DEFAULT_ISOLATION,type GardenIsolation,runtimeAudit} from './performance/runtimeAudit';
 import { productionQARecords } from './planting/productionGrowthQAData';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  cancelAnimation,
-  Easing,
-  useAnimatedReaction,
-  useDerivedValue,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GardenLoadingOverlay } from './loading/GardenLoadingOverlay';
 import { createGardenLoadStore } from './loading/gardenReadiness';

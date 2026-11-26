@@ -36,13 +36,13 @@ export function buildFlowerLanguageCollectionPages(
 ): {
   pages: CollectionPageData[];
   categoryPageMap: Record<string, number>;
-  categoryRanges: Array<{ id: string; startPage: number; endPage: number }>;
+  categoryRanges: { id: string; startPage: number; endPage: number }[];
 } {
   const isZh = lang === 'zh-Hans';
   const localeKey = isZh ? 'zh' : 'en';
   const pages: CollectionPageData[] = [];
   const categoryPageMap: Record<string, number> = {};
-  const categoryRanges: Array<{ id: string; startPage: number; endPage: number }> = [];
+  const categoryRanges: { id: string; startPage: number; endPage: number }[] = [];
 
   const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
