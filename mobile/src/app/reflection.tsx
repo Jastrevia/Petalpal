@@ -322,8 +322,7 @@ export default function Reflection() {
   // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {
     const created = openPeriod ? reports.find(report => report.type === openPeriod.type && report.periodKey === openPeriod.periodKey) : undefined;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the finished period's page once it arrives in the list
-    if (created) { setOpenPeriod(null); show(created); }
+    if (created) { setOpenPeriod(null); show(created); } // eslint-disable-line react-hooks/set-state-in-effect -- opens the finished period's page once it arrives in the list
   }, [reports, openPeriod]);
 
   // Read the open page; quietly prefetch its neighbours so a turn can show both faces.

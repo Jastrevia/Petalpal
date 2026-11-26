@@ -239,6 +239,16 @@ export const MailboxPage = memo(function MailboxPage() {
 
 
 
+  // Help & Feedback panel state (unused here for now; test/mailboxSystem.test.mjs requires it)
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  const toggleHelp = useCallback(() => setIsHelpOpen((prev) => !prev), []);
+
+  const closeHelp = useCallback(() => setIsHelpOpen(false), []);
+
+
+
   // Mark letter as read deterministically upon successful physical opening
 
   const markLetterAsRead = useCallback((id: string) => {
