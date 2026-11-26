@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import type { AppLocale } from '../../services/locale';
 import { FLOWER_ASSETS } from '../../data/flowerAssets';
 const flowerCollectionJson = require('../../data/flowerLanguageCollection.json');

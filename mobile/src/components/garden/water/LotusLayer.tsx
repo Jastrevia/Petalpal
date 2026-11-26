@@ -5,7 +5,7 @@ import {runtimeAudit} from '../performance/runtimeAudit';
 import GardenLotusContact from './GardenLotusContact';
 import { Group, Image, type SkImage, type Transforms3d } from '@shopify/react-native-skia';
 import { useGardenImage } from '../gardenImageScope';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import {
   cancelAnimation,
   useDerivedValue,

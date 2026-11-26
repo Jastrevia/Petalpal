@@ -1,4 +1,4 @@
-import { ImageShader, Rect, Shader, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
+import { ImageShader, Rect, Shader, Skia, type SkImage } from '@shopify/react-native-skia';
 import type { ReactNode } from 'react';
 import scenic from './terrain/upper-right-scenic.json';
 

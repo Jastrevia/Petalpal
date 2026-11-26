@@ -2,7 +2,7 @@ import { BlurMask, Circle, Group, Image, Line, Oval, Path, Rect, Skia, useImage 
 import { memo, useMemo } from 'react';
 import { FLOWER_GROUND_ANCHOR, FLOWER_VISUAL_HEIGHT, FLOWER_VISUAL_WIDTH, getBlossomAnchors } from './blossomAnchors';
 import { calculateGlowParameters, generateRainParticles, generateRaindropPlacements, generateSparkleParticles } from './effectEngine';
-import type { BlossomAnchorPoint, FlowerEffectConfig, RainParticle, RaindropPlacement, SparkleParticle } from './types';
+import type { BlossomAnchorPoint, FlowerEffectConfig } from './types';
 
 // Approved PetalPal tulip artwork
 const TULIP_NORMAL_ASSET = require('../../../../assets/garden/flowers/species/tulip/base/tulip_garden_normal.png');

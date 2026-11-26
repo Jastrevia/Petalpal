@@ -1,4 +1,4 @@
-import { GARDEN_LANDS, type GardenLand, type GardenLandLayout } from '../gardenMapLayout';
+import { type GardenLandLayout } from '../gardenMapLayout';
 import {
   GARDEN_WORLD_HEIGHT,
   GARDEN_WORLD_WIDTH,
@@ -13,7 +13,6 @@ import {
   type MonthRegionCalibration,
   type ParentLandAssetId,
   PLANTING_REGION_CALIBRATION,
-  getLandGeometry,
   getParentLand,
   landLocalToMaskLocal,
   worldToLandLocal,

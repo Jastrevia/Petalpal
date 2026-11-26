@@ -1,19 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Platform,
-  Image, useWindowDimensions, AccessibilityInfo,
+  Image, AccessibilityInfo,
 } from 'react-native';
 import type { AppLocale } from '../../services/locale';
 import type { PavilionBookId } from './pavilionMotion';
-import { EmotionalSafetyNote } from '../features/EmotionalSafetyNote';
 import { AiOutputReport } from '../features/AiPrivacySettings';
 import { MoodPetalChart } from '../features/WeeklyBloom';
-import { petalCardArt } from '../petalCards/petalCardArt';
 import {
-  weekLabel, shortDate, type SavedReport, type ReflectionReport,
+  weekLabel, type SavedReport, type ReflectionReport,
   SHORT_COPY, monthly2, shortWeekly,
 } from '../../services/reflections';
-type PrimaryMood = 'SUNNY_BLOOM' | 'GENTLE_BLOOM' | 'QUIET_BLOOM' | 'HEALING_BLOOM' | 'FIRE_BLOOM' | 'WONDER_BLOOM' | 'DRIFTING_BLOOM' | 'PEACEFUL_BLOOM';
 import type { Rect } from './bookMotion';
 import {
   buildFlowerLanguageCollectionPages,
@@ -23,6 +20,7 @@ import {
   buildInstructionPages,
   INSTRUCTION_BOOKMARK_CATEGORIES,
 } from './instructionPages';
+type PrimaryMood = 'SUNNY_BLOOM' | 'GENTLE_BLOOM' | 'QUIET_BLOOM' | 'HEALING_BLOOM' | 'FIRE_BLOOM' | 'WONDER_BLOOM' | 'DRIFTING_BLOOM' | 'PEACEFUL_BLOOM';
 
 // The page itself: warm ivory handmade paper (FLUX.2 klein, cropped to plain grain), aged at its edges by styles.paperAge.
 const parchment = require('../../../assets/reflection/journal/paper.webp');

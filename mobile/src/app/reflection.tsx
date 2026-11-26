@@ -1,4 +1,4 @@
-import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, pavilionReadingCamera, PAVILION, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { pavilionScene, pavilionGeometry, pavilionFullLeaves, pavilionReadingCamera, PAVILION, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
 import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
 import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
 import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';

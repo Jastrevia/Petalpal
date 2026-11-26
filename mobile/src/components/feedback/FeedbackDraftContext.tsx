@@ -29,11 +29,11 @@ async function getStoredDraft(): Promise<string | null> {
     try {
       const val = window.localStorage.getItem(STORAGE_KEY);
       if (val) return val;
-    } catch (_) {}
+    } catch {}
   }
   try {
     return await AsyncStorage.getItem(STORAGE_KEY);
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -42,22 +42,22 @@ async function setStoredDraft(value: string): Promise<void> {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       window.localStorage.setItem(STORAGE_KEY, value);
-    } catch (_) {}
+    } catch {}
   }
   try {
     await AsyncStorage.setItem(STORAGE_KEY, value);
-  } catch (_) {}
+  } catch {}
 }
 
 async function removeStoredDraft(): Promise<void> {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       window.localStorage.removeItem(STORAGE_KEY);
-    } catch (_) {}
+    } catch {}
   }
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch (_) {}
+  } catch {}
 }
 
 interface FeedbackDraftContextValue {

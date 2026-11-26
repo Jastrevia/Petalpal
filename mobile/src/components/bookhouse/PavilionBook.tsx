@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Canvas, Picture, Skia, FilterMode, MipmapMode, PaintStyle, BlendMode, TileMode, ImageFormat, BlurStyle, createPicture, useImage, useFont,
+import { Platform, StyleSheet, View } from 'react-native';
+import { Canvas, Picture, Skia, FilterMode, MipmapMode, PaintStyle, BlendMode, TileMode, ImageFormat, createPicture, useImage, useFont,
   type SkImage, type SkCanvas, type SkFont } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import type { AppLocale } from '../../services/locale';

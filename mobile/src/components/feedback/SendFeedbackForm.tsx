@@ -14,7 +14,7 @@
  * - Persistent draft state preservation
  */
 
-import React, { memo, useCallback, useId, useRef, useState } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -26,11 +26,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
+import { FONT_BODY, FONT_TITLE } from '../mailbox/ExpandedLetter';
 import { useFeedbackDraft } from './FeedbackDraftContext';
 import { FEEDBACK_EMAIL, getFeedbackTransport } from './feedbackService';
 import { useAppLocale } from '../../services/locale';
 import Constants from 'expo-constants';
+import {
+  FEEDBACK_CATEGORIES,
+  FeedbackCategory,
+  SubmissionStatus,
+} from './feedbackTypes';
 
 // The form in the app language (one language per screen).
 const FORM_COPY = {
@@ -61,11 +66,6 @@ const FORM_COPY = {
     received: (ref?: string) => `谢谢你，团队已经收到你的反馈${ref ? `（#${ref}）` : ''}。`,
     categories: { bug: '问题报告', feature: '功能建议', general: '一般反馈', ai_concern: 'AI 回复的问题', other: '其他' } as Record<string, string> },
 };
-import {
-  FEEDBACK_CATEGORIES,
-  FeedbackCategory,
-  SubmissionStatus,
-} from './feedbackTypes';
 
 interface SendFeedbackFormProps {
   onBack: () => void;

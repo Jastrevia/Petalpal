@@ -10,7 +10,6 @@ import {
 
   Image,
 
-  ImageBackground,
 
   Platform,
 
@@ -32,7 +31,6 @@ import { FloatingLetterStack } from './FloatingLetterStack';
 
 import { FloatingPetalsOverlay } from './FloatingPetalsOverlay';
 
-import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 
 import { MagicLevitationAura } from './MagicLevitationAura';
 
@@ -229,7 +227,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const [phase, setPhase] = useState<MailboxPhase>('reading');
 
-  const [pendingLetterId, setPendingLetterId] = useState<string | null>(null);
+  const [, setPendingLetterId] = useState<string | null>(null);
 
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
 
@@ -238,16 +236,6 @@ export const MailboxPage = memo(function MailboxPage() {
     'idle' | 'folding' | 'sliding' | 'unfolding'
 
   >('idle');
-
-
-
-  // Help & Feedback panel state
-
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-
-  const toggleHelp = useCallback(() => setIsHelpOpen((prev) => !prev), []);
-
-  const closeHelp = useCallback(() => setIsHelpOpen(false), []);
 
 
 
@@ -837,8 +825,6 @@ export const MailboxPage = memo(function MailboxPage() {
     ? Math.min(windowWidth - 32, 840)
     : Math.min(windowWidth - 24, 420);
 
-  const usableHeight = Math.max(480, windowHeight - insets.top - insets.bottom);
-  const maxContentHeight = Math.min(540, Math.round(usableHeight * 0.72));
 
 
 

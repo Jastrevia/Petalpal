@@ -4,7 +4,7 @@ import SleepingMoonFairy from './fairy/SleepingMoonFairy';
 import SeatedSwingFairy from './fairy/SeatedSwingFairy';
 import {GardenProfile} from './performance/GardenRuntimePanel';
 import {runtimeAudit} from './performance/runtimeAudit';
-import { Blur, Circle, Group, Oval, Path, Rect } from '@shopify/react-native-skia';
+import { Blur, Circle, Group, Oval, Rect } from '@shopify/react-native-skia';
 import type { ReactNode } from 'react';
 import MoonBedEntity, { MOON_BED_HEIGHT, MOON_BED_WIDTH } from './MoonBedEntity';
 import TeaSetEntity, { TEA_SET_HEIGHT, TEA_SET_WIDTH } from './TeaSetEntity';

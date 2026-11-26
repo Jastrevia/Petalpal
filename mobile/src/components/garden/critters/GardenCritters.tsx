@@ -7,7 +7,6 @@ import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
 import { ACTION_FPS, actionSeconds, MALTESE_ACTIONS, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
-export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
@@ -18,6 +17,7 @@ import { dogHouse, doorSpot } from '../dogHouseState';
 import { HOUSE_ENTER_SECONDS } from './DogHouseOccupants';
 import type { FoxReason } from './silktailDays';
 import { useGardenLoadState, type GardenLoadStore } from '../loading/gardenReadiness';
+export type { MalteseLook } from './puppyLooks';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The

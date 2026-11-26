@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -8,14 +8,11 @@ import {
   View,
 } from 'react-native';
 import {
-  ACTION_DURATION_MS,
   CYCLE_DURATION_MS,
-  FairyActionId,
   FairyLoadingFrame,
   getActionHoldTime,
   getFairyLoadingFrame,
   getCanonicalHeadHeight,
-  getPoseScale,
   POSE_METADATA,
   ANCHOR_PEEKING,
   ANCHOR_SITTING,
@@ -46,7 +43,6 @@ function withWebAssetVersion(asset: any, version: string) {
   return asset;
 }
 
-const FAIRY_SPRITE_01 = require('../../../assets/auth/fairy-loading/fairy_pose01_peeking.webp');
 const FAIRY_SPRITE_01_BODY = withWebAssetVersion(
   require('../../../assets/auth/fairy-loading/fairy_pose01_body.png'),
   POSE01_LAYER_CACHE_VERSION
@@ -294,7 +290,6 @@ const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperie
   // Rendered dimensions and local contact anchors
   const p1W = Math.round(POSE_METADATA.peeking.spriteWidth * scaleP1);
   const p1H = Math.round(POSE_METADATA.peeking.spriteHeight * scaleP1);
-  const p1ClipH = Math.round((POSE_METADATA.peeking.clipBottomY ?? POSE_METADATA.peeking.spriteHeight) * scaleP1);
   const p1Ax = Math.round(POSE_METADATA.peeking.anchorX * scaleP1);
   const p1Ay = Math.round(POSE_METADATA.peeking.anchorY * scaleP1);
 

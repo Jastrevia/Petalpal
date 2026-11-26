@@ -1,7 +1,7 @@
 import { tourRunning, useOnboarding } from '../components/onboarding/onboardingStore';
 import { OnboardingPanelLayer } from '../components/onboarding/OnboardingStepView';
 import { dispatchOnboarding } from '../components/onboarding/onboardingSignals';
-import { onboardingScrollHandler, onboardingTarget, registerOnboardingScroller } from '../components/onboarding/onboardingTargets';
+import { onboardingTarget, registerOnboardingScroller } from '../components/onboarding/onboardingTargets';
 import { useWorldTime } from '../components/garden/world-time';
 import type { PanelTheme } from '../components/features/PanelTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -89,13 +89,6 @@ export default function Bookhouse() {
     dispatchOnboarding({ type: 'bookhouseOpened' });
     return registerOnboardingScroller('bookhouse', sceneScroll);
   }, []);
-  // Onboarding targets:
-  const _bhTargets = {
-    years: onboardingTarget('bookhouse.years'),
-    books: onboardingTarget('bookhouse.books'),
-    shelf: onboardingTarget('bookhouse.shelf'),
-    back: onboardingTarget('bookhouse.back'),
-  };
   const bookNodes = useRef(new Map<string, ShelfSlot>());
   // The desk-view bookcase (portrait layout): its books open their months from the desk (switching books).
   const deskShelfNodes = useRef(new Map<string, ShelfSlot>());

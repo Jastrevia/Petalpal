@@ -314,9 +314,6 @@ export function MonthBook({ year, month, shelfRect, days, userId, today, reduced
       if (mode === 'idle' || ((mode === 'focused' || mode === 'leaning-in') && side !== 1)) panToSide(1);
     }
   }, [onboardingStep, mode, side, panToSide]);
-  const _unusedDeps = useMemo(() => { if (true) {
-    }
-  }, [setView]);
   const settlePan = useCallback((dx: number, vx: number) => {
     const from = panFrom.current, to = (-from) as 1 | -1;
     const toward = from < 0 ? -1 : 1;                       // the swipe direction that leads to the other page
