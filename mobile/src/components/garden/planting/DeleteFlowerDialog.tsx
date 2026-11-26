@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAppLocale } from '../../../services/locale';
 import { FeatureActionButton, ui } from '../../features/FeatureUI';

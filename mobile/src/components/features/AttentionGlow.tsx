@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 
 const FULL = { color: '#EFC95F', shrink: 1500, fade: 900, rounds: 8, rest: .7, glow: '0 0 14px 4px' };

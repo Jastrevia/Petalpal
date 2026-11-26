@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { finishSignUpGift, holdBondCelebration, loadSignUpGift, receiveWelcomeAvatars, setWelcomeActive, useAvatarCollection, useSignUpGiftPending } from '../../services/avatars';

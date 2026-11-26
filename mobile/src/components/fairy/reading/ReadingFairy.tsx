@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle,
 } from 'react-native';

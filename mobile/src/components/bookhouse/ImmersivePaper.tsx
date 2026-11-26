@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, useState } from 'react';
+import { useEffect, type ReactNode, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MODAL_ORIENTATIONS } from '../../constants/orientation';
