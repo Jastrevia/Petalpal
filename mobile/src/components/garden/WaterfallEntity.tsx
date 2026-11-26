@@ -102,6 +102,7 @@ function WaterfallEntity({ x=0, y=0, scale=1, debugMode='all',
   // One timer for every sequence. It rerenders only this memoized entity, never GardenScene.
   useEffect(() => {
     if (!playing || !active || !foreground || !allLoaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: the waterfall's own timer state; rerenders only this entity, never GardenScene
       if (!playing) setElapsed(0);
       return;
     }

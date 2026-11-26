@@ -1,5 +1,5 @@
 import { ColorMatrix, Group, Image, Mask, Paint, Rect, useImage } from '@shopify/react-native-skia';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useReducedMotion, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import OtterWaterSpirit from './OtterWaterSpirit';
 import type { LotusOccluder } from '../water/LotusLayer';
@@ -31,7 +31,9 @@ export function Otter({clock,active=true,visible=true,network:provided,lotusOccl
   clock:SharedValue<number>;active?:boolean;visible?:boolean;network?:SwimNetwork;lotusOccluders?:readonly LotusOccluder[];
 }) {
   const network=useMemo(()=>provided ?? getSwimNetwork(),[provided]);
-  const swimmer=useSharedValue(createSwim(network,Math.floor(Math.random()*4294967296)));
+  // The first swim (with its random seed) is made once; useSharedValue keeps only its first value anyway.
+  const [firstSwim]=useState(()=>createSwim(network,Math.floor(Math.random()*4294967296)));
+  const swimmer=useSharedValue(firstSwim);
   const sheet=useImage(ART), b02=useImage(OCCLUDERS[0].source), b01=useImage(OCCLUDERS[1].source),
     st01=useImage(OCCLUDERS[2].source), b02Front=useImage(OCCLUDERS[3].source),
     b01Front=useImage(OCCLUDERS[4].source), st01Front=useImage(OCCLUDERS[5].source);

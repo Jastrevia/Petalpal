@@ -159,7 +159,7 @@ function GardenSubmergedRocks({ flow }: { flow: WaterTopFlow }) {
   // Each Garden root owns its own snapshot. On web, an unmounting root deletes
   // the images it drew, so a module-wide copy shared with a friend's Garden was
   // deleted under the still-mounted home Garden when the visitor returned.
-  const floor = useMemo(makeFloor, []);
+  const floor = useMemo(() => makeFloor(), []);
   const shore=useGardenImage(require('./assets/garden-shore-distance.webp'));
   const wet=useGardenImage(require('./assets/water-surface-mask.webp'));
   const uniforms=useDerivedValue(() => ({

@@ -41,6 +41,7 @@ export function GardenRuntimePanel({flags,onFlags,count,onCount,canChangeFixture
   },[recording]);
   useEffect(()=>()=>{if(runtimeAudit.active)runtimeAudit.stop();},[]);
   const stop=()=>{const data=runtimeAudit.stop(Platform.OS==='web'?[]:uiSamples.value,budget);
+    // eslint-disable-next-line react-hooks/refs -- dev panel: the latest stop() for the recording timer
     setResult(JSON.stringify(data,null,2));setRecording(false);};stopRef.current=stop;
   const button=(label:string,fn:()=>void,disabled=false)=><Pressable key={label} disabled={disabled} onPress={fn} style={styles.button}><Text>{label}</Text></Pressable>;
   if(!__DEV__)return null;
@@ -71,7 +72,7 @@ export function GardenRuntimePanel({flags,onFlags,count,onCount,canChangeFixture
       {button('Restore visual defaults',()=>{onFlags({...DEFAULT_ISOLATION});onCount(null);},recording||!canChangeFixture)}
       <View style={styles.row}>{button('60Hz budget',()=>setBudget(1000/60),recording)}{button('120Hz budget',()=>setBudget(1000/120),recording)}</View>
       {button(recording?'Stop + show report':'Record 30 seconds',()=>{
-        if(recording){stop();return;}uiSamples.value=[];runtimeAudit.start({...metadata,flags:{...flags},fixtureCount:count,platform:Platform.OS,configuration,budgetMs:budget});setRecording(true);
+        if(recording){stop();return;}uiSamples.set([]);runtimeAudit.start({...metadata,flags:{...flags},fixtureCount:count,platform:Platform.OS,configuration,budgetMs:budget});setRecording(true);
       })}
       <Text selectable>{result||'Warm assets first. Record idle, pan/zoom, detail and Adjust separately. No per-frame React state updates in this recorder.'}</Text>
     </ScrollView>}

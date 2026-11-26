@@ -22,7 +22,7 @@ export function GardenLoadingOverlay({ store, title }: { store: GardenLoadStore;
   const [elapsed, setElapsed] = useState(0);
   // Ready, and the loading screen has faded: nothing left to cover.
   const [exited, setExited] = useState(false);
-  useEffect(() => { if (!ready) setExited(false); }, [ready]);
+  if (!ready && exited) setExited(false);
   useEffect(() => {
     if (ready) return;
     const started = Date.now();

@@ -93,7 +93,7 @@ const SparkleEffect = memo(function SparkleEffect({ config, x, y, seconds }: {
   config: FlowerEffectConfig; x: number; y: number; seconds: SharedValue<number>;
 }) {
   const particles = useMemo(() => generateSparkleParticles(config, x, y, config.seed), [config, x, y]);
-  const star = useMemo(unitStar, []);
+  const star = useMemo(() => unitStar(), []);
   return <Group>{particles.map(p => <SparkleView key={p.id} p={p} opacity={config.opacity} star={star} seconds={seconds} />)}</Group>;
 });
 

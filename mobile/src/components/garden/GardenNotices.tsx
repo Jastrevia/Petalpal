@@ -24,6 +24,7 @@ export function GardenNotices({ ownerId, chinese, top, left, maxWidth, visible }
   }, [ownerId]);
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: another owner's notices start empty, then load from storage
     loaded.current = false; latest.current = []; setNotices([]); setOpen(false); setArrivals(0);
     AsyncStorage.getItem(storageKey(ownerId)).catch(() => null).then(stored => {
       if (!active) return;

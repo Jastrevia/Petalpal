@@ -83,6 +83,7 @@ export default function PlantingRegionCalibrationEditor({
 
   // PanResponder to make panel draggable by its header
   const headerPanResponder = useRef(
+    // eslint-disable-next-line react-hooks/refs -- dev editor: the responder's handlers run after render
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -138,6 +139,7 @@ export default function PlantingRegionCalibrationEditor({
     >
       {/* Draggable Header */}
       <View style={styles.headerRow}>
+        {/* eslint-disable-next-line react-hooks/refs -- dev editor: the responder's handlers run after render */}
         <View style={styles.headerDragArea} {...headerPanResponder.panHandlers}>
           <Text style={styles.dragIcon}>⠿</Text>
           <View style={styles.headerTitleContainer}>

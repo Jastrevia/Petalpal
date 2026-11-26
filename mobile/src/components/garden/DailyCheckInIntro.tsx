@@ -62,6 +62,7 @@ export function DailyCheckInIntro() {
   useEffect(() => {
     if (welcomeActive) return;
     if (deferredReveal) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: once the welcome flow ends, the deferred reveal runs (with its keepsake callback)
       setReveal(deferredReveal);
       setDeferredReveal(null);
     } else if (deferredToday) {

@@ -20,8 +20,10 @@ function Handle({ placement: p, camera, selected, select, update }: {
   select: () => void; update: Props['update'];
 }) {
   const current = useRef({ p, camera, select, update });
+  // eslint-disable-next-line react-hooks/refs -- dev editor: the pan responder reads the latest values without being rebuilt
   current.current = { p, camera, select, update };
   const start = useRef(p);
+  // eslint-disable-next-line react-hooks/refs -- dev editor: the responder's handlers run after render
   const responder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
