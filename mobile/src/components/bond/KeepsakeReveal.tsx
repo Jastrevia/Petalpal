@@ -20,7 +20,8 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   // and whatever still doesn't fit scrolls, with the button always in view.
   const screen = useWindowDimensions();
   const wide = screen.height < 520 && screen.width > screen.height;
-  useEffect(() => { setIndex(0); }, [result]);
+  const [indexFor, setIndexFor] = useState(result);
+  if (indexFor !== result) { setIndexFor(result); setIndex(0); }
   // A Fairy Bond level-up celebration waits until the keepsakes have been looked at.
   const showing = Boolean(result?.keepsakes.length);
   useEffect(() => (showing ? holdBondCelebration() : undefined), [showing]);

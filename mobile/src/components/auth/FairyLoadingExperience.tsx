@@ -196,6 +196,7 @@ const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperie
   // Sync manualTimeMs when provided by test controls
   useEffect(() => {
     if (manualTimeMs !== null && manualTimeMs !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- test controls seek the animation clock
       setElapsedMs(manualTimeMs);
     }
   }, [manualTimeMs]);
@@ -205,6 +206,7 @@ const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperie
     if (forceAction !== null && forceAction !== undefined) {
       // Jump to hold position of that action
       const targetTime = getActionHoldTime(forceAction);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- test controls jump the animation clock to an action
       setElapsedMs(targetTime);
     }
   }, [forceAction]);
@@ -264,6 +266,7 @@ const OriginalFairyLoadingExperience = memo(function OriginalFairyLoadingExperie
       exitingRef.current = false;
       exitAnim.setValue(1);
       if (manualTimeMs === null || manualTimeMs === undefined) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- loading again restarts the animation clock, with its Animated value
         setElapsedMs(0);
       }
       lastTimeRef.current = null;

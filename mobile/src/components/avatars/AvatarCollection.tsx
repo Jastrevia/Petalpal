@@ -60,7 +60,9 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
   const firstReady = collection?.pending.find(reward => reward.eligible > 0);
 
   // Each visit starts on the first tier; a waiting reward is shown at the top.
-  useEffect(() => { if (visible) { setTab(1); setSelected(null); setNote(''); setUnlocked(null); } }, [visible]);
+  // (Set while rendering; starting from "closed" means a collection opened on mount resets too, as before.)
+  const [openFor, setOpenFor] = useState(false);
+  if (openFor !== visible) { setOpenFor(visible); if (visible) { setTab(1); setSelected(null); setNote(''); setUnlocked(null); } }
   useEffect(() => {
     if (!unlocked) return;
     bloom.setValue(0);

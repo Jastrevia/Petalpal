@@ -64,6 +64,7 @@ export default function NativeSecurityHarnessScreen() {
         const saved=await harness.current!.readContinuation(),last=saved?.journal.at(-1);
         if(mounted.current&&saved?.active&&last&&last.code!=='FAIL'&&last.code!=='BLOCKED'&&!(last.scenario===7&&last.code==='PASS'))void runRemaining();
       }).catch(()=>{});
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the security harness could not start: show it as blocked
     }catch{setCurrent(null);setBlocked(true)}
     // Only explicitly activated continuation resumes; Scenario 1 never reruns.
     return ()=>{mounted.current=false;if(target.__PETALPAL_NATIVE_SECURITY_ATTEMPT__===controls)delete target.__PETALPAL_NATIVE_SECURITY_ATTEMPT__};

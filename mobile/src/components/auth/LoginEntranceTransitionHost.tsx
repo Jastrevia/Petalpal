@@ -34,14 +34,13 @@ export function LoginEntranceTransitionHost({ children }: { children: React.Reac
   const [gardenPrewarmed, setGardenPrewarmed] = useState(pathname === '/player-preview');
   const navigatingRef = useRef(false);
 
-  // Synchronize state when route changes externally
+  // Synchronize state when route changes externally (the prewarm flag is set while rendering)
+  if (pathname === '/player-preview' && !gardenPrewarmed) setGardenPrewarmed(true);
   useEffect(() => {
-    if (pathname === '/player-preview' && !gardenPrewarmed) {
-      setGardenPrewarmed(true);
-    }
     if (pathname === '/login-preview' && handoffState !== 'transitioning') {
       navigatingRef.current = false;
       if (handoffState !== 'idle') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- a route change from outside ends the handoff, with its navigation lock
         setHandoffState('idle');
       }
     } else if (
