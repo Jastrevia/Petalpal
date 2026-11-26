@@ -24,9 +24,9 @@ const EN = {
     eyebrow: 'GROW A LITTLE FURTHER', title: 'PetalPal VIP', close: 'Close',
     benefits: (flowers: number) => [`${flowers} new flowers a day, instead of 2`, 'A Weekly letter written for you, every week', 'A Monthly letter that looks back on your month', '3 Petal Tarot readings every week'],
     everyone: 'Your Garden, journal, Events and emotion insights stay free for everyone.',
-    lifetime: 'Founding Member', lifetimeSub: 'Pay once, VIP for life', until: (date: string) => `Only until ${date}`,
-    month: 'Monthly', monthSub: 'Renews every month until you cancel', perMonth: (price: string) => `${price} / month`, once: (price: string) => `${price} once`,
-    buyLifetime: 'Become a Founding Member', buyMonthly: 'Choose monthly',
+    lifetime: 'Founding Member', lifetimeSub: 'VIP for life', until: (date: string) => `Until ${date}`, limited: 'LIMITED',
+    month: 'Monthly', monthSub: 'Cancel anytime', unitMonth: 'per month', unitOnce: 'one time',
+    buyLifetime: 'Buy once', buyMonthly: 'Subscribe',
     restore: 'Restore purchases', manage: 'Manage subscription',
     web: 'VIP is bought in the PetalPal iPhone app. Once you join there, it shows here too.',
     soon: 'VIP opens soon.', none: 'VIP is not on sale in this build yet.',
@@ -48,9 +48,9 @@ const COPY: Record<AppLocale, Copy> = {
     eyebrow: '让花园再多长一点', title: 'PetalPal 会员', close: '关闭',
     benefits: (flowers: number) => [`每天可以种 ${flowers} 朵新花（免费为 2 朵）`, '每周都有一封为你写的周报信', '每月一封回望这个月的月报信', '每周 3 次花语塔罗解读'],
     everyone: '花园、日记、事件和情绪洞察，对所有人都一直免费。',
-    lifetime: '创始会员', lifetimeSub: '一次买断，终身会员', until: (date: string) => `限时至 ${date}`,
-    month: '按月', monthSub: '每月自动续订，可随时取消', perMonth: (price: string) => `${price} / 月`, once: (price: string) => `${price} 一次`,
-    buyLifetime: '成为创始会员', buyMonthly: '按月订阅',
+    lifetime: '创始会员', lifetimeSub: '终身会员', until: (date: string) => `至 ${date}`, limited: '限时',
+    month: '按月会员', monthSub: '可随时取消', unitMonth: '每月', unitOnce: '一次买断',
+    buyLifetime: '立即买断', buyMonthly: '按月订阅',
     restore: '恢复购买', manage: '管理订阅',
     web: '会员请在 PetalPal iPhone App 里购买。加入后，这里也会显示。',
     soon: '会员即将开放。', none: '这个版本暂时还不能购买会员。',
@@ -65,6 +65,10 @@ const COPY: Record<AppLocale, Copy> = {
 
 const dateText = (iso: string | null, locale: AppLocale) => iso
   ? new Date(iso).toLocaleDateString(locale === 'zh-Hans' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
+
+// On a plan card (narrow): numbers only, so it stays on one line.
+const shortDate = (iso: string, locale: AppLocale) =>
+  new Date(iso).toLocaleDateString(locale === 'zh-Hans' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'numeric', day: 'numeric' });
 
 /** One line on where the owner stands (Me, and the sheet's top). */
 export function vipStatus(summary: BillingSummary, copy: Copy, locale: AppLocale) {
@@ -172,16 +176,29 @@ export function VipSheet({ ownerId, summary, onSummary, onClose }: {
 
           {offer ? <View style={styles.plans}>
             {plans === null ? <ActivityIndicator accessibilityLabel={copy.loading} color={GOLD} /> : null}
-            {plans?.map(plan => <View key={plan.plan} testID={`vip-plan-${plan.plan}`} style={styles.plan}>
-              <Text style={styles.planTitle}>{plan.plan === 'LIFETIME' ? copy.lifetime : copy.month}</Text>
-              <Text style={styles.planPrice}>{plan.plan === 'LIFETIME' ? copy.once(plan.price) : copy.perMonth(plan.price)}</Text>
-              <Text style={styles.planSub}>{plan.plan === 'LIFETIME' ? copy.lifetimeSub : copy.monthSub}</Text>
-              {plan.plan === 'LIFETIME' && plan.endsAt ? <Text style={styles.planUntil}>{copy.until(dateText(plan.endsAt, locale)!)}</Text> : null}
-              <Pressable testID={`vip-buy-${plan.plan}`} accessibilityRole="button" disabled={busy} onPress={() => void buy(plan)}
-                style={({ pressed }) => [styles.buy, plan.plan === 'LIFETIME' && styles.buyForward, busy && ui.disabled, pressed && ui.pressed]}>
-                <Text style={styles.buyText}>{plan.plan === 'LIFETIME' ? copy.buyLifetime : copy.buyMonthly}  ›</Text>
-              </Pressable>
-            </View>)}
+            {/* Side by side, like a shop shelf: Founding Member (while it lasts) beside Monthly, the same
+                height, prices in the same row; stacked only on a very narrow screen. */}
+            {plans?.length ? <View style={styles.shelf}>
+              {plans.map(plan => {
+                const lifetime = plan.plan === 'LIFETIME';
+                return <View key={plan.plan} testID={`vip-plan-${plan.plan}`} style={[styles.plan, lifetime && styles.planForward]}>
+                  <View style={styles.planTop}>
+                    <Text style={[styles.tag, !lifetime && styles.tagHidden]}>{lifetime ? copy.limited : ' '}</Text>
+                    <Text style={styles.planTitle}>{lifetime ? copy.lifetime : copy.month}</Text>
+                    <Text style={styles.planPrice} adjustsFontSizeToFit numberOfLines={1}>{plan.price}</Text>
+                    <Text style={styles.planUnit}>{lifetime ? copy.unitOnce : copy.unitMonth}</Text>
+                    <Text style={styles.planSub}>{lifetime ? copy.lifetimeSub : copy.monthSub}</Text>
+                    {lifetime && plan.endsAt ? <Text style={styles.planUntil}>{copy.until(shortDate(plan.endsAt, locale))}</Text> : null}
+                  </View>
+                  <Pressable testID={`vip-buy-${plan.plan}`} accessibilityRole="button"
+                    accessibilityLabel={`${lifetime ? copy.lifetime : copy.month}, ${plan.price} ${lifetime ? copy.unitOnce : copy.unitMonth}`}
+                    disabled={busy} onPress={() => void buy(plan)}
+                    style={({ pressed }) => [styles.buy, lifetime && styles.buyForward, busy && ui.disabled, pressed && ui.pressed]}>
+                    <Text style={styles.buyText} numberOfLines={1}>{lifetime ? copy.buyLifetime : copy.buyMonthly}</Text>
+                  </Pressable>
+                </View>;
+              })}
+            </View> : null}
             {empty ? <Text style={[styles.body, styles.center, { color: theme.text }]}>
               {Platform.OS === 'web' ? copy.web : loadFailed ? copy.failed : storeAvailable ? copy.none : copy.soon}</Text> : null}
             {empty && loadFailed ? <FeatureActionButton title={copy.retry} secondary onPress={() => setReloads(n => n + 1)} /> : null}
@@ -230,15 +247,23 @@ const styles = StyleSheet.create({
   small: { fontSize: 13, lineHeight: 19, marginTop: 2 },
   center: { textAlign: 'center', flex: 0 },
   plans: { gap: 12, marginTop: 8 },
-  plan: { backgroundColor: CREAM, borderRadius: 22, borderWidth: 1, borderColor: GOLD, padding: 16, gap: 4 },
-  planTitle: { fontFamily: serif, fontSize: 20, color: INK },
-  planPrice: { fontSize: 17, fontWeight: '600', color: INK },
-  planSub: { fontSize: 13, lineHeight: 19, color: '#4F6A61' },
-  planUntil: { fontSize: 13, color: '#9A6A3A' },
-  buy: { marginTop: 10, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18,
+  shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'stretch' },
+  plan: { flexGrow: 1, flexBasis: 130, backgroundColor: CREAM, borderRadius: 20, borderWidth: 1, borderColor: GOLD,
+    paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, justifyContent: 'space-between', gap: 10 },
+  planForward: { borderWidth: 2, backgroundColor: '#FBEEDC' },
+  planTop: { alignItems: 'center', gap: 2 },
+  tag: { overflow: 'hidden', fontSize: 10.5, letterSpacing: 1.6, color: '#FFF9EC', backgroundColor: '#B98A4E', borderRadius: 9,
+    paddingHorizontal: 9, paddingVertical: 2, marginBottom: 4 },
+  tagHidden: { backgroundColor: 'transparent' },
+  planTitle: { fontFamily: serif, fontSize: 17, color: INK, textAlign: 'center' },
+  planPrice: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: INK, marginTop: 4 },
+  planUnit: { fontSize: 12.5, color: INK, opacity: 0.8 },
+  planSub: { fontSize: 12.5, lineHeight: 17, color: '#4F6A61', textAlign: 'center', marginTop: 4 },
+  planUntil: { fontSize: 12, color: '#9A6A3A', textAlign: 'center' },
+  buy: { minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10,
     backgroundColor: '#FFF9EC', borderWidth: 1, borderColor: GOLD },
   buyForward: { backgroundColor: '#F2B784' },
-  buyText: { fontFamily: serif, fontSize: 16, color: INK },
+  buyText: { fontFamily: serif, fontSize: 15.5, color: INK },
   links: { flexDirection: 'row', justifyContent: 'center', gap: 22, flexWrap: 'wrap', marginTop: 4 },
   link: { fontSize: 14, textDecorationLine: 'underline', minHeight: 24 },
   legal: { fontSize: 11.5, lineHeight: 17, textAlign: 'center', marginTop: 6 },

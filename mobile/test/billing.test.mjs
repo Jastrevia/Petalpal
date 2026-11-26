@@ -59,7 +59,7 @@ test('the store: RevenueCat customer is the PetalPal account, a cancel is not an
 
 test('the sheet shows what Apple asks for: price per period, auto-renewal, restore, Terms and Privacy', () => {
   const sheet = source('components/features/VipMembership.tsx');
-  for (const text of ['renews automatically', 'cancel at least 24 hours', 'Apple ID', 'Restore purchases', 'Terms of Use', 'Privacy Policy', '/ month', '自动续订', '恢复购买']) {
+  for (const text of ['renews automatically', 'cancel at least 24 hours', 'Apple ID', 'Restore purchases', 'Terms of Use', 'Privacy Policy', 'per month', '每月', '自动续订', '恢复购买']) {
     assert.ok(sheet.includes(text), text);
   }
   assert.match(sheet, /EXPO_PUBLIC_TERMS_URL/);
