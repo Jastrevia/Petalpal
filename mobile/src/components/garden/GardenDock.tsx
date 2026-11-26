@@ -39,7 +39,7 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
   const casketRef = useRef<View>(null);
   useEffect(() => (ownerId ? registerCollectionIcon(casketRef) : undefined), [ownerId]);
   // A keepsake flying in from the check-in reveal: the casket takes it with a small bounce.
-  const bounce = useRef(new Animated.Value(1)).current;
+  const bounce = useState(() => new Animated.Value(1))[0];
   useEffect(() => onKeepsakeLanded(() => {
     const native = Platform.OS !== 'web';
     Animated.sequence([
@@ -76,9 +76,11 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
   return <>
     <View testID="garden-dock" pointerEvents="box-none" style={[styles.dock, { top: insets.top + 78, right: insets.right + 4 }]}>
       {/* Hidden while the server's petal card switch leaves this owner out. */}
+      {/* eslint-disable-next-line react-hooks/refs -- dock items read refs only in their press handlers */}
       {petal ? item('tarot', TAROT, copy.tarot, drawn ? copy.tarotUsed : copy.tarot, () => void openRing(), !drawn) : null}
       {item('letters', LETTER, copy.letters, `${copy.letters}${unreadMail ? copy.unread : ''}`, () => router.push('/mailbox'), unreadMail)}
       {ownerId ? item('collection', CASKET, collectionCopy.dock, `${collectionCopy.dock}${collectionDot ? collectionCopy.waiting : ''}`,
+        // eslint-disable-next-line react-hooks/refs -- casketRef is attached as a ref, not read while rendering
         () => setCollectionOpen(true), collectionDot, collectionDot, casketRef) : null}
     </View>
     {ownerId ? <CollectionPanel visible={collectionOpen} locale={chinese ? 'zh-Hans' : 'en'} alerts={alerts} onClose={() => setCollectionOpen(false)} /> : null}

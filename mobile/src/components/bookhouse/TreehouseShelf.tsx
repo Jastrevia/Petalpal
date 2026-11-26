@@ -2,7 +2,7 @@ import { onboardingTarget } from '../onboarding/onboardingTargets';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Reanimated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { MONTH_NAMES, MONTHS, monthKey, monthLocked, yearLocked } from '../../services/bookhouse';
+import { monthKey, monthLocked, yearLocked } from '../../services/bookhouse';
 import { journalCount, monthShort, monthYear, treehouseZh, tt } from '../../services/treehouseCopy';
 import { archiveKey } from '../../services/monthlyArchive';
 import { BookhouseArt } from './BookhouseArt';
@@ -144,7 +144,7 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
   const scene = useMemo(() => ({ camera, books: drawnBooks }), [sceneKey]);
   const { scale, width } = layout;
   const sourceTop = SHELF.top - cabinetTop / scale;
-  const fade = useRef(new Animated.Value(1)).current;
+  const fade = useState(() => new Animated.Value(1))[0];
   const shownYear = useRef(year);
   useEffect(() => {
     if (shownYear.current === year) return;

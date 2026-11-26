@@ -2,7 +2,7 @@
 // Flat faces are drawn as images under a 4×4 perspective matrix (exact perspective texturing); curved
 // surfaces — the rounded spine, the gutter curve of the open pages and a turning sheet — are meshes.
 import { BlendMode, BlurStyle, FilterMode, MipmapMode, Skia, TileMode, VertexMode, type SkCanvas, type SkImage } from '@shopify/react-native-skia';
-import { apply, arcAngle, hingeZ, leafAngles, leafMeanAngle, LIGHT, mul, poseMatrix, project, projection, rotY, slabMatrix, SPEC, translate, type BookState, type Camera, type M4, type Pose, type V3 } from './math';
+import { apply, arcAngle, hingeZ, leafAngles, leafMeanAngle, LIGHT, mul, poseMatrix, project, projection, slabMatrix, SPEC, type BookState, type Camera, type M4, type Pose, type V3 } from './math';
 
 export * from './math';
 export type BookTextures = {
@@ -130,7 +130,7 @@ function blockEnd(out: Face[], world: M4, cam: Camera, state: BookState, zh: num
 /** The top page of a stack. side 1: right stack (faces +z); side −1: left stack's inner face (faces −z before the slab turns). */
 function pageSurface(out: Face[], world: M4, cam: Camera, state: BookState, zh: number, side: 1 | -1, rightMix = 0, previewMix = 0, leftMix = 0) {
   'worklet';
-  const { H, W, T, over: o, gap: g, gutter } = SPEC;
+  const { H, W, over: o, gap: g, gutter } = SPEC;
   const cols = 9, rows = 2;
   const grid: V3[] = [], uv: number[] = [], shadow: number[] = [];
   const xs: number[] = [];
@@ -243,7 +243,7 @@ function leaf(out: Face[], world: M4, cam: Camera, state: BookState, zh: number,
 /** Builds every visible face of the book for a pose and state. */
 export function bookFaces(cam: Camera, pose: Pose, state: BookState, layer: 'base' | 'sheet' | 'all' = 'all', ih = 96, ribbon = 0, rightMix = 0, previewMix = 0, leftMix = 0): Face[] {
   'worklet';
-  const { H, W, T, board: b, over: o, gap: g } = SPEC;
+  const { H, W, T, board: b, over: o } = SPEC;
   const world = poseMatrix(pose);
   const slab = mul(world, slabMatrix(state));
   const zh = hingeZ(state);

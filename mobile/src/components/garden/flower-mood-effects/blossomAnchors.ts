@@ -11,7 +11,7 @@ export const FLOWER_GROUND_ANCHOR = { x: 0.47, y: 0.90 };
  * Relative blossom petal anchors relative to the ground anchor point (0, 0).
  * Since the flower grows upward, blossom offsets have negative Y.
  */
-export const RELATIVE_BLOSSOM_ANCHORS: ReadonlyArray<Omit<BlossomAnchorPoint, 'id'>> = [
+export const RELATIVE_BLOSSOM_ANCHORS: readonly Omit<BlossomAnchorPoint, 'id'>[] = [
   { x: -4.0, y: -36.0, normalAngle: -Math.PI / 2, tiltAngle: 0.05, petalIndex: 0 }, // Center-left crown petal
   { x: -12.5, y: -34.5, normalAngle: -2.1, tiltAngle: 0.25, petalIndex: 1 }, // Left tulip blossom curve
   { x: 8.5, y: -33.5, normalAngle: -1.0, tiltAngle: -0.22, petalIndex: 2 }, // Right tulip blossom upper curve

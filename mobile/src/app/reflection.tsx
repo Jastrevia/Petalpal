@@ -1,4 +1,4 @@
-import { pavilionScene, pavilionGeometry, pavilionPages, pavilionFullLeaves, pavilionReadingCamera, PAVILION, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
+import { pavilionScene, pavilionGeometry, pavilionFullLeaves, pavilionReadingCamera, PAVILION, PAVILION_CLOTH } from '../components/bookhouse/pavilionMotion';
 import { PavilionBook, PavilionEngraving, usePavilionSpines } from '../components/bookhouse/PavilionBook';
 import { PAVILION_TEXT } from '../components/bookhouse/pavilionText';
 import { cancelAnimation, runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -107,7 +107,7 @@ export default function Reflection() {
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
   const night = (__DEV__ ? nightOverride : null) ?? worldNight;
-  const lighting = useRef(new Animated.Value(night ? 1 : 0)).current;
+  const lighting = useState(() => new Animated.Value(night ? 1 : 0))[0];
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     let mounted = true;
@@ -125,7 +125,7 @@ export default function Reflection() {
   const [open, setOpen] = useState<Book | null>(null);
   const spines = usePavilionSpines(lang);
   const pavilionText = PAVILION_TEXT[lang];
-  const instructionFade = useRef(new Animated.Value(1)).current;
+  const instructionFade = useState(() => new Animated.Value(1))[0];
   useEffect(() => {
     const fade = Animated.timing(instructionFade, { toValue: open ? 0 : 1,
       duration: reducedMotion ? 0 : open ? 180 : 360, useNativeDriver: true });
@@ -136,7 +136,7 @@ export default function Reflection() {
   const onBook = (book: Book) => open === book;
   const [flying, setFlying] = useState<Book | null>(null);
   const timeline = useSharedValue(0), focus = useSharedValue(0);
-  const contentFade = useRef(new Animated.Value(0)).current;
+  const contentFade = useState(() => new Animated.Value(0))[0];
   const busy = useRef(false), pendingBook = useRef<Book | null>(null);
   const [bookDrawn, setBookDrawn] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -256,6 +256,7 @@ export default function Reflection() {
       if (!controller.signal.aborted) setListError(lang === 'en' && error instanceof Error ? error.message : t.loadFailed);
     } finally { if (!controller.signal.aborted) setLoading(false); }
   }
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- first list load; load() aborts the previous request and sets loading itself
   useEffect(() => { void load(); return () => listAbort.current?.abort(); }, []);
 
   // Back to the Garden already underneath; replacing would mount a second Garden each visit.
@@ -280,6 +281,7 @@ export default function Reflection() {
   }, [monthNumber, spines]);
   // That month's report may be on an older page of the list: keep loading pages until it appears or the list ends.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads older pages until this month's report appears; not restructured (Weekly/Monthly load order)
     if (monthNumber !== null && type === 'monthly' && !loading && !listError && cursor && pages.length === 0) void load(cursor);
   }, [monthNumber, type, loading, listError, cursor, pages.length]);
 
@@ -313,17 +315,19 @@ export default function Reflection() {
     if (type === 'monthly' && monthNumber !== null) return;
     const lastKey = type === 'weekly' ? lastClosedWeekKey() : lastClosedMonthKey();
     if (reports.some(report => report.type === type && report.periodKey === lastKey)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- writes the missing reflection once per visit (guarded by autoCreated); kept as is because it starts paid AI writing
     autoCreated.current[type] = true; void createLast(type);
   }, [type, loading, listError, reports, creating, monthNumber]);
   // A finished reflection opens on its own book's page, but never switches books: the owner may
   // have tapped the other book while it was being written (Weekly and Monthly write one at a time).
   useEffect(() => {
     const created = openPeriod ? reports.find(report => report.type === openPeriod.type && report.periodKey === openPeriod.periodKey) : undefined;
-    if (created) { setOpenPeriod(null); show(created); }
+    if (created) { setOpenPeriod(null); show(created); } // eslint-disable-line react-hooks/set-state-in-effect -- opens the finished period's page once it arrives in the list
   }, [reports, openPeriod]);
 
   // Read the open page; quietly prefetch its neighbours so a turn can show both faces.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the reader when the open page changes, then fetches it
     setReadError(''); setSection('Summary');
     if (!selected) { setReading(false); return; }
     const controller = new AbortController();
@@ -344,7 +348,7 @@ export default function Reflection() {
   // Page turn: one leaf rotates around the spine (Journal technique). Forward: the right
   // page swings left and its back is the next period's left page; backward reverses it.
   const [turning, setTurning] = useState<{ from: number; to: number } | null>(null);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const locked = useRef(false);
   useEffect(() => () => progress.stopAnimation(), [progress]);
   async function turn(direction: number) {
@@ -367,6 +371,7 @@ export default function Reflection() {
     onPanResponderRelease: (_event, g) => { if (Math.abs(g.dx) > 50) void turnRef.current(g.dx < 0 ? 1 : -1); },
   })).current;
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- focus resets with its shared value when the window size changes
   useEffect(() => { focus.value = 0; setFocused(false); }, [width, height, focus]);
   // A phone: each page of the open book fits the screen's width, with a small margin (the spread is two pages wide).
   const scene = useMemo(() => pavilionScene(width, height, phone ? 2 * (screen.width - 16) : undefined, insets.bottom), [width, height, phone, screen.width, insets.bottom]);
@@ -376,7 +381,7 @@ export default function Reflection() {
   // The first view frames the shelf; opening a book glides to its left page (the right one is a drag
   // away), and putting it back glides to the shelf again. A sideways drag looks anywhere in between.
   const panMin = phone ? Math.min(0, screen.width - width) : 0;
-  const pan = useRef(new Animated.Value(0)).current;
+  const pan = useState(() => new Animated.Value(0))[0];
   const panAt = useRef<number | null>(null);
   const panning = useRef({ min: 0, max: 0 });
   // A phone with a book open: where the view rests so that one whole page (left, right) is centred on the screen.

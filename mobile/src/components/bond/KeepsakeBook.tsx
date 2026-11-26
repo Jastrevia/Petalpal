@@ -23,7 +23,10 @@ export function KeepsakeBook({ visible, locale, onClose, newIds = [] }: { visibl
     setError(false);
     loadKeepsakeBook().then(setBook).catch(() => setError(true));
   };
-  useEffect(() => { if (visible) load(); else { setOpen(null); setFilter('ALL'); } }, [visible]);
+  // Opening clears an old error and closing resets the view, both while rendering; the effect only asks.
+  const [openFor, setOpenFor] = useState(false);
+  if (openFor !== visible) { setOpenFor(visible); if (visible) setError(false); else { setOpen(null); setFilter('ALL'); } }
+  useEffect(() => { if (visible) loadKeepsakeBook().then(setBook).catch(() => setError(true)); }, [visible]);
   // Today's new keepsakes come first, so they are the first thing seen.
   const shown = (book?.keepsakes.filter(keepsake => filter === 'ALL' || keepsake.rarity === filter) ?? [])
     .sort((a, b) => Number(newIds.includes(b.id) && b.owned) - Number(newIds.includes(a.id) && a.owned));

@@ -1,4 +1,4 @@
-import { Blur, Group, Image, LinearGradient, Path, useImage } from '@shopify/react-native-skia';
+import { Blur, Group, Image, Path, useImage } from '@shopify/react-native-skia';
 import { memo, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import {

@@ -9,9 +9,11 @@ type State=ReturnType<typeof useMonthlySigns>;
 type Props=Camera & State & {canEdit:boolean;onOpen:(month:number)=>void;focus:(x:number,y:number)=>void};
 const button={padding:7,margin:2,borderRadius:6,backgroundColor:'#e3d5bc'};
 function SignHandle({p,props,selected,select}:{p:SignPlacement;props:Props;selected:boolean;select:()=>void}) {
+ // eslint-disable-next-line react-hooks/refs -- dev editor: the pan responder reads the latest values without being rebuilt
  const current=useRef({p,props,select});current.current={p,props,select};
  const start=useRef(p), moved=useRef(false);
  const [hovered,setHovered]=useState(false);
+ // eslint-disable-next-line react-hooks/refs -- dev editor: the responder's handlers run after render
  const responder=useMemo(()=>PanResponder.create({
   onStartShouldSetPanResponder:()=>true,onMoveShouldSetPanResponder:()=>true,
   onPanResponderGrant:()=>{start.current=current.current.p;moved.current=false;if(current.current.props.editing)current.current.select();},

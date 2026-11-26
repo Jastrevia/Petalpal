@@ -1,9 +1,8 @@
-import { GARDEN_LANDS, type GardenLand, type GardenLandLayout } from '../gardenMapLayout';
+import { type GardenLandLayout } from '../gardenMapLayout';
 import {
   GARDEN_WORLD_HEIGHT,
   GARDEN_WORLD_WIDTH,
   MONTH_REGION_METAS,
-  MonthRegionMeta,
   REGION_GRID_HEIGHT,
   REGION_GRID_SCALE,
   REGION_GRID_WIDTH,
@@ -13,6 +12,15 @@ import {
   getMonthMaskRefinement,
   isPointInMonthRefinedMaskWorld,
 } from './plantingMaskRefinement';
+import {
+  type MonthRegionCalibration,
+  PLANTING_REGION_CALIBRATION,
+  getParentLand,
+  worldToLandLocal,
+  landLocalToWorld,
+  landLocalToMaskLocal,
+  maskLocalToLandLocal,
+} from './plantingRegionGeometry';
 
 export {
   type ParentLandAssetId,
@@ -26,15 +34,6 @@ export {
   maskLocalToLandLocal,
   PARENT_LAND_ASSET_BY_MONTH,
   PLANTING_REGION_CALIBRATION,
-} from './plantingRegionGeometry';
-import {
-  type MonthRegionCalibration,
-  PLANTING_REGION_CALIBRATION,
-  getParentLand,
-  worldToLandLocal,
-  landLocalToWorld,
-  landLocalToMaskLocal,
-  maskLocalToLandLocal,
 } from './plantingRegionGeometry';
 
 const STORAGE_KEY = 'petalpal_planting_calibration_v1';
@@ -52,7 +51,7 @@ if (typeof localStorage !== 'undefined') {
         activeCalibrationStore = { ...PLANTING_REGION_CALIBRATION, ...parsed };
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore in non-browser environments
   }
 }

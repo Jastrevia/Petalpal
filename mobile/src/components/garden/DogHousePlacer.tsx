@@ -39,6 +39,7 @@ export default function DogHousePlacer({ placement, initial, onChange, baseX, ba
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const start = useRef(placement);
   const latest = useRef(placement);
+  // eslint-disable-next-line react-hooks/refs -- Garden: the drag gesture reads the latest placement without rebuilding the gesture
   latest.current = placement;
 
   const box = useAnimatedStyle(() => ({
@@ -49,7 +50,9 @@ export default function DogHousePlacer({ placement, initial, onChange, baseX, ba
   }));
 
   const drag = useMemo(() => Gesture.Pan().runOnJS(true)
+    // eslint-disable-next-line react-hooks/refs -- gesture callback, runs after render
     .onStart(() => { start.current = latest.current; setConfirmed(null); })
+    // eslint-disable-next-line react-hooks/refs -- gesture callback, runs after render
     .onUpdate(event => {
       const k = fit * cameraZoom.value;
       onChange({ ...start.current, x: start.current.x + event.translationX / k, y: start.current.y + event.translationY / k });

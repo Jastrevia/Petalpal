@@ -16,9 +16,11 @@ export function PanelThemeProvider({ userId, children }: { userId?: string; chil
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const writing = useRef(false);
+  // Signed out there is nothing to load.
+  if (!userId && loading) setLoading(false);
   useEffect(() => {
     let active = true;
-    if (!userId) { setLoading(false); return; }
+    if (!userId) return;
     AsyncStorage.getItem(panelThemeStorageKey(userId)).then(value => {
       if (active) setValue(value === 'light');
     }).catch(() => { if (active) setError('Unable to load background preference.'); })

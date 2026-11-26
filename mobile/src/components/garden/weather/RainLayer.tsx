@@ -99,7 +99,7 @@ const RainDrops = memo(function RainDrops({ streak, crown, grid, seconds, camera
   streak: SkImage; crown: SkImage; grid: number[]; seconds: SharedValue<number>;
   cameraTransform: SharedValue<Transforms3d>; look: SharedValue<WeatherLook>; flash: SharedValue<number>; night: boolean;
 }) {
-  const drops = useMemo(makeDrops, []);
+  const drops = useMemo(() => makeDrops(), []);
   const streakSprites = useMemo(() => drops.map(() => rect(0, 0, STREAK_W, STREAK_H)), [drops]);
   const crownSprites = useMemo(() => drops.map(() => rect(0, 0, CROWN_W, CROWN_H)), [drops]);
   const dim = night ? 0.6 : 1;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Image, View } from 'react-native';
 import Reanimated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
@@ -26,14 +26,16 @@ export function Scrollkeeper({ x, y, height, still, roam }: {
   x: number; y: number; height: number; still: boolean; roam?: { from: number; to: number };
 }) {
   // x, y: where its feet rest (scene units); height: drawn cell height.
-  const now0 = Date.now();
-  const [phase, setPhase] = useState<Phase>({ clip: 'idle', frame: 0, step: 1, until: now0 + between(25, 50) * 1000, walkUntil: now0 + between(3, 6) * 1000 });
+  const [phase, setPhase] = useState<Phase>(() => {
+    const now0 = Date.now();
+    return { clip: 'idle', frame: 0, step: 1, until: now0 + between(25, 50) * 1000, walkUntil: now0 + between(3, 6) * 1000 };
+  });
   const [facing, setFacing] = useState<1 | -1>(1);
   const offset = useSharedValue(0);
   const hop = useSharedValue(0);
   const at = useRef(0);
   const roamRef = useRef(roam);
-  roamRef.current = roam;
+  useLayoutEffect(() => { roamRef.current = roam; });
 
   // A walk: pick a spot well away from here, face it, and hop there; the clip rests on its first pose meanwhile.
   const walk = () => {

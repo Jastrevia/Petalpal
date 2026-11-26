@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { apiRequest } from './api';
 import { onClosenessChanged } from './fairyCloseness';
 
@@ -48,10 +48,15 @@ export function useAvatarCollection(enabled: boolean, refreshKey?: unknown) {
     const offAvatars = onAvatarsChanged(bump), offCloseness = onClosenessChanged(bump);
     return () => { offAvatars(); offCloseness(); };
   }, []);
+  // A new load clears an earlier failure while rendering; the effect only asks.
+  const [loadFor, setLoadFor] = useState({ enabled, refreshKey, changes, retryNonce });
+  if (loadFor.enabled !== enabled || loadFor.refreshKey !== refreshKey || loadFor.changes !== changes || loadFor.retryNonce !== retryNonce) {
+    setLoadFor({ enabled, refreshKey, changes, retryNonce });
+    if (enabled) setState(current => (current.failed ? { ...current, failed: false, error: null } : current));
+  }
   useEffect(() => {
     if (!enabled) return;
     let active = true;
-    setState(current => (current.failed ? { ...current, failed: false, error: null } : current));
     loadAvatarCollection()
       .then(collection => { if (active) setState({ collection, failed: false, error: null }); })
       .catch((error: unknown) => {
@@ -79,10 +84,9 @@ export function holdBondCelebration() {
   };
 }
 export const bondCelebrationHeld = () => holds > 0;
+const subscribeHolds = (onChange: () => void) => { holdListeners.add(onChange); return () => { holdListeners.delete(onChange); }; };
 export function useBondCelebrationHeld() {
-  const [held, setHeld] = useState(bondCelebrationHeld);
-  useEffect(() => { holdListeners.add(setHeld); setHeld(bondCelebrationHeld()); return () => { holdListeners.delete(setHeld); }; }, []);
-  return held;
+  return useSyncExternalStore(subscribeHolds, bondCelebrationHeld, bondCelebrationHeld);
 }
 
 // Sign-up gives the chosen avatar and three gifts in one go (Avatar System V1.0); the Garden then
@@ -100,10 +104,9 @@ export async function loadSignUpGift() {
 }
 export function finishSignUpGift() { setGiftPending(false); AsyncStorage.removeItem(GIFT_REVEAL_KEY).catch(() => undefined); }
 // Follows the pending gift, so a screen already open when the account is made still learns of it at once.
+const subscribeGift = (onChange: () => void) => { giftListeners.add(onChange); return () => { giftListeners.delete(onChange); }; };
 export function useSignUpGiftPending() {
-  const [pending, setPending] = useState(giftRevealPending);
-  useEffect(() => { giftListeners.add(setPending); setPending(giftRevealPending); return () => { giftListeners.delete(setPending); }; }, []);
-  return pending;
+  return useSyncExternalStore(subscribeGift, signUpGiftPending, signUpGiftPending);
 }
 
 // The welcome flow (choosing a first avatar, then revealing the three gifts) goes before
@@ -116,9 +119,8 @@ export function setWelcomeActive(active: boolean) {
   welcomeListeners.forEach(listener => listener(active));
 }
 export const isWelcomeActive = () => welcomeActive;
+const subscribeWelcome = (onChange: () => void) => { welcomeListeners.add(onChange); return () => { welcomeListeners.delete(onChange); }; };
 export function useWelcomeActive() {
-  const [active, setActive] = useState(welcomeActive);
-  // Read again once subscribed: a change between the first render and this effect is not missed.
-  useEffect(() => { welcomeListeners.add(setActive); setActive(welcomeActive); return () => { welcomeListeners.delete(setActive); }; }, []);
-  return active;
+  // useSyncExternalStore reads again once subscribed, so a change before the subscription is not missed.
+  return useSyncExternalStore(subscribeWelcome, isWelcomeActive, isWelcomeActive);
 }

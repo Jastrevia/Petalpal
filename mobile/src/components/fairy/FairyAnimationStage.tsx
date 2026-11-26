@@ -47,6 +47,7 @@ export function FairyAnimationStage({ play, reduced, onStart, height }: FairyAni
     const state = key.split(':')[0] as FairyAnimationState;
     return <Image
       key={key}
+      // eslint-disable-next-line react-hooks/refs -- a callback ref: it runs when the image mounts or unmounts, not while rendering
       ref={image => { if (image) refs.current.set(key, image); else refs.current.delete(key); }}
       source={source(state, height)}
       style={[StyleSheet.absoluteFill, { opacity: visible ? 1 : 0 }]}

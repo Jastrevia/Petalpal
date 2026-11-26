@@ -1,4 +1,15 @@
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  cancelAnimation,
+  Easing,
+  useAnimatedReaction,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
@@ -47,17 +58,6 @@ import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel
 import {DEFAULT_ISOLATION,type GardenIsolation,runtimeAudit} from './performance/runtimeAudit';
 import { productionQARecords } from './planting/productionGrowthQAData';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  cancelAnimation,
-  Easing,
-  useAnimatedReaction,
-  useDerivedValue,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GardenLoadingOverlay } from './loading/GardenLoadingOverlay';
 import { createGardenLoadStore } from './loading/gardenReadiness';
@@ -331,21 +331,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     placements,
     activeMode,
     targetFlower,
-    previewCoords,
-    validationResult,
     selectedFlower,
-    isSaving,
     showDevPlantingRegions,
     showDevFootprints,
     showDevHitboxes,
     showPlacementDebug,
     startPlanting,
     updatePreview,
-    confirmPlacement,
     cancelPlacement,
     openFlowerDetail,
-    closeFlowerDetail,
-    supportFlower,
     resetAllPlacements,
     setShowDevPlantingRegions,
     setShowDevFootprints,
@@ -609,8 +603,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [waterRipplesVisible, setWaterRipplesVisible] = useState(true);
   const [waterRippleOpacity, setWaterRippleOpacity] = useState(0.35);
   const [fishVisible, setFishVisible] = useState(true);
-  const [fishDensity, setFishDensity] = useState<FishDensity>('normal');
-  const [fishMotionPreset, setFishMotionPreset] = useState<FishMotionPreset>('normal');
+  const [fishDensity] = useState<FishDensity>('normal');
+  const [fishMotionPreset] = useState<FishMotionPreset>('normal');
   const [lotusVisible, setLotusVisible] = useState(true);
   // Register on image arrival/removal only; sway stays on the UI thread and
   // never updates React state. The mask reads each cluster's live transform.
@@ -621,8 +615,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       return occluder ? [...others, occluder] : others;
     });
   }, []);
-  const [lotusMode, setLotusMode] = useState<LotusRenderMode>('sway');
-  const [wakeVisible, setWakeVisible] = useState(false); // Optional DEV toggle, default OFF
+  const [lotusMode] = useState<LotusRenderMode>('sway');
   const [foamVisible, setFoamVisible] = useState(true);
   const [topWaterAssemblyEnabled, setTopWaterAssemblyEnabled] = useState(true);
   const [topWaterMotionMode, setTopWaterMotionMode] = useState<TopWaterMotionMode>('animate');

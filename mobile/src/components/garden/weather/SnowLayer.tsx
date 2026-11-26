@@ -149,7 +149,7 @@ const Flakes = memo(function Flakes({ sprite, grid, seconds, look, cameraTransfo
   sprite: SkImage; grid: number[]; seconds: SharedValue<number>; look: SharedValue<WeatherLook>;
   cameraTransform: SharedValue<Transforms3d>; night: SharedValue<number>;
 }) {
-  const flakes = useMemo(makeFlakes, []);
+  const flakes = useMemo(() => makeFlakes(), []);
   const sprites = useMemo(() => flakes.map(() => rect(0, 0, FLAKE, FLAKE)), [flakes]);
   const transforms = useRSXformBuffer(COUNT, (val, i) => {
     'worklet';

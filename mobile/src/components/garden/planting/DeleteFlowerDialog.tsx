@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAppLocale } from '../../../services/locale';
 import { FeatureActionButton, ui } from '../../features/FeatureUI';
@@ -31,7 +31,7 @@ export function DeleteFlowerDialog({ visible, flowerName, busy, error, onCancel,
   const copy = DELETE_FLOWER_COPY[useAppLocale()];
   const { theme } = usePanelTheme();
   const [typed, setTyped] = useState('');
-  useEffect(() => { if (!visible) setTyped(''); }, [visible]);
+  if (!visible && typed) setTyped('');
   const confirmed = typed.trim() === DELETE_FLOWER_PHRASE;
   return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
     <View style={styles.backdrop}>

@@ -80,6 +80,7 @@ export default function FlowerDetailModal() {
   const eventId = selectedFlowerIsOwner ? selectedFlower?.sourceEventId : undefined;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: another flower resets the modal's confirm and delete state
     setConfirmDelete(false);
     setMessageToDelete(null); setDeleteMessageError('');
     setSourceEvent(null);

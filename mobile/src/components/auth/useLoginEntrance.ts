@@ -11,11 +11,12 @@ export interface LoginEntranceCallbacks {
 
 /** One native animation clock drives every visual track and phase boundary. */
 export function useLoginEntrance(callbacks?: LoginEntranceCallbacks) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const animation = useRef<Animated.CompositeAnimation | null>(null);
   const running = useRef(false), mounted = useRef(true), runToken = useRef(0);
   const phaseRef = useRef<LoginEntrancePhase>('idle');
   const callbacksRef = useRef<LoginEntranceCallbacks | undefined>(callbacks);
+  // eslint-disable-next-line react-hooks/refs -- the latest callbacks are kept as each render runs (the entrance tests drive it render by render)
   callbacksRef.current = callbacks;
   const [phase, setPhase] = useState<LoginEntrancePhase>('idle');
   const [ready, setReady] = useState(false), [failedAsset, setFailedAsset] = useState(false);

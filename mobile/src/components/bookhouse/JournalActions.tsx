@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookhouseArt } from './BookhouseArt';
@@ -15,9 +15,10 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<SheetState>('menu');
   const [error, setError] = useState('');
-  const rise = useRef(new Animated.Value(0)).current;
+  const rise = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     if (!visible) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- each opening starts on the menu, with its rise animation
     setState('menu'); setError('');
     rise.setValue(reducedMotion ? 1 : 0);
     Animated.timing(rise, { toValue: 1, duration: reducedMotion ? 0 : 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();

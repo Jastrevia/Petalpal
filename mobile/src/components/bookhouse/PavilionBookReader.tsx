@@ -1,19 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Easing, Platform,
-  Image, useWindowDimensions, AccessibilityInfo,
+  Image, AccessibilityInfo,
 } from 'react-native';
 import type { AppLocale } from '../../services/locale';
 import type { PavilionBookId } from './pavilionMotion';
-import { EmotionalSafetyNote } from '../features/EmotionalSafetyNote';
 import { AiOutputReport } from '../features/AiPrivacySettings';
 import { MoodPetalChart } from '../features/WeeklyBloom';
-import { petalCardArt } from '../petalCards/petalCardArt';
 import {
-  weekLabel, shortDate, type SavedReport, type ReflectionReport,
+  weekLabel, type SavedReport, type ReflectionReport,
   SHORT_COPY, monthly2, shortWeekly,
 } from '../../services/reflections';
-type PrimaryMood = 'SUNNY_BLOOM' | 'GENTLE_BLOOM' | 'QUIET_BLOOM' | 'HEALING_BLOOM' | 'FIRE_BLOOM' | 'WONDER_BLOOM' | 'DRIFTING_BLOOM' | 'PEACEFUL_BLOOM';
 import type { Rect } from './bookMotion';
 import {
   buildFlowerLanguageCollectionPages,
@@ -23,6 +20,7 @@ import {
   buildInstructionPages,
   INSTRUCTION_BOOKMARK_CATEGORIES,
 } from './instructionPages';
+type PrimaryMood = 'SUNNY_BLOOM' | 'GENTLE_BLOOM' | 'QUIET_BLOOM' | 'HEALING_BLOOM' | 'FIRE_BLOOM' | 'WONDER_BLOOM' | 'DRIFTING_BLOOM' | 'PEACEFUL_BLOOM';
 
 // The page itself: warm ivory handmade paper (FLUX.2 klein, cropped to plain grain), aged at its edges by styles.paperAge.
 const parchment = require('../../../assets/reflection/journal/paper.webp');
@@ -64,7 +62,7 @@ export function PavilionBookReader({
 }: BookReaderProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [turning, setTurning] = useState<{ from: number; to: number; dir: 1 | -1 } | null>(null);
-  const turnProgress = useRef(new Animated.Value(0)).current;
+  const turnProgress = useState(() => new Animated.Value(0))[0];
   const isTurningLocked = useRef(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -77,6 +75,7 @@ export function PavilionBookReader({
 
   // Reset spread when bookId changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- another book starts at its first spread, with the turn lock released
     setSpreadIndex(0);
     setTurning(null);
     isTurningLocked.current = false;
@@ -110,7 +109,7 @@ export function PavilionBookReader({
       case 'monthly': {
         const detail = selectedReport ? details[selectedReport.id] ?? null : null;
         const twoPointO = !!detail && (bookId === 'monthly' ? !!monthly2(detail) : !!shortWeekly(detail)?.version2);
-        const parts: Array<'left' | 'right' | 'all'> = compact ? ['all'] : ['left', 'right'];
+        const parts: ('left' | 'right' | 'all')[] = compact ? ['all'] : ['left', 'right'];
         const report = selectedReport;
         const book = twoPointO && reportPage && report
           ? parts.map((part, i) => ({ pageNumber: i + 1, ownPager: true, render: (interactive: boolean) => reportPage(report, part, interactive) }))
@@ -134,7 +133,7 @@ export function PavilionBookReader({
         right: page,
       }));
     }
-    const result: Array<{ spreadNumber: number; left: PageData | null; right: PageData | null }> = [];
+    const result: { spreadNumber: number; left: PageData | null; right: PageData | null }[] = [];
     for (let i = 0; i < pages.length; i += 2) {
       result.push({
         spreadNumber: Math.floor(i / 2),

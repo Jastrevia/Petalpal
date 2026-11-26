@@ -91,8 +91,10 @@ export function useCheckInMonth(month: string, enabled: boolean) {
   const [data, setData] = useState<CheckInMonth | null>(null);
   const [changes, setChanges] = useState(0);
   useEffect(() => onClosenessChanged(() => setChanges(count => count + 1)), []);
+  // Disabled: no data (cleared while rendering).
+  if (!enabled && data !== null) setData(null);
   useEffect(() => {
-    if (!enabled) { setData(null); return; }
+    if (!enabled) return;
     let active = true;
     loadCheckInMonth(month).then(result => { if (active) setData(result); }).catch(() => undefined);
     return () => { active = false; };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import type { AppLocale } from '../../services/locale';
 import { FLOWER_ASSETS } from '../../data/flowerAssets';
 const flowerCollectionJson = require('../../data/flowerLanguageCollection.json');
@@ -36,13 +36,13 @@ export function buildFlowerLanguageCollectionPages(
 ): {
   pages: CollectionPageData[];
   categoryPageMap: Record<string, number>;
-  categoryRanges: Array<{ id: string; startPage: number; endPage: number }>;
+  categoryRanges: { id: string; startPage: number; endPage: number }[];
 } {
   const isZh = lang === 'zh-Hans';
   const localeKey = isZh ? 'zh' : 'en';
   const pages: CollectionPageData[] = [];
   const categoryPageMap: Record<string, number> = {};
-  const categoryRanges: Array<{ id: string; startPage: number; endPage: number }> = [];
+  const categoryRanges: { id: string; startPage: number; endPage: number }[] = [];
 
   const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 

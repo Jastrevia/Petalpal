@@ -79,6 +79,7 @@ export default function Letterwing({ placement, clock, unread }: {
       { translateX: -CELL.w / 2 }, { translateY: -CELL.h / 2 }];
   }, [k, mailboxX, mailboxY, drawScale, unread, rate, placement.x, placement.y]);
   // Development only: window.__letterwing() is where it is now (Garden world units) and its state.
+  // eslint-disable-next-line react-hooks/immutability -- development-only window hook to call Letterwing up
   if (__DEV__ && typeof window !== 'undefined') (window as unknown as { __letterwing?: unknown }).__letterwing = () => {
     const c = circuit(clock.value * rate), t = transform.value as { translateX?: number; translateY?: number }[];
     return { x: t[0].translateX, y: t[1].translateY, rest: c.rest, flying: c.flying, frame: c.frame };

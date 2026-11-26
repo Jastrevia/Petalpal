@@ -39,7 +39,7 @@ export function DailyCheckInIntro() {
   const insets = useSafeAreaInsets();
   // Same size rule as the calendar button (GardenCalendar).
   const calendarWidth = Math.min(164, Math.max(125, width * .22));
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const [card, setCard] = useState<{ time: string | null; streak: number; keepsake?: string } | null>(null);
   const [reveal, setReveal] = useState<CheckInResult | null>(null);
   const [deferredReveal, setDeferredReveal] = useState<CheckInResult | null>(null);
@@ -62,6 +62,7 @@ export function DailyCheckInIntro() {
   useEffect(() => {
     if (welcomeActive) return;
     if (deferredReveal) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: once the welcome flow ends, the deferred reveal runs (with its keepsake callback)
       setReveal(deferredReveal);
       setDeferredReveal(null);
     } else if (deferredToday) {
@@ -148,7 +149,7 @@ export function DailyCheckInIntro() {
   // "Keep it": each keepsake of the reveal flies from the middle of the screen into the Collection
   // icon, shrinking along a gentle arc, a few frames apart; the icon answers as the first one lands.
   const [flight, setFlight] = useState<{ ids: string[]; to: { x: number; y: number; size: number } } | null>(null);
-  const flown = useRef(new Animated.Value(0)).current;
+  const flown = useState(() => new Animated.Value(0))[0];
   const closeReveal = async () => {
     const ids = (reveal?.keepsakes ?? []).map(keepsake => keepsake.id).filter(id => keepsakeArt(id)).slice(0, 3);
     setReveal(null);

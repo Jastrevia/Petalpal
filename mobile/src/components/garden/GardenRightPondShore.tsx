@@ -163,6 +163,7 @@ function GardenRightPondShore({ mineral: shared }: { mineral?: SkImage | null })
     }
     const created = makeShore(mineral);
     if (created) {
+      // eslint-disable-next-line react-hooks/globals -- Garden: the shore snapshot is cached for the app's life on purpose (made once, reused by every mount)
       cachedShoreSnapshot = { mineral, image: created };
     }
     return created;

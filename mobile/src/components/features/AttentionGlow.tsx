@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 
 const FULL = { color: '#EFC95F', shrink: 1500, fade: 900, rounds: 8, rest: .7, glow: '0 0 14px 4px' };
@@ -13,7 +13,7 @@ const useNativeDriver = true;
 // Only transform and opacity animate, so it costs the frame nothing. `spread`: how far out it starts.
 export function AttentionGlow({ radius, spread = 12, soft = false, bright = false }: { radius: number; spread?: number; soft?: boolean; bright?: boolean }) {
   const look = bright ? BRIGHT : soft ? SOFT : FULL;
-  const ring = useRef(new Animated.Value(0)).current, rest = useRef(new Animated.Value(0)).current;
+  const ring = useState(() => new Animated.Value(0))[0], rest = useState(() => new Animated.Value(0))[0];
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
     let loop: Animated.CompositeAnimation | undefined, active = true;

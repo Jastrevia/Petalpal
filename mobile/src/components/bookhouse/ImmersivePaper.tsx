@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MODAL_ORIENTATIONS } from '../../constants/orientation';
@@ -12,7 +12,7 @@ export function ImmersivePaper({ title, subtitle, onClose, closeLabel = 'Close',
   children: ReactNode; footer?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  const rise = useRef(new Animated.Value(0)).current;
+  const rise = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     let active = true;
     AccessibilityInfo.isReduceMotionEnabled().then(reduced => {

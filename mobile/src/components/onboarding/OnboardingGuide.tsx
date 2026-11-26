@@ -82,6 +82,7 @@ export function OnboardingGuide({
       prevPlace.current = { x: place.x, y: place.y };
       x.value = place.x;
       y.value = place.y;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reduced motion: the guide jumps to its place with its shared values and rests
       setFairyState('idle');
       return;
     }

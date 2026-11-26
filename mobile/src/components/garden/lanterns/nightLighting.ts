@@ -14,6 +14,7 @@ export function useNightLighting(enabled: boolean) {
   const amount = useSharedValue(enabled ? 1 : 0);
   const [active, setActive] = useState(enabled);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: lanterns are drawn before the night fade-in starts
     if (enabled) setActive(true);
     amount.value = withTiming(enabled ? 1 : 0, { duration: reduced ? 0 : enabled ? 1000 : 800 }, finished => {
       if (finished && !enabled) runOnJS(setActive)(false);

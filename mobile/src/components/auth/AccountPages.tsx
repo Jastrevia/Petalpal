@@ -5,10 +5,10 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
 import { AVATAR_TIERS } from '../avatars/avatarArt';
+import { UserAvatar } from '../avatars/UserAvatar';
 
 // Sign-up offers every Level 1 avatar (Avatar System V1.0): the one chosen is worn, three others are her gift.
 const LEVEL_1 = AVATAR_TIERS[0].ids;
-import { UserAvatar } from '../avatars/UserAvatar';
 
 // The sign-up pages (the owner's mock-ups, 2026-11-06): one garden scene (wisteria, a misty
 // waterfall, a lotus pond and a lantern; painted with FLUX.2 klein from the mock-up) behind a cream
@@ -20,7 +20,7 @@ import { UserAvatar } from '../avatars/UserAvatar';
 const BACKGROUND = require('../../../assets/auth/signup/background.webp');
 const FAIRY = require('../../../assets/auth/signup/fairy-leaning.webp');
 const FAIRY_RATIO = 684 / 620;
-const GOLD = '#C9A35E', INK = '#4A3426', BROWN = '#6B4A2F', TEXT = '#5A4636', HINT = '#6E5B4B', PARCHMENT = '#FBF4EA';
+const GOLD = '#C9A35E', INK = '#4A3426', BROWN = '#6B4A2F', TEXT = '#5A4636', HINT = '#6E5B4B';
 
 // ---- Small line icons (24-unit paths) ----
 const PATHS = {

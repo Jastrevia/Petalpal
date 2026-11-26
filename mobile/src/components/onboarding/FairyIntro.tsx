@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput,
   useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue,
   withDelay, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FairyAnimationController, type FairyAnimationState, FAIRY_CHARACTER_CANVAS_RATIO, FAIRY_CANVAS_ASPECT } from '../fairy/FairyAnimationController';
-import { portraitWidth } from './FairyArt';
 import { GOLD, INK, PAPER, serif } from './OnboardingGuide';
 import { stepLine, UI_COPY, type OnboardingLocale } from './onboardingCopy';
 import { dispatchOnboarding, saveFairyName } from './onboardingStore';
@@ -66,6 +65,7 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
 
   useEffect(() => {
     if (step !== 'intro.celebrate') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the celebrate step starts the fairy's celebration animation
     setFairyState('celebrate');
     if (reduced) {
       setCelebrated(true);

@@ -334,6 +334,7 @@ export default function SwingEntity({
   // Blurred glows cost a lot to draw even when invisible, so by day they are not drawn at all.
   const [glowDrawn, setGlowDrawn] = useState(lanternLightingEnabled);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: the glow is drawn before its fade-in starts (blurred glows are not drawn by day)
     if (lanternLightingEnabled) setGlowDrawn(true);
     lanternGlowOpacity.value = withTiming(lanternLightingEnabled ? 1 : 0, {
       duration: reducedMotion ? 0 : lanternLightingEnabled ? 1200 : 900,

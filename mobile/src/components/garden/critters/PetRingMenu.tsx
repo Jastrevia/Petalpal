@@ -100,7 +100,7 @@ export default memo(function PetRingMenu({ petId, pet, viewport, locale, onClose
   const reload = useCallback(() => loadPets().then(next => { if (live.current) setPets(next); }).catch(() => { if (live.current) setNote(copy.failed); }), [copy]);
   useEffect(() => { reload(); }, [reload]);
   // The ring and each panel come in with a short fade.
-  const appear = useRef(new Animated.Value(0)).current;
+  const appear = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     appear.setValue(0);
     Animated.timing(appear, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
@@ -388,7 +388,7 @@ function ArcCard({ card, index, scrollY, busy, geometry }: { card: CardSpec; ind
 // Small pink hearts floating up from the pet's head (after its eating or patting clip).
 function Hearts({ x, y }: { x: number; y: number }) {
   const reduced = useReducedMotion();
-  const rise = useRef(new Animated.Value(0)).current;
+  const rise = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     Animated.timing(rise, { toValue: 1, duration: 1400, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }).start();
   }, [rise]);

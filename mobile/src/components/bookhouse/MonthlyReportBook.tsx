@@ -64,9 +64,11 @@ function pageText(page: ArchivePage, year: number, loaded: Loaded): string {
 function useArchive(year: number) {
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  // Another year or a retry shows loading at once (set while rendering); the effect only asks.
+  const [loadFor, setLoadFor] = useState({ year, attempt });
+  if (loadFor.year !== year || loadFor.attempt !== attempt) { setLoadFor({ year, attempt }); setLoaded({ status: 'loading' }); }
   useEffect(() => {
     const controller = new AbortController();
-    setLoaded({ status: 'loading' });
     loadMonthlyArchive(year, controller.signal).then(
       archive => { if (!controller.signal.aborted) setLoaded({ status: 'ready', archive }); },
       error => { if (!controller.signal.aborted) setLoaded({ status: 'error', problem: archiveProblem(error) }); });
@@ -213,7 +215,7 @@ export function MonthlyReportBook({ year, shelfRect, reducedMotion, closeSignal,
   const t = useSharedValue(0), lean = useSharedValue(0), turn = useSharedValue(0), dir = useSharedValue(0), count = useSharedValue(1), reading3d = useSharedValue(0);
   const leanSide = useSharedValue(1);
   const { pull, geometry, rootX, scrollY } = scene;
-  const heldOpen = useRef(!!(scene.held && scene.deskRect)).current;
+  const heldOpen = useState(() => !!(scene.held && scene.deskRect))[0];
   const held = useSharedValue(heldOpen ? 1 : 0);
   const deskOrigin = useSharedValue<ShelfOrigin | null>(heldOpen && scene.deskRect ? toOrigin(scene.deskRect) : null);
   useAnimatedReaction(() => t.value, v => { if (held.value !== 1) pull.value = pullOf(v); }, [pull]);

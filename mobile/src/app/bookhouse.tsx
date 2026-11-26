@@ -1,7 +1,7 @@
 import { tourRunning, useOnboarding } from '../components/onboarding/onboardingStore';
 import { OnboardingPanelLayer } from '../components/onboarding/OnboardingStepView';
 import { dispatchOnboarding } from '../components/onboarding/onboardingSignals';
-import { onboardingScrollHandler, onboardingTarget, registerOnboardingScroller } from '../components/onboarding/onboardingTargets';
+import { onboardingTarget, registerOnboardingScroller } from '../components/onboarding/onboardingTargets';
 import { useWorldTime } from '../components/garden/world-time';
 import type { PanelTheme } from '../components/features/PanelTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -89,13 +89,6 @@ export default function Bookhouse() {
     dispatchOnboarding({ type: 'bookhouseOpened' });
     return registerOnboardingScroller('bookhouse', sceneScroll);
   }, []);
-  // Onboarding targets:
-  const _bhTargets = {
-    years: onboardingTarget('bookhouse.years'),
-    books: onboardingTarget('bookhouse.books'),
-    shelf: onboardingTarget('bookhouse.shelf'),
-    back: onboardingTarget('bookhouse.back'),
-  };
   const bookNodes = useRef(new Map<string, ShelfSlot>());
   // The desk-view bookcase (portrait layout): its books open their months from the desk (switching books).
   const deskShelfNodes = useRef(new Map<string, ShelfSlot>());
@@ -134,7 +127,7 @@ export default function Bookhouse() {
   const pendingYear = useRef<number | null>(null);
   const [shelfYear, setShelfYear] = useState<number | null>(null);
   // Unsaved writing, kept while the Treehouse is open (by day and journal) so leaving a page never loses it.
-  const drafts = useRef(new Map<string, Draft>()).current;
+  const drafts = useState(() => new Map<string, Draft>())[0];
   // The camera pulling back from the shelf to the writing desk (driven by the open book's timeline).
   const pull = useSharedValue(0);
   const sceneY = useRef(0);
@@ -142,13 +135,15 @@ export default function Bookhouse() {
   const [actionEntry, setActionEntry] = useState<JournalCheckIn | null>(null);
   const [notice, setNotice] = useState('');
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 3600); return () => clearTimeout(timer); }, [notice]);
-  const arrival = useRef(new Animated.Value(0)).current;
+  const arrival = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     Animated.timing(arrival, { toValue: 1, duration: reducedMotion ? 0 : 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [arrival, reducedMotion]);
 
   const requestVersion = useRef(0);
   const journalRequest = useRef<AbortController | null>(null);
+  const [checkIns, setCheckIns] = useState<DailyCheckInRecord[]>([]);
+  const [recordsFailed, setRecordsFailed] = useState(false);
   const reload = useCallback(async (): Promise<JournalCheckIn[] | null> => {
     if (!session) return null;
     const version = ++requestVersion.current;
@@ -164,10 +159,8 @@ export default function Bookhouse() {
       setEntries(next); setCheckIns(records.list); setRecordsFailed(failed => failed || records.failed); return next;
     } catch (e) { if (version === requestVersion.current) setError(errorMessage(e)); return null; }
   }, [session]);
-  const [checkIns, setCheckIns] = useState<DailyCheckInRecord[]>([]);
   // Each month's Events (for its books' left pages), kept per month so a switch never changes the closing book's pages.
   const [monthEvents, setMonthEvents] = useState<Record<string, MonthEvent[]>>({});
-  const [recordsFailed, setRecordsFailed] = useState(false);
   useFocusEffect(useCallback(() => { void reload(); return () => { requestVersion.current++; journalRequest.current?.abort(); }; }, [reload]));
 
   const today = todayLocalDate(timezone);
@@ -235,6 +228,7 @@ export default function Bookhouse() {
         void measureBook(slot).then(rect => openMonth(curYear, curMonth, rect));
       }
     } else if ((tour.step === 'treehouse.shelf' || (tour.step === 'treehouse.books' && bookMode === 'focused')) && book) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the tour closes the open book, with its pull value and the parent's book mode
       if (true) { setBook(null); setNextBook(null); setShownMonths([]); onBookMode(null); pull.value = 0;
       }
     }
@@ -290,7 +284,7 @@ export default function Bookhouse() {
     if (to === 'shelf' && nextYear !== null) setShelfYear(nextYear);
   };
   // Each book's days, rebuilt only when that month's own data changes (a switch never redraws the other book's pages).
-  const daysCache = useRef(new Map<string, { inputs: unknown[]; days: ReturnType<typeof monthDays> }>()).current;
+  const daysCache = useState(() => new Map<string, { inputs: unknown[]; days: ReturnType<typeof monthDays> }>())[0];
   const daysOf = (b: OpenBook & { kind: 'month' }) => {
     const key = `${b.year}-${b.month}`, events = monthEvents[key];
     const inputs = [entries, checkIns, events, today];
@@ -301,7 +295,13 @@ export default function Bookhouse() {
     return days;
   };
   // (A journal's records only: the Monthly Report archive shows none of them.)
-  useEffect(() => { if (recordsFailed && book?.kind === 'month') setNotice(tt('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.')); }, [recordsFailed, book]);
+  // Said once each time a month's book opens (or its records fail) while some records are missing.
+  const recordsNoticeFor = recordsFailed && book?.kind === 'month' ? book : null;
+  const [recordsNoticed, setRecordsNoticed] = useState<typeof book>(null);
+  if (recordsNoticeFor !== recordsNoticed) {
+    setRecordsNoticed(recordsNoticeFor);
+    if (recordsNoticeFor) setNotice(tt('Some flower, Event or mood records could not be loaded. They will appear once the connection returns.'));
+  }
   const removeEntry = async () => {
     if (!session || !actionEntry?.journal) return;
     await deletePrivateJournal(session.user.id, actionEntry.journal.id);
@@ -324,6 +324,7 @@ export default function Bookhouse() {
   // The open book's column: in the portrait Treehouse, the width the bookcase, the desk and the journal share once
   // pulled back (the whole width on phones; on wider windows a centred column as wide as the bookcase).
   const portrait = ROOM_SCENE && (ROOM_LAYOUT === 'portrait' || ROOM_LAYOUT === 'reference') && !ROOM_ARTWORK;
+  /* eslint-disable react-hooks/preserve-manual-memoization -- pure layout helpers; this component is not compiled (it has an exhaustive-deps suppression) */
   const deskColumn = useMemo(() => {
     if (!portrait) return Math.min(width, 560);
     const rest = shelfLayout(column, cabinetTop, cabinetBottom, shelfFills);
@@ -333,6 +334,7 @@ export default function Bookhouse() {
   }, [portrait, width, height, insets, column, cabinetTop, cabinetBottom, sceneHeight, shelfFills]);
   const deskFooter = portrait ? PORTRAIT_FOOTER : 0;
   const desk = useMemo(() => ROOM_ARTWORK ? deskBookLayout(width, height, insets) : bookLayout(width, height, insets, 0, deskColumn, deskFooter), [width, height, insets, deskColumn, deskFooter]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
   // The title sign hangs on the shelf's top beam, so it recedes with the shelf: the same uniform scale about the
   // shelf's top centre (the sign is centred, so only its centre's height changes).
   const plaqueCentre = insets.top + TOP_BAR + 25;
@@ -386,6 +388,7 @@ export default function Bookhouse() {
       const start = offBookTap.current;
       offBookTap.current = null;
       const x = e.nativeEvent.pageX, y = e.nativeEvent.pageY;
+      // eslint-disable-next-line react-hooks/purity -- press handler, runs on a tap
       if (!start || Math.hypot(x - start.x, y - start.y) > 10 || Date.now() - start.at > 700) return;
       if (inOpenBookZone(desk, x, y)) return;
       closeFromOutside();
@@ -531,14 +534,18 @@ function FlowerHistory({ userId, timezone, onClose }: { userId: string; timezone
   const [detail, setDetail] = useState<{ id: string; content: string; messages: string[]; supports: number; secondary: string[] } | null>(null);
   const [detailError, setDetailError] = useState(''); const [detailBusy, setDetailBusy] = useState<string | null>(null);
   const version = useRef(0);
-  const load = useCallback(async () => { setLoading(true); setError(''); try {
-    const [records, placements] = await Promise.all([loadGardenPlacements(userId, userId, timezone), loadFlowerPlacements()]);
-    const plantedDates = new Map(placements.map(p => [p.flowerId, p.plantedDate]));
-    // Flower History lists planted flowers; one not planted yet (a draft) is not part of it.
-    setFlowers(records.filter(flower => !awaitsPlanting(flower)).map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
-      ? plantedDates.get(flower.flowerId) || flower.plantedDate : flower.plantedDate })).sort((a, b) => b.plantedDate.localeCompare(a.plantedDate)));
-  } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); } }, [userId, timezone]);
-  useEffect(() => { void load(); return () => { version.current++; }; }, [load]);
+  // Retry asks for the list again: the effect does the request and sets state only once it answers.
+  const [attempt, setAttempt] = useState(0);
+  const load = () => { setLoading(true); setError(''); setAttempt(count => count + 1); };
+  useEffect(() => {
+    Promise.all([loadGardenPlacements(userId, userId, timezone), loadFlowerPlacements()]).then(([records, placements]) => {
+      const plantedDates = new Map(placements.map(p => [p.flowerId, p.plantedDate]));
+      // Flower History lists planted flowers; one not planted yet (a draft) is not part of it.
+      setFlowers(records.filter(flower => !awaitsPlanting(flower)).map(flower => ({ ...flower, plantedDate: flower.placementOrigin === 'LOCAL'
+        ? plantedDates.get(flower.flowerId) || flower.plantedDate : flower.plantedDate })).sort((a, b) => b.plantedDate.localeCompare(a.plantedDate)));
+    }).catch(e => { setError(errorMessage(e)); }).finally(() => setLoading(false));
+    return () => { version.current++; };
+  }, [userId, timezone, attempt]);
   const inspect = async (flower: FlowerPlacementRecord) => {
     const request = ++version.current; setDetailBusy(flower.flowerId); setDetailError(''); setDetail(null);
     try { const [source, event] = await Promise.all([loadFlowerSource(userId, flower.flowerId), flower.sourceEventId ? readEvent(flower.sourceEventId) : Promise.resolve(null)]);

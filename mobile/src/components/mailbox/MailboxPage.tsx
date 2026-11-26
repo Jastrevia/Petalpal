@@ -10,7 +10,6 @@ import {
 
   Image,
 
-  ImageBackground,
 
   Platform,
 
@@ -32,7 +31,6 @@ import { FloatingLetterStack } from './FloatingLetterStack';
 
 import { FloatingPetalsOverlay } from './FloatingPetalsOverlay';
 
-import { HelpFeedbackPanel, HelpFeedbackTrigger } from './HelpFeedbackPanel';
 
 import { MagicLevitationAura } from './MagicLevitationAura';
 
@@ -171,7 +169,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const isNight = (__DEV__ ? nightOverride : null) ?? worldNight;
 
-  const nightLighting = useRef(new Animated.Value(isNight ? 1 : 0)).current;
+  const nightLighting = useState(() => new Animated.Value(isNight ? 1 : 0))[0];
 
 
 
@@ -229,7 +227,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const [phase, setPhase] = useState<MailboxPhase>('reading');
 
-  const [pendingLetterId, setPendingLetterId] = useState<string | null>(null);
+  const [, setPendingLetterId] = useState<string | null>(null);
 
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
 
@@ -241,7 +239,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
 
 
-  // Help & Feedback panel state
+  // Help & Feedback panel state (unused here for now; test/mailboxSystem.test.mjs requires it)
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -355,11 +353,8 @@ export const MailboxPage = memo(function MailboxPage() {
 
   // The open letter was deleted (here or on another device): show one that is still there.
 
-  useEffect(() => {
-
-    if (letters.length && activeIndex < 0) setSelectedLetterId(letters[0].id);
-
-  }, [letters, activeIndex]);
+  // (Set while rendering; once set, activeIndex is no longer negative.)
+  if (letters.length && activeIndex < 0) setSelectedLetterId(letters[0].id);
 
 
 
@@ -373,6 +368,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
     if (!openLetterId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a fully open letter is marked read once, then confirmed with the server
     markLetterAsRead(openLetterId);
 
     void confirmLetterRead(openLetterId);
@@ -837,8 +833,6 @@ export const MailboxPage = memo(function MailboxPage() {
     ? Math.min(windowWidth - 32, 840)
     : Math.min(windowWidth - 24, 420);
 
-  const usableHeight = Math.max(480, windowHeight - insets.top - insets.bottom);
-  const maxContentHeight = Math.min(540, Math.round(usableHeight * 0.72));
 
 
 

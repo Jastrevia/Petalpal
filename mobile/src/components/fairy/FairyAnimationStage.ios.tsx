@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -32,7 +32,7 @@ function Action({ state, height, loop, visible, current, onFirstFrame, onEnd }: 
   onFirstFrame?: () => void; onEnd?: () => void;
 }) {
   const ended = useRef(onEnd);
-  ended.current = onEnd;
+  useLayoutEffect(() => { ended.current = onEnd; });
   const player = useVideoPlayer(source(state, height), video => {
     video.muted = true;
     video.audioMixingMode = 'mixWithOthers'; // never pauses the owner's music
@@ -43,6 +43,7 @@ function Action({ state, height, loop, visible, current, onFirstFrame, onEnd }: 
     const subscription = player.addListener('playToEnd', () => ended.current?.());
     return () => subscription.remove();
   }, [player]);
+  // eslint-disable-next-line react-hooks/immutability -- expo-video's player is configured by setting its properties
   useEffect(() => { player.loop = loop; }, [player, loop]);
   // Once the next action has been asked for, this one holds its frame until that one is on screen.
   useEffect(() => { if (!current) player.pause(); }, [player, current]);

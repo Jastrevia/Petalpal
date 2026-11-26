@@ -4,7 +4,7 @@ import { Group, ImageShader, Rect, Shader, Skia, useImage, type SkImage } from '
 import { memo, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import { useDerivedValue, useFrameCallback, useReducedMotion, useSharedValue, type SharedValue } from 'react-native-reanimated';
-import { FISH, getFishForDensity, getFishPose, type FishConfig, type FishDensity, type FishMotionPreset } from './fishMotion';
+import { getFishForDensity, getFishPose, type FishConfig, type FishDensity, type FishMotionPreset } from './fishMotion';
 export { FISH, getFishForDensity } from './fishMotion';
 export type { FishConfig, FishDensity, FishMotionPreset } from './fishMotion';
 

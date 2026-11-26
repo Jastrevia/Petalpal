@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ClosenessSummary } from '../../services/fairyCloseness';
@@ -25,7 +25,7 @@ export function BondLevelUp({ userId, locale, summary, paused, onChoose }: {
   const level = summary?.level ?? 0;
   const { collection } = useAvatarCollection(Boolean(summary), level);
   const [seen, setSeen] = useState<number | null | undefined>(undefined);
-  const bloom = useRef(new Animated.Value(0)).current;
+  const bloom = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(bondLevelSeenKey(userId))

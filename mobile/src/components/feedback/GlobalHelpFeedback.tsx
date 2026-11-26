@@ -18,24 +18,18 @@
  */
 
 import { usePathname } from 'expo-router';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { onOpenHelpFeedback } from './helpFeedbackBus';
 import {
   Image,
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../mailbox/ExpandedLetter';
-import {
-  BotanicalSupportIcon,
-  HelpFeedbackTrigger,
-  SUPPORT_MENU_ITEMS,
-} from '../mailbox/HelpFeedbackPanel';
+import { FONT_BODY, FONT_TITLE } from '../mailbox/ExpandedLetter';
 import { ENVELOPE_PAPER_BACKGROUND } from '../mailbox/paperTextures';
 import { useFeedbackDraft } from './FeedbackDraftContext';
 import { HelpFeedbackView, SupportTopicItem } from './feedbackTypes';

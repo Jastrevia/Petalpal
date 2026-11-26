@@ -62,6 +62,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
       eventId: unfinished.sourceEventId, flowerId: unfinished.id } : null;
   }, [ownerId]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- first refresh on mount; refresh() is shared with the screen's own reloads
     void refresh().then(remote => {
       if (!mounted.current || draftChecked.current) return;
       draftChecked.current = true;
@@ -101,8 +102,11 @@ export function useEventJournal(onGardenChanged?: () => void) {
   // Still pending after the last check: say so plainly (the Event and flower are saved) instead
   // of showing "AI is reading" forever. Checking again only re-reads the Event; it never re-runs AI.
   const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+  // Another Event or analysis status starts without the timeout notice (reset while rendering).
+  const analysisKey = `${result?.event.id ?? ''}|${result?.event.emotionStatus ?? ''}`;
+  const [analysisFor, setAnalysisFor] = useState(analysisKey);
+  if (analysisFor !== analysisKey) { setAnalysisFor(analysisKey); setAnalysisTimedOut(false); }
   useEffect(() => {
-    setAnalysisTimedOut(false);
     if (!result || !['PENDING','RUNNING'].includes(result.event.emotionStatus)) return;
     let cancelled = false; let timer: ReturnType<typeof setTimeout>; let attempts = 0;
     async function poll() {

@@ -20,7 +20,7 @@ import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
 import { GardenWeatherSettings } from './GardenWeatherSettings';
 import { VipSettings } from './VipMembership';
-import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
+import { FEATURE_COLORS as colors, FeatureSection, StatusChip, ui } from './FeatureUI';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { avatarCopy } from '../avatars/avatarCopy';
 import { useAvatarCollection } from '../../services/avatars';
@@ -75,6 +75,7 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const scroller = useRef<ScrollView>(null), contentHeight = useRef(0);
   const locale = useAppLocale();
   const closeLabel = OVERLAY_COPY[locale].close;
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- another panel starts without the add-friend and Events intro states, with its measured height
   useEffect(() => { setAddingFriend(false); setEventsIntro(false); contentHeight.current = 0; }, [feature?.id]);
   // The first-time tour follows the Events and Friends panels opening and closing.
   useEffect(() => {

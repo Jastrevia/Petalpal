@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue,
   withDelay, withSequence, withTiming } from 'react-native-reanimated';
-import { FairyReach, Hover, glideWidth, portraitWidth, REACH_HAND, reachWidth } from './FairyArt';
+import { Hover, glideWidth, REACH_HAND, reachWidth } from './FairyArt';
 import { FairyAnimationController, FAIRY_CHARACTER_CANVAS_RATIO, FAIRY_CANVAS_ASPECT } from '../fairy/FairyAnimationController';
 import { FINALE_LINE } from './onboardingCopy';
 import { serif } from './OnboardingGuide';

@@ -102,7 +102,7 @@ const Leaves = memo(function Leaves({ sheet, shadow, seconds, look, day, cameraT
   sheet: SkImage; shadow: SkImage; seconds: SharedValue<number>; look: SharedValue<WeatherLook>;
   day: SharedValue<number>; cameraTransform: SharedValue<Transforms3d>;
 }) {
-  const leaves = useMemo(makeLeaves, []);
+  const leaves = useMemo(() => makeLeaves(), []);
   const shadowSprites = useMemo(() => leaves.map(() => rect(0, 0, SHADOW_W, SHADOW_H)), [leaves]);
   const shadowTransforms = useRSXformBuffer(COUNT, (val, i) => {
     'worklet';

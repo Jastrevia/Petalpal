@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useCallback, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { router, useFocusEffect } from 'expo-router';
