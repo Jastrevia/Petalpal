@@ -26,9 +26,13 @@ export default function VisitGardenScreen() {
   const [ready, setReady] = useState<{ ownerId: string; viewerId: string } | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  // Another Garden or a retry starts clean at once (set while rendering); the effect enters it.
+  const [enterFor, setEnterFor] = useState({ ownerId, viewerId, attempt });
+  if (enterFor.ownerId !== ownerId || enterFor.viewerId !== viewerId || enterFor.attempt !== attempt) {
+    setEnterFor({ ownerId, viewerId, attempt }); setReady(null); setError('');
+  }
   useEffect(() => {
     let active = true, joined = false;
-    setReady(null); setError('');
     async function enter() {
       if (!ownerId || !viewerId || ownerId === viewerId) { if (active) setError('Select a friend’s Garden to visit.'); return; }
       try {

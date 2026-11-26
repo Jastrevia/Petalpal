@@ -29,9 +29,14 @@ export function GardenVisitLog({ ownerId, locale, theme, revision = 0 }: { owner
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloads, setReloads] = useState(0);
+  // A new owner, revision or reload shows loading at once (set while rendering); the effect only asks.
+  const loadKey = { ownerId, revision, reloads, errorCopy: copy.error };
+  const [loadFor, setLoadFor] = useState(loadKey);
+  if (loadFor.ownerId !== ownerId || loadFor.revision !== revision || loadFor.reloads !== reloads || loadFor.errorCopy !== copy.error) {
+    setLoadFor(loadKey); setLoading(true); setError('');
+  }
   useEffect(() => {
     let active = true;
-    setLoading(true); setError('');
     if (ownerId) loadGardenVisits(ownerId)
       .then(items => { if (active) setVisits(items); })
       .catch(() => { if (active) setError(copy.error); })

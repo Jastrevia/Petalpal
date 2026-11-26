@@ -79,6 +79,7 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
   const rise = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     if (!visible) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- each opening starts on the menu, with its rise animation
     setState('menu'); setError('');
     rise.setValue(reducedMotion ? 1 : 0);
     Animated.timing(rise, { toValue: 1, duration: reducedMotion ? 0 : 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();

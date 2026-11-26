@@ -49,7 +49,13 @@ export function PetalCollection({ headingSize = 22 }: { headingSize?: number }) 
     try { const next = await loadCollection(signal); setBook(next); setState('ready'); }
     catch { if (!signal?.aborted) setState('error'); }
   }, []);
-  useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
+  // The first read: state starts as loading, so the effect only asks and sets state once it answers.
+  useEffect(() => {
+    const controller = new AbortController();
+    loadCollection(controller.signal).then(next => { setBook(next); setState('ready'); })
+      .catch(() => { if (!controller.signal.aborted) setState('error'); });
+    return () => controller.abort();
+  }, []);
   // Every change saves first and then reads the book again, so the page shows only what the server kept.
   async function change(run: () => Promise<unknown>) {
     setNote('');

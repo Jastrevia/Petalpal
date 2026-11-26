@@ -75,6 +75,7 @@ export function PavilionBookReader({
 
   // Reset spread when bookId changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- another book starts at its first spread, with the turn lock released
     setSpreadIndex(0);
     setTurning(null);
     isTurningLocked.current = false;

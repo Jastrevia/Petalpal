@@ -87,7 +87,13 @@ export function BlockedUsers() {
     catch(e) { setStatus((e as Error).message); }
     finally { setBusy(false); }
   },[]);
-  useEffect(()=>{void load();},[load]);
+  // The first page: busy starts true, so the effect only asks and sets state once it answers.
+  useEffect(()=>{
+    apiRequest<{users:BlockedUser[];nextCursor:string|null}>('/users/me/blocks')
+      .then(page=>{setUsers(page.users);setCursor(page.nextCursor);setStatus('');})
+      .catch(e=>{setStatus((e as Error).message);})
+      .finally(()=>{setBusy(false);});
+  },[]);
   async function unblock(user:BlockedUser){
     setBusy(true);setStatus('');
     try { await apiRequest(`/users/me/blocks/${encodeURIComponent(user.id)}`,'DELETE');

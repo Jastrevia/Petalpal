@@ -82,6 +82,7 @@ function useBookImage(source: Source) {
   useEffect(() => {
     let alive = true;
     const hit = decoded.get(source);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- an image already in the shared decode cache is taken at once
     if (hit) setImage(hit);
     else void decode(source).then(value => { if (alive) setImage(value); });
     return () => { alive = false; };
@@ -181,6 +182,7 @@ export function useJournalFonts(cjk = false) {
   const [fonts, setFonts] = useState<SkTypefaceFontProvider | null>(() => (cjk && sharedCjkFonts) || sharedFonts);
   useEffect(() => {
     let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fonts already in the shared cache are taken at once
     if (cjk && sharedCjkFonts) { setFonts(sharedCjkFonts); return; }
     if (sharedFonts) setFonts(sharedFonts);
     else void loadJournalFonts().then(value => { if (alive && value) setFonts(current => current ?? value); });
