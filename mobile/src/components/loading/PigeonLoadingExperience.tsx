@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useAppLocale } from '../../services/locale';
@@ -90,7 +90,7 @@ export function PigeonLoadingScreen({
   const barWidth = Math.max(120, Math.min(compact ? 300 : 380, width - birdWidth - 24, width - 2 * ORNAMENT_PAD - 16));
   const fade = useState(() => new Animated.Value(1))[0];
   const exitedRef = useRef(onExited);
-  exitedRef.current = onExited;
+  useLayoutEffect(() => { exitedRef.current = onExited; });
 
   useEffect(() => {
     if (!done) { fade.setValue(1); return; }

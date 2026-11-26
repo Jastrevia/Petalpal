@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import { BlurStyle, Canvas, Picture, Skia, TileMode, createPicture } from '@shopify/react-native-skia';
@@ -19,7 +19,7 @@ export function SaveCeremony({ from, to, label, run, reducedMotion, onDone }: {
 }) {
   const t = useSharedValue(0);
   const doneRef = useRef(onDone);
-  doneRef.current = onDone;
+  useLayoutEffect(() => { doneRef.current = onDone; });
   useEffect(() => {
     const finish = () => doneRef.current();
     t.value = 0;

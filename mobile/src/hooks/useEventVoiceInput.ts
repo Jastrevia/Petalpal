@@ -1,5 +1,5 @@
 import { apiRequest } from '../services/api';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { useAuth } from '../services/auth';
@@ -21,7 +21,7 @@ export function useEventVoiceInput(content: string, setContent: (text: string) =
   const [error, setError] = useState('');
   const [overflow, setOverflow] = useState('');
   const live = useRef({ content, setContent, saving });
-  live.current = { content, setContent, saving };
+  useLayoutEffect(() => { live.current = { content, setContent, saving }; });
   const operation = useRef(0);
   const preparation = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
@@ -122,7 +122,7 @@ export function useEventVoiceInput(content: string, setContent: (text: string) =
       if (id === operation.current) { setError((err as Error).message); await cleanup(); setCurrentPhase('idle'); }
     }
   }
-  finished.current = () => { if (currentPhase.current === 'recording') void done(); };
+  useLayoutEffect(() => { finished.current = () => { if (currentPhase.current === 'recording') void done(); }; });
   function start() {
     if (currentPhase.current !== 'idle') return Promise.resolve();
     const pending = prepare(); preparation.current = pending;

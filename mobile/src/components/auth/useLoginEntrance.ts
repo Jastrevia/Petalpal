@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {AccessibilityInfo, Animated, Easing} from 'react-native';
 import {ENTRANCE_DURATION, entrancePhase, LoginEntrancePhase} from './entranceTimeline';
 
@@ -16,7 +16,7 @@ export function useLoginEntrance(callbacks?: LoginEntranceCallbacks) {
   const running = useRef(false), mounted = useRef(true), runToken = useRef(0);
   const phaseRef = useRef<LoginEntrancePhase>('idle');
   const callbacksRef = useRef<LoginEntranceCallbacks | undefined>(callbacks);
-  callbacksRef.current = callbacks;
+  useLayoutEffect(() => { callbacksRef.current = callbacks; });
   const [phase, setPhase] = useState<LoginEntrancePhase>('idle');
   const [ready, setReady] = useState(false), [failedAsset, setFailedAsset] = useState(false);
   const [reduced, setReduced] = useState(false);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { FairyAnimationStage, STAGE_REPORTS_END } from './FairyAnimationStage';
@@ -44,7 +44,7 @@ export function FairyAnimationController({
   // Callers pass a fresh function each render; keeping it in a ref means a re-render never
   // restarts the timer (which could otherwise delay or skip the report).
   const done = useRef(onAnimationComplete);
-  done.current = onAnimationComplete;
+  useLayoutEffect(() => { done.current = onAnimationComplete; });
 
   // Each state asked for is a new request; a one-shot request plays once, then she rests in idle.
   const [request, setRequest] = useState<FairyPlay>({ state, id: 0 });
