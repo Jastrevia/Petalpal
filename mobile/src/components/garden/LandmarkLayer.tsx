@@ -14,6 +14,7 @@ import {
 } from './StaticLandmarkEntities';
 import SwingEntity, { SWING_HEIGHT, SWING_WIDTH } from './SwingEntity';
 import { Snowy } from './weather/SnowLayer';
+import DogHouseOccupants from './critters/DogHouseOccupants';
 import TreehouseEntity, { TREEHOUSE_HEIGHT, TREEHOUSE_WIDTH } from './TreehouseEntity';
 import WaterfallEntity, { WATERFALL_HEIGHT, WATERFALL_WIDTH } from './WaterfallEntity';
 import { INITIAL_WATERFALL_PLACEMENT, type WaterfallMapPlacement } from './waterfallMapPlacement';
@@ -54,6 +55,8 @@ type LandmarkLayerProps = {
   gardenArchPlacement?: StaticLandmarkMapPlacement;
   pavilionPlacement?: StaticLandmarkMapPlacement;
   dogHousePlacement?: StaticLandmarkMapPlacement;
+  /** The Garden critters' clock, for the dogs in their house (critters/DogHouseOccupants.tsx). */
+  dogHouseClock?: SharedValue<number>;
   teaSetPlacement?: { x: number; y: number; scale: number; rotation: number };
   waterfallPlacement?: WaterfallMapPlacement;
   waterfallActive?: boolean;
@@ -112,6 +115,7 @@ export default function LandmarkLayer({
   gardenArchPlacement = STATIC_LANDMARK_MAP_PLACEMENTS.gardenArch,
   pavilionPlacement = STATIC_LANDMARK_MAP_PLACEMENTS.pavilion,
   dogHousePlacement = STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse,
+  dogHouseClock,
   teaSetPlacement = {
     x: TEA_SET_MAP_X, y: TEA_SET_MAP_Y, scale: TEA_SET_MAP_SCALE, rotation: TEA_SET_MAP_ROTATION,
   },
@@ -277,6 +281,8 @@ export default function LandmarkLayer({
       </Group>
       <DogHouseEntity x={dogHousePlacement.x} y={dogHousePlacement.y} scale={dogHousePlacement.scale} />
       </Snowy>
+      {/* The dogs going in and resting inside, over the house (seen through its doorway). */}
+      {dogHouseClock ? <DogHouseOccupants clock={dogHouseClock} /> : null}
       {/* Tea Set is map-static and remains internally layered for future seating. */}
       </GardenProfile>
       {renderPass !== 'motion' && behindTeaSet}

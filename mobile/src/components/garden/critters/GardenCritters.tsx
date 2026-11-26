@@ -15,6 +15,7 @@ import {
   type CritterId, type Lawns, type Visit, FADE_SECONDS, MALTESE_RUN_SPEED, pathLength, RISE_SECONDS, RUN_SPEED, travelSeconds,
 } from './critterVisits';
 import { dogHouse, doorSpot } from '../dogHouseState';
+import { HOUSE_ENTER_SECONDS } from './DogHouseOccupants';
 import type { FoxReason } from './silktailDays';
 import { useGardenLoadState, type GardenLoadStore } from '../loading/gardenReadiness';
 
@@ -347,6 +348,8 @@ export default memo(function GardenCritters({ clock, active, pets, shelter = fal
     // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
     const legs = setInterval(() => {
       const now = clock.value;
+      // Gone in (the clip has played): resting inside until the weather clears.
+      if (dogHouse.get().phase === 'entering' && now - dogHouse.get().since >= HOUSE_ENTER_SECONDS) dogHouse.set({ phase: 'inside', since: now });
       // Both sitting at the door for a moment: the house's clip takes them in from here.
       if (shelterRef.current && dogHouse.get().phase === 'out') {
         const pairNow = visitsRef.current.filter(v => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving);

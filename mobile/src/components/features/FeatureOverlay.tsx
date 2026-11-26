@@ -18,6 +18,7 @@ import { EventsPanel } from './EventsPanel';
 import { EventIllustration } from './EventIllustration';
 import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
+import { GardenWeatherSettings } from './GardenWeatherSettings';
 import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { avatarCopy } from '../avatars/avatarCopy';
@@ -167,6 +168,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
       {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
     </FeatureSection>
     <GardenPrivacySettings key={session?.user.id} />
+    <GardenWeatherSettings key={`weather-${session?.user.id}`} />
     <PrivacyAndSupport account onLeave={onClose} key={`support-${session?.user.id}`} />
     {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
     <AccountRecoverySettings key={`recovery-${session?.user.id}`} />

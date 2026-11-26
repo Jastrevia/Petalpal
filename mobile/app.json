@@ -34,7 +34,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": ["android.permission.ACCESS_FINE_LOCATION"]
     },
     "web": {
       "output": "single",
@@ -56,6 +57,14 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow PetalPal to use your approximate location so your Garden shows the weather where you are. Only a rounded area (about 11 km) is kept and sent to MET Norway for the forecast. You can turn it off in Me.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
       ],
       [

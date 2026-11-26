@@ -22,6 +22,20 @@ tier is non-commercial only.
 3. Show the credit "Weather data: MET Norway (CC BY 4.0)" where the weather appears (the API returns it as
    `attribution`).
 
+## App (release/1.0.1, 2026-11-26)
+
+- Me → **Garden weather** ([GardenWeatherSettings.tsx](../../mobile/src/components/features/GardenWeatherSettings.tsx)):
+  off by default. On asks for foreground location (`expo-location`, `Accuracy.Lowest`, a last-known fix up to an hour
+  old first), rounds to one decimal and sends `PUT /api/weather/location` once; off sends `{ location: null }`. Shows
+  the MET credit while on. No background location (plugin flags off; Android `ACCESS_FINE_LOCATION` blocked).
+- The Garden ([services/gardenWeather.ts](../../mobile/src/services/gardenWeather.ts)) reads `GET /api/weather` (or
+  `GET /users/:id/weather` in a friend's Garden) when it opens and every 15 minutes while it is open; anything
+  unknown, off or unreachable is clear. The dev web `?weather=` preview still wins.
+- Rain, storms and snow send the puppy and the Maltese home: they run to the door, go in (painted clip,
+  [DogHouseOccupants.tsx](../../mobile/src/components/garden/critters/DogHouseOccupants.tsx)) and rest in the doorway
+  until it clears; a tap on the house then shows them asleep ([DogsAsleepCard.tsx](../../mobile/src/components/garden/DogsAsleepCard.tsx)).
+- Needs a new native build (`expo-location`). Until the owner setup below is done every Garden stays clear.
+
 ## API
 
 | Route | Body | Returns |

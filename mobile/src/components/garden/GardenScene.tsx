@@ -134,8 +134,12 @@ import Bluebird from './spirits/Bluebird';
 import Butterfly from './critters/Butterfly';
 import GardenCritters, { type GardenPetsHandle } from './critters/GardenCritters';
 import { SilktailNote } from './SilktailNote';
+import { DogsAsleepCard } from './DogsAsleepCard';
+import { dogHouse } from './dogHouseState';
+import { DOG_HOUSE_HEIGHT, DOG_HOUSE_WIDTH } from './StaticLandmarkEntities';
 import type { FoxReason } from './critters/silktailDays';
 import { useSilktailReason } from '../../services/silktail';
+import { dogsShelterIn, useLiveWeather } from '../../services/gardenWeather';
 import PetRingMenu from './critters/PetRingMenu';
 import type { PetSpot } from './critters/petRing';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
@@ -579,9 +583,19 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const overlayPaused = useGardenPausedByOverlay();
   const worldActive = gardenActive && foreground && !overlayPaused;
+  // The sky where the Garden's owner is (Me → Garden weather; a friend's on a visit). The dev web
+  // ?weather= preview wins over it.
+  const liveWeather = useLiveWeather(gardenActive && foreground, { signedIn: Boolean(planting.currentUserId),
+    friendId: readOnly && planting.gardenOwnerUserId !== planting.currentUserId ? planting.gardenOwnerUserId : undefined });
+  useEffect(() => {
+    if (!liveWeather || weather.preview) return;
+    if (liveWeather.state !== weather.state || liveWeather.windy !== weather.windy) setWeather(liveWeather);
+  }, [liveWeather, weather]);
   // The Silktail Fox's days (14 days of Events, holidays) in the owner's own Garden only.
   const foxGarden = enableFairyWalk && !readOnly;
   const { reason: foxToday, date: foxDate } = useSilktailReason(foxGarden && worldActive, true);
+  // The dogs asleep in their house (DogsAsleepCard), opened by a tap on it while they shelter there.
+  const [dogsAsleep, setDogsAsleep] = useState(false);
   const [foxArrival, setFoxArrival] = useState<{ reason: FoxReason; date: string; at: number } | null>(null);
   const onFoxArrive = useCallback((reason: FoxReason) => setFoxArrival({ reason, date: foxDate, at: Date.now() }), [foxDate]);
 
@@ -1249,6 +1263,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     } else {
       // A pet (drawn over the flowers) answers first: its ring menu opens beside it. A little
       // grace around its body keeps it easy to tap on a phone.
+      // The dogs sheltering in their house: a tap on it looks in on them, asleep.
+      if (!readOnly && dogHouse.get().phase === 'inside') {
+        const house = dogHouse.placement(), w = DOG_HOUSE_WIDTH * house.scale, h = DOG_HOUSE_HEIGHT * house.scale;
+        if (worldX >= house.x && worldX <= house.x + w && worldY >= house.y && worldY <= house.y + h) { setDogsAsleep(true); return; }
+      }
       const pet = readOnly ? null : gardenPets.current?.petAt({ x: worldX, y: worldY }, 14 / (fit * currentZoom));
       if (pet) {
         gardenPets.current?.hold(pet.id);
@@ -1807,7 +1826,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 set (static-front pass) still draw above her. */}
             {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} loadStore={loadStore} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} shelter={dogsShelterIn(weather.state)} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} loadStore={loadStore} />}
             {/* In rain or snow the bluebird and the butterfly keep under cover. */}
             {showLandmarks && !weatherSheltering && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {showLandmarks && !weatherSheltering && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
@@ -1826,7 +1845,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>}
           <Group transform={cameraTransform}>
             {showLandmarks && (
-              <LandmarkLayer fairySeconds={fairySeconds} fairyAtTea={fairyState==='seatedAtTea'||fairyState==='drinkingTea'?fairyState:null} renderPass="static-front"
+              <LandmarkLayer fairySeconds={fairySeconds} fairyAtTea={fairyState==='seatedAtTea'||fairyState==='drinkingTea'?fairyState:null} renderPass="static-front" dogHouseClock={readOnly ? undefined : surfaceFlow.seconds}
                 behindTeaSet={<GardenProfile name="Flowers behind Tea Set" enabled={perf.Flowers}><PlantedFlowerLayer depthPass="behind-tea-set" useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>}
                 landmarksVisible={perf.Landmarks}
                 waterEnabled={perf.Water}
@@ -1978,6 +1997,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
         </View>
       )}
+      {dogsAsleep && activeMode === 'normal' && <DogsAsleepCard locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={() => setDogsAsleep(false)} />}
       {foxGarden && activeMode === 'normal' && <SilktailNote arrival={foxArrival} locale={zhHans(locale) ? 'zh-Hans' : 'en'} />}
       {lawnNote && activeMode === 'normal' && !selectedFlower && (
         <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
