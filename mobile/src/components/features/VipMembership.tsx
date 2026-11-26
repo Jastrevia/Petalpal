@@ -14,7 +14,7 @@ import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 // auto-renewal, Terms and Privacy links). What VIP unlocks is decided by the server. On the web
 // VIP is only shown: it is bought in the iPhone app.
 const CREST = require('@/assets/keepsakes/crocus-brooch.webp');
-const GOLD = '#C9A96E', CREAM = '#F2ECDD', INK = '#234A3F';
+const GOLD = '#C9A96E', INK = '#234A3F';
 
 const EN = {
     section: 'PetalPal VIP', open: 'See VIP', details: 'VIP details', loading: 'Loading VIP',
@@ -26,6 +26,11 @@ const EN = {
     everyone: 'Your Garden, journal, Events and emotion insights stay free for everyone.',
     lifetime: 'Founding Member', lifetimeSub: 'VIP for life', until: (date: string) => `Until ${date}`, limited: 'LIMITED',
     month: 'Monthly', monthSub: 'Cancel anytime', unitMonth: 'per month', unitOnce: 'one time',
+    // What each plan includes, each with what the free Garden has instead (lib/billing.js limits).
+    perks: [['3 new flowers a day', 'Free: 2'], ['A Weekly letter written for you, every week', 'Free: 2 to try'],
+      ['A Monthly letter written for you', 'Free: a short summary'], ['3 Petal Tarot readings a week', 'Free: 3 in all']] as [string, string][],
+    founderPerks: ['Pay once, yours for life', 'Founding Member title in Me', 'Everything VIP adds later'],
+    monthlyPerks: ['Everything VIP adds later'],
     buyLifetime: 'Buy once', buyMonthly: 'Subscribe',
     restore: 'Restore purchases', manage: 'Manage subscription',
     web: 'VIP is bought in the PetalPal iPhone app. Once you join there, it shows here too.',
@@ -50,6 +55,10 @@ const COPY: Record<AppLocale, Copy> = {
     everyone: '花园、日记、事件和情绪洞察，对所有人都一直免费。',
     lifetime: '创始会员', lifetimeSub: '终身会员', until: (date: string) => `至 ${date}`, limited: '限时',
     month: '按月会员', monthSub: '可随时取消', unitMonth: '每月', unitOnce: '一次买断',
+    perks: [['每天 3 朵新花', '免费 2 朵'], ['每周一封为你写的周报信', '免费可试读 2 封'],
+      ['每月一封为你写的月报信', '免费为简要回顾'], ['每周 3 次花语塔罗解读', '免费共 3 次']] as [string, string][],
+    founderPerks: ['一次付款，永久有效', '「我」页面的创始会员称号', '以后新增的会员内容'],
+    monthlyPerks: ['以后新增的会员内容'],
     buyLifetime: '立即买断', buyMonthly: '按月订阅',
     restore: '恢复购买', manage: '管理订阅',
     web: '会员请在 PetalPal iPhone App 里购买。加入后，这里也会显示。',
@@ -167,12 +176,13 @@ export function VipSheet({ ownerId, summary, onSummary, onClose }: {
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.title}</Text>
           <Text style={[styles.status, { color: theme.text }]}>{vipStatus(summary, copy, locale)}</Text>
 
-          <View style={styles.benefits}>
+          {/* With plan cards each card lists what it includes; otherwise (already VIP, or the web) one list. */}
+          {offer && plans?.length ? <Text style={[styles.small, styles.center, { color: theme.muted }]}>{copy.everyone}</Text> : <View style={styles.benefits}>
             {copy.benefits(3).map(line => <View key={line} style={styles.benefit}>
               <View style={styles.dot} /><Text style={[styles.body, { color: theme.text }]}>{line}</Text>
             </View>)}
             <Text style={[styles.small, { color: theme.muted }]}>{copy.everyone}</Text>
-          </View>
+          </View>}
 
           {offer ? <View style={styles.plans}>
             {plans === null ? <ActivityIndicator accessibilityLabel={copy.loading} color={GOLD} /> : null}
@@ -182,13 +192,21 @@ export function VipSheet({ ownerId, summary, onSummary, onClose }: {
               {plans.map(plan => {
                 const lifetime = plan.plan === 'LIFETIME';
                 return <View key={plan.plan} testID={`vip-plan-${plan.plan}`} style={[styles.plan, lifetime && styles.planForward]}>
+                  {lifetime ? <View style={styles.ribbon}><Text style={styles.ribbonText}>{copy.limited}</Text></View> : null}
                   <View style={styles.planTop}>
-                    <Text style={[styles.tag, !lifetime && styles.tagHidden]}>{lifetime ? copy.limited : ' '}</Text>
-                    <Text style={styles.planTitle}>{lifetime ? copy.lifetime : copy.month}</Text>
+                    <Text style={[styles.planTitle, lifetime && styles.planTitleForward]}>{lifetime ? copy.lifetime : copy.month}</Text>
                     <Text style={styles.planPrice} adjustsFontSizeToFit numberOfLines={1}>{plan.price}</Text>
                     <Text style={styles.planUnit}>{lifetime ? copy.unitOnce : copy.unitMonth}</Text>
-                    <Text style={styles.planSub}>{lifetime ? copy.lifetimeSub : copy.monthSub}</Text>
-                    {lifetime && plan.endsAt ? <Text style={styles.planUntil}>{copy.until(shortDate(plan.endsAt, locale))}</Text> : null}
+                    <Text style={styles.planUntil}>{lifetime ? (plan.endsAt ? copy.until(shortDate(plan.endsAt, locale)) : copy.lifetimeSub) : copy.monthSub}</Text>
+                    <View style={[styles.rule, lifetime && styles.ruleForward]} />
+                    {(lifetime ? copy.founderPerks : copy.monthlyPerks).map(line => <View key={line} style={styles.perk}>
+                      <Text style={[styles.check, lifetime && styles.checkForward]}>✓</Text>
+                      <Text style={[styles.perkText, lifetime && styles.perkForward]}>{line}</Text>
+                    </View>)}
+                    {copy.perks.map(([line, free]) => <View key={line} style={styles.perk}>
+                      <Text style={styles.check}>✓</Text>
+                      <View style={styles.perkBody}><Text style={styles.perkText}>{line}</Text><Text style={styles.perkFree}>{free}</Text></View>
+                    </View>)}
                   </View>
                   <Pressable testID={`vip-buy-${plan.plan}`} accessibilityRole="button"
                     accessibilityLabel={`${lifetime ? copy.lifetime : copy.month}, ${plan.price} ${lifetime ? copy.unitOnce : copy.unitMonth}`}
@@ -246,20 +264,31 @@ const styles = StyleSheet.create({
   body: { flex: 1, fontSize: 15, lineHeight: 22 },
   small: { fontSize: 13, lineHeight: 19, marginTop: 2 },
   center: { textAlign: 'center', flex: 0 },
-  plans: { gap: 12, marginTop: 8 },
+  plans: { gap: 12, marginTop: 14 },
   shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'stretch' },
-  plan: { flexGrow: 1, flexBasis: 130, backgroundColor: CREAM, borderRadius: 20, borderWidth: 1, borderColor: GOLD,
-    paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, justifyContent: 'space-between', gap: 10 },
-  planForward: { borderWidth: 2, backgroundColor: '#FBEEDC' },
+  plan: { flexGrow: 1, flexBasis: 130, backgroundColor: '#EEE8D8', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(201, 169, 110, 0.7)',
+    paddingHorizontal: 11, paddingTop: 18, paddingBottom: 12, justifyContent: 'space-between', gap: 12 },
+  // Founding Member: the warm, raised card with a ribbon on its top edge.
+  planForward: { borderWidth: 2, borderColor: GOLD, backgroundColor: '#FCEFD9',
+    shadowColor: '#E9B470', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  ribbon: { position: 'absolute', top: -11, alignSelf: 'center', backgroundColor: '#B98A4E', borderRadius: 11, borderWidth: 1, borderColor: '#F6D9A8',
+    paddingHorizontal: 12, paddingVertical: 3 },
+  ribbonText: { fontSize: 10.5, letterSpacing: 1.8, color: '#FFF9EC', fontWeight: '700' },
   planTop: { alignItems: 'center', gap: 2 },
-  tag: { overflow: 'hidden', fontSize: 10.5, letterSpacing: 1.6, color: '#FFF9EC', backgroundColor: '#B98A4E', borderRadius: 9,
-    paddingHorizontal: 9, paddingVertical: 2, marginBottom: 4 },
-  tagHidden: { backgroundColor: 'transparent' },
   planTitle: { fontFamily: serif, fontSize: 17, color: INK, textAlign: 'center' },
-  planPrice: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: INK, marginTop: 4 },
+  planTitleForward: { color: '#7A4E1E' },
+  planPrice: { fontSize: 27, lineHeight: 33, fontWeight: '700', color: INK, marginTop: 4 },
   planUnit: { fontSize: 12.5, color: INK, opacity: 0.8 },
-  planSub: { fontSize: 12.5, lineHeight: 17, color: '#4F6A61', textAlign: 'center', marginTop: 4 },
-  planUntil: { fontSize: 12, color: '#9A6A3A', textAlign: 'center' },
+  planUntil: { fontSize: 12, color: '#9A6A3A', textAlign: 'center', marginTop: 2 },
+  rule: { alignSelf: 'stretch', height: 1, backgroundColor: 'rgba(201, 169, 110, 0.45)', marginTop: 10, marginBottom: 6 },
+  ruleForward: { backgroundColor: 'rgba(185, 138, 78, 0.6)' },
+  perk: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 3 },
+  check: { fontSize: 12.5, lineHeight: 17, color: '#8A9F86', fontWeight: '700' },
+  checkForward: { color: '#B98A4E' },
+  perkBody: { flex: 1 },
+  perkText: { flex: 1, fontSize: 12.5, lineHeight: 17, color: INK },
+  perkForward: { fontWeight: '700', color: '#7A4E1E' },
+  perkFree: { fontSize: 11, lineHeight: 15, color: '#7C8C84' },
   buy: { minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10,
     backgroundColor: '#FFF9EC', borderWidth: 1, borderColor: GOLD },
   buyForward: { backgroundColor: '#F2B784' },
