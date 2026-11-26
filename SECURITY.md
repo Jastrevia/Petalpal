@@ -30,6 +30,68 @@ Local branch `feat/w27-backend`; not deployed, no provider, store or database to
 - **Cost safeguards.** With `BILLING_ENFORCED=true`, free accounts' Weekly 2.0 is the code template with no model call and no cost reservation, except two trials; free Monthly is code-only. VIP tarot readings are capped per local week. Existing per-user, global and provider caps are unchanged.
 - **Open:** RevenueCat customer records are not deleted on account deletion yet (owner action or follow-up); the privacy policy must name RevenueCat before launch.
 - **Evidence.** `test/back/billing.test.js`, the VIP test in `test/back/petal-reading.test.js`, the billing test in `test/back/sonnet-weekly.test.js`. Not verified: real RevenueCat responses, store sandbox purchases, hosted TEST.
+## Review of everything merged 2026-10-26 → 2026-11-08 (`main` `d372bd4c`), 2026-11-08
+
+Local branch `security/review-2026-11-08`. Scope: 42 merged PRs, about 35 new or changed routes and
+11 migrations. No provider, database, deployment or production traffic; the only remote request was
+one anonymous read of the hosted TEST backend's response headers.
+
+**Checked, no change needed**
+- **Default-deny holds.** Every route still passes Firebase authentication except `POST /auth/register`
+  and `POST /auth/password-login` (admission-limited). `/internal/ai-jobs/*`, including the new
+  `schedule-weekly`, sits behind the private service credential.
+- **Ownership.** New `:userId` routes (journals, events, flower placement) call `requireOwnUser` and
+  query by `req.auth.userId`. Onboarding accepts `firstEventId`/`firstFlowerId` only when the Event and
+  Flower are the caller's, never rewinds, and runs in a locked transaction. Every insight-loop query
+  (keep, follow, answer, future letters, mutes, collection) is scoped by `ownerId`, with per-owner caps.
+  Message reactions go through `canVisitGarden` and expose only like counts and the caller's own reaction.
+- **Unlocks are server-side.** Avatar claims check the real Fairy Bond level, tier and duplicates; the
+  profile avatar must be owned; pet outfits and food check locks and stock; pet names pass `assertSocialContent`.
+- **Redeem codes.** 100-bit codes, only SHA-256 hashes in the repository, one claim per code and per
+  account per batch inside an advisory-locked transaction, wrong guesses limited per account.
+- **Paid AI.** Monthly trigger is create-or-return per owner, month and version; sparse months stop
+  before any model call; every provider call passes the shared cost gate (per-owner action limits,
+  lower `noEmail` limits, per-user and global USD caps).
+- **Injection and leakage.** New raw SQL interpolates only constant fragments or generated `$n`
+  placeholders. No new `fetch`/`exec`/`eval` on user input. Error bodies come only from the app's own
+  typed errors. New client `Linking.openURL` targets are constants (helplines, support email); new
+  `AsyncStorage` keys hold UI flags and seen-markers only.
+- **Deletion.** 12 of the 13 new tables cascade from `User`; `RedeemCodeClaim` sets `userId` null on purpose
+  so a code stays spent. Account deletion hard-deletes the `User` row and the Firebase user.
+- **Secrets.** Pattern scan of all tracked files: hits are placeholders and synthetic fixtures only;
+  no tracked `.env`, key or provisioning file. The historical `DATABASE_URL` in the first commit is the
+  known item below.
+- **Hosted TEST headers.** CSP with `frame-ancestors 'none'`, HSTS, `nosniff`, `X-Frame-Options: DENY`,
+  `no-store`; a CORS preflight from a foreign origin gets 403.
+
+**Changed:** `app.disable("x-powered-by")`, so responses no longer name Express (test "responses do not
+name the framework").
+
+**Open, owner decisions or manual checks**
+1. Historical `DATABASE_URL` (unchanged item): confirm at Prisma that it is revoked, else rotate.
+2. Confirm `AI_GLOBAL_DAILY_USD_LIMIT` and `AI_GLOBAL_MONTHLY_USD_LIMIT` are set on production Render
+   (names and presence only). With email-free sign-up (10 accounts per IP per day) these caps are what
+   bounds spend from many accounts.
+3. A password change does not end other sessions. The backend already verifies with `checkRevoked`, so
+   calling `revokeRefreshTokens` after a replaced password would sign out every other device, and the
+   current one too unless it signs in again. Product decision.
+4. New passwords are capped at 16 characters; NIST SP 800-63B asks to allow at least 64.
+5. The per-name login limiter fails closed at 10,000 keys: many IPs spraying random names could refuse
+   new logins for one window. A name and its PP number are separate buckets (10 guesses each).
+6. Dependencies. Backend: 6 moderate (glob/minimatch/rimraf under `google-gax`/`gaxios`, not reachable
+   from requests); `npm audit fix` is semver-compatible but rewrites much of the lockfile, so it belongs
+   in its own refresh PR. Mobile: `query-string`/`decode-uri-component` under `expo-router` (a crafted
+   link can hang the viewer's own app; fixed with Expo SDK 58); `zod` is build-time (`@expo/cli`);
+   `re2js` and `@grpc/grpc-js` come with Firestore, which the app does not import.
+7. Onboarding fairy names skip `assertSocialContent` (sign-up runs it). Names are private to the owner
+   and limited to letters, numbers and spaces, so this is consistency, not exposure.
+
+**Evidence.** `npm run test:security:ci` (fixture database URL, as in CI): all files PASS except
+`opus-monthly.test.js`, which hit the 90 s child limit while other suites ran; alone it passed 54/54 in
+36 s. `test/back/http-security.test.js` 7/8: the new test passes; "actual HTTP app preserves public
+caching" needs the built web app, absent from a fresh worktree. Workflows: every action pinned to a
+full SHA, no `pull_request_target` or event text in `run:`. Not covered: DAST against a running server,
+hosted TEST beyond headers, production provider settings.
 
 ## Sign-up without email: name and avatar, 2026-11-02
 

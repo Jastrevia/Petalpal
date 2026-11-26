@@ -196,6 +196,8 @@ const openapiDocument = YAML.parse(
 );
 
 const app = express();
+// Responses do not name the framework (X-Powered-By: Express).
+app.disable("x-powered-by");
 app.use(httpSecurity);
 if (process.env.NATIVE_SECURITY_TEST === '1') {
   app.get('/', (_req, res) => res.set('Cache-Control', 'no-store').json({
