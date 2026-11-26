@@ -38,10 +38,11 @@ export function OnboardingPanelLayer({ surface, scroller = 'panel' }: { surface:
 
 function PanelStep({ step, speaker, draftHasText, scroller }: { step: OnboardingStep; speaker: string | null; draftHasText: boolean; scroller: string }) {
   const locale = useTourLocale();
-  const spec = STEP_SPECS[step];
+  const spec = STEP_SPECS[step] as (typeof STEP_SPECS)[OnboardingStep] | undefined;
+  const target = spec?.target;
+  const anchor = useOnboardingTargetRect(target);
+  useEffect(() => { if (target) void scrollOnboardingTargetIntoView(target, scroller); }, [target, scroller]);
   if (!spec) return null;
-  const anchor = useOnboardingTargetRect(spec.target);
-  useEffect(() => { if (spec.target) void scrollOnboardingTargetIntoView(spec.target, scroller); }, [spec.target, scroller]);
   const showNext = spec.kind === 'info' || (step === 'event.write' && draftHasText);
   const prefer = step === 'treehouse.archive' || step === 'treehouse.journal' ? 'below' : 'auto';
   return <OnboardingStepView step={step} locale={locale} speaker={speaker} anchor={anchor} showNext={showNext} prefer={prefer}>

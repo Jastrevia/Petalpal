@@ -60,8 +60,6 @@ export default function WaterTestScreen() {
     void SplashScreen.hideAsync();
   }, []);
 
-  if (!__DEV__) return <Redirect href="/" />;
-
   // Viewport fitting for the 2400 x 1800 world
   const fit = viewport.width && viewport.height
     ? Math.min(viewport.width / GARDEN_WORLD_WIDTH, viewport.height / GARDEN_WORLD_HEIGHT)
@@ -120,6 +118,9 @@ export default function WaterTestScreen() {
     cameraY.value = 0;
     cameraZoom.value = 1;
   };
+
+  // Dev-only screen: the hooks above always run, so hook order is the same in every build.
+  if (!__DEV__) return <Redirect href="/" />;
 
   return (
     <GestureHandlerRootView style={styles.container}>

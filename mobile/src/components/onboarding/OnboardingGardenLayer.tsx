@@ -81,9 +81,8 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
 }) {
   const insets = useSafeAreaInsets();
   const planting = usePlanting();
-  const spec = STEP_SPECS[step];
-  if (!spec) return null;
-  const measured = useOnboardingTargetRect(spec.target && !spec.target.startsWith('world.') ? spec.target
+  const spec = STEP_SPECS[step] as (typeof STEP_SPECS)[OnboardingStep] | undefined;
+  const measured = useOnboardingTargetRect(spec?.target && !spec.target.startsWith('world.') ? spec.target
     : step === 'plant.place' ? 'planting.banner' : undefined);
   const [world, setWorld] = useState<{ step: OnboardingStep; box: Box } | null>(null);
   const [monthsState, setMonthsState] = useState<'arriving' | 'sweeping' | 'shown' | 'hiding'>('arriving');
@@ -187,6 +186,7 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
     return () => { gone = true; };
   }, [step, planting.targetFlower?.month, measured?.height, framedFor]);
 
+  if (!spec) return null;
   const isWorld = spec.target?.startsWith('world.');
   const anchor = isWorld ? (world?.step === step ? world.box : null)
     : step === 'plant.growth' ? (world?.step === step ? world.box : null) : measured;

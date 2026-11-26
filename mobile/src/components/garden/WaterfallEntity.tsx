@@ -29,6 +29,9 @@ export const APPROVED_WATERFALL_LAYER_REGISTRATION = WATERFALL_LAYER_REGISTRATIO
 
 type LoadedImage = ReturnType<typeof useImage>;
 function useSequence(sources: readonly number[], onError: (reason: Error) => void) {
+  // Every sequence is a fixed module array and the map and full sets have equal lengths
+  // (test/waterfallAssets.test.mjs), so the number of useImage calls never changes.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   return sources.map(source => useImage(source, onError));
 }
 function SequenceLayer({ image, placement, pixelScale }: {
