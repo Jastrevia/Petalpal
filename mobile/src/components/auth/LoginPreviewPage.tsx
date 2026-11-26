@@ -253,6 +253,14 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   const [showDevControls, setShowDevControls] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  // In-world feedback notification banner
+  const [bannerNotice, setBannerNotice] = useState<{
+    type: 'info' | 'success' | 'warning';
+    title: string;
+    message: string;
+  } | null>(null);
+  // The account's own sign-in feedback (wrong password, expired session, …).
+  const [dismissedAuth, setDismissedAuth] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
 
   const passwordRef = useRef<TextInput>(null);
@@ -271,7 +279,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   const [devOverrideAnimal, setDevOverrideAnimal] = useState<'pigeon' | 'squirrel' | null>(null);
   const activeAnimal = devOverrideAnimal ?? loginAnimal;
   const animalRef = useRef<'pigeon' | 'squirrel'>(activeAnimal);
-  animalRef.current = activeAnimal;
+  useEffect(() => { animalRef.current = activeAnimal; }, [activeAnimal]);
 
   const [cardLayout, setCardLayout] = useState({ width: 420, height: 546 });
   const [manualFairyTime, setManualFairyTime] = useState<number | null>(null);
@@ -319,13 +327,6 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
       }
     };
   }, [entrance, live]);
-
-  // In-world feedback notification banner
-  const [bannerNotice, setBannerNotice] = useState<{
-    type: 'info' | 'success' | 'warning';
-    title: string;
-    message: string;
-  } | null>(null);
 
   // Layer B gentle breathing motion animation
   const breathingAnim = useState(() => new Animated.Value(0))[0];
@@ -447,8 +448,6 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
       message: 'Garden account registration will open together with player onboarding in the upcoming milestone.',
     });
   }, [onCreateAccount]);
-  // The account's own sign-in feedback (wrong password, expired session, …).
-  const [dismissedAuth, setDismissedAuth] = useState<string | null>(null);
   const authText = authError || authMessage || '';
   const notice = bannerNotice ?? (signingIn || !authText || authText === dismissedAuth ? null
     : { type: authError ? 'warning' as const : 'info' as const, title: authError ? 'Couldn’t open the garden' : 'PetalPal', message: authText });
