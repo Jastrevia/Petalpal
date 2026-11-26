@@ -13,7 +13,14 @@ import { MODAL_ORIENTATIONS } from '../../constants/orientation';
 // and manages purchases, and carries the subscription terms Apple asks for (length, price,
 // auto-renewal, Terms and Privacy links). What VIP unlocks is decided by the server. On the web
 // VIP is only shown: it is bought in the iPhone app.
-const CREST = require('@/assets/keepsakes/crocus-brooch.webp');
+// Painted art: the moonlit (or morning) garden over the sheet's title, the same scene as Our Bond's
+// garden deck; a crocus in bloom inside a gold laurel for Founding Member (FLUX.2 klein, 2026-11-26,
+// cut out) and, for Monthly, a quieter posy of two crocuses tied with a lavender ribbon (same style, no gold).
+const ART = {
+  header: { dark: require('@/assets/vip/header-dark.webp'), light: require('@/assets/vip/header-light.webp') },
+  founder: require('@/assets/vip/founder-emblem.webp'),
+  monthly: require('@/assets/vip/monthly-emblem.webp'),
+};
 const GOLD = '#C9A96E', INK = '#234A3F';
 
 const EN = {
@@ -27,10 +34,10 @@ const EN = {
     lifetime: 'Founding Member', lifetimeSub: 'VIP for life', until: (date: string) => `Until ${date}`, limited: 'LIMITED',
     month: 'Monthly', monthSub: 'Cancel anytime', unitMonth: 'per month', unitOnce: 'one time',
     // What each plan includes, each with what the free Garden has instead (lib/billing.js limits).
-    perks: [['3 new flowers a day', 'Free: 2'], ['A Weekly letter written for you, every week', 'Free: 2 to try'],
-      ['A Monthly letter written for you', 'Free: a short summary'], ['3 Petal Tarot readings a week', 'Free: 3 in all']] as [string, string][],
-    founderPerks: ['Pay once, yours for life', 'Founding Member title in Me', 'Everything VIP adds later'],
-    monthlyPerks: ['Everything VIP adds later'],
+    perks: [['3 flowers a day', 'Free: 2'], ['Weekly letter, every week', 'Free: 2 to try'],
+      ['Monthly letter', 'Free: a short summary'], ['3 tarot readings a week', 'Free: 3 in all']] as [string, string][],
+    founderPerks: ['Yours forever', 'Founding Member title', 'Future VIP extras'],
+    monthlyPerks: ['Future VIP extras'],
     buyLifetime: 'Buy once', buyMonthly: 'Subscribe',
     restore: 'Restore purchases', manage: 'Manage subscription',
     web: 'VIP is bought in the PetalPal iPhone app. Once you join there, it shows here too.',
@@ -55,10 +62,10 @@ const COPY: Record<AppLocale, Copy> = {
     everyone: '花园、日记、事件和情绪洞察，对所有人都一直免费。',
     lifetime: '创始会员', lifetimeSub: '终身会员', until: (date: string) => `至 ${date}`, limited: '限时',
     month: '按月会员', monthSub: '可随时取消', unitMonth: '每月', unitOnce: '一次买断',
-    perks: [['每天 3 朵新花', '免费 2 朵'], ['每周一封为你写的周报信', '免费可试读 2 封'],
-      ['每月一封为你写的月报信', '免费为简要回顾'], ['每周 3 次花语塔罗解读', '免费共 3 次']] as [string, string][],
-    founderPerks: ['一次付款，永久有效', '「我」页面的创始会员称号', '以后新增的会员内容'],
-    monthlyPerks: ['以后新增的会员内容'],
+    perks: [['每天 3 朵新花', '免费 2 朵'], ['每周一封周报信', '免费试读 2 封'],
+      ['每月一封月报信', '免费为简要回顾'], ['每周 3 次塔罗', '免费共 3 次']] as [string, string][],
+    founderPerks: ['永久有效', '创始会员称号', '未来新增内容'],
+    monthlyPerks: ['未来新增内容'],
     buyLifetime: '立即买断', buyMonthly: '按月订阅',
     restore: '恢复购买', manage: '管理订阅',
     web: '会员请在 PetalPal iPhone App 里购买。加入后，这里也会显示。',
@@ -119,7 +126,7 @@ type Note = { text: string; kind: 'info' | 'error' } | null;
 export function VipSheet({ ownerId, summary, onSummary, onClose }: {
   ownerId: string; summary: BillingSummary; onSummary: (next: BillingSummary) => void; onClose: () => void;
 }) {
-  const { theme } = usePanelTheme();
+  const { theme, light } = usePanelTheme();
   const locale = useAppLocale();
   const copy = COPY[locale];
   const [plans, setPlans] = useState<ShownPlan[] | null>(null);
@@ -161,139 +168,163 @@ export function VipSheet({ ownerId, summary, onSummary, onClose }: {
   const openUrl = (url?: string) => { if (url) void Linking.openURL(url); };
 
   const offer = !summary.vip;
+  const cards = offer && Boolean(plans?.length);
   const empty = plans && !plans.length;
+  // The quiet card follows the panel: dark glass on the night panel, warm paper on the light one.
+  const quiet = light ? { card: '#FFFBF1', text: theme.text, muted: theme.muted, border: 'rgba(160, 130, 80, 0.45)' }
+    : { card: 'rgba(255, 244, 220, 0.06)', text: theme.text, muted: theme.muted, border: 'rgba(201, 169, 110, 0.5)' };
   return <Modal supportedOrientations={MODAL_ORIENTATIONS} transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.overlay}>
       <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={[StyleSheet.absoluteFill, styles.backdrop]} />
       <View testID="vip-sheet" style={[styles.panel, { backgroundColor: theme.background }]}>
-        <View pointerEvents="none" style={styles.inset} />
-        <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} hitSlop={10} style={styles.close}>
-          <Text style={[styles.closeText, { color: theme.text }]}>×</Text>
-        </Pressable>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Image source={CREST} style={styles.crest} resizeMode="contain" accessible={false} />
-          <Text style={[styles.eyebrow, { color: theme.muted }]}>{copy.eyebrow}</Text>
-          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.title}</Text>
-          <Text style={[styles.status, { color: theme.text }]}>{vipStatus(summary, copy, locale)}</Text>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* The painted garden over the title, fading into the panel. */}
+          <View style={styles.hero} accessible={false}>
+            <Image source={light ? ART.header.light : ART.header.dark} style={styles.heroImage} resizeMode="cover" />
+            {FADE.map((opacity, i) => <View key={i} style={[styles.fadeBand, { bottom: 0, height: (i + 1) * 3, opacity, backgroundColor: theme.background }]} />)}
+          </View>
+          <View style={styles.content}>
+            <Text style={[styles.eyebrow, { color: light ? '#8A7A55' : '#D8C59A' }]}>{copy.eyebrow}</Text>
+            <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.title}</Text>
+            <Text style={[styles.status, { color: theme.muted }]}>{vipStatus(summary, copy, locale)}</Text>
 
-          {/* With plan cards each card lists what it includes; otherwise (already VIP, or the web) one list. */}
-          {offer && plans?.length ? <Text style={[styles.small, styles.center, { color: theme.muted }]}>{copy.everyone}</Text> : <View style={styles.benefits}>
-            {copy.benefits(3).map(line => <View key={line} style={styles.benefit}>
-              <View style={styles.dot} /><Text style={[styles.body, { color: theme.text }]}>{line}</Text>
-            </View>)}
-            <Text style={[styles.small, { color: theme.muted }]}>{copy.everyone}</Text>
-          </View>}
+            {cards ? <Text style={[styles.small, styles.center, { color: theme.muted }]}>{copy.everyone}</Text> : <View style={styles.benefits}>
+              {copy.benefits(3).map(line => <View key={line} style={styles.benefit}>
+                <View style={styles.dot} /><Text style={[styles.body, { color: theme.text }]}>{line}</Text>
+              </View>)}
+              <Text style={[styles.small, { color: theme.muted }]}>{copy.everyone}</Text>
+            </View>}
 
-          {offer ? <View style={styles.plans}>
-            {plans === null ? <ActivityIndicator accessibilityLabel={copy.loading} color={GOLD} /> : null}
-            {/* Side by side, like a shop shelf: Founding Member (while it lasts) beside Monthly, the same
-                height, prices in the same row; stacked only on a very narrow screen. */}
-            {plans?.length ? <View style={styles.shelf}>
-              {plans.map(plan => {
+            {offer && plans === null ? <ActivityIndicator accessibilityLabel={copy.loading} color={GOLD} style={{ marginTop: 16 }} /> : null}
+            {/* Side by side, as on a shop shelf: Founding Member (while it lasts), the warm raised card
+                with its laurel, beside the quieter Monthly. Each lists what it includes, with what the
+                free Garden has instead under each line. Stacked only on a very narrow screen. */}
+            {cards ? <View style={styles.shelf}>
+              {plans!.map(plan => {
                 const lifetime = plan.plan === 'LIFETIME';
-                return <View key={plan.plan} testID={`vip-plan-${plan.plan}`} style={[styles.plan, lifetime && styles.planForward]}>
+                const text = lifetime ? FOUNDER.text : quiet.text, muted = lifetime ? FOUNDER.muted : quiet.muted;
+                return <View key={plan.plan} testID={`vip-plan-${plan.plan}`}
+                  style={[styles.plan, lifetime ? styles.founder : { backgroundColor: quiet.card, borderColor: quiet.border }]}>
+                  {lifetime ? <View pointerEvents="none" style={styles.founderInset} /> : null}
                   {lifetime ? <View style={styles.ribbon}><Text style={styles.ribbonText}>{copy.limited}</Text></View> : null}
                   <View style={styles.planTop}>
-                    <Text style={[styles.planTitle, lifetime && styles.planTitleForward]}>{lifetime ? copy.lifetime : copy.month}</Text>
-                    <Text style={styles.planPrice} adjustsFontSizeToFit numberOfLines={1}>{plan.price}</Text>
-                    <Text style={styles.planUnit}>{lifetime ? copy.unitOnce : copy.unitMonth}</Text>
-                    <Text style={styles.planUntil}>{lifetime ? (plan.endsAt ? copy.until(shortDate(plan.endsAt, locale)) : copy.lifetimeSub) : copy.monthSub}</Text>
-                    <View style={[styles.rule, lifetime && styles.ruleForward]} />
+                    <Image source={lifetime ? ART.founder : ART.monthly} style={lifetime ? styles.emblem : styles.bud} resizeMode="contain" accessible={false} />
+                    <Text style={[styles.planTitle, { color: lifetime ? FOUNDER.title : text }]}>{lifetime ? copy.lifetime : copy.month}</Text>
+                    <Text style={[styles.planPrice, { color: text }]} adjustsFontSizeToFit numberOfLines={1}>{plan.price}</Text>
+                    <Text style={[styles.planUnit, { color: muted }]}>{lifetime ? copy.unitOnce : copy.unitMonth}</Text>
+                    <Text style={[styles.planNote, { color: lifetime ? FOUNDER.accent : muted }]}>
+                      {lifetime ? (plan.endsAt ? copy.until(shortDate(plan.endsAt, locale)) : copy.lifetimeSub) : copy.monthSub}</Text>
+                    <View style={[styles.rule, { backgroundColor: lifetime ? 'rgba(185, 138, 78, 0.45)' : quiet.border }]} />
                     {(lifetime ? copy.founderPerks : copy.monthlyPerks).map(line => <View key={line} style={styles.perk}>
-                      <Text style={[styles.check, lifetime && styles.checkForward]}>✓</Text>
-                      <Text style={[styles.perkText, lifetime && styles.perkForward]}>{line}</Text>
+                      <View style={[styles.mark, lifetime ? styles.markFounder : { borderColor: GOLD }]} />
+                      <Text style={[styles.perkText, { color: lifetime ? FOUNDER.title : text }, lifetime && styles.perkStrong]}>{line}</Text>
                     </View>)}
                     {copy.perks.map(([line, free]) => <View key={line} style={styles.perk}>
-                      <Text style={styles.check}>✓</Text>
-                      <View style={styles.perkBody}><Text style={styles.perkText}>{line}</Text><Text style={styles.perkFree}>{free}</Text></View>
+                      <View style={[styles.mark, { borderColor: GOLD }]} />
+                      <View style={styles.perkBody}>
+                        <Text style={[styles.perkText, { color: text }]}>{line}</Text>
+                        <Text style={[styles.perkFree, { color: muted }]}>{free}</Text>
+                      </View>
                     </View>)}
                   </View>
                   <Pressable testID={`vip-buy-${plan.plan}`} accessibilityRole="button"
                     accessibilityLabel={`${lifetime ? copy.lifetime : copy.month}, ${plan.price} ${lifetime ? copy.unitOnce : copy.unitMonth}`}
                     disabled={busy} onPress={() => void buy(plan)}
-                    style={({ pressed }) => [styles.buy, lifetime && styles.buyForward, busy && ui.disabled, pressed && ui.pressed]}>
-                    <Text style={styles.buyText} numberOfLines={1}>{lifetime ? copy.buyLifetime : copy.buyMonthly}</Text>
+                    style={({ pressed }) => [styles.buy, lifetime ? styles.buyFounder : { borderColor: GOLD }, busy && ui.disabled, pressed && ui.pressed]}>
+                    <Text style={[styles.buyText, { color: lifetime ? INK : text }]} numberOfLines={1}>{lifetime ? copy.buyLifetime : copy.buyMonthly}</Text>
                   </Pressable>
                 </View>;
               })}
             </View> : null}
-            {empty ? <Text style={[styles.body, styles.center, { color: theme.text }]}>
+            {offer && empty ? <Text style={[styles.body, styles.center, { color: theme.text, marginTop: 12 }]}>
               {Platform.OS === 'web' ? copy.web : loadFailed ? copy.failed : storeAvailable ? copy.none : copy.soon}</Text> : null}
-            {empty && loadFailed ? <FeatureActionButton title={copy.retry} secondary onPress={() => setReloads(n => n + 1)} /> : null}
-          </View> : null}
+            {offer && empty && loadFailed ? <FeatureActionButton title={copy.retry} secondary onPress={() => setReloads(n => n + 1)} /> : null}
 
-          {busy ? <ActivityIndicator color={GOLD} /> : null}
-          {note ? <Text accessibilityRole={note.kind === 'error' ? 'alert' : 'text'} style={[styles.body, styles.center, { color: theme.text }]}>{note.text}</Text> : null}
+            {busy ? <ActivityIndicator color={GOLD} /> : null}
+            {note ? <Text accessibilityRole={note.kind === 'error' ? 'alert' : 'text'} style={[styles.body, styles.center, { color: theme.text }]}>{note.text}</Text> : null}
 
-          {storeAvailable ? <View style={styles.links}>
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void restore()} hitSlop={8}>
-              <Text style={[styles.link, { color: theme.text }]}>{copy.restore}</Text>
-            </Pressable>
-            {summary.vip && summary.plan === 'MONTHLY' ? <Pressable accessibilityRole="button" onPress={() => void manageSubscription().catch(() => setNote({ kind: 'error', text: copy.failed }))} hitSlop={8}>
-              <Text style={[styles.link, { color: theme.text }]}>{copy.manage}</Text>
-            </Pressable> : null}
-          </View> : null}
+            {storeAvailable ? <View style={styles.links}>
+              <Pressable accessibilityRole="button" disabled={busy} onPress={() => void restore()} hitSlop={8}>
+                <Text style={[styles.link, { color: theme.text }]}>{copy.restore}</Text>
+              </Pressable>
+              {summary.vip && summary.plan === 'MONTHLY' ? <Pressable accessibilityRole="button" onPress={() => void manageSubscription().catch(() => setNote({ kind: 'error', text: copy.failed }))} hitSlop={8}>
+                <Text style={[styles.link, { color: theme.text }]}>{copy.manage}</Text>
+              </Pressable> : null}
+            </View> : null}
 
-          {offer ? <Text style={[styles.legal, { color: theme.muted }]}>{copy.legal}</Text> : null}
-          <View style={styles.links}>
-            <Pressable accessibilityRole="link" onPress={() => openUrl(process.env.EXPO_PUBLIC_TERMS_URL)} hitSlop={8}><Text style={[styles.link, { color: theme.muted }]}>{copy.terms}</Text></Pressable>
-            <Pressable accessibilityRole="link" onPress={() => openUrl(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)} hitSlop={8}><Text style={[styles.link, { color: theme.muted }]}>{copy.privacy}</Text></Pressable>
+            {offer ? <Text style={[styles.legal, { color: theme.muted }]}>{copy.legal}</Text> : null}
+            <View style={styles.links}>
+              <Pressable accessibilityRole="link" onPress={() => openUrl(process.env.EXPO_PUBLIC_TERMS_URL)} hitSlop={8}><Text style={[styles.linkSmall, { color: theme.muted }]}>{copy.terms}</Text></Pressable>
+              <Pressable accessibilityRole="link" onPress={() => openUrl(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)} hitSlop={8}><Text style={[styles.linkSmall, { color: theme.muted }]}>{copy.privacy}</Text></Pressable>
+            </View>
           </View>
         </ScrollView>
+        <View pointerEvents="none" style={styles.inset} />
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} hitSlop={10} style={styles.close}>
+          <Text style={styles.closeText}>×</Text>
+        </Pressable>
       </View>
     </View>
   </Modal>;
 }
 
+// The header painting's fade into the panel: bands from the bottom up, opaque to clear.
+// (Many thin bands, each a little less opaque, so no band edge shows.)
+const FADE = Array.from({ length: 22 }, (_, i) => Math.pow(1 - i / 22, 1.6) * 0.32);
+// Founding Member's warm card (the same on both panel themes).
+const FOUNDER = { title: '#6E4519', text: INK, muted: '#6F6650', accent: '#9A6A3A' };
 const serif = Platform.select({ ios: 'Georgia', default: 'serif' });
 const styles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 24 },
-  backdrop: { backgroundColor: 'rgba(8, 20, 18, 0.55)' },
-  panel: { width: '100%', maxWidth: 440, maxHeight: '100%', borderRadius: 30, borderWidth: 1.5, borderColor: GOLD, overflow: 'hidden' },
+  backdrop: { backgroundColor: 'rgba(8, 20, 18, 0.6)' },
+  panel: { width: '100%', maxWidth: 460, maxHeight: '100%', borderRadius: 30, borderWidth: 1.5, borderColor: GOLD, overflow: 'hidden' },
   inset: { position: 'absolute', top: 5, right: 5, bottom: 5, left: 5, borderRadius: 25, borderWidth: 1, borderColor: 'rgba(201, 169, 110, 0.4)' },
-  close: { position: 'absolute', top: 12, right: 14, zIndex: 2, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 26, lineHeight: 28 },
-  content: { paddingHorizontal: 22, paddingTop: 22, paddingBottom: 24, gap: 10, alignItems: 'stretch' },
-  crest: { width: 84, height: 84, alignSelf: 'center' },
-  eyebrow: { fontSize: 12, letterSpacing: 2.4, textAlign: 'center' },
-  title: { fontFamily: serif, fontSize: 30, lineHeight: 36, textAlign: 'center' },
-  status: { fontSize: 14, lineHeight: 20, textAlign: 'center', opacity: 0.9 },
-  benefits: { gap: 8, marginTop: 6 },
+  close: { position: 'absolute', top: 12, right: 12, zIndex: 3, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(16, 40, 37, 0.55)', borderWidth: 1, borderColor: 'rgba(201, 169, 110, 0.6)' },
+  closeText: { fontSize: 22, lineHeight: 24, color: '#FFF4DC' },
+  scroll: { paddingBottom: 22 },
+  hero: { height: 132, overflow: 'hidden' },
+  heroImage: { width: '100%', height: '100%' },
+  fadeBand: { position: 'absolute', left: 0, right: 0 },
+  content: { paddingHorizontal: 18, marginTop: -34, gap: 8 },
+  eyebrow: { fontSize: 11.5, letterSpacing: 2.6, textAlign: 'center' },
+  title: { fontFamily: serif, fontSize: 31, lineHeight: 37, textAlign: 'center' },
+  status: { fontSize: 13.5, lineHeight: 19, textAlign: 'center' },
+  benefits: { gap: 8, marginTop: 8 },
   benefit: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: GOLD, marginTop: 8 },
   body: { flex: 1, fontSize: 15, lineHeight: 22 },
-  small: { fontSize: 13, lineHeight: 19, marginTop: 2 },
+  small: { fontSize: 12.5, lineHeight: 18, marginTop: 2 },
   center: { textAlign: 'center', flex: 0 },
-  plans: { gap: 12, marginTop: 14 },
-  shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'stretch' },
-  plan: { flexGrow: 1, flexBasis: 130, backgroundColor: '#EEE8D8', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(201, 169, 110, 0.7)',
-    paddingHorizontal: 11, paddingTop: 18, paddingBottom: 12, justifyContent: 'space-between', gap: 12 },
-  // Founding Member: the warm, raised card with a ribbon on its top edge.
-  planForward: { borderWidth: 2, borderColor: GOLD, backgroundColor: '#FCEFD9',
-    shadowColor: '#E9B470', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  ribbon: { position: 'absolute', top: -11, alignSelf: 'center', backgroundColor: '#B98A4E', borderRadius: 11, borderWidth: 1, borderColor: '#F6D9A8',
-    paddingHorizontal: 12, paddingVertical: 3 },
-  ribbonText: { fontSize: 10.5, letterSpacing: 1.8, color: '#FFF9EC', fontWeight: '700' },
-  planTop: { alignItems: 'center', gap: 2 },
-  planTitle: { fontFamily: serif, fontSize: 17, color: INK, textAlign: 'center' },
-  planTitleForward: { color: '#7A4E1E' },
-  planPrice: { fontSize: 27, lineHeight: 33, fontWeight: '700', color: INK, marginTop: 4 },
-  planUnit: { fontSize: 12.5, color: INK, opacity: 0.8 },
-  planUntil: { fontSize: 12, color: '#9A6A3A', textAlign: 'center', marginTop: 2 },
-  rule: { alignSelf: 'stretch', height: 1, backgroundColor: 'rgba(201, 169, 110, 0.45)', marginTop: 10, marginBottom: 6 },
-  ruleForward: { backgroundColor: 'rgba(185, 138, 78, 0.6)' },
-  perk: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 3 },
-  check: { fontSize: 12.5, lineHeight: 17, color: '#8A9F86', fontWeight: '700' },
-  checkForward: { color: '#B98A4E' },
+  shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'stretch', marginTop: 18 },
+  plan: { flexGrow: 1, flexBasis: 130, borderRadius: 22, borderWidth: 1, paddingHorizontal: 12, paddingTop: 16, paddingBottom: 12,
+    justifyContent: 'space-between', gap: 14 },
+  founder: { backgroundColor: '#FCEFD9', borderWidth: 1.5, borderColor: GOLD,
+    shadowColor: '#F0B86E', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  founderInset: { position: 'absolute', top: 4, right: 4, bottom: 4, left: 4, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(185, 138, 78, 0.45)' },
+  ribbon: { position: 'absolute', top: -12, alignSelf: 'center', zIndex: 2, backgroundColor: '#A87A3E', borderRadius: 12, borderWidth: 1, borderColor: '#F3D6A0',
+    paddingHorizontal: 14, paddingVertical: 3 },
+  ribbonText: { fontFamily: serif, fontSize: 12, letterSpacing: 2, color: '#FFF6E4' },
+  planTop: { alignItems: 'center' },
+  emblem: { width: 74, height: 74, marginTop: 2 },
+  bud: { width: 68, height: 68, marginTop: 4, marginBottom: 2 },
+  planTitle: { fontFamily: serif, fontSize: 17.5, textAlign: 'center', marginTop: 2 },
+  planPrice: { fontFamily: serif, fontSize: 31, lineHeight: 38, marginTop: 4 },
+  planUnit: { fontSize: 12, letterSpacing: 0.4 },
+  planNote: { fontSize: 12, textAlign: 'center', marginTop: 3 },
+  rule: { alignSelf: 'stretch', height: StyleSheet.hairlineWidth * 2, marginTop: 12, marginBottom: 6 },
+  perk: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingVertical: 3.5 },
+  mark: { width: 7, height: 7, borderRadius: 4, borderWidth: 1.5, marginTop: 5.5 },
+  markFounder: { borderColor: '#B98A4E', backgroundColor: '#B98A4E' },
   perkBody: { flex: 1 },
-  perkText: { flex: 1, fontSize: 12.5, lineHeight: 17, color: INK },
-  perkForward: { fontWeight: '700', color: '#7A4E1E' },
-  perkFree: { fontSize: 11, lineHeight: 15, color: '#7C8C84' },
-  buy: { minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10,
-    backgroundColor: '#FFF9EC', borderWidth: 1, borderColor: GOLD },
-  buyForward: { backgroundColor: '#F2B784' },
-  buyText: { fontFamily: serif, fontSize: 15.5, color: INK },
-  links: { flexDirection: 'row', justifyContent: 'center', gap: 22, flexWrap: 'wrap', marginTop: 4 },
+  perkText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  perkStrong: { fontWeight: '700' },
+  perkFree: { fontSize: 11, lineHeight: 15, marginTop: 1 },
+  buy: { minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1 },
+  buyFounder: { backgroundColor: '#F2B784', borderColor: '#C9935A' },
+  buyText: { fontFamily: serif, fontSize: 16 },
+  links: { flexDirection: 'row', justifyContent: 'center', gap: 22, flexWrap: 'wrap', marginTop: 6 },
   link: { fontSize: 14, textDecorationLine: 'underline', minHeight: 24 },
-  legal: { fontSize: 11.5, lineHeight: 17, textAlign: 'center', marginTop: 6 },
+  linkSmall: { fontSize: 13, textDecorationLine: 'underline', minHeight: 24 },
+  legal: { fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 4 },
 });
