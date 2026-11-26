@@ -39,7 +39,7 @@ export function GardenDock({ chinese, ownerId }: { chinese: boolean; ownerId?: s
   const casketRef = useRef<View>(null);
   useEffect(() => (ownerId ? registerCollectionIcon(casketRef) : undefined), [ownerId]);
   // A keepsake flying in from the check-in reveal: the casket takes it with a small bounce.
-  const bounce = useRef(new Animated.Value(1)).current;
+  const bounce = useState(() => new Animated.Value(1))[0];
   useEffect(() => onKeepsakeLanded(() => {
     const native = Platform.OS !== 'web';
     Animated.sequence([

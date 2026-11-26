@@ -325,7 +325,7 @@ export const LoginAnimalExperience = memo(function LoginAnimalExperience({
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const exitingRef = useRef(false);
-  const exitAnim = useRef(new Animated.Value(isLoading ? 1 : 0)).current;
+  const exitAnim = useState(() => new Animated.Value(isLoading ? 1 : 0))[0];
 
   // Manual time sync for dev/preview controls
   useEffect(() => {

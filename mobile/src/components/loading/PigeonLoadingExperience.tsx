@@ -88,7 +88,7 @@ export function PigeonLoadingScreen({
   const birdWidth = birdHeight * CELL.w / CELL.h;
   // Narrow enough that the bird is never clipped with its centre over either end of the bar.
   const barWidth = Math.max(120, Math.min(compact ? 300 : 380, width - birdWidth - 24, width - 2 * ORNAMENT_PAD - 16));
-  const fade = useRef(new Animated.Value(1)).current;
+  const fade = useState(() => new Animated.Value(1))[0];
   const exitedRef = useRef(onExited);
   exitedRef.current = onExited;
 
@@ -131,8 +131,8 @@ function RotateHint({ reduced }: { reduced: boolean }) {
   const label = ROTATE_COPY[useAppLocale()];
   // Read without the hook's "no provider" error: a loading screen must show wherever it is mounted.
   const bottom = (useContext(SafeAreaInsetsContext)?.bottom ?? 0) + 26;
-  const turn = useRef(new Animated.Value(reduced ? 1 : 0)).current;
-  const appear = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  const turn = useState(() => new Animated.Value(reduced ? 1 : 0))[0];
+  const appear = useState(() => new Animated.Value(reduced ? 1 : 0))[0];
   useEffect(() => {
     if (reduced) { turn.setValue(1); appear.setValue(1); return; }
     const native = Platform.OS !== 'web', easing = Easing.inOut(Easing.cubic);
@@ -264,7 +264,7 @@ function WaitingDots({ visible, reduced }: { visible: boolean; reduced: boolean 
 }
 
 function NativeWaitingDots({ reduced }: { reduced: boolean }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const pulse = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     if (reduced) { pulse.setValue(0); return; }
     const run = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: DOT_PULSE_SECONDS * 1000, easing: Easing.linear, useNativeDriver: true }));
@@ -288,8 +288,8 @@ function dotOpacity(phase: number) {
 // `fill` and `bird` ease to the same target with the same duration and easing.
 function useFlightMotion(at: number, reduced: boolean) {
   const [armed, setArmed] = useState(false);
-  const fill = useRef(new Animated.Value(0)).current;
-  const bird = useRef(new Animated.Value(0)).current;
+  const fill = useState(() => new Animated.Value(0))[0];
+  const bird = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     let second = 0;
     const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => setArmed(true)); });
@@ -338,10 +338,10 @@ function WebLetterwing({ height, reduced }: { height: number; reduced: boolean }
 // set straight on Animated nodes, so React never re-renders per frame. Reduced motion: still.
 function NativeLetterwing({ height, reduced }: { height: number; reduced: boolean }) {
   const width = height * CELL.w / CELL.h;
-  const sheetX = useRef(new Animated.Value(0)).current;
-  const sheetY = useRef(new Animated.Value(0)).current;
-  const bob = useRef(new Animated.Value(0)).current;
-  const tilt = useRef(new Animated.Value(0)).current;
+  const sheetX = useState(() => new Animated.Value(0))[0];
+  const sheetY = useState(() => new Animated.Value(0))[0];
+  const bob = useState(() => new Animated.Value(0))[0];
+  const tilt = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     if (reduced) { bob.setValue(0); tilt.setValue(0); sheetX.setValue(0); sheetY.setValue(0); return; }
     let raf = 0, lastFrame = -1;

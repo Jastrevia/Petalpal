@@ -144,7 +144,7 @@ export function TreehouseShelf({ column, height, cabinetTop, cabinetBottom, rail
   const scene = useMemo(() => ({ camera, books: drawnBooks }), [sceneKey]);
   const { scale, width } = layout;
   const sourceTop = SHELF.top - cabinetTop / scale;
-  const fade = useRef(new Animated.Value(1)).current;
+  const fade = useState(() => new Animated.Value(1))[0];
   const shownYear = useRef(year);
   useEffect(() => {
     if (shownYear.current === year) return;

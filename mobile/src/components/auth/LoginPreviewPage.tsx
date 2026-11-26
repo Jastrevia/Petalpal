@@ -328,7 +328,7 @@ export const LoginPreviewPage = memo(function LoginPreviewPage({
   } | null>(null);
 
   // Layer B gentle breathing motion animation
-  const breathingAnim = useRef(new Animated.Value(0)).current;
+  const breathingAnim = useState(() => new Animated.Value(0))[0];
 
   useEffect(() => {
     if (entrance.phase !== 'idle' || entrance.reduced) { breathingAnim.setValue(0); return; }

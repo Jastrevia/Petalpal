@@ -76,7 +76,7 @@ export function JournalActions({ visible, locked, date, onClose, onEdit, onDelet
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<SheetState>('menu');
   const [error, setError] = useState('');
-  const rise = useRef(new Animated.Value(0)).current;
+  const rise = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     if (!visible) return;
     setState('menu'); setError('');

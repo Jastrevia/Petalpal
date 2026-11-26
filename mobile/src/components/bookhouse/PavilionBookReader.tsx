@@ -62,7 +62,7 @@ export function PavilionBookReader({
 }: BookReaderProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [turning, setTurning] = useState<{ from: number; to: number; dir: 1 | -1 } | null>(null);
-  const turnProgress = useRef(new Animated.Value(0)).current;
+  const turnProgress = useState(() => new Animated.Value(0))[0];
   const isTurningLocked = useRef(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 

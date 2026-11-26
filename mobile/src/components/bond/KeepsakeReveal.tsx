@@ -15,7 +15,7 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const fairyName = useFairyName();
   const copy = bondCopy(locale, fairyName);
   const [index, setIndex] = useState(0);
-  const grow = useRef(new Animated.Value(0)).current;
+  const grow = useState(() => new Animated.Value(0))[0];
   // A phone held sideways is wide but short: the keepsake sits beside PPL's note instead of above it,
   // and whatever still doesn't fit scrolls, with the button always in view.
   const screen = useWindowDimensions();

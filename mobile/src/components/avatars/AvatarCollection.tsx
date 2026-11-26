@@ -55,7 +55,7 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [unlocked, setUnlocked] = useState<string | null>(null);
-  const bloom = useRef(new Animated.Value(0)).current;
+  const bloom = useState(() => new Animated.Value(0))[0];
   const equipped = session?.user.avatar ?? collection?.equipped;
   const firstReady = collection?.pending.find(reward => reward.eligible > 0);
 

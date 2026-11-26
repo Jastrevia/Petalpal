@@ -107,7 +107,7 @@ export default function Reflection() {
   const { isTreehouseLightingTime: worldNight } = useWorldTime();
   const [nightOverride, setNightOverride] = useState<boolean | null>(null);
   const night = (__DEV__ ? nightOverride : null) ?? worldNight;
-  const lighting = useRef(new Animated.Value(night ? 1 : 0)).current;
+  const lighting = useState(() => new Animated.Value(night ? 1 : 0))[0];
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     let mounted = true;
@@ -125,7 +125,7 @@ export default function Reflection() {
   const [open, setOpen] = useState<Book | null>(null);
   const spines = usePavilionSpines(lang);
   const pavilionText = PAVILION_TEXT[lang];
-  const instructionFade = useRef(new Animated.Value(1)).current;
+  const instructionFade = useState(() => new Animated.Value(1))[0];
   useEffect(() => {
     const fade = Animated.timing(instructionFade, { toValue: open ? 0 : 1,
       duration: reducedMotion ? 0 : open ? 180 : 360, useNativeDriver: true });
@@ -136,7 +136,7 @@ export default function Reflection() {
   const onBook = (book: Book) => open === book;
   const [flying, setFlying] = useState<Book | null>(null);
   const timeline = useSharedValue(0), focus = useSharedValue(0);
-  const contentFade = useRef(new Animated.Value(0)).current;
+  const contentFade = useState(() => new Animated.Value(0))[0];
   const busy = useRef(false), pendingBook = useRef<Book | null>(null);
   const [bookDrawn, setBookDrawn] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -344,7 +344,7 @@ export default function Reflection() {
   // Page turn: one leaf rotates around the spine (Journal technique). Forward: the right
   // page swings left and its back is the next period's left page; backward reverses it.
   const [turning, setTurning] = useState<{ from: number; to: number } | null>(null);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const locked = useRef(false);
   useEffect(() => () => progress.stopAnimation(), [progress]);
   async function turn(direction: number) {
@@ -376,7 +376,7 @@ export default function Reflection() {
   // The first view frames the shelf; opening a book glides to its left page (the right one is a drag
   // away), and putting it back glides to the shelf again. A sideways drag looks anywhere in between.
   const panMin = phone ? Math.min(0, screen.width - width) : 0;
-  const pan = useRef(new Animated.Value(0)).current;
+  const pan = useState(() => new Animated.Value(0))[0];
   const panAt = useRef<number | null>(null);
   const panning = useRef({ min: 0, max: 0 });
   // A phone with a book open: where the view rests so that one whole page (left, right) is centred on the screen.

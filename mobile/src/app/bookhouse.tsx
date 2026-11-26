@@ -127,7 +127,7 @@ export default function Bookhouse() {
   const pendingYear = useRef<number | null>(null);
   const [shelfYear, setShelfYear] = useState<number | null>(null);
   // Unsaved writing, kept while the Treehouse is open (by day and journal) so leaving a page never loses it.
-  const drafts = useRef(new Map<string, Draft>()).current;
+  const drafts = useState(() => new Map<string, Draft>())[0];
   // The camera pulling back from the shelf to the writing desk (driven by the open book's timeline).
   const pull = useSharedValue(0);
   const sceneY = useRef(0);
@@ -135,7 +135,7 @@ export default function Bookhouse() {
   const [actionEntry, setActionEntry] = useState<JournalCheckIn | null>(null);
   const [notice, setNotice] = useState('');
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 3600); return () => clearTimeout(timer); }, [notice]);
-  const arrival = useRef(new Animated.Value(0)).current;
+  const arrival = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     Animated.timing(arrival, { toValue: 1, duration: reducedMotion ? 0 : 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [arrival, reducedMotion]);
@@ -283,7 +283,7 @@ export default function Bookhouse() {
     if (to === 'shelf' && nextYear !== null) setShelfYear(nextYear);
   };
   // Each book's days, rebuilt only when that month's own data changes (a switch never redraws the other book's pages).
-  const daysCache = useRef(new Map<string, { inputs: unknown[]; days: ReturnType<typeof monthDays> }>()).current;
+  const daysCache = useState(() => new Map<string, { inputs: unknown[]; days: ReturnType<typeof monthDays> }>())[0];
   const daysOf = (b: OpenBook & { kind: 'month' }) => {
     const key = `${b.year}-${b.month}`, events = monthEvents[key];
     const inputs = [entries, checkIns, events, today];

@@ -169,7 +169,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
   const isNight = (__DEV__ ? nightOverride : null) ?? worldNight;
 
-  const nightLighting = useRef(new Animated.Value(isNight ? 1 : 0)).current;
+  const nightLighting = useState(() => new Animated.Value(isNight ? 1 : 0))[0];
 
 
 

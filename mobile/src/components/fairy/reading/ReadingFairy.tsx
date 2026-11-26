@@ -72,7 +72,7 @@ export function ReadingFairyView({ snapshot, art = READING_ART, style }: {
     return () => { active = false; subscription.remove(); };
   }, []);
   const [width, setWidth] = useState(0);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const mode = readingArt(art);
 
   // Each state's movement starts from wherever the strip is, so a re-render never replays it and

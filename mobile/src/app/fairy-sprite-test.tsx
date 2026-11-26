@@ -21,7 +21,7 @@ function Test() {
   const [dark, setDark] = useState(false);
   const [width, setWidth] = useState(600);
   const [active, setActive] = useState(true);
-  const x = useRef(new Animated.Value(0)).current;
+  const x = useState(() => new Animated.Value(0))[0];
   const distance = useRef(0);
   const phase = useRef(0);
   useEffect(() => {

@@ -91,7 +91,7 @@ function SparkleIcon({ size = 13, color = '#FAF7F0' }: { size?: number; color?: 
 }
 
 const BackgroundScene = memo(function BackgroundScene({ reducedMotion }: { reducedMotion: boolean }) {
-  const entranceProgress = useRef(new Animated.Value(0)).current;
+  const entranceProgress = useState(() => new Animated.Value(0))[0];
   return (
     <View style={styles.scenicBackground} pointerEvents="none">
       <LoginEntranceScene

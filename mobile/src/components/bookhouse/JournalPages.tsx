@@ -59,7 +59,7 @@ export function MeasuredPages({ text, width, height, textStyle, paper, onIntroCh
   const [spread, setSpread] = useState(0);
   const spreads = composeSpreads(pages.length);
   const [turning, setTurning] = useState<{ from: number; to: number } | null>(null);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const locked = useRef(false);
   const reduced = useRef(true);
   useEffect(() => {

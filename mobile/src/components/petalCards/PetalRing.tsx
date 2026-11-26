@@ -72,7 +72,7 @@ export function PetalRing({ visible, today, onClose }: { visible: boolean; today
   const [reading, setReading] = useState<PetalReading | null>(null);
   const [chosenNo, setChosenNo] = useState(0);
   const [error, setError] = useState('');
-  const lift = useRef(new Animated.Value(0)).current, flip = useRef(new Animated.Value(0)).current;
+  const lift = useState(() => new Animated.Value(0))[0], flip = useState(() => new Animated.Value(0))[0];
   // The share picture is made once the card faces up (petalShare.ts).
   const [prepared, setPrepared] = useState<PreparedShare | null>(null);
   const [shared, setShared] = useState<ShareOutcome | null>(null);
