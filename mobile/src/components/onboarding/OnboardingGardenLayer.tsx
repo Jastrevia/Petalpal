@@ -97,6 +97,7 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
   useEffect(() => {
     const run = ++version.current;
     const live = () => run === version.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- each camera move starts with no world box, cancelled if the step changes
     setWorld(null);
     const frame = (box: Box, fill: number, ms: number, edge: Insets = viewInsets) => {
       if (camera.fit <= 0 || camera.viewport.width <= 0 || camera.viewport.height <= 0) return Promise.resolve(false);
@@ -160,6 +161,7 @@ function GardenStep({ step, camera, locale, speaker, firstFlowerId, onOpenTreeho
   }, [step, planting.activeMode, firstFlowerId, plantAttempt, planting.startPlanting]);
 
   const plantError = step === 'plant.place' && planting.activeMode === 'normal' ? planting.detailError : '';
+  // eslint-disable-next-line react-hooks/refs -- whether this attempt's planting was started and then cancelled; set only by the effect above
   const plantCancelled = step === 'plant.place' && planting.activeMode === 'normal' && autoStartedAttemptRef.current === plantAttempt && !plantError;
 
   // The month is the owner's own: the Flower's month, which is this month on the phone's local

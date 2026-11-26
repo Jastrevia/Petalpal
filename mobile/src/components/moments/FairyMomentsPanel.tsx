@@ -45,6 +45,7 @@ export function FairyMomentsPanel({ visible, onClose, onFindFairy, highlightNewe
       if (current === request.current) setError('loadError');
     }
   }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- opening loads (load() is also the retry); closing drops the page and any request in flight
   useEffect(() => { if (visible) void load(); else { request.current++; setPage(null); } }, [visible, load]);
 
   const loadMore = async () => {

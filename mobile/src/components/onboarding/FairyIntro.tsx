@@ -65,6 +65,7 @@ export function FairyIntro({ step, locale, fairyName }: { step: 'intro.name' | '
 
   useEffect(() => {
     if (step !== 'intro.celebrate') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the celebrate step starts the fairy's celebration animation
     setFairyState('celebrate');
     if (reduced) {
       setCelebrated(true);

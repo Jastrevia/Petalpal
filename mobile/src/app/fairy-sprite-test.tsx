@@ -56,6 +56,7 @@ function Test() {
     <Text>Frame {index+1}/8 · {100/speed} ms/frame · travel {travelSpeed} px/s</Text>
     <View style={{flexDirection:'row',flexWrap:'wrap'}}>
       {button(playing?'Pause':'Play',()=>setPlaying(!playing))}
+      {/* eslint-disable-next-line react-hooks/refs -- dev test page: step() touches the phase ref only when pressed */}
       {button('Previous',()=>step(-1))}{button('Next',()=>step(1))}
       {[.5,1,2].map(s=>button(`Animation ${s}×`,()=>setSpeed(s)))}
       {[0,30,60,120].map(s=>button(`Travel ${s} px/s`,()=>setTravelSpeed(s)))}

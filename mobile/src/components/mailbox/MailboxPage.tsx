@@ -343,11 +343,8 @@ export const MailboxPage = memo(function MailboxPage() {
 
   // The open letter was deleted (here or on another device): show one that is still there.
 
-  useEffect(() => {
-
-    if (letters.length && activeIndex < 0) setSelectedLetterId(letters[0].id);
-
-  }, [letters, activeIndex]);
+  // (Set while rendering; once set, activeIndex is no longer negative.)
+  if (letters.length && activeIndex < 0) setSelectedLetterId(letters[0].id);
 
 
 
@@ -361,6 +358,7 @@ export const MailboxPage = memo(function MailboxPage() {
 
     if (!openLetterId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a fully open letter is marked read once, then confirmed with the server
     markLetterAsRead(openLetterId);
 
     void confirmLetterRead(openLetterId);
