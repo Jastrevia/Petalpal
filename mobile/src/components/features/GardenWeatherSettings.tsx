@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Switch, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { usePanelTheme } from './PanelTheme';
@@ -35,15 +35,17 @@ export function GardenWeatherSettings() {
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
 
-  const load = useCallback(async () => {
+  // Whether it is on, read when Me opens (and again after Reload).
+  const [reloads, setReloads] = useState(0);
+  const failed = copy.failed;
+  useEffect(() => {
     if (!ownerId) return;
-    setError('');
-    try {
-      const answer = await loadWeather();
-      if (live.current) setEnabled(answer?.enabled === true);
-    } catch { if (live.current) { setEnabled(null); setError(copy.failed); } }
-  }, [ownerId, copy.failed]);
-  useEffect(() => { void load(); }, [load]);
+    let current = true;
+    loadWeather()
+      .then(answer => { if (current) { setError(''); setEnabled(answer?.enabled === true); } })
+      .catch(() => { if (current) { setEnabled(null); setError(failed); } });
+    return () => { current = false; };
+  }, [ownerId, reloads, failed]);
 
   const change = async (on: boolean) => {
     if (busy) return;
@@ -78,6 +80,6 @@ export function GardenWeatherSettings() {
     {denied ? <><Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{copy.denied}</Text>
       <FeatureActionButton secondary title={copy.openSettings} onPress={() => void Linking.openSettings()} /></> : null}
     {error ? <><Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text>
-      <FeatureActionButton secondary title={copy.reload} disabled={busy} onPress={() => void load()} /></> : null}
+      <FeatureActionButton secondary title={copy.reload} disabled={busy} onPress={() => setReloads(n => n + 1)} /></> : null}
   </FeatureSection>;
 }

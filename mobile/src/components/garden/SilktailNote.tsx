@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text } from 'react-native';
 import { foxMessage, foxVisitKey, type FoxReason } from './critters/silktailDays';
 
@@ -12,7 +12,7 @@ const SEEN_KEY = 'petalpal.silktailNote.v1';
 
 export function SilktailNote({ arrival, locale }: { arrival: { reason: FoxReason; date: string; at: number } | null; locale: 'en' | 'zh-Hans' }) {
   const [shown, setShown] = useState<{ text: string; at: number } | null>(null);
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [opacity] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!arrival) return;
     let live = true;

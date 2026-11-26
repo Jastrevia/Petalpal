@@ -57,7 +57,14 @@ const server = http.createServer((req, res) => {
       res.writeHead(response.statusCode, outHeaders); res.end(out);
     });
   });
-  upstream.on('error', () => { res.writeHead(502, { 'Content-Type': 'text/plain' }); res.end('Expo is still starting. Reload in a few seconds.'); });
+  // Expo not up yet: say so. Cut off mid-answer (a reload abandons dozens of image requests at
+  // once): just drop that one response; writing its headers again would end the whole preview.
+  upstream.on('error', () => {
+    if (res.headersSent) { res.destroy(); return; }
+    res.writeHead(502, { 'Content-Type': 'text/plain' }); res.end('Expo is still starting. Reload in a few seconds.');
+  });
+  // The browser gave up on it (a reload, a closed tab): stop asking Expo for it.
+  res.on('close', () => { if (!res.writableFinished) upstream.destroy(); });
   req.pipe(upstream);
 });
 // Live reload (Metro's websocket) passes straight through.

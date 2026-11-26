@@ -14,6 +14,13 @@ for recovering from a technical failure and are never used to restore a deleted 
 promise is the owner's job: delete every export older than 30 days, and never restore a deleted account
 from one. If an export is ever restored, delete again the accounts deleted after that export was made.
 
+**Update 2026-11-26 (Privacy Policy effective November 26, 2026; on release/1.0.1, not yet published).**
+Adds optional Garden weather: an approximate location rounded to ~11 km, kept per account until weather is
+turned off or the account is deleted, and sent only as that rounded point to MET Norway; no background
+location. Publish it with (or before) the first Web or app release that contains Garden weather, and
+move the effective date to the day it actually goes live (update `test/back/legal-pages.test.js` with
+it). The App Store privacy label then needs **Coarse Location** (see STORE_PRIVACY_WORKSHEETS.md).
+
 | Page | Source | Public URL |
 |---|---|---|
 | Privacy Policy | `mobile/public/legal/privacy.html` | https://app.jastrevia.com/legal/privacy.html |
