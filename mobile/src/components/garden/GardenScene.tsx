@@ -1,4 +1,15 @@
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  cancelAnimation,
+  Easing,
+  useAnimatedReaction,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GardenCameraApi } from '../onboarding/gardenCamera';
 import { dispatchOnboarding } from '../onboarding/onboardingSignals';
@@ -9,6 +20,15 @@ import MonthlySignControls from './month-signs/MonthlySignControls';
 import { GardenImageScope } from './gardenImageScope';
 import { useMonthlySigns } from './month-signs/useMonthlySigns';
 import FireflyLayer from './fireflies/FireflyLayer';
+import RainLayer from './weather/RainLayer';
+import { readWeatherPreview } from './weather/weatherPreview';
+import { composeColorMatrix } from './weather/rainGrade';
+import { flashMatrix, lookFor, nightSnowMatrix, needsGrade, useWeatherClock, useWeatherLook, weatherMatrix, FLOWER_WIND, LOOKS } from './weather/gardenWeather';
+import { CloudShadowLayer, MistLayer } from './weather/SkyLayers';
+import { SnowFlakesLayer, SnowGroundCover, SnowProvider, Snowy } from './weather/SnowLayer';
+import { LeavesLayer } from './weather/LeavesLayer';
+import { useLightning } from './weather/lightning';
+import WeatherPreviewControls from './weather/WeatherPreviewControls';
 import FireflyPreviewControls from './fireflies/FireflyPreviewControls';
 import { DEFAULT_FIREFLIES } from './fireflies/fireflyMotion';
 import ExistingWindowLights from './lanterns/ExistingWindowLights';
@@ -38,17 +58,6 @@ import {GardenProfile,GardenRuntimePanel} from './performance/GardenRuntimePanel
 import {DEFAULT_ISOLATION,type GardenIsolation,runtimeAudit} from './performance/runtimeAudit';
 import { productionQARecords } from './planting/productionGrowthQAData';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  cancelAnimation,
-  Easing,
-  useAnimatedReaction,
-  useDerivedValue,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GardenLoadingOverlay } from './loading/GardenLoadingOverlay';
 import { createGardenLoadStore } from './loading/gardenReadiness';
@@ -105,6 +114,7 @@ import NativeLandCalibrationEditor from './NativeLandCalibrationEditor';
 import SwingCalibrationEditor, { type SwingMapPlacement } from './SwingCalibrationEditor';
 import MoonBedMapCalibrationEditor, { type MoonBedMapPlacement } from './MoonBedMapCalibrationEditor';
 import StaticLandmarkCalibrationEditor from './StaticLandmarkCalibrationEditor';
+import DogHousePlacer, { placingDogHouse, savedDogHousePlacement } from './DogHousePlacer';
 import TeaSetMapCalibrationEditor, { type TeaSetMapPlacement } from './TeaSetMapCalibrationEditor';
 import WaterfallMapCalibrationEditor from './WaterfallMapCalibrationEditor';
 import { INITIAL_WATERFALL_PLACEMENT } from './waterfallMapPlacement';
@@ -123,6 +133,13 @@ import MemoryOtter from './spirits/MemoryOtter';
 import Bluebird from './spirits/Bluebird';
 import Butterfly from './critters/Butterfly';
 import GardenCritters, { type GardenPetsHandle } from './critters/GardenCritters';
+import { SilktailNote } from './SilktailNote';
+import { DogsAsleepCard } from './DogsAsleepCard';
+import { dogHouse } from './dogHouseState';
+import { DOG_HOUSE_HEIGHT, DOG_HOUSE_WIDTH } from './StaticLandmarkEntities';
+import type { FoxReason } from './critters/silktailDays';
+import { useSilktailReason } from '../../services/silktail';
+import { dogsShelterIn, useLiveWeather } from '../../services/gardenWeather';
 import PetRingMenu from './critters/PetRingMenu';
 import type { PetSpot } from './critters/petRing';
 import { useGardenPausedByOverlay } from './gardenOverlayPause';
@@ -314,21 +331,15 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     placements,
     activeMode,
     targetFlower,
-    previewCoords,
-    validationResult,
     selectedFlower,
-    isSaving,
     showDevPlantingRegions,
     showDevFootprints,
     showDevHitboxes,
     showPlacementDebug,
     startPlanting,
     updatePreview,
-    confirmPlacement,
     cancelPlacement,
     openFlowerDetail,
-    closeFlowerDetail,
-    supportFlower,
     resetAllPlacements,
     setShowDevPlantingRegions,
     setShowDevFootprints,
@@ -412,7 +423,34 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
   const [waterfallVersion, setWaterfallVersion] = useState<WaterfallVersion>(initialWaterfallVersion);
   const worldTime = useWorldTime();
+  const [weather, setWeather] = useState(readWeatherPreview);
+  const weatherPreview = __DEV__ && weather.preview;
   const nightLighting = useNightLighting(worldTime.isTreehouseLightingTime);
+  // The weather as one eased description every layer reads (weather/gardenWeather.ts).
+  const { look: weatherLook, shown: weatherShown } = useWeatherLook(weather);
+  const raining = weatherShown.rain > 0;
+  // Rain or snow falling: small flying creatures (fireflies, the butterfly, the bluebird) shelter.
+  const weatherSheltering = lookFor(weather).rain > 0 || lookFor(weather).flakes > 0;
+  const weatherGraded = needsGrade(weatherShown);
+  const lightning = useLightning(weather.state === 'STORM');
+  const dayLight = useDerivedValue(() => 1 - nightLighting.amount.value);
+  const nightAmount = nightLighting.amount;
+  // The weather re-lights the whole painting first, then night, then any lightning, in the scene's one colour layer.
+  const nightMatrix = nightLighting.matrix;
+  const nightOn = nightLighting.active;
+  const sceneMatrix = useDerivedValue(() => {
+    let m = weatherGraded ? weatherMatrix(weatherLook.value) : null;
+    if (nightOn) m = m ? composeColorMatrix(m, nightMatrix.value) : nightMatrix.value;
+    if (m && nightOn && weatherLook.value.snow > 0) m = composeColorMatrix(m, nightSnowMatrix(weatherLook.value.snow, nightAmount.value));
+    if (lightning.value > 0.001) m = m ? composeColorMatrix(m, flashMatrix(lightning.value)) : flashMatrix(lightning.value);
+    return m ?? [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0];
+  }, [weatherGraded, nightOn, nightMatrix]);
+  const weatherRain = useDerivedValue(() => Math.min(1, weatherLook.value.rain / LOOKS.RAIN.rain));
+  const weatherWind = useDerivedValue(() => Math.max(0, weatherLook.value.wind - LOOKS.CLEAR.wind));
+  const waterWeather = useMemo(() => ({
+    rain: weatherRain, wind: weatherWind, flash: lightning,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [lightning]);
   const lanternPathname = usePathname();
   const fireflyPreview = __DEV__ && lanternPathname === '/firefly-preview';
   const [fireflySettings, setFireflySettings] = useState(DEFAULT_FIREFLIES);
@@ -511,6 +549,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [gardenArchPlacement, setGardenArchPlacement] = useState<StaticLandmarkMapPlacement>(
     () => ({ ...CHECKED_IN_GARDEN_ARCH }),
   );
+  // Dev placing mode for the dog house (?place=doghouse): starts from the last confirmed spot in this browser.
+  const [placingDogHouseMode] = useState(placingDogHouse);
+  const [dogHousePlacement, setDogHousePlacement] = useState<StaticLandmarkMapPlacement>(
+    () => (placingDogHouseMode && savedDogHousePlacement()) || { ...STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse });
   const [pavilionPlacement, setPavilionPlacement] = useState<StaticLandmarkMapPlacement>(
     () => ({ ...CHECKED_IN_PAVILION }),
   );
@@ -535,6 +577,21 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const overlayPaused = useGardenPausedByOverlay();
   const worldActive = gardenActive && foreground && !overlayPaused;
+  // The sky where the Garden's owner is (Me → Garden weather; a friend's on a visit). The dev web
+  // ?weather= preview wins over it.
+  const liveWeather = useLiveWeather(gardenActive && foreground, { signedIn: Boolean(planting.currentUserId),
+    friendId: readOnly && planting.gardenOwnerUserId !== planting.currentUserId ? planting.gardenOwnerUserId : undefined });
+  useEffect(() => {
+    if (!liveWeather || weather.preview) return;
+    if (liveWeather.state !== weather.state || liveWeather.windy !== weather.windy) setWeather(liveWeather);
+  }, [liveWeather, weather]);
+  // The Silktail Fox's days (14 days of Events, holidays) in the owner's own Garden only.
+  const foxGarden = enableFairyWalk && !readOnly;
+  const { reason: foxToday, date: foxDate } = useSilktailReason(foxGarden && worldActive, true);
+  // The dogs asleep in their house (DogsAsleepCard), opened by a tap on it while they shelter there.
+  const [dogsAsleep, setDogsAsleep] = useState(false);
+  const [foxArrival, setFoxArrival] = useState<{ reason: FoxReason; date: string; at: number } | null>(null);
+  const onFoxArrive = useCallback((reason: FoxReason) => setFoxArrival({ reason, date: foxDate, at: Date.now() }), [foxDate]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
@@ -546,8 +603,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
   const [waterRipplesVisible, setWaterRipplesVisible] = useState(true);
   const [waterRippleOpacity, setWaterRippleOpacity] = useState(0.35);
   const [fishVisible, setFishVisible] = useState(true);
-  const [fishDensity, setFishDensity] = useState<FishDensity>('normal');
-  const [fishMotionPreset, setFishMotionPreset] = useState<FishMotionPreset>('normal');
+  const [fishDensity] = useState<FishDensity>('normal');
+  const [fishMotionPreset] = useState<FishMotionPreset>('normal');
   const [lotusVisible, setLotusVisible] = useState(true);
   // Register on image arrival/removal only; sway stays on the UI thread and
   // never updates React state. The mask reads each cluster's live transform.
@@ -558,8 +615,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
       return occluder ? [...others, occluder] : others;
     });
   }, []);
-  const [lotusMode, setLotusMode] = useState<LotusRenderMode>('sway');
-  const [wakeVisible, setWakeVisible] = useState(false); // Optional DEV toggle, default OFF
+  const [lotusMode] = useState<LotusRenderMode>('sway');
   const [foamVisible, setFoamVisible] = useState(true);
   const [topWaterAssemblyEnabled, setTopWaterAssemblyEnabled] = useState(true);
   const [topWaterMotionMode, setTopWaterMotionMode] = useState<TopWaterMotionMode>('animate');
@@ -725,6 +781,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     { scale: fit * cameraZoom.value },
   ]);
   useAnimatedReaction(() => cameraTransform.value, () => { noteGardenMotion(); });
+  // For weather layers drawn inside a group that already carries the camera.
+  const identityTransform = useSharedValue<Transforms3d>([{ translateX: 0 }]);
+  // Weather that moves on its own (clouds, mist, snow, leaves, bending flowers) runs on one clock.
+  const weatherMoving = weatherShown.clouds > 0 || weatherShown.fog > 0 || weatherShown.flakes > 0 || weatherShown.wind > FLOWER_WIND;
+  const weatherClock = useWeatherClock(worldActive && weatherMoving, weatherLook);
   // The entry hit areas laid over the Garden (pavilion, treehouse, month signs) are invisible, and a finger
   // that is dragging the Garden cannot press them. Following the camera on every frame of a drag made the
   // native views lay out and commit each frame, so during a drag or pinch they stay where they were and
@@ -766,9 +827,9 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     width: 56, height: 56,
   }));
   const fairyBubbleStyle = useAnimatedStyle(() => ({
-    left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 110,
-    top: baseY + cameraY.value + (fairyBubblePoint.value.y - 150) * fit * cameraZoom.value - 64,
-    width: 220,
+    left: baseX + cameraX.value + fairyBubblePoint.value.x * fit * cameraZoom.value - 75,
+    top: baseY + cameraY.value + (fairyBubblePoint.value.y - 150) * fit * cameraZoom.value - 50,
+    width: 150,
   }));
   const sayFairyLine = useCallback((state: FairyState, at: { x: number; y: number }) => {
     const line = pickTapLine(state, locale, recentFairyLines.current, Math.random, AMBIENT_LINES);
@@ -1195,6 +1256,11 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
     } else {
       // A pet (drawn over the flowers) answers first: its ring menu opens beside it. A little
       // grace around its body keeps it easy to tap on a phone.
+      // The dogs sheltering in their house: a tap on it looks in on them, asleep.
+      if (!readOnly && dogHouse.get().phase === 'inside') {
+        const house = dogHouse.placement(), w = DOG_HOUSE_WIDTH * house.scale, h = DOG_HOUSE_HEIGHT * house.scale;
+        if (worldX >= house.x && worldX <= house.x + w && worldY >= house.y && worldY <= house.y + h) { setDogsAsleep(true); return; }
+      }
       const pet = readOnly ? null : gardenPets.current?.petAt({ x: worldX, y: worldY }, 14 / (fit * currentZoom));
       if (pet) {
         gardenPets.current?.hold(pet.id);
@@ -1620,7 +1686,10 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           <GardenImageScope>
           <GardenLandResources loadStore={loadStore}>
           <PlantingProvider value={drawnPlanting}>
-          <Group layer={nightLighting.active ? <Paint><ColorMatrix matrix={nightLighting.matrix} /></Paint> : undefined}>
+          <SnowProvider value={weatherShown.snow > 0 ? weatherLook : null}>
+          {/* While the weather can change on screen, this layer must stay put: adding or removing it mid-session
+              dropped the islands' static snapshot on web (the land vanished until reload). */}
+          <Group layer={nightLighting.active || weatherGraded || weatherPreview ? <Paint><ColorMatrix matrix={sceneMatrix} /></Paint> : undefined}>
           {/* Shared camera only. Neither sibling inherits an individual land transform. */}
           <Group transform={cameraTransform}>
             {/* 1. Solid fallback, only while the water field is not drawn: the field fills this same rectangle opaquely
@@ -1629,7 +1698,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
 
             {/* 2. Calm water base */}
             {perf.Water && waterBaseVisible && calmBaseImage && (
-              <GardenProfile name="Water field" enabled={perf.Water}><GardenWaterField flow={surfaceFlow} image={calmBaseImage} active={worldActive && perf.WaterAnimation} animated={waterRipplesVisible && perf.WaterAnimation} /></GardenProfile>
+              <GardenProfile name="Water field" enabled={perf.Water}><GardenWaterField flow={surfaceFlow} weather={waterWeather} image={calmBaseImage} active={worldActive && perf.WaterAnimation} animated={waterRipplesVisible && perf.WaterAnimation} /></GardenProfile>
             )}
 
             {/* Approved receiving-water floor/contact, below fish and all terrain. */}
@@ -1722,6 +1791,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 moonBedPlacement={moonBedPlacement}
                 gardenArchPlacement={gardenArchPlacement}
                 pavilionPlacement={pavilionPlacement}
+                dogHousePlacement={dogHousePlacement}
                 teaSetPlacement={teaSetPlacement}
                 waterfallPlacement={waterfallPlacement}
                 waterfallActive={worldActive && perf.WaterAnimation}
@@ -1742,14 +1812,17 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             )}
             {/* Ground and entrance slabs belong below the walking fairy. */}
             {infrastructureEnabled && showLandmarks && <GardenRoadApproachLayer />}
+            {/* Lying snow on everything painted so far; later artwork carries its own (weather/SnowLayer.tsx). */}
+            {weatherShown.snow > 0 && <SnowGroundCover look={weatherLook} cameraTransform={identityTransform} />}
             {/* Planted flowers & placement preview sit below the walking fairy, so PPL standing on a
                 stone among them is never covered by the bloom behind her. The arch, pavilion and tea
                 set (static-front pass) still draw above her. */}
             {!monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
             <GardenProfile name="Flower foreground" enabled={perf.Flowers}><PlantedFlowerLayer depthPass={showLandmarks ? 'foreground' : 'all'} useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>
-            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} />}
-            {showLandmarks && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
-            {showLandmarks && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && <GardenCritters clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} pets={gardenPets} shelter={dogsShelterIn(weather.state)} fox={foxGarden ? foxToday : null} onFoxArrive={onFoxArrive} loadStore={loadStore} />}
+            {/* In rain or snow the bluebird and the butterfly keep under cover. */}
+            {showLandmarks && !weatherSheltering && <Bluebird clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
+            {showLandmarks && !weatherSheltering && <Butterfly clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} />}
             {enableFairyWalk && !readOnly && showLandmarks && <Letterwing placement={treehousePlacement} clock={surfaceFlow.seconds} unread={unreadMail} />}
           </Group>
           {enableFairyWalk && <Group transform={cameraTransform}>
@@ -1765,7 +1838,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
           </Group>}
           <Group transform={cameraTransform}>
             {showLandmarks && (
-              <LandmarkLayer fairySeconds={fairySeconds} fairyAtTea={fairyState==='seatedAtTea'||fairyState==='drinkingTea'?fairyState:null} renderPass="static-front"
+              <LandmarkLayer fairySeconds={fairySeconds} fairyAtTea={fairyState==='seatedAtTea'||fairyState==='drinkingTea'?fairyState:null} renderPass="static-front" dogHouseClock={readOnly ? undefined : surfaceFlow.seconds}
                 behindTeaSet={<GardenProfile name="Flowers behind Tea Set" enabled={perf.Flowers}><PlantedFlowerLayer depthPass="behind-tea-set" useMonthlyGrowth={useMonthlyGrowth} /></GardenProfile>}
                 landmarksVisible={perf.Landmarks}
                 waterEnabled={perf.Water}
@@ -1781,6 +1854,7 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
                 moonBedPlacement={moonBedPlacement}
                 gardenArchPlacement={gardenArchPlacement}
                 pavilionPlacement={pavilionPlacement}
+                dogHousePlacement={dogHousePlacement}
                 teaSetPlacement={teaSetPlacement}
                 waterfallPlacement={waterfallPlacement}
                 waterfallActive={worldActive && perf.WaterAnimation}
@@ -1809,17 +1883,30 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
               <WaterfallImpactDebugShape placement={waterfallImpactPlacement} />
             )}
           </Group>
+          {/* Wind-blown leaves, graded with the painting. */}
+          {weatherShown.wind > 0.32 && <LeavesLayer look={weatherLook} seconds={weatherClock.seconds} day={dayLight} cameraTransform={cameraTransform} />}
           </Group>
           <Group transform={cameraTransform}>
             {nightLighting.active ? plantingOverlay : null}
             {/* A glowing spirit: drawn after the night grade, like the lanterns, or the grade dims it into the dark water. */}
             {showLandmarks && <MemoryOtter clock={surfaceFlow.seconds} active={worldActive && activeMode === 'normal'} night={worldTime.phase !== 'day'} lotusOccluders={lotusVisible && perf.Lotus ? lotusOccluders : undefined} />}
             {showLandmarks && perf.Landmarks && nightLighting.active && <ExistingWindowLights light={nightLighting.amount} treehouse={treehousePlacement} swing={swingPlacement} />}
-            {nightLighting.active && worldActive && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
+            {nightLighting.active && worldActive && !weatherSheltering && fireflies.enabled && fireflies.count > 0 && fireflies.brightness > 0 &&
               <FireflyLayer clock={surfaceFlow.seconds} light={nightLighting.amount} settings={fireflies} />}
             {monthlySigns.editing && <MonthlySignLayer placements={monthlySigns.placements} />}
-            <LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount} nightMatrix={nightLighting.matrix} waterFlow={surfaceFlow} />
+            <Snowy cap={3}><LanternLayer placements={lanterns.placements} lit={nightLighting.active} light={nightLighting.amount}
+              nightMatrix={weatherGraded ? sceneMatrix : nightLighting.matrix} graded={weatherGraded} waterFlow={surfaceFlow} /></Snowy>
           </Group>
+          {/* Cloud shadows fall on everything on the ground, lanterns included (only by day). */}
+          {weatherShown.clouds > 0 && <CloudShadowLayer look={weatherLook} seconds={weatherClock.seconds} travel={weatherClock.travel}
+            cameraTransform={cameraTransform} day={dayLight} />}
+          {/* Mist hangs in front of everything on the ground, lanterns and their glow included; it carries its own night tint. */}
+          {weatherShown.fog > 0 && <MistLayer look={weatherLook} seconds={weatherClock.seconds} travel={weatherClock.travel} cameraTransform={cameraTransform} night={nightAmount} />}
+          {raining && <RainLayer width={viewport.width} height={viewport.height}
+            cameraTransform={cameraTransform} clock={surfaceFlow.enabled ? surfaceFlow.seconds : undefined} active={worldActive} night={worldTime.phase !== 'day'}
+            look={weatherLook} flash={lightning} />}
+          {weatherShown.flakes > 0 && <SnowFlakesLayer seconds={weatherClock.seconds} look={weatherLook} cameraTransform={cameraTransform} night={nightAmount} />}
+          </SnowProvider>
           </PlantingProvider>
           </GardenLandResources>
           </GardenImageScope>
@@ -1843,15 +1930,21 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
         <PetRingMenu key={petRing.id} petId={petRing.id} pet={petRing} viewport={viewport} locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={closePetRing}
           onAction={kind => gardenPets.current?.act(petRing.id, kind) ?? 0} />
       </View>}
+      {__DEV__ && placingDogHouseMode && fit > 0 && <DogHousePlacer placement={dogHousePlacement}
+        initial={STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse} onChange={setDogHousePlacement}
+        baseX={baseX} baseY={baseY} fit={fit} cameraX={cameraX} cameraY={cameraY} cameraZoom={cameraZoom} />}
       {fireflyPreview && <FireflyPreviewControls settings={fireflySettings} onChange={setFireflySettings} />}
+      {weatherPreview && <WeatherPreviewControls weather={weather} onChange={setWeather} />}
       <GardenLoadingOverlay store={loadStore} title={readOnly ? (zhHans(locale) ? '正在走进朋友的花园…' : 'Walking into your friend’s Garden…') : undefined} />
-      {/* left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
-      <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
+      {/* A phone zooms with two fingers, so it shows no − and + (the same phone rule as the Garden's
+          navigation); the onboarding zoom step then shows its card on its own (its copy says pinch).
+          left clears the notch / Dynamic Island on a phone held sideways (it covered the − button). */}
+      {viewport.width < 600 || (viewport.width < 900 && viewport.height < 500) ? null : <View {...onboardingTarget('garden.zoom')} style={{position:'absolute',left:safeArea.left + 12,bottom:zoomBottom,flexDirection:'row',gap:6,zIndex:30}}>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom out Garden" onPress={() => { zoomAt(1 / 1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>−</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Zoom in Garden" onPress={() => { zoomAt(1.25); dispatchOnboarding({ type: 'zoom' }); }}
           style={styles.zoomButton}><Text style={styles.zoomButtonText}>+</Text></Pressable>
-      </View>
+      </View>}
       {isDev && __DEV__ && <GardenRuntimePanel flags={perfFlags} onFlags={setPerfFlags} count={perfCount} onCount={setPerfCount}
         canChangeFixture={activeMode==='normal'} metadata={{realParentCount:placements.length,renderedParentCount:drawnPlanting.placements.length,
           viewport,waterfallVersion,growthV11:useMonthlyGrowth,previewMode,environmentEnabled,worldPhase:worldTime.phase}}/>}
@@ -1897,6 +1990,8 @@ function GardenSceneContent({ enableFairyWalk = false, initialPreviewMode = true
             onPress={() => fairyRef.current?.returnFromMailbox()}><Text style={styles.fairyActionText}>Return from mailbox</Text></Pressable>
         </View>
       )}
+      {dogsAsleep && activeMode === 'normal' && <DogsAsleepCard locale={zhHans(locale) ? 'zh-Hans' : 'en'} onClose={() => setDogsAsleep(false)} />}
+      {foxGarden && activeMode === 'normal' && <SilktailNote arrival={foxArrival} locale={zhHans(locale) ? 'zh-Hans' : 'en'} />}
       {lawnNote && activeMode === 'normal' && !selectedFlower && (
         <View key={lawnNote.key} testID="lawn-note" pointerEvents="none" accessibilityLiveRegion="polite" style={styles.lawnNote}>
           <Text accessibilityRole="alert" style={styles.lawnNoteText}>{zhHans(locale)
@@ -2455,10 +2550,10 @@ const styles = StyleSheet.create({
   scene: { flex: 1, overflow: 'hidden', backgroundColor: GARDEN_WATER_COLOR },
   fairyAction: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#365b42', alignItems: 'center' },
   fairyActionText: { color: '#fff', fontSize: 14 },
-  treehouseHint: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, alignItems: 'center',
+  treehouseHint: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 11, alignItems: 'center',
     backgroundColor: '#FFF6E2F2', borderWidth: 1, borderColor: '#C9A44C' },
-  treehouseHintText: { color: '#5A4630', fontSize: 13, fontWeight: '600' },
-  treehouseHintTail: { width: 10, height: 10, marginTop: -6, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF6E2F2',
+  treehouseHintText: { color: '#5A4630', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
+  treehouseHintTail: { width: 7, height: 7, marginTop: -4, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF6E2F2',
     borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#C9A44C' },
   zoomButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#365b42', borderWidth: 1, borderColor: '#e3edda', alignItems: 'center', justifyContent: 'center' },
   zoomButtonText: { color: '#fff', fontSize: 25, lineHeight: 30 },

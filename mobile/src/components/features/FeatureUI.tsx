@@ -16,10 +16,10 @@ export function StatusChip({ status }: { status: FeatureStatus }) {
   </View>;
 }
 
-export function FeatureActionButton({ title, onPress, disabled = false, secondary = false, danger = false }: {
-  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean; danger?: boolean;
+export function FeatureActionButton({ title, onPress, disabled = false, secondary = false, danger = false, testID }: {
+  title: string; onPress: () => void; disabled?: boolean; secondary?: boolean; danger?: boolean; testID?: string;
 }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title}
+  return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={6}
     style={({ pressed }) => [ui.button, secondary && ui.secondaryButton, danger && ui.dangerButton, disabled && ui.disabled, pressed && ui.pressed]}>
     <Text style={[ui.buttonText, danger && { color: '#FFF4EF' }]}>{title}</Text>

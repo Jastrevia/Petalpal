@@ -71,6 +71,11 @@ async function fixture(t) {
     };
     return {
       $queryRawUnsafe: query,
+      $queryRaw: async () => [{ locked: "" }],
+      dailyFlowerQuota: { findUnique: async ({ where }) => {
+        const { userId, localDate } = where.userId_localDate;
+        return (await query('SELECT * FROM "DailyFlowerQuota" WHERE "userId"=$1 AND "localDate"=$2', userId, localDate))[0] || null;
+      } },
       user: { findUnique: async ({ where }) => {
         const id = where.firebaseUid ? where.firebaseUid.replace("firebase-", "") : where.id;
         const user = (await query('SELECT * FROM "User" WHERE "id"=$1', id))[0];
@@ -89,7 +94,8 @@ async function fixture(t) {
           return event;
         },
         update: async args => { const rows = await updateEvents(args); if (rows.length !== 1) throw Error("Synthetic missing Event"); return rows[0]; },
-        updateMany: async args => ({ count: (await updateEvents(args)).length })
+        updateMany: async args => ({ count: (await updateEvents(args)).length }),
+        count: async ({ where }) => (await eventRows({ ownerId: where.ownerId })).filter(event => event.localDate === where.localDate).length
       },
       garden: { findUnique: async ({ where }) => ({ id: `garden-${where.ownerId}` }) },
       flower: {
@@ -327,7 +333,7 @@ test("final fence blocks deleted/changed/finalized Events and rolls back failed 
   assert.equal((await f.ledger()).length, 12);
 });
 
-test("Events grow at most two Flowers a day; deleting one does not free the day", async t => {
+test("two Flowers a day are taken by planting, not writing; four Events a day", async t => {
   const f = await fixture(t);
   await f.pg.exec(`CREATE TABLE "DailyFlowerQuota" ("userId" text,"localDate" varchar(10),"planted" integer NOT NULL DEFAULT 0,
     "updatedAt" timestamp(3) NOT NULL, PRIMARY KEY ("userId","localDate"))`);
@@ -359,18 +365,24 @@ test("Events grow at most two Flowers a day; deleting one does not free the day"
   };
   const first = await save("quota-1"), second = await save("quota-2");
   assert.ok(first.data.flower); assert.ok(second.data.flower);
-  assert.deepEqual(second.data.dailyFlowers, { limit: 2, planted: 2, limitReached: false });
+  assert.deepEqual(second.data.dailyFlowers, { limit: 2, planted: 0, limitReached: false }, "writing an Event takes no flower");
   const replay = await save("quota-2");
   assert.equal(replay.status, 200); assert.equal(replay.data.flower.id, second.data.flower.id);
   const third = await save("quota-3");
-  assert.equal(third.status, 201, "the Event itself is still saved");
-  assert.equal(third.data.flower, null);
-  assert.deepEqual(third.data.dailyFlowers, { limit: 2, planted: 2, limitReached: true });
-  await f.pg.query('DELETE FROM "Flower" WHERE "sourceEventId"=$1', [first.data.event.id]);
-  const afterDelete = await save("quota-4");
-  assert.equal(afterDelete.data.flower, null);
-  assert.equal(afterDelete.data.dailyFlowers.limitReached, true);
-  assert.deepEqual((await f.pg.query('SELECT "planted" FROM "DailyFlowerQuota"')).rows, [{ planted: 2 }]);
+  assert.equal(third.status, 201);
+  assert.ok(third.data.flower, "a third Event's flower can wait to be planted");
+  assert.equal((await f.pg.query('SELECT * FROM "DailyFlowerQuota"')).rows.length, 0);
+  // With the day's plantings used, an Event is still saved but grows no flower.
+  await f.pg.query(`INSERT INTO "DailyFlowerQuota" VALUES ('alice',$1,2,CURRENT_TIMESTAMP)`, [first.data.event.localDate]);
+  const full = await save("quota-4");
+  assert.equal(full.status, 201, "the Event itself is still saved");
+  assert.equal(full.data.flower, null);
+  assert.deepEqual(full.data.dailyFlowers, { limit: 2, planted: 2, limitReached: true });
+  // four Events a day: the fifth is refused before anything is written, and a replay is never counted.
+  const beyond = await save("quota-5");
+  assert.equal(beyond.status, 429); assert.equal(beyond.data.code, "DAILY_EVENT_LIMIT");
+  assert.equal((await f.pg.query('SELECT count(*)::int AS n FROM "Event"')).rows[0].n, 4);
+  assert.equal((await save("quota-2")).status, 200);
 });
 
 test("Event HTTP pipeline saves one Flower, keeps memory deterministic and isolates Haiku from legacy/preview/Journal", async t => {

@@ -62,7 +62,7 @@ export function configureGardenWebRootCleanup(
 // This shim is installed only by the Web bootstrap; native Skia is untouched.
 export function configureGardenWebNativeOwnership(
   paintPrototype: object,
-  factories: ReadonlyArray<readonly [unknown, readonly string[]]>,
+  factories: readonly (readonly [unknown, readonly string[]])[],
   makeRegistry?: RegistryFactory,
 ) {
   if (configured.has(paintPrototype)) return;

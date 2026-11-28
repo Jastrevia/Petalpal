@@ -252,7 +252,10 @@ test('normal Garden taps prioritize placement and flower details before all Fair
     tapTreehouse: { current: () => calls.push('bookhouse') }, tapMailbox: { current: () => calls.push('mailbox') },
     // A pet under the tap (the puppy) opens its ring menu before anything else (critters/PetRingMenu.tsx).
     gardenPets: { current: null }, setPetRing: () => calls.push('ring'),
+    // The dogs sheltering in their house: a tap on it looks in on them (DogsAsleepCard).
+    house: { phase: 'out' }, DOG_HOUSE_WIDTH: 900, DOG_HOUSE_HEIGHT: 887, setDogsAsleep: () => calls.push('asleep'),
   };
+  context.dogHouse = { get: () => context.house, placement: () => ({ x: 50, y: 50, scale: 0.21 }) };
   for (const [hit, action] of [['hitsSwing','visitSwing'],['hitsTeaArea','visitTea'],['hitsMoonBed','visitMoonBed']]) {
     context[hit] = () => false; context.fairyRef.current[action] = () => calls.push(action);
   }
@@ -266,6 +269,13 @@ test('normal Garden taps prioritize placement and flower details before all Fair
   // The puppy under the tap: it sits and its ring menu opens; nothing else happens.
   context.gardenPets.current = { petAt: () => ({ id: 'puppy', x: 100, y: 100, size: 113 }), hold: () => calls.push('hold') };
   expect(['hold', 'ring']);
+  // The dogs inside their house (taps at 100,100 fall on it): it opens, before the pets and her.
+  context.house = { phase: 'inside' };
+  expect(['asleep']);
+  // While they are out (or still going in) the house is just scenery.
+  context.house = { phase: 'entering' };
+  expect(['hold', 'ring']);
+  context.house = { phase: 'out' };
   context.gardenPets.current = null;
   // The owner's Garden: this month's lawn opens Events with or without flowers, another month's says whose it is.
   context.monthLawnOpensEvents = true;

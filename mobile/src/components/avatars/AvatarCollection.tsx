@@ -55,12 +55,14 @@ export function AvatarCollection({ visible, locale, onClose }: { visible: boolea
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [unlocked, setUnlocked] = useState<string | null>(null);
-  const bloom = useRef(new Animated.Value(0)).current;
+  const bloom = useState(() => new Animated.Value(0))[0];
   const equipped = session?.user.avatar ?? collection?.equipped;
   const firstReady = collection?.pending.find(reward => reward.eligible > 0);
 
   // Each visit starts on the first tier; a waiting reward is shown at the top.
-  useEffect(() => { if (visible) { setTab(1); setSelected(null); setNote(''); setUnlocked(null); } }, [visible]);
+  // (Set while rendering; starting from "closed" means a collection opened on mount resets too, as before.)
+  const [openFor, setOpenFor] = useState(false);
+  if (openFor !== visible) { setOpenFor(visible); if (visible) { setTab(1); setSelected(null); setNote(''); setUnlocked(null); } }
   useEffect(() => {
     if (!unlocked) return;
     bloom.setValue(0);

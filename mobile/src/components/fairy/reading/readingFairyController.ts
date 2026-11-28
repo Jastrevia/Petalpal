@@ -22,7 +22,7 @@ export type ReadingTiming = {
 
 export const READING_TIMING: ReadingTiming = {
   pageTurnGapMs: { min: 45_000, typical: [90_000, 180_000], max: 300_000 },
-  phaseMs: { preparation: 520, lift: 420, turn: 820, settle: 480, returnToReading: 680 },
+  phaseMs: { preparation: 700, lift: 520, turn: 880, settle: 620, returnToReading: 820 },
   thinkingAfterMs: [10 * 60_000, 20 * 60_000],
   thinkingHoldMs: [4_000, 8_000],
   thinkingBeatMs: 2_500,
@@ -187,23 +187,40 @@ export function createReadingFairyController({ timing = READING_TIMING, clock = 
 }
 export type ReadingFairyController = ReturnType<typeof createReadingFairyController>;
 
-// What to show for a state: art frames (index into the six reading poses) with the moment each
-// appears (ms after the state begins) and how long it crossfades in. Missing frames fall back to
-// the reading pose; with no reading pose at all, nothing is drawn.
-export type ReadingFrameCue = { frame: number; atMs: number; fadeMs: number };
-export const READING_FRAME_COUNT = 6;
-export function readingFrameCues(state: ReadingState, durationMs: number | null): ReadingFrameCue[] {
+// The motion is one continuous strip of 42 frames: the six storyboard poses with in-betweens, the
+// last frame being the reading pose again. Playback moves a fractional position along the strip
+// (neighbouring frames crossfade), so the hand travels instead of jumping between poses.
+export const READING_SHEET = { columns: 7, rows: 6, frames: 42, size: 502, crop: { x: 168, y: 58, width: 334, height: 384 } };
+export const READING_KEYS = { reading: 0, gather: 7, reach: 13, lift: 20, arc: 27, settle: 33, end: 41 } as const;
+
+export type ReadingEasing = 'in' | 'out' | 'linear' | 'inOut';
+// Where the strip should go for a state, from position `at`. thenJumpTo: the end of the strip is the
+// reading pose again, so it wraps to 0 without a visible change. null: stay where it is.
+export type ReadingMotion = { to: number; durationMs: number; easing: ReadingEasing; thenJumpTo?: number };
+const SETTLE_MS_PER_FRAME = 40;
+export function readingMotion(state: ReadingState, durationMs: number | null, at: number): ReadingMotion | null {
+  const { reading, gather, reach, arc, settle, end } = READING_KEYS;
+  const ms = durationMs ?? 0;
   switch (state) {
-    case 'PAGE_PREPARATION': return [{ frame: 1, atMs: 0, fadeMs: 360 }];
-    case 'PAGE_LIFT': return [{ frame: 2, atMs: 0, fadeMs: 240 }];
-    case 'PAGE_TURN': return [{ frame: 3, atMs: 0, fadeMs: 220 }, { frame: 4, atMs: Math.round((durationMs ?? 0) / 2), fadeMs: 220 }];
-    case 'PAGE_SETTLE': return [{ frame: 5, atMs: 0, fadeMs: 260 }];
-    case 'THINKING': return [{ frame: 1, atMs: 0, fadeMs: 900 }];
-    case 'RETURN_TO_READING': return [{ frame: 0, atMs: 0, fadeMs: durationMs ?? 600 }];
-    default: return [{ frame: 0, atMs: 0, fadeMs: 400 }];
+    // One page turn is one sweep: easing only at its start and end, so it never stops at a pose.
+    case 'PAGE_PREPARATION': return { to: gather, durationMs: ms, easing: 'in' };
+    case 'PAGE_LIFT': return { to: reach, durationMs: ms, easing: 'linear' };
+    case 'PAGE_TURN': return { to: arc, durationMs: ms, easing: 'linear' };
+    case 'PAGE_SETTLE': return { to: settle, durationMs: ms, easing: 'out' };
+    case 'THINKING': return { to: gather, durationMs: 1_200, easing: 'inOut' };
+    case 'RETURN_TO_READING':
+      return at > gather ? { to: end, durationMs: ms, easing: 'inOut', thenJumpTo: reading } : { to: reading, durationMs: ms, easing: 'inOut' };
+    default:
+      // READING, PAUSED, IDLE: finish any movement gently back to the reading pose.
+      if (at <= reading || at >= end) return at >= end ? { to: reading, durationMs: 0, easing: 'linear' } : null;
+      return at <= gather ? { to: reading, durationMs: Math.round(at * 100), easing: 'inOut' }
+        : { to: end, durationMs: Math.round((end - at) * SETTLE_MS_PER_FRAME), easing: 'out', thenJumpTo: reading };
   }
 }
-export function resolveReadingFrame(frame: number, available: readonly unknown[]) {
-  if (available[frame]) return frame;
-  return available[0] ? 0 : null;
+
+// Which art can be drawn: the moving strip over the reading pose, the reading pose alone if the
+// strip is missing, or nothing.
+export function readingArt(art: { base?: unknown; sheet?: unknown }) {
+  if (!art.base) return null;
+  return art.sheet ? 'animated' : 'still';
 }

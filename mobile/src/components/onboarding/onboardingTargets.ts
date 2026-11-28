@@ -69,8 +69,10 @@ export function useOnboardingTargetRect(id: string | undefined, active = true): 
   const current = useSyncExternalStore(subscribe, () => version, () => version);
   const [rect, setRect] = useState<Rect | null>(null);
   useEffect(listenForLayoutChanges, []);
+  // No target (or not active): no rect (cleared while rendering).
+  if ((!id || !active) && rect !== null) setRect(null);
   useEffect(() => {
-    if (!id || !active) { setRect(null); return; }
+    if (!id || !active) return;
     let cancelled = false;
     // Measure after this frame's layout and again one frame later, once nested layout settles.
     const measure = () => void measureOnboardingTarget(id).then(next => {

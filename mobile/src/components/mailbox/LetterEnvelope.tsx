@@ -7,11 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from './ExpandedLetter';
-import {
-  ENVELOPE_DECKLE_CLIP,
-  ENVELOPE_PAPER_BACKGROUND,
-} from './paperTextures';
+import { FONT_BODY, FONT_TITLE } from './ExpandedLetter';
 import { SparklingMagicStar } from './SparklingMagicStar';
 import type { BotanicalIconType, Letter, PaperTone } from './types';
 

@@ -59,7 +59,13 @@
     ['gilded-tome', 'pendant', 'Gilded Tome', '鎏金书册'], ['noble-lantern', 'pendant', 'Noble Lantern', '贵族提灯'], ['hourglass', 'pendant', 'Hourglass', '沙漏'],
     ['crystal-spire', 'pendant', 'Crystal Spire', '水晶尖坠'], ['gilded-feather', 'pendant', 'Gilded Feather', '金羽坠']];
   const petOpened = new Set([...petPieces.filter(([, row]) => row === 'hat').map(([id]) => id), 'petal-capelet', 'lilac-cape', 'crystal-drop', 'glow-lantern', 'compass-star', 'crescent-crystal', 'midnight-cape', 'crystal-spire']);
-  const petFoods = [['berry-tart', 'Berry Tart', '莓果挞', 3], ['flower-cookies', 'Flower Cookies', '小花饼干', 2], ['fish-biscuit', 'Fish Biscuit', '小鱼饼', 1], ['honey-seeds', 'Honey Seeds', '蜂蜜谷粒', 0]];
+  const petFoods = [['kibble', 'Kibble', '狗粮', 4], ['carrot', 'Carrot', '胡萝卜', 2], ['blueberries', 'Blueberries', '蓝莓', 1], ['apple', 'Apple', '苹果', 1],
+    ['pumpkin', 'Pumpkin', '南瓜', 0], ['banana', 'Banana', '香蕉', 1], ['strawberries', 'Strawberries', '草莓', 0], ['salmon', 'Salmon', '三文鱼', 1], ['egg', 'Egg', '鸡蛋', 0]];
+  // PetalPal VIP (lib/billing.js): free until a purchase in the preview store (?store=preview).
+  let vip = null;
+  const billing = () => ({ vip: Boolean(vip), plan: vip, founder: vip === 'LIFETIME', expiresAt: null, willRenew: false, inGracePeriod: false,
+    store: vip ? 'APP_STORE' : null, enforced: true,
+    benefits: { weeklyAi: Boolean(vip), monthlyAi: Boolean(vip), weeklyAiTrialsLeft: vip ? null : 2, dailyFlowers: vip ? 3 : 2, tarotReadingsPerWeek: vip ? 3 : null } });
   const petOutfits = { puppy: { hat: 'lilac-beret', collar: null, pendant: null } };
 
   // The petal ring follows ?lang= like the rest of the preview (lib/petal-card-draw.js PETAL_TOPICS).
@@ -583,7 +589,12 @@
       if (p === '/moderation/reports') return json(staffReports);
       const reportAction = p.match(/^\/moderation\/reports\/([^/]+)$/);
       if (reportAction && method === 'POST') { staffReports = staffReports.filter(report => report.id !== reportAction[1]); return json({ success: true }); }
+      if (p === '/billing/sync' && method === 'POST') { vip = 'LIFETIME'; return json(billing()); }
       if (method !== 'GET') return json({ ok: true });
+      if (p === '/billing/me') return json(billing());
+      if (p === '/billing/plans') return json({ entitlementId: 'vip', plans: [
+        { plan: 'MONTHLY', productId: 'petalpal_vip_monthly', referencePriceUsd: 3, period: 'P1M', available: true, endsAt: null },
+        { plan: 'LIFETIME', productId: 'petalpal_vip_lifetime', referencePriceUsd: 10, period: null, available: true, endsAt: new Date(Date.now() + 90 * 86400000).toISOString() }] });
       if (p === '/session') return json({ user, garden: { owner: { id: uid } }, fairyState: { onboardingStep: 'COMPLETED', onboardingCompleted: true, unlockedFeatures: [] }, todayCheckIn: null, hasCheckedInToday: false, dailyGrowLimitEnabled: true });
       if (p === '/api/flowers/today') return json({ localDate: day(0), limit: 2, planted: plantedToday, remaining: Math.max(0, 2 - plantedToday) });
       if (p === '/ai/disclosure') return json({ version: 'ai-2026-10-15', features: [{ feature: 'Event emotion labels', processor: 'Cloudflare Workers AI', configured: true }],

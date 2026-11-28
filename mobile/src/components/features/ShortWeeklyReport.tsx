@@ -73,7 +73,7 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   }, [canMark, reportId, cardIndex, cardId]);
   async function keep(index: number) {
     if (!reportId) return;
-    const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); on ? copy.add(index) : copy.delete(index); return copy; });
+    const next = !kept.has(index), flip = (on: boolean) => setKept(current => { const copy = new Set(current); if (on) copy.add(index); else copy.delete(index); return copy; });
     flip(next); setLoopNote(null);
     try { await keepSection(reportId, index, next); } catch { flip(!next); setLoopNote({ index, text: copy.feedbackFailed }); }
   }
@@ -147,17 +147,8 @@ export function ShortWeeklyReport({ short, interactive, onWrite, reportId, reduc
   </View>;
   };
   // More insights: one card at a time, the next one peeking in from the side.
-  const [rowWidth, setRowWidth] = useState(0);
   const [cardOpen, setCardOpen] = useState(false);
   const [headWidth, setHeadWidth] = useState(0);
-  const cardWidth = Math.max(0, rowWidth - 36);
-  const more = (list: Insight[]) => list.length === 1 ? insightCard(list[0], 'more-0', false)
-    : <View onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
-      {cardWidth > 0 && <ScrollView horizontal decelerationRate="fast" snapToInterval={cardWidth + 12} snapToAlignment="start"
-        showsHorizontalScrollIndicator contentContainerStyle={{ gap: 12, paddingBottom: 6, marginBottom: 12, alignItems: 'flex-start' }}>
-        {list.map((item, i) => insightCard(item, `more-${i}`, false, { width: cardWidth, marginBottom: 0 }))}
-      </ScrollView>}
-    </View>;
   const curve = short.curve && <>
     <Text style={s.heading}>{copy.curve}</Text>
     <View accessible={!insights} accessibilityLabel={short.curve.claim} onLayout={event => setWidth(event.nativeEvent.layout.width)}

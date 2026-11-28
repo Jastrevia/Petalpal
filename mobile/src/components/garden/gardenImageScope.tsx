@@ -29,6 +29,7 @@ export function useGardenImage(source: DataSourceParam): SkImage | null {
   useEffect(() => {
     let live = true;
     if (!scope) return () => { live = false; };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: no source clears the shared image (scoped image cache)
     if (source === null || source === undefined) { setImage(null); return () => { live = false; }; }
     let entry = scope.get(source);
     if (!entry) {

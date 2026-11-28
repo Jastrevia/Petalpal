@@ -18,7 +18,9 @@ import { EventsPanel } from './EventsPanel';
 import { EventIllustration } from './EventIllustration';
 import { FriendsPanel } from './FriendsPanel';
 import { GardenPrivacySettings } from './GardenPrivacySettings';
-import { FEATURE_COLORS as colors, FeatureActionButton, FeatureSection, StatusChip, ui } from './FeatureUI';
+import { GardenWeatherSettings } from './GardenWeatherSettings';
+import { VipSettings } from './VipMembership';
+import { FEATURE_COLORS as colors, FeatureSection, StatusChip, ui } from './FeatureUI';
 import { AvatarCollection } from '../avatars/AvatarCollection';
 import { avatarCopy } from '../avatars/avatarCopy';
 import { useAvatarCollection } from '../../services/avatars';
@@ -73,6 +75,7 @@ export function FeatureOverlay({ feature, onClose, onGardenChanged, onOpenSettin
   const scroller = useRef<ScrollView>(null), contentHeight = useRef(0);
   const locale = useAppLocale();
   const closeLabel = OVERLAY_COPY[locale].close;
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- another panel starts without the add-friend and Events intro states, with its measured height
   useEffect(() => { setAddingFriend(false); setEventsIntro(false); contentHeight.current = 0; }, [feature?.id]);
   // The first-time tour follows the Events and Friends panels opening and closing.
   useEffect(() => {
@@ -146,6 +149,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
   // Me: the profile and every setting on one page (no separate Settings step).
   if (feature.id === 'profile' || feature.id === 'settings') return <View style={ui.body}>
     <ProfileHero theme={theme} />
+    <VipSettings key={`vip-${session?.user.id}`} />
     <FeatureSection title={copy.language}>
       <ReportLanguageSettings key={session?.user.id} />
     </FeatureSection>
@@ -167,6 +171,7 @@ function FeatureContent({ feature, onClose, onGardenChanged, onOpenSettings, eve
       {themeError ? <Text accessibilityRole="alert" style={[ui.caption, { color: theme.text }]}>{themeError}</Text> : null}
     </FeatureSection>
     <GardenPrivacySettings key={session?.user.id} />
+    <GardenWeatherSettings key={`weather-${session?.user.id}`} />
     <PrivacyAndSupport account onLeave={onClose} key={`support-${session?.user.id}`} />
     {error ? <Text accessibilityRole="alert" style={[ui.text, { color: theme.text }]}>{error}</Text> : null}
     <AccountRecoverySettings key={`recovery-${session?.user.id}`} />

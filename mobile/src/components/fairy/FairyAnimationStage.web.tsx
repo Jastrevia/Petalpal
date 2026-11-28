@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Asset } from 'expo-asset';
 import { FAIRY_ANIMATION_ASSETS, type FairyAnimationState, type FairyAnimationStageProps } from './fairyAnimationAssets';
 
@@ -81,7 +81,7 @@ export function FairyAnimationStage({ play, loop, reduced, onStart, onEnd, heigh
   const [noVideo, setNoVideo] = useState<ReadonlySet<Action>>(() => new Set());
   const [urls, setUrls] = useState<Record<string, string>>({});
   const liveUrls = useRef(urls);
-  liveUrls.current = urls;
+  useLayoutEffect(() => { liveUrls.current = urls; });
   const videos = useRef(new Map<Action, HTMLVideoElement | null>());
   const wantedAction = play.state === 'idle' ? null : play.state;
   const shownAction = onScreen && onScreen !== 'idle' ? onScreen.split(':')[0] as Action : null;
@@ -122,6 +122,7 @@ export function FairyAnimationStage({ play, loop, reduced, onStart, onEnd, heigh
     const stale = Object.keys(urls).filter(key => !keep.has(key));
     if (!stale.length) return;
     stale.forEach(key => URL.revokeObjectURL(urls[key]));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- drops blob URLs no longer shown, after revoking them
     setUrls(all => Object.fromEntries(Object.entries(all).filter(([key]) => keep.has(key))));
   }, [wanted, onScreen, urls]);
   useEffect(() => () => { Object.values(liveUrls.current).forEach(url => URL.revokeObjectURL(url)); }, []);

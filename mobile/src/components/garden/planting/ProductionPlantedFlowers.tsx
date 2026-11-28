@@ -2,7 +2,10 @@ import { CanonicalFlowerArt } from './CanonicalFlowerArt';
 import { GardenMoodEffectsLayer } from '../flower-mood-effects/GardenMoodEffects';
 import {runtimeAudit} from '../performance/runtimeAudit';
 import { BlurMask, Circle, Group, Image, Oval, useImage, type SkImage } from '@shopify/react-native-skia';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDerivedValue } from 'react-native-reanimated';
+import { Snowy } from '../weather/SnowLayer';
+import { gardenWeatherSeconds, gardenWind, useWindBendsFlowers, windGust } from '../weather/gardenWeather';
 import { usePlanting } from './PlantingContext';
 import { flowerInDepthPass, type FlowerDepthPass } from '../flowerOcclusion';
 import GardenStaticPicture from '../GardenStaticPicture';
@@ -15,6 +18,22 @@ const ClusterLoader = memo(function ClusterLoader({ source, onLoad }: { source: 
   return null;
 });
 
+/**
+ * A cluster bending in the wind from its root: the stems shear downwind (the base stays planted)
+ * and spring back, and each gust band that crosses the Garden bends the beds it passes in turn.
+ */
+function Bending({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+  const transform = useDerivedValue(() => {
+    const t = gardenWeatherSeconds.value, wind = gardenWind.value;
+    const gust = windGust(x, y, t);
+    const flutter = Math.sin(t * (2.1 + wind * 2.4) + x * 0.031 + y * 0.017);
+    const bend = wind * (0.05 + 0.2 * gust) + wind * (0.03 + 0.06 * gust) * flutter;
+    // Points above the root have negative y, so a negative skew carries the tops downwind (+x).
+    return [{ skewX: -bend }, { scaleY: 1 - Math.abs(bend) * 0.12 }];
+  });
+  return <Group origin={{ x, y }} transform={transform}>{children}</Group>;
+}
+
 /** One painted cluster per planted flower, standing on its planting point, back to front. */
 function ClusterBed({ flowers, cacheStatic = false }: { flowers: readonly FlowerPlacementRecord[]; cacheStatic?: boolean }) {
   const [images, setImages] = useState<Record<string, SkImage>>({});
@@ -24,21 +43,23 @@ function ClusterBed({ flowers, cacheStatic = false }: { flowers: readonly Flower
     .map(flower => ({ flower, cluster: clusterDrawing(flower) })), [flowers]);
   const sources = useMemo(() => [...new Set(drawn.flatMap(({ cluster }) => cluster ? [cluster.source] : []))], [drawn]);
   const complete = sources.every(source => images[source]);
+  const bending = useWindBendsFlowers();
   const drawing = useMemo(() => <Group>
     {drawn.map(({ flower, cluster }) => {
       if (!cluster) return flower.sourceType || flower.sourceEventId ? <CanonicalFlowerArt key={flower.id} flower={flower} />
         : __DEV__ ? <Circle key={flower.id} cx={flower.worldX} cy={flower.worldY} r={4} color="#a6643c" style="stroke" strokeWidth={1.5}/> : null;
       const image = images[cluster.source];
+      const art = <Image image={image} x={cluster.x} y={cluster.y} width={cluster.width} height={cluster.height} fit="fill" />;
       return image ? <Group key={flower.id}>
         <Oval x={flower.worldX - cluster.width * .4} y={flower.worldY - cluster.width * .07} width={cluster.width * .8}
           height={cluster.width * .16} color="#2f3f22" opacity={.2}><BlurMask blur={2.5} style="normal"/></Oval>
-        <Image image={image} x={cluster.x} y={cluster.y} width={cluster.width} height={cluster.height} fit="fill" />
+        {bending ? <Bending x={flower.worldX} y={flower.worldY}>{art}</Bending> : art}
       </Group> : null;
     })}
-  </Group>, [drawn, images]);
+  </Group>, [drawn, images, bending]);
   return <Group>
     {sources.map(source => <ClusterLoader key={source} source={source} onLoad={onLoad} />)}
-    {cacheStatic && complete ? <GardenStaticPicture images={Object.values(images)}>{drawing}</GardenStaticPicture> : drawing}
+    <Snowy>{cacheStatic && complete && !bending ? <GardenStaticPicture images={Object.values(images)}>{drawing}</GardenStaticPicture> : drawing}</Snowy>
   </Group>;
 }
 

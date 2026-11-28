@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Canvas, Picture, Skia, FilterMode, MipmapMode, PaintStyle, BlendMode, TileMode, ImageFormat, BlurStyle, createPicture, useImage, useFont,
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Canvas, Picture, Skia, FilterMode, MipmapMode, PaintStyle, BlendMode, TileMode, ImageFormat, createPicture, useImage, useFont,
   type SkImage, type SkCanvas, type SkFont } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import type { AppLocale } from '../../services/locale';
@@ -346,7 +346,8 @@ export function PavilionBook({ id, locale, spine, geometry, timeline, focus, onR
     const tint = [1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255) as [number, number, number];
     return { cover, spine, grain, edges, parchment, left: paper, right: paper, tint };
   }, [spine, grain, edges, parchment, cover, paper, id]);
-  const started = useRef(false), ready = useRef(onReady); ready.current = onReady;
+  const started = useRef(false), ready = useRef(onReady);
+  useLayoutEffect(() => { ready.current = onReady; });
   useEffect(() => { if (textures && !started.current) { started.current = true; ready.current(); } }, [textures]);
   const picture = useDerivedValue(() => createPicture(canvas => {
     if (!textures || !spine) return;

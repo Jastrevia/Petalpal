@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { CheckInResult } from '../../services/fairyCloseness';
 import { holdBondCelebration } from '../../services/avatars';
@@ -15,12 +15,13 @@ export function KeepsakeReveal({ result, locale, onDone }: {
   const fairyName = useFairyName();
   const copy = bondCopy(locale, fairyName);
   const [index, setIndex] = useState(0);
-  const grow = useRef(new Animated.Value(0)).current;
+  const grow = useState(() => new Animated.Value(0))[0];
   // A phone held sideways is wide but short: the keepsake sits beside PPL's note instead of above it,
   // and whatever still doesn't fit scrolls, with the button always in view.
   const screen = useWindowDimensions();
   const wide = screen.height < 520 && screen.width > screen.height;
-  useEffect(() => { setIndex(0); }, [result]);
+  const [indexFor, setIndexFor] = useState(result);
+  if (indexFor !== result) { setIndexFor(result); setIndex(0); }
   // A Fairy Bond level-up celebration waits until the keepsakes have been looked at.
   const showing = Boolean(result?.keepsakes.length);
   useEffect(() => (showing ? holdBondCelebration() : undefined), [showing]);

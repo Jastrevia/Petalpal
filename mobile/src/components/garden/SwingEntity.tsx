@@ -2,6 +2,7 @@ import {
   Blur, Circle, ColorMatrix, Group, Image, RadialGradient, useImage,
 } from '@shopify/react-native-skia';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { LOOKS, gardenWind } from './weather/gardenWeather';
 import {
   cancelAnimation,
   Easing,
@@ -126,7 +127,9 @@ function useRibbonWind(
     return () => cancelAnimation(phase);
   }, [duration, enabled, phase, phaseOffset]);
   return useDerivedValue(() => {
-    const wind = enabled ? Math.sin(phase.value) : 0;
+    // Ribbons answer the weather's wind first: wider, quicker and streaming downwind in a gale.
+    const extra = Math.max(0, gardenWind.value - LOOKS.CLEAR.wind);
+    const wind = enabled ? Math.sin(phase.value) * (1 + 3 * extra) + extra * (0.8 * Math.sin(phase.value * 6 + 0.4) + 1.6) : 0;
     return [
       { translateX: wind * driftX },
       { rotate: wind * degrees * Math.PI / 180 },
@@ -331,6 +334,7 @@ export default function SwingEntity({
   // Blurred glows cost a lot to draw even when invisible, so by day they are not drawn at all.
   const [glowDrawn, setGlowDrawn] = useState(lanternLightingEnabled);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: the glow is drawn before its fade-in starts (blurred glows are not drawn by day)
     if (lanternLightingEnabled) setGlowDrawn(true);
     lanternGlowOpacity.value = withTiming(lanternLightingEnabled ? 1 : 0, {
       duration: reducedMotion ? 0 : lanternLightingEnabled ? 1200 : 900,

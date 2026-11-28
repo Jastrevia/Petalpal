@@ -12,6 +12,9 @@ test("production HTTPS security headers protect public responses", () => {
   assert.equal(h["Referrer-Policy"], "strict-origin-when-cross-origin");
   assert.match(h["Content-Security-Policy"], /frame-ancestors 'none'/);
 });
+test("responses do not name the framework", () => {
+  assert.equal(app.get("x-powered-by"), false);
+});
 test("HSTS requires production HTTPS or the Render HTTPS ingress signal", () => {
   for (const env of [{ NODE_ENV: "development", RENDER: "true" }, { NODE_ENV: "production" }]) {
     assert.equal(securityHeaders({ ...request, headers: { ...request.headers, "x-forwarded-proto": "https" } }, env)["Strict-Transport-Security"], undefined);

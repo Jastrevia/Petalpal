@@ -18,6 +18,9 @@ import { devVariant } from '../services/deviceReset';
 import { DeviceResetDone } from '../components/features/DeviceReset';
 import { useEffect } from 'react';
 import { useAppReloadKey } from '../services/appReload';
+import { startMonitoring } from '../services/monitoring';
+import { useOtaUpdates } from '../services/otaUpdates';
+import { AppConfigGate } from '../components/AppConfigGate';
 
 // Onboarding preview shell (/onboarding-preview): DEV-only, a synthetic signed-in owner and an
 // in-memory API instead of Firebase and Render. Production never loads it.
@@ -31,9 +34,12 @@ const DevLoginEntranceHost: React.ComponentType<{ children: React.ReactNode }> =
 
 SplashScreen.preventAutoHideAsync();
 keepWebPageInPlace();
+// Crash reports from store builds (off without a DSN and in development).
+startMonitoring();
 
 export default function Layout() {
   const pathname = usePathname();
+  useOtaUpdates();
   if (__DEV__ && nativeSecurityEnabled) {
     const HarnessScreen = require('../components/NativeSecurityHarnessScreen').default;
     return <AuthProvider><HarnessScreen /></AuthProvider>;
@@ -42,7 +48,7 @@ export default function Layout() {
     const { OnboardingPreviewShell } = onboardingPreview;
     return <OnboardingPreviewShell><AuthGate><RoutedContent /></AuthGate></OnboardingPreviewShell>;
   }
-  return <AuthProvider><AuthGate><RoutedContent /></AuthGate>{devVariant ? <DeviceResetDone /> : null}</AuthProvider>;
+  return <AuthProvider><AppConfigGate><AuthGate><RoutedContent /></AuthGate></AppConfigGate>{devVariant ? <DeviceResetDone /> : null}</AuthProvider>;
 }
 
 function RoutedContent() {

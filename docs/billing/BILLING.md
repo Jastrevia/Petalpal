@@ -75,6 +75,29 @@ App (RevenueCat SDK) ──purchase──► App Store / Google Play / Web
 6. "Manage subscription" opens the store's page (`Purchases.showManageSubscriptions()` or the store URL). Lifetime has
    nothing to manage.
 
+### In the app (release/1.0.1, 2026-11-26)
+
+- Me → **PetalPal VIP** ([VipMembership.tsx](../../mobile/src/components/features/VipMembership.tsx)) shows the
+  owner's state from `GET /billing/me` (free / VIP until or renewing / Founding Member, grace-period notice, AI
+  trial letters left) and opens the membership sheet: the benefits, the plans from `GET /billing/plans` matched to
+  the RevenueCat `default` offering ([services/billing.ts](../../mobile/src/services/billing.ts) `plansToShow`:
+  product id first, else package type), store prices, the lifetime end date, Buy, Restore, Manage (monthly), and
+  the auto-renewal terms with Terms of Use and Privacy Policy links (App Review 3.1.2).
+- [purchases.native.ts](../../mobile/src/services/purchases.native.ts): `react-native-purchases` **11.0.4** (pinned;
+  needs a new native build). RevenueCat is configured lazily with `appUserID` = the PetalPal account id the first
+  time the owner opens the sheet (`logIn` when another account signed in since). A user cancel is not an error.
+  After a purchase or restore it calls `POST /billing/sync`.
+- Web ([purchases.ts](../../mobile/src/services/purchases.ts)) never sells: the sheet says VIP is bought in the
+  iPhone app. Dev web `?store=preview` stands in a pretend store to look at the sheet (the local preview's
+  fixtures make the account a Founding Member on sync).
+- Build setting (EAS environment, production and preview): **`EXPO_PUBLIC_REVENUECAT_IOS_KEY`** = the RevenueCat
+  *public* Apple SDK key (Project settings → API keys; public keys are meant to ship in the app). Without it the
+  sheet says "VIP opens soon". Never use a RevenueCat Test Store key in a release build. Android later:
+  `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+- Legal pages (effective November 26, 2026, not yet published): Terms §4 PetalPal VIP (auto-renewal, cancelling,
+  Founding Member, refunds through Apple), Privacy Policy names RevenueCat and Apple, the deletion page and the
+  in-app Delete Account screen say deleting the account does not cancel an App Store subscription.
+
 ## Owner setup (one time)
 
 Nothing here can be done from code. Do these yourself; never paste keys into chat.

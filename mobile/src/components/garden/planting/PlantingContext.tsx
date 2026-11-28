@@ -1,3 +1,4 @@
+import type { ApiError } from '../../../services/api';
 import { dispatchOnboarding } from '../../onboarding/onboardingSignals';
 import { readEvent } from '../../../services/events';
 import { landMonth, loadGarden, plantFlowerSpot } from '../../../services/garden';
@@ -134,6 +135,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const placements = useMemo(() => records.filter(p => !awaitsPlanting(p)), [records]);
   const unplantedFlowers = useMemo(() => records.filter(awaitsPlanting), [records]);
   // Read by startPlanting without making it change identity on every Garden refresh.
+  // eslint-disable-next-line react-hooks/refs -- Garden: startPlanting reads the latest placements without changing identity on every Garden refresh
   const plantedRef = useRef(placements); plantedRef.current = placements;
   const [placementNotice, setPlacementNotice] = useState<PlacementNotice | null>(null);
   const [isGardenLoading, setIsGardenLoading] = useState(true);
@@ -148,6 +150,9 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   const [selectedFlower, setSelectedFlower] = useState<FlowerPlacementRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [session, setSession] = useState<FlowerSession | null>(suppliedSession || null);
+  // The owner's language, from the session (services/locale needs the auth provider, which the
+  // planting tests do not mount).
+  const locale = (session?.user as { preferredLocale?: string } | undefined)?.preferredLocale === 'zh-Hans' ? 'zh-Hans' : 'en';
   const [flowerDetailSource, setFlowerDetailSource] = useState<FlowerSourceDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isDetailWorking, setIsDetailWorking] = useState(false);
@@ -195,6 +200,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   }, [refreshGarden]));
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: a supplied session is taken as is; the effect's stale-load guard stays as it was
     if (suppliedSession) { setSession(suppliedSession); return; }
     let mounted = true;
     loadFlowerSession().then((loaded) => {
@@ -208,6 +214,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
   useEffect(() => {
     detailVersion.current++;
     detailWorking.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: another account or Garden drops the open flower detail, with its version guard
     setSelectedFlower(null); setFlowerDetailSource(null);
     setIsDetailLoading(false); setIsDetailWorking(false); setDetailError('');
   }, [suppliedSession?.user.id, session?.user.id, gardenOwnerUserId]);
@@ -219,6 +226,7 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     let mounted = true;
     const version = detailVersion.current;
     const refreshBase = flowerDetailSource;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden planting: shows loading for the request this effect starts (version-guarded)
     setIsDetailLoading(true);
     loadFlowerSource(ownerId, selectedFlower.flowerId).then((source) => {
       if (mounted && version === detailVersion.current) {
@@ -421,13 +429,17 @@ function PlantingProviderRoot({ children, gardenOwnerUserId, session: suppliedSe
     } catch (err) {
       if (stale()) return false;
       console.error('[PlantingContext] Unable to save placement.');
-      // Nothing was planted: stay in planting with the same valid preview so Plant can be retried.
-      setPlacementNotice({ kind: 'error', message: err instanceof Error && err.message ? err.message : 'Unable to plant here. Try again.' });
+      // Nothing was planted: stay in planting with the same valid preview so Plant can be retried
+      // (or, with the day's flowers used, plant it another day; VIP has 3 a day, so no number here).
+      const limitHit = (err as ApiError).code === 'DAILY_FLOWER_LIMIT';
+      setPlacementNotice({ kind: 'error', message: limitHit
+        ? (locale === 'zh-Hans' ? '今天的花都种下了。这朵可以留到明天再种。' : "You've planted today's flowers. This one can wait until tomorrow.")
+        : err instanceof Error && err.message ? err.message : 'Unable to plant here. Try again.' });
       return false;
     } finally {
       if (op === plantingOpRef.current) setIsSaving(false);
     }
-  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode, activeMode, refreshGarden]);
+  }, [targetFlower, previewCoords, validationResult, isSaving, placements, validateAt, session, gardenOwnerUserId, backendMode, activeMode, refreshGarden, locale]);
 
   // Leaving planting on purpose (Cancel) keeps the unfinished planting as a draft: the valid
   // preview is remembered for when the owner comes back. Nothing is saved or planted.

@@ -1,4 +1,4 @@
-import { BlurMask, Group, Image, Oval, Path, Skia, useImage, type SkImage } from '@shopify/react-native-skia';
+import { BlurMask, Circle, Group, Image, Oval, Path, RadialGradient, Skia, useImage, vec, type SkImage } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useDerivedValue, useReducedMotion, type DerivedValue, type SharedValue } from 'react-native-reanimated';
 import { usePetOutfits } from '@/services/gardenPets';
@@ -7,13 +7,17 @@ import { usePlanting } from '../planting/PlantingContext';
 import { awaitsPlanting } from '../planting/plantingPersistence';
 import { onBirdFlight, residents } from './gardenResidents';
 import { ACTION_FPS, actionSeconds, MALTESE_ACTIONS, malteseLookOf, malteseLookOfOutfit, MATCHING_FRAME, PUPPY_ACTIONS, PUPPY_LOOKS, puppyLookOf, type ActionFrames, type MalteseLook, type PuppyAction, type PuppyLook } from './puppyLooks';
-export type { MalteseLook } from './puppyLooks';
 import { distance, route, safeSegment, WALK_NETWORK, type Point } from '../fairy/walkNetwork';
 import SheetFrame from '../SheetFrame';
 import {
-  AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
-  type CritterId, type Lawns, type Visit,
+  AWAY_SECONDS, burstLength, CRITTER_IDS, RESIDENT, planFoxArrival, CHASE_CHANCE, RHYTHMS, APART, asideFrom, breakOff, clearOf, CRITTERS, FOLLOW_NEAR, holdVisit, isRunning, leadSpell, pickLeader, planFollow, planFriendVisit, planPlay, planScene, PLAY_CHANCE, PLAY_NEAR, SCENE_SPECS, sceneHold, sceneShown, type PairLeader, type Scene, type SceneKind, leaveVisit, releaseVisit, nextGap, planChase, planNextLeg, planVisit, pointAlong, sitDown, visitDistance, visitPose, walkableEdges,
+  type CritterId, type Lawns, type Visit, FADE_SECONDS, MALTESE_RUN_SPEED, pathLength, RISE_SECONDS, RUN_SPEED, travelSeconds,
 } from './critterVisits';
+import { dogHouse, doorSpot } from '../dogHouseState';
+import { HOUSE_ENTER_SECONDS } from './DogHouseOccupants';
+import type { FoxReason } from './silktailDays';
+import { useGardenLoadState, type GardenLoadStore } from '../loading/gardenReadiness';
+export type { MalteseLook } from './puppyLooks';
 
 // Painted visitors (one painting each); all motion is drawn from the Garden clock, so no React
 // renders happen while they move. Art: assets/garden/critters, painting size in pixels. The
@@ -23,8 +27,10 @@ import {
 // A flight: `fps`, played in time. `rest`: frames of settling down (same cells), played while it
 // rests between legs (`always`, or when the leg `sits`), and backwards as far as `rise`
 // (standing) to get up again. `run`: a running stride (same cells), for a leg that `chase`s.
-// `trail`: a painted petal it sheds behind it while it moves.
+// `trail`: a painted petal it sheds behind it while it moves. `arrive`: frames of it taking
+// shape (same cells), played at REST_FPS over a leg's first `arrive` seconds (planFoxArrival).
 type Frames = { columns: number; count: number; ground: number; loop: number; fps?: number;
+  arrive?: { source: number; count: number };
   rest?: { source: number; count: number; rise: number; always?: boolean };
   run?: { source: number; columns: number; count: number; loop: number;
     // A run in bigger cells than the walk's (a gallop stretches past them): their size, and where
@@ -114,9 +120,12 @@ const ART: Record<CritterId, { source: number; frames?: Frames; w: number; h: nu
   maltese: { source: MALTESE_LOOKS.bare.source, w: 293, h: 220, frames: MALTESE_LOOKS.bare },
   // The Silktail Fox spirit, generated from the Garden spirits design sheet: it gallops (several
   // strides of a running clip) shedding petals, then slows, stops and sits down to rest (a clip
-  // from that same running pose), and gets up again (back to its standing frame, 24).
+  // from that same running pose), and gets up again (back to its standing frame, 24). It arrives
+  // out of a swirl of petals and silk ribbons (oil-motion, 2026-11-23, ending on the sit sheet's
+  // last frame; ~/dev/petalpal-motion/silktail/arrive, scripts/critters/pack-arrival.py).
   silktail: { source: require('@/assets/garden/spirits/silktail-run.webp'), w: 240, h: 180,
     frames: { columns: 8, count: 47, ground: 167, loop: 394, trail: require('@/assets/garden/spirits/silktail-petal.webp'),
+      arrive: { source: require('@/assets/garden/spirits/silktail-arrive.webp'), count: 62 },
       rest: { source: require('@/assets/garden/spirits/silktail-sit.webp'), count: 62, rise: 24, always: true } } },
 };
 const REST_FPS = 12;
@@ -150,10 +159,101 @@ export type GardenPetsHandle = {
 // then until MAX_VISITORS are here, only while the Garden is active. They stay, setting off again whenever a leg ends; after AWAY_SECONDS away they have
 // gone. The rabbit and the hedgehog keep to unplanted lawns (critterVisits.ts): when only one is
 // left, just one of them comes this session, picked when the Garden opens.
-export default memo(function GardenCritters({ clock, active, pets }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null> }) {
+// Rain: the pair run home to their house door (a step short of it, then onto it from the left, so
+// they sit facing the door as in the house's clip) and sit there; the clip then takes them in.
+const RUNNING_HOME = { cycle: 0, moving: 1 };
+const HANDOFF_SECONDS = 1.6;
+const HOLD_AT_DOOR = 3600;
+function goHome(visit: Visit, now: number): Visit {
+  const id = visit.id === 'maltese' ? 'maltese' : 'puppy';
+  const spot = doorSpot(id), before = { x: spot.x - 10, y: spot.y };
+  const pose = visitPose(visit, now), here = { x: pose.x, y: pose.y };
+  const way = pathTo(here, before);
+  const path = way ? [...way, spot] : [here, before, spot];
+  const speed = id === 'maltese' ? MALTESE_RUN_SPEED : RUN_SPEED;
+  const rising = Boolean(visit.sits) && now < visit.start + visit.lead;
+  const lead = rising ? RISE_SECONDS : 0.15;
+  return { ...visit, path, start: now, lead, fadeIn: false, walked: visit.walked + visitDistance(visit, now), homing: 'going',
+    held: false, action: undefined, sits: false, rising, chase: id === 'puppy', running: id === 'maltese', play: false, following: false,
+    inScene: undefined, lawn: undefined, speed, rhythm: RUNNING_HOME, duration: lead + pathLength(path) / speed };
+}
+// Rain over: each comes out of the door (fading in there) and strolls to the nearest path point.
+function comeOut(key: number, id: 'puppy' | 'maltese', now: number): Visit {
+  const spot = doorSpot(id), spec = CRITTERS[id];
+  const node = WALK_NETWORK.nodes.filter(n => safeSegment(spot, n, isGardenGroundBlocked))
+    .sort((a, b) => Math.hypot(a.x - spot.x, a.y - spot.y) - Math.hypot(b.x - spot.x, b.y - spot.y))[0];
+  const path = node ? [spot, node] : [{ x: spot.x - 1e-3, y: spot.y }, spot];
+  return { key, id, path, start: now, lead: FADE_SECONDS, fadeIn: true, walked: 0, speed: spec.speed, rhythm: RHYTHMS[id],
+    duration: FADE_SECONDS + travelSeconds(pathLength(path) / spec.speed, RHYTHMS[id]) };
+}
+
+// The Silktail Fox comes a few seconds after the Garden opens on its days (`fox`, silktailDays.ts).
+const FOX_DELAY_MS = 6000;
+const NO_LOAD_STORE: GardenLoadStore = { publishLandsLoaded() {}, publishWater() {}, reportFailure() {}, subscribe: () => () => {}, getState: () => ({ landsLoaded: 1, landsTotal: 1, water: 'ready', failures: [] }) };
+export default memo(function GardenCritters({ clock, active, pets, shelter = false, fox = null, onFoxArrive, loadStore }: { clock: SharedValue<number>; active: boolean; pets?: MutableRefObject<GardenPetsHandle | null>; shelter?: boolean;
+  fox?: FoxReason | null; onFoxArrive?: (reason: FoxReason) => void; loadStore?: GardenLoadStore }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const keyRef = useRef(0);
   const visitsRef = useRef(visits); visitsRef.current = visits;
+  const shelterRef = useRef(shelter); shelterRef.current = shelter;
+  // The Silktail Fox's day: it arrives (out of petals) a moment after the Garden opens and stays
+  // all day, walking the paths like the others; when its day is over it fades out where it is.
+  const foxRef = useRef(fox); foxRef.current = fox;
+  const foxArrived = useRef(onFoxArrive); foxArrived.current = onFoxArrive;
+  const foxKey = fox ? (fox.kind === 'milestone' ? `m${fox.days}` : fox.holiday) : null;
+  // It arrives only once the Garden is painted on screen (water and every island loaded), so its
+  // arrival is seen, not played behind the loading veil.
+  const load = useGardenLoadState(loadStore ?? NO_LOAD_STORE);
+  const shown = !loadStore || (load.water === 'ready' && load.landsLoaded >= load.landsTotal);
+  useEffect(() => {
+    if (!active || (foxKey && !shown)) return;
+    const here = visitsRef.current.find(v => v.id === 'silktail' && !v.leaving);
+    if (!foxKey) {
+      if (here) { visitsRef.current = visitsRef.current.map(v => (v === here ? leaveVisit(v, clock.value) : v)); setVisits(visitsRef.current); }
+      return;
+    }
+    // (Checked when the timer fires, not now: coming back after AWAY_SECONDS empties the Garden
+    // just after this runs, and the fox then arrives again.)
+    const timer = setTimeout(() => {
+      const reason = foxRef.current;
+      if (!reason || visitsRef.current.some(v => v.id === 'silktail' && !v.leaving)) return;
+      const others = visitsRef.current.map(v => { const pose = visitPose(v, clock.value); return { x: pose.x, y: pose.y }; });
+      const visit = planFoxArrival({ key: ++keyRef.current, now: clock.value, network: WALK_NETWORK, edges: EDGES, random: Math.random, others });
+      if (!visit) return;
+      visitsRef.current = [...visitsRef.current, visit]; setVisits(visitsRef.current);
+      foxArrived.current?.(reason);
+    }, FOX_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [active, foxKey, clock, shown]);
+  useEffect(() => { dogHouse.clock = clock; }, [clock]);
+  // The rain starts: the pair (if here) run home; with neither here they are simply indoors. The
+  // rain stops: whoever is indoors comes out of the door.
+  useEffect(() => {
+    if (!active) return;
+    const now = clock.value;
+    const isPair = (v: Visit) => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving;
+    if (shelter) {
+      if (dogHouse.get().phase !== 'out') return;
+      if (!visitsRef.current.some(isPair)) { dogHouse.set({ phase: 'inside', since: now }); return; }
+      visitsRef.current = visitsRef.current.map(v => (isPair(v) && !v.homing ? goHome(v, now) : v));
+      setVisits(visitsRef.current);
+      return;
+    }
+    // Still on their way, or sitting at the door: they simply carry on with their day.
+    if (visitsRef.current.some(v => v.homing)) {
+      visitsRef.current = visitsRef.current.map(v => {
+        if (!v.homing) return v;
+        const elapsed = Math.max(0, now - v.start), lead = Math.min(v.lead, elapsed + 1.2);
+        return { ...v, homing: undefined, lead, duration: v.duration - v.lead + lead };
+      });
+      setVisits(visitsRef.current);
+    }
+    if (dogHouse.get().phase === 'out') return;
+    dogHouse.set({ phase: 'out', since: now });
+    const out = (['puppy', 'maltese'] as const).filter(id => !visitsRef.current.some(v => v.id === id));
+    visitsRef.current = [...visitsRef.current, ...out.map(id => comeOut(++keyRef.current, id, now))];
+    setVisits(visitsRef.current);
+  }, [shelter, active, clock]);
   const awaySince = useRef<number | null>(null);
   const chase = useRef<(to: Point) => void>(() => {});
   const { placements, isGardenLoading } = usePlanting();
@@ -228,14 +328,17 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     if (left) { visitsRef.current = []; setVisits([]); }
     let timer: ReturnType<typeof setTimeout>;
     const arrive = () => {
-      const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current,
-        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: excluded.current });
+      const indoors = shelterRef.current || dogHouse.get().phase !== 'out';
+      // (The fox, a spirit, takes no visitor's place.)
+      const visit = excluded.current === null ? null : planVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current.filter(v => v.id !== 'silktail'),
+        network: WALK_NETWORK, edges: EDGES, points: POINTS, random: Math.random, lawns: lawns.current, excluded: indoors ? [...excluded.current, 'puppy'] : excluded.current });
       if (visit) setVisits(current => [...current, visit]);
       // The puppy's friend follows it in now and then.
-      const friend = Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
+      const friend = !indoors && Math.random() < 0.7 ? planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random }) : null;
       if (friend) setVisits(current => (current.some(v => v.id === 'maltese') ? current : [...current, friend]));
-      // Until the puppy is in (the Garden still loading, or no route this time) it is asked again soon.
-      const residentIn = visit?.id === RESIDENT || visitsRef.current.some(v => v.id === RESIDENT);
+      // Until the puppy is in (the Garden still loading, or no route this time) it is asked again
+      // soon. Sheltering in its house counts as in: the others then keep their usual gaps.
+      const residentIn = indoors || visit?.id === RESIDENT || visitsRef.current.some(v => v.id === RESIDENT);
       timer = setTimeout(arrive, residentIn ? nextGap(Math.random) * 1000 : 1000);
     };
     // The puppy comes a moment after the Garden opens (or after it has been away AWAY_SECONDS).
@@ -245,10 +348,22 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     // butterfly, for the rabbit) fades out instead, and one that has faded out is gone.
     const legs = setInterval(() => {
       const now = clock.value;
+      // Gone in (the clip has played): resting inside until the weather clears.
+      if (dogHouse.get().phase === 'entering' && now - dogHouse.get().since >= HOUSE_ENTER_SECONDS) dogHouse.set({ phase: 'inside', since: now });
+      // Both sitting at the door for a moment: the house's clip takes them in from here.
+      if (shelterRef.current && dogHouse.get().phase === 'out') {
+        const pairNow = visitsRef.current.filter(v => (v.id === 'puppy' || v.id === 'maltese') && !v.leaving);
+        if (!pairNow.length || pairNow.every(v => v.homing === 'arrived' && now - v.start >= HANDOFF_SECONDS)) {
+          visitsRef.current = visitsRef.current.filter(v => !pairNow.includes(v));
+          setVisits(visitsRef.current);
+          dogHouse.set({ phase: pairNow.length ? 'entering' : 'inside', since: now });
+          return;
+        }
+      }
       if (now >= pair.current.until) pair.current = { leader: pickLeader(Math.random), until: now + leadSpell(Math.random) };
       // Whoever follows breaks off a walk of its own to go after the other.
       const follower = pair.current.leader === 'maltese' ? 'puppy' : 'maltese';
-      if (visitsRef.current.some(v => v.id === 'maltese' && !v.leaving) && visitsRef.current.some(v => v.id === 'puppy' && !v.leaving)) {
+      if (!shelterRef.current && visitsRef.current.some(v => v.id === 'maltese' && !v.leaving) && visitsRef.current.some(v => v.id === 'puppy' && !v.leaving)) {
         const lagging = visitsRef.current.find(v => v.id === follower), other = visitsRef.current.find(v => v.id !== follower && (v.id === 'puppy' || v.id === 'maltese'));
         // Never inside each other: one walking into the other makes the follower step aside.
         const a = lagging && visitPose(lagging, now), b = other && visitPose(other, now);
@@ -266,7 +381,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           lastTry.current = { check: true, busyM: !!busy(maltese), busyP: !!busy(puppy), gap: Math.round(Math.hypot(m.x - p.x, m.y - p.y)) };
         }
-        if (maltese && puppy && !lookPending.current && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
+        if (!shelterRef.current && maltese && puppy && !lookPending.current && now >= maltese.start + maltese.duration && !busy(maltese) && !busy(puppy) && (forcePlay.current || Math.random() < PLAY_CHANCE)) {
           const m = visitPose(maltese, maltese.start + maltese.duration), p = visitPose(puppy, now);
           const here = { x: m.x, y: m.y }, mate = { x: p.x, y: p.y };
           if (distance(here, mate) <= PLAY_NEAR * 1.6) {
@@ -311,6 +426,9 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
         let visit = original;
         if (now < visit.start + visit.duration) return [visit];
         if (visit.leaving) return [];
+        // Home at the door: sit down there facing it and wait for the other.
+        if (visit.homing === 'going') return [{ ...sitDown(visit, now, HOLD_AT_DOOR), homing: 'arrived' as const }];
+        if (visit.homing === 'arrived') return [visit];
         const lawn = visit.lawn;
         if (lawn !== undefined && (!lawns.current.unplanted.includes(lawn) || lawns.current.taken(visit.id).includes(lawn))) return [leaveVisit(visit, now)];
         // In a pair scene: stay put until it is over (the clip shows them both meanwhile).
@@ -352,7 +470,7 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
     chase.current = (to: Point) => {
       const now = clock.value, goal = belowPerch(to);
       setVisits(current => current.map(visit => {
-        if (visit.id !== 'puppy' || visit.leaving || visit.held || lookPending.current || visit.fadeIn && now < visit.start + visit.lead) return visit;
+        if (visit.id !== 'puppy' || visit.homing || visit.leaving || visit.held || lookPending.current || visit.fadeIn && now < visit.start + visit.lead) return visit;
         const pose = visitPose(visit, now);
         return planChase({ visit, now, path: route({ x: pose.x, y: pose.y }, goal, isGardenGroundBlocked) }) ?? visit;
       }));
@@ -427,6 +545,15 @@ export default memo(function GardenCritters({ clock, active, pets }: { clock: Sh
       // to what the server says).
       dress: (to?: PuppyLook) => setDressed(to),
       unplanted: () => lawns.current.unplanted, lawnOf: (id: CritterId) => visitsRef.current.find(v => v.id === id)?.lawn,
+      // The Silktail Fox arrives again now, where it is told (world units) or on a free path crossing.
+      arrive: (at?: Point) => {
+        const others = visitsRef.current.filter(v => v.id !== 'silktail').map(v => { const pose = visitPose(v, clock.value); return { x: pose.x, y: pose.y }; });
+        const visit = planFoxArrival({ key: ++keyRef.current, now: clock.value, network: WALK_NETWORK, edges: EDGES, random: Math.random, others });
+        if (!visit) return null;
+        if (at) visit.path = [at, ...visit.path.slice(1)];
+        visitsRef.current = [...visitsRef.current.filter(v => v.id !== 'silktail'), visit]; setVisits(visitsRef.current);
+        return visit.path[0];
+      },
       spawn: (id: CritterId) => {
         if (id === 'maltese') {
           const friend = planFriendVisit({ key: ++keyRef.current, now: clock.value, active: visitsRef.current, network: WALK_NETWORK, edges: EDGES, random: Math.random });
@@ -526,6 +653,7 @@ function Puppy({ visit, clock, look }: { visit: Visit; clock: SharedValue<number
   useEffect(() => {
     if (look === shown.look) return;
     // Back to the look still showing before the new one was in: it simply stays.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: a look change returning to the one still showing just keeps it
     if (look === shown.from && !shown.ready) { setShown({ look, phase: shown.fromPhase, fromPhase: 0, ready: true, at: 0 }); return; }
     const now = clock.value, along = visit.walked + visitDistance(visit, now);
     const was = PUPPY_LOOKS[shown.look], next = PUPPY_LOOKS[look];
@@ -585,11 +713,25 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
   // Resting between legs (with a rest sheet): settling down, sitting, then getting up again; or,
   // getting up only (`rising`, before a chase).
   const restSheet = useImage(frames.rest?.source ?? null);
-  const loaded = (!frames.run || !!runSheet) && (!frames.rest || !!restSheet);
+  const arriveSheet = useImage(frames.arrive?.source ?? null);
+  const loaded = (!frames.run || !!runSheet) && (!frames.rest || !!restSheet) && (!frames.arrive || !!arriveSheet);
   useEffect(() => { if (loaded) onReady?.(); }, [loaded, onReady]);
+  // Arriving (the Silktail Fox): its arrival clip, then sitting where it appeared until it gets up.
+  // With motion reduced it is simply sitting there.
+  const arriveFrame = useDerivedValue(() => {
+    const arrive = frames.arrive, e = clock.value - visit.start;
+    if (!arrive || !visit.arrive || reduced || e < 0 || e >= visit.arrive) return -1;
+    return Math.min(arrive.count - 1, Math.floor(e * REST_FPS));
+  }, [visit, frames, reduced]);
   const restFrame = useDerivedValue(() => {
     const rest = frames.rest, e = clock.value - visit.start;
     if (!rest || visit.fadeIn || e < 0 || e >= visit.lead) return -1;
+    if (visit.arrive) {
+      if (arriveFrame.value >= 0) return -1;
+      const rise = (rest.count - rest.rise) / REST_FPS;
+      if (!reduced && e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
+      return rest.count - 1;
+    }
     if (visit.rising) return Math.max(rest.rise, rest.count - 1 - Math.floor(e / visit.lead * (rest.count - rest.rise)));
     if (!rest.always && !visit.sits) return -1;
     if (reduced) return rest.count - 1;
@@ -597,7 +739,7 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     if (e < settle) return Math.floor(e * REST_FPS);
     if (e > visit.lead - rise) return Math.max(rest.rise, rest.count - 1 - Math.floor((e - (visit.lead - rise)) * REST_FPS));
     return rest.count - 1;
-  }, [visit, frames, reduced]);
+  }, [visit, frames, reduced, arriveFrame]);
   // Eating or being patted (held, sitting): its clip over the sitting frame, fading in and out
   // over ACTION_FADE (its first and last frames are the sitting pose; the bowl comes and goes).
   const actionShown = useDerivedValue(() => {
@@ -607,7 +749,13 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     if (e < 0 || e >= length) return 0;
     return Math.min(1, e / ACTION_FADE, (length - e) / ACTION_FADE);
   }, [visit, actions]);
-  const walkOpacity = useDerivedValue(() => (restFrame.value < 0 ? 1 : 0), [restFrame]);
+  const walkOpacity = useDerivedValue(() => (restFrame.value < 0 && arriveFrame.value < 0 ? 1 : 0), [restFrame, arriveFrame]);
+  const arriveOpacity = useDerivedValue(() => (arriveFrame.value < 0 ? 0 : 1), [arriveFrame]);
+  const arriveCell = useDerivedValue(() => Math.max(0, arriveFrame.value), [arriveFrame]);
+  // While it takes shape: no shadow until it has a body, and a soft warm light where it appears.
+  const arrivalT = useDerivedValue(() => (visit.arrive && !reduced ? (clock.value - visit.start) / visit.arrive : 1), [visit, reduced]);
+  const shadowOpacity = useDerivedValue(() => Math.min(1, Math.max(0, (arrivalT.value - 0.45) / 0.3)), [arrivalT]);
+  const glowOpacity = useDerivedValue(() => { const t = arrivalT.value; return t <= 0 || t >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.9; }, [arrivalT]);
   const restOpacity = useDerivedValue(() => (restFrame.value < 0 ? 0 : 1 - actionShown.value), [restFrame, actionShown]);
   const restCell = useDerivedValue(() => Math.max(0, restFrame.value), [restFrame]);
   const shadow = useDerivedValue(() => {
@@ -615,7 +763,12 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
     return [{ translateX: pose.x }, { translateY: pose.y }];
   }, [visit]);
   return <Group opacity={opacity}>
-    {fade ? null : <Group transform={shadow}>
+    {visit.arrive ? <Group transform={shadow} opacity={glowOpacity}>
+      <Circle cx={0} cy={-spec.size * 0.38} r={spec.size * 0.75}>
+        <RadialGradient c={vec(0, -spec.size * 0.38)} r={spec.size * 0.75} colors={['rgba(255, 241, 208, 0.62)', 'rgba(255, 226, 214, 0.22)', 'rgba(255, 226, 214, 0)']} />
+      </Circle>
+    </Group> : null}
+    {fade ? null : <Group transform={shadow} opacity={shadowOpacity}>
       <Oval x={-spec.size * 0.4} y={-spec.size * 0.06} width={spec.size * 0.8} height={spec.size * 0.12} color="rgba(30, 44, 26, 0.22)">
         <BlurMask blur={3} style="normal" />
       </Oval>
@@ -628,6 +781,7 @@ function FrameWalker({ visit, clock, sheet, frames, w, h, phase = 0, fade, onRea
           : <SheetFrame sheet={runSheet} frame={frame} columns={frames.run!.columns} count={frames.run!.count} w={w} h={h} />)
         : <SheetFrame sheet={sheet} frame={frame} columns={frames.columns} count={frames.count} w={w} h={h} />}</Group>
       {restSheet && frames.rest ? <Group opacity={restOpacity}><SheetFrame sheet={restSheet} frame={restCell} columns={frames.columns} count={frames.rest.count} w={w} h={h} /></Group> : null}
+      {arriveSheet && frames.arrive && visit.arrive ? <Group opacity={arriveOpacity}><SheetFrame sheet={arriveSheet} frame={arriveCell} columns={frames.columns} count={frames.arrive.count} w={w} h={h} /></Group> : null}
       {actions ? (['eat', 'pat'] as const).map(kind => <ActionClip key={kind} kind={kind} spec={actions[kind]} visit={visit} clock={clock} shown={actionShown} w={w} ground={frames.ground} />) : null}
     </Group>
   </Group>;

@@ -1,7 +1,6 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Easing,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -13,19 +12,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Link, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from '../components/mailbox/ExpandedLetter';
 import { FloatingPetalsOverlay } from '../components/mailbox/FloatingPetalsOverlay';
 import { LoginEntranceScene } from '../components/auth/LoginEntranceScene';
 import {
   FairyLoadingExperience,
-  FairyLoadingProps,
 } from '../components/auth/FairyLoadingExperience';
 import {
-  ACTION_DURATION_MS,
-  CYCLE_DURATION_MS,
   FairyLoadingFrame,
   getActionHoldTime,
 } from '../components/auth/fairyLoadingTimeline';
@@ -96,7 +91,7 @@ function SparkleIcon({ size = 13, color = '#FAF7F0' }: { size?: number; color?: 
 }
 
 const BackgroundScene = memo(function BackgroundScene({ reducedMotion }: { reducedMotion: boolean }) {
-  const entranceProgress = useRef(new Animated.Value(0)).current;
+  const entranceProgress = useState(() => new Animated.Value(0))[0];
   return (
     <View style={styles.scenicBackground} pointerEvents="none">
       <LoginEntranceScene

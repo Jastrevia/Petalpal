@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { FONT_BODY, FONT_DISPLAY, FONT_TITLE } from './ExpandedLetter';
+import { FONT_BODY, FONT_TITLE } from './ExpandedLetter';
 import { ENVELOPE_PAPER_BACKGROUND } from './paperTextures';
 
 const PANEL_POP_KEYFRAMES = `

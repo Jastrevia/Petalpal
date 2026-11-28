@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { PigeonLoadingScreen } from '../components/loading/PigeonLoadingExperience';
 
 // DEV-only preview of the Letterwing loading screen; production builds send it to the Garden.

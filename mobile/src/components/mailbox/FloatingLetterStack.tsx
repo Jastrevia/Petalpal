@@ -26,7 +26,6 @@ import {
 
   DriedBotanicalSprig,
 
-  ENVELOPE_TONES,
 
   getEnvelopeTone,
 
@@ -252,7 +251,6 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
 
   const isClosingFlap = phase === 'closing_flap';
 
-  const isClosing = phase === 'closing';
 
 
 
@@ -934,7 +932,7 @@ export const FloatingLetterStack = memo(function FloatingLetterStack({
 
                   >
 
-                    "{activeLetter.snippet}"
+                    &quot;{activeLetter.snippet}&quot;
 
                   </Text>
 

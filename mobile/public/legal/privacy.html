@@ -14,11 +14,11 @@ nav{font-size:15px;margin:18px 0}nav a{margin-right:14px}
 <body>
 <main>
 <h1>PetalPal Privacy Policy</h1>
-<p class="meta">Effective October 23, 2026 · PetalPal is a Jastrevia product</p>
+<p class="meta">Effective November 26, 2026 · PetalPal is a Jastrevia product</p>
 <nav><a href="terms.html">Terms of Use</a><a href="account-deletion.html">Account &amp; Data Deletion</a><a href="mailto:contact@jastrevia.com">contact@jastrevia.com</a></nav>
 
 <div class="summary" lang="zh-Hans">
-<p><strong>中文摘要：</strong>PetalPal 由联合创始人 Xingran Ma 和 Jinyin Cao 运营，仅供成年人使用。你的日记和照片只有你自己能看到，不会用于 AI。AI 功能默认关闭，开启后只把需要的 Event 内容发给本政策列出的服务商。我们不出售你的数据，不做广告。你可以随时在设置里删除账号，删除后数据立即从我们的数据库移除，我们不保留已删除账号的备份。以英文正文为准。问题请写信到 contact@jastrevia.com。</p>
+<p><strong>中文摘要：</strong>PetalPal 由联合创始人 Xingran Ma 和 Jinyin Cao 运营，仅供成年人使用。你的日记和照片只有你自己能看到，不会用于 AI。AI 功能默认关闭，开启后只把需要的 Event 内容发给本政策列出的服务商。我们不出售你的数据，不做广告。花园天气默认关闭；开启后只保存约 11 公里范围的粗略位置，用来向挪威气象局（MET Norway）查询天气，关闭即删除。你可以随时在设置里删除账号，删除后数据立即从我们的数据库移除，我们不保留已删除账号的备份。以英文正文为准。问题请写信到 contact@jastrevia.com。</p>
 </div>
 
 <h2>Who we are</h2>
@@ -33,8 +33,11 @@ nav{font-size:15px;margin:18px 0}nav a{margin-right:14px}
 <li><strong>Account:</strong> your email address, your sign-in identifier from Google Firebase, display name, chosen avatar, time zone and preferred language. Firebase handles your password and sign-in sessions; we never see your password.</li>
 <li><strong>What you create:</strong> private Journal entries and photos you attach, Events (text, date and the mood you choose), your Garden and Flowers, and the Weekly and Monthly reflections you generate.</li>
 <li><strong>Social:</strong> friend connections and requests, Garden visits, Flower messages, blocks and reports.</li>
+<li><strong>VIP purchases:</strong> if you buy PetalPal VIP, your plan, its renewal and end dates, and the store's purchase records. Apple handles the payment; we never see your card or payment details.</li>
+<li><strong>Optional Garden weather:</strong> if you turn it on, an approximate location rounded to about 11 km (one decimal place of latitude and longitude). See <a href="#weather">Garden weather is optional</a>.</li>
 <li><strong>Optional AI data:</strong> suggested emotion labels, Event summaries and memory embeddings, reflections and the references that support them, and voice recordings you choose to send for transcription.</li>
 <li><strong>Technical records:</strong> consent and version records, security events, request identifiers, minimal records of AI usage cost, and deletion records. Our hosting providers may also process your IP address and basic request information to deliver the service.</li>
+<li><strong>Crash and error reports:</strong> when the app or our server fails, a report of what failed and where in the code, with the device model, operating system and app version. Reports do not include your name, email, account or anything you write, and they are not used for advertising or tracking.</li>
 </ul>
 
 <h2>How we use it</h2>
@@ -47,15 +50,18 @@ nav{font-size:15px;margin:18px 0}nav a{margin-right:14px}
 <p>AI stays off until you agree. We ask once, with one tap to turn it all on, when your Garden first opens. In Settings you can change separately whether to allow <strong>AI Processing</strong> (emotion suggestions and voice transcription), <strong>Personalization</strong> (personalized reflections from your Events) and <strong>Long-term Memory</strong> (saved Event summaries used in Weekly and Monthly reflections). Settings shows which service handles each feature.</p>
 <p>When a feature is on, we send only what it needs: Event text, the mood you chose, dates, derived memories and short Event excerpts, or a recording you submit for transcription. Journals and photos are never sent. Fairy Moments captions are written without any of your Events or Journals. You can turn these choices off at any time; this stops future processing but cannot recall data already sent. Turning off Long-term Memory deletes the saved memories and reflections in our database while keeping your original entries. AI can be wrong, and its output is not a diagnosis or professional advice.</p>
 
+<h2 id="weather">Garden weather is optional</h2>
+<p>Garden weather is off until you turn it on in Me → Garden weather. When you do, the app asks for location permission, reads your approximate position once and sends it to us rounded to about 11 km. We keep only that rounded point, never a precise location or a location history, and the app never uses location in the background. To find the weather there, our server sends only the rounded point to the Norwegian Meteorological Institute (MET Norway), with no account details. Friends who visit your Garden see its weather, never your location. Turning Garden weather off, or deleting your account, deletes the saved point right away.</p>
+
 <h2>Service providers</h2>
-<p>We use these providers to run PetalPal: Google Firebase (sign-in), Cloudflare (website delivery, Workers AI and AI Gateway), Render (our server and PostgreSQL database) and Anthropic (AI-written reflections and captions, reached through Cloudflare AI Gateway). They process information on our behalf to provide these services. Your information may be processed outside Canada, including in the United States, where it is subject to local law.</p>
+<p>We use these providers to run PetalPal: Google Firebase (sign-in), Cloudflare (website delivery, Workers AI and AI Gateway), Render (our server and PostgreSQL database), Sentry (crash and error reports) and Anthropic (AI-written reflections and captions, reached through Cloudflare AI Gateway). If you buy VIP, RevenueCat (which manages subscriptions for us) receives your PetalPal account identifier and the App Store's records of your purchases, and Apple processes the payment under its own terms. They process information on our behalf to provide these services. If you turn on Garden weather, the Norwegian Meteorological Institute (MET Norway) receives the rounded point described above to return a forecast; it is a public weather service, not a processor of your account. Your information may be processed outside Canada, including in the United States, where it is subject to local law.</p>
 
 <h2>On your device</h2>
 <p>The app and website store your sign-in session, preferences and some Garden display data on your device or in your browser. Signing out and deleting your account clear the app's own stored data.</p>
 
 <h2>How long we keep it, and deletion</h2>
 <p>We keep your information while your account is active and until you delete it. You can delete your account at any time in Settings → Delete Account, or by emailing us (see <a href="account-deletion.html">Account &amp; Data Deletion</a>). When you delete your account, your account and its data are removed from our database right away. To protect against data loss, we make regular backup copies of our database and keep each copy for no more than 30 days. A deleted account can remain in backups made before the deletion until those backups are deleted, at most 30 days later. We use backups only to recover from a technical failure, never to restore a deleted account, and we do not keep backups of deleted accounts beyond those 30 days.</p>
-<p>A few minimal records that contain none of your entries, such as security events, AI cost records and the record that a deletion happened, are kept only as long as needed to protect the service and confirm the deletion. Messages already delivered to other people and data already sent to an AI provider may remain with them under their own retention.</p>
+<p>A few minimal records that contain none of your entries, such as security events, AI cost records and the record that a deletion happened, are kept only as long as needed to protect the service and confirm the deletion. Messages already delivered to other people and data already sent to an AI provider may remain with them under their own retention. Purchase records kept by Apple and RevenueCat follow their own retention and any law that requires keeping them; you can ask us to delete your RevenueCat record.</p>
 
 <h2>Your rights</h2>
 <p>You can ask to access or correct your personal information, withdraw consent, or delete your account by writing to <a href="mailto:contact@jastrevia.com">contact@jastrevia.com</a> from your account email. We will reply within 30 days. We handle personal information under Canadian privacy law, including PIPEDA and British Columbia's Personal Information Protection Act. If you are not satisfied with our answer, you can contact the Office of the Privacy Commissioner of Canada or the Office of the Information and Privacy Commissioner for British Columbia.</p>

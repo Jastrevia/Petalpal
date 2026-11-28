@@ -1,7 +1,8 @@
 import { dispatchOnboarding, onboardingActive } from '../components/onboarding/onboardingSignals';
+import { silktailChanged } from '../services/silktail';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, usePathname } from 'expo-router';
-import { apiRequest } from '../services/api';
+import { apiRequest, type ApiError } from '../services/api';
 import { useAuth } from '../services/auth';
 import { createEvent, deleteEvent, eventFlowers, loadFlowersToday, plantingRecord, readEvent,
   type BackendFlower, type EventResponse, type FlowersToday, type PrimaryMood } from '../services/events';
@@ -22,6 +23,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
   const [error, setError] = useState('');
   const [pollError, setPollError] = useState('');
   const [today, setToday] = useState<FlowersToday | null>(null);
+  const [eventLimitHit, setEventLimitHit] = useState(false);
   const pending = useRef<{ content: string; mood: PrimaryMood; key: string } | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -61,6 +63,7 @@ export function useEventJournal(onGardenChanged?: () => void) {
       eventId: unfinished.sourceEventId, flowerId: unfinished.id } : null;
   }, [ownerId]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- first refresh on mount; refresh() is shared with the screen's own reloads
     void refresh().then(remote => {
       if (!mounted.current || draftChecked.current) return;
       draftChecked.current = true;
@@ -90,16 +93,25 @@ export function useEventJournal(onGardenChanged?: () => void) {
       await refresh();
       // The first-time tour links its first Event (and the Flower it grew) to the real records.
       dispatchOnboarding({ type: 'eventSaved', eventId: created.event.id, flowerId: created.flower?.id ?? null });
+      // This Event may make 14 days: the Silktail Fox then comes at once.
+      silktailChanged();
       if (!mounted.current) return;
       onGardenChanged?.();
-    } catch (err) { if (mounted.current) setError((err as Error).message); }
-    finally { if (mounted.current) setBusy(false); }
+    } catch (err) {
+      if (!mounted.current) return;
+      // The day's Events are used up. What they wrote stays on the page.
+      if ((err as ApiError).code === 'DAILY_EVENT_LIMIT') { setEventLimitHit(true); void refresh(); }
+      else setError((err as Error).message);
+    } finally { if (mounted.current) setBusy(false); }
   }
   // Still pending after the last check: say so plainly (the Event and flower are saved) instead
   // of showing "AI is reading" forever. Checking again only re-reads the Event; it never re-runs AI.
   const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+  // Another Event or analysis status starts without the timeout notice (reset while rendering).
+  const analysisKey = `${result?.event.id ?? ''}|${result?.event.emotionStatus ?? ''}`;
+  const [analysisFor, setAnalysisFor] = useState(analysisKey);
+  if (analysisFor !== analysisKey) { setAnalysisFor(analysisKey); setAnalysisTimedOut(false); }
   useEffect(() => {
-    setAnalysisTimedOut(false);
     if (!result || !['PENDING','RUNNING'].includes(result.event.emotionStatus)) return;
     let cancelled = false; let timer: ReturnType<typeof setTimeout>; let attempts = 0;
     async function poll() {
@@ -234,7 +246,10 @@ export function useEventJournal(onGardenChanged?: () => void) {
   }
   const currentFlowers = result ? flowers.filter(flower => flower.sourceEventId === result.event.id) : [];
   const flowersLeft = today?.limit == null ? null : today.remaining;
-  return { flowers: currentFlowers, flowersToday: today, flowersLeft, content, setContent, mood, setMood, result, busy, loading,
+  // The day's Events used up (4, each is read by the AI: lib/flower-quota.js DAILY_EVENT_LIMIT).
+  const eventsDone = eventLimitHit || today?.events?.remaining === 0;
+  const eventLimit = today?.events?.limit ?? 4;
+  return { flowers: currentFlowers, flowersToday: today, flowersLeft, eventsDone, eventLimit, content, setContent, mood, setMood, result, busy, loading,
     error, pollError, analysisTimedOut, aiProcessingOn, refresh, saveEvent, refreshEventStatus, placeFlower, reset,
     draftPrompt, draftBusy, continueDraft, discardDraft };
 }

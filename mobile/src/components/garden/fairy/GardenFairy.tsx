@@ -57,6 +57,7 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
   const pendingMove=useRef<Point|null>(null),lastMove=useRef(-Infinity),turning=useRef(0);
   const [state,setState]=useState<FairyState>('idle');
   const lastState=useRef<FairyState>('idle');
+  // eslint-disable-next-line react-hooks/refs -- Garden fairy: latest props for the frame loop without re-rendering the canvas owner
   const config=useRef({blocked,active,debug,onStatus,onStateChange,pixelsPerUnit,onTreehouseEntered,onTreehouseExited,onMailboxOpened});config.current={blocked,active,debug,onStatus,onStateChange,pixelsPerUnit,onTreehouseEntered,onTreehouseExited,onMailboxOpened};
   const [routeDrawing,setRouteDrawing]=useState(''),[targetDrawing,setTargetDrawing]=useState<Point|null>(null);
   const [pointerDrawing,setPointerDrawing]=useState<{p:Point;valid:boolean}|null>(null);
@@ -95,6 +96,7 @@ const GardenFairy=forwardRef<FairyHandle,Props>(function GardenFairy({blocked,ac
     }
     return true;
   };
+  // eslint-disable-next-line react-hooks/refs -- Garden fairy: the controls object is made once, lazily
   if(!controls.current)controls.current={
     getPosition:()=>({...nav.current.position}),
     getState:()=>nav.current.state,

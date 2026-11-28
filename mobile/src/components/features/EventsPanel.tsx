@@ -6,6 +6,7 @@ import { usePanelTheme, type PanelTheme } from './PanelTheme';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useEventVoiceInput } from '../../hooks/useEventVoiceInput';
+import { voiceMessage } from '../../services/voiceErrors';
 import { useEventJournal } from '../../hooks/useEventJournal';
 import { PRIMARY_MOODS, type PrimaryMood } from '../../services/events';
 import { loadFlowerChoice, saveFlowerChoice } from '../../services/flowerChoices';
@@ -28,8 +29,9 @@ const COPY = {
     what: 'What happened? (Optional)', placeholder: 'A small moment from today…', choose: 'Choose your mood', required: 'Required',
     moodHint: 'Choose a mood above to enable Save & Analyze.',
     save: 'Save & Analyze', saving: 'Saving and analyzing…', saved: 'Saved ✓', another: 'Write another Event',
-    left: (n: number, of: number) => `${n} of ${of} flowers left to grow today.`, none: (of: number) => `You've grown today's ${of} flowers. Events still save; new flowers tomorrow.`,
-    limit: (of: number) => `Today's ${of} flowers are already growing, so this Event didn't add one. Come back tomorrow for new flowers.`,
+    left: (n: number, of: number) => `${n} of ${of} flowers left to plant today.`, none: (of: number) => `You've planted today's ${of} flowers. Events still save; new flowers tomorrow.`,
+    limit: (of: number) => `Today's ${of} flowers are already planted, so this Event didn't add one. Come back tomorrow for new flowers.`,
+    eventsDone: (of: number) => `You've written today's ${of} Events. Come back tomorrow, or keep writing in your Journal.`,
     yourFlower: 'Your flower', mood: 'Mood you chose', analysis: 'AI emotion analysis', notDiagnosis: 'Suggestions, not a diagnosis.',
     pending: 'AI is reading your Event…', slow: 'AI analysis is taking longer than usual. Your Event and flower are saved: you can plant now, or check again in a moment.', checkAgain: 'Check again', failed: 'AI analysis is unavailable right now. Your Event and flower are saved.',
     skipped: 'AI is not turned on yet, so only your chosen mood is used. To turn it on, open Me → AI & privacy and tap "Save my AI choices".', noEmotions: 'No other feelings stood out.',
@@ -49,8 +51,9 @@ const COPY = {
     what: '发生了什么？（选填）', placeholder: '今天的一件小事…', choose: '选择你的心情', required: '必填',
     moodHint: '请先在上方选择一个心情，即可保存并分析。',
     save: '保存并分析', saving: '正在保存并分析…', saved: '已保存 ✓', another: '再写一件事',
-    left: (n: number, of: number) => `今天还能长 ${n} 朵花（共 ${of} 朵）。`, none: (of: number) => `今天的 ${of} 朵花都长出来了。事件照样会保存，明天再长新花。`,
-    limit: (of: number) => `今天的 ${of} 朵花已经在长了，这件事没有再长出新花。明天再来吧。`,
+    left: (n: number, of: number) => `今天还能种 ${n} 朵花（共 ${of} 朵）。`, none: (of: number) => `今天的 ${of} 朵花都种下了。事件照样会保存，明天才有新花。`,
+    limit: (of: number) => `今天的 ${of} 朵花都种下了，这件事没有再长出新花。明天再来吧。`,
+    eventsDone: (of: number) => `今天的 ${of} 件事都写完了。明天再来，或者去日记里接着写。`,
     yourFlower: '你的花', mood: '你选的心情', analysis: 'AI 情绪分析', notDiagnosis: '只是建议，不是诊断。',
     pending: 'AI 正在读你的事件…', slow: 'AI 分析比平时慢。你的事件和花都已保存：现在就可以种下，或者过一会儿再查看。', checkAgain: '再查看一次', failed: '暂时无法进行 AI 分析。你的事件和花都已保存。',
     skipped: 'AI 还没开启，所以只用你选的心情。想开启的话，打开「我 → AI 与隐私」，点「保存我的 AI 选择」。', noEmotions: '没有发现其他明显的情绪。',
@@ -141,7 +144,7 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
         <Text style={styles.text}>{copy.done}</Text></Pressable> : null}
       <Pressable accessibilityRole="button" onPress={() => void voice.cancel()} style={styles.voiceControl}><Text style={styles.text}>{copy.cancel}</Text></Pressable>
     </View> : null}
-    {voice.error ? <Text accessibilityRole="alert" style={styles.caption}>{voice.error}</Text> : null}
+    {voice.error ? <Text accessibilityRole="alert" style={styles.caption}>{voiceMessage(voice.error, locale)}</Text> : null}
     {voice.overflow ? <Text selectable style={styles.text}>{voice.overflow}</Text> : null}
 
     <Text style={styles.sectionTitle}>{copy.choose} <Text accessibilityLabel={copy.required} style={styles.required}>*</Text></Text>
@@ -159,10 +162,11 @@ export function EventsPanel({ onClose, onGardenChanged, introOpen = false }: { o
 
     {/* Write another sits right under Saved, ready for the next one: Plant is what ends the page. */}
     {saved ? <><EventAction secondary title={copy.saved} onPress={() => {}} disabled />
-      <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} /></>
+      {journal.eventsDone ? null : <EventAction secondary title={copy.another} onPress={() => { journal.reset(); setShowToFriends(false); setHelp(false); }} />}</>
       : <View {...onboardingTarget('events.save')}><EventAction title={journal.busy ? copy.saving : copy.save} onPress={() => safety.guard(() => void journal.saveEvent())}
-        disabled={journal.busy || voice.active || !journal.mood} /></View>}
-    {!saved && !journal.mood ? <Text style={styles.caption}>{copy.moodHint}</Text> : null}
+        disabled={journal.busy || voice.active || journal.eventsDone || !journal.mood} /></View>}
+    {!saved && !journal.mood && !journal.eventsDone ? <Text style={styles.caption}>{copy.moodHint}</Text> : null}
+    {journal.eventsDone ? <View style={styles.notice}><Text accessibilityRole="alert" style={styles.text}>{copy.eventsDone(journal.eventLimit)}</Text></View> : null}
     {!saved && journal.flowersToday?.limit != null ? <Text style={styles.caption}>{journal.flowersLeft
       ? copy.left(journal.flowersLeft, journal.flowersToday.limit) : copy.none(journal.flowersToday.limit)}</Text> : null}
     {journal.error ? <View style={styles.notice}><Text accessibilityRole="alert" style={styles.text}>{journal.error}</Text></View> : null}

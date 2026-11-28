@@ -16,7 +16,9 @@ export function useFairySchedule(fairyRef: RefObject<FairyHandle | null>, enable
   // No day to follow (no first flower yet, offline, guest) or a state this build does not know: she strolls.
   const rest = !enabled ? null : (runtime?.gardenSchedule === true && scheduleRest(runtime.currentState)) || 'path';
   const memory = useRef({ placed: false, startedAt: 0, userAt: 0, idleSince: 0, pauseMs: wanderPause(Math.random), retryAt: 0, lastState: '' });
+  // eslint-disable-next-line react-hooks/refs -- Garden fairy: the schedule timer reads the latest values without restarting
   const restRef = useRef(rest); restRef.current = rest;
+  // eslint-disable-next-line react-hooks/refs -- Garden fairy: the schedule timer reads the latest values without restarting
   const hasDay = useRef(false); hasDay.current = runtime?.gardenSchedule === true;
   useEffect(() => { if (!rest) memory.current.placed = false; }, [rest]);
   useEffect(() => {

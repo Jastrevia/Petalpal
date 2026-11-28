@@ -29,6 +29,9 @@ export const APPROVED_WATERFALL_LAYER_REGISTRATION = WATERFALL_LAYER_REGISTRATIO
 
 type LoadedImage = ReturnType<typeof useImage>;
 function useSequence(sources: readonly number[], onError: (reason: Error) => void) {
+  // Every sequence is a fixed module array and the map and full sets have equal lengths
+  // (test/waterfallAssets.test.mjs), so the number of useImage calls never changes.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   return sources.map(source => useImage(source, onError));
 }
 function SequenceLayer({ image, placement, pixelScale }: {
@@ -99,6 +102,7 @@ function WaterfallEntity({ x=0, y=0, scale=1, debugMode='all',
   // One timer for every sequence. It rerenders only this memoized entity, never GardenScene.
   useEffect(() => {
     if (!playing || !active || !foreground || !allLoaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: the waterfall's own timer state; rerenders only this entity, never GardenScene
       if (!playing) setElapsed(0);
       return;
     }

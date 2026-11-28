@@ -1,4 +1,4 @@
-import type { DailyFlowerEffect, DailyMood, FlowerEffectConfig } from './types';
+import type { DailyFlowerEffect, FlowerEffectConfig } from './types';
 
 export const DEFAULT_TIMEZONE = 'America/Vancouver';
 

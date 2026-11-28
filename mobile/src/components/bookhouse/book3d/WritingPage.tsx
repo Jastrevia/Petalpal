@@ -7,6 +7,7 @@ import { formatLocalDate, journalLocked, savePrivateJournal, updatePrivateJourna
 import { JournalCover } from '../JournalCover';
 import { Icon, LOCK_ICON } from '../TreehouseArt';
 import { treehouseZh, tt } from '../../../services/treehouseCopy';
+import { voiceMessage } from '../../../services/voiceErrors';
 import { useLayoutWindow, useWebVisibleBottom } from './layoutWindow';
 import { rightPageOf } from './usePageFaces';
 import { joinJournal, splitJournal, type Draft, type ReadingMetrics } from './readingLayout';
@@ -189,7 +190,7 @@ export const WritingPage = forwardRef<WritingPageHandle, {
           {voice.phase === 'recording' && <Pressable accessibilityRole="button" accessibilityLabel={tt('Done recording')} onPress={() => void voice.done()} style={styles.textButton}><Text style={[regular, styles.small]}>{tt('Done')}</Text></Pressable>}
           <Pressable accessibilityRole="button" accessibilityLabel={tt('Cancel voice input')} onPress={() => void voice.cancel()} style={styles.textButton}><Text style={[regular, styles.small]}>{tt('Cancel')}</Text></Pressable>
         </View>}
-        {!!voice.error && <Text accessibilityRole="alert" style={[regular, styles.error]}>{voice.error}</Text>}
+        {!!voice.error && <Text accessibilityRole="alert" style={[regular, styles.error]}>{voiceMessage(voice.error, treehouseZh() ? 'zh-Hans' : 'en')}</Text>}
         {!!voice.overflow && <Text selectable style={[regular, styles.small]}>{voice.overflow}</Text>}
         {editable && <View style={styles.footer}>
           <Pressable accessibilityRole="button" accessibilityLabel={tt('Dictate private journal')} accessibilityHint={tt('Record up to three minutes, then review before saving')}

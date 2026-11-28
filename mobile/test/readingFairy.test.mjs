@@ -14,7 +14,7 @@ const { outputText } = ts.transpileModule(source, { compilerOptions: { target: t
 const reading = { exports: {} };
 vm.runInNewContext(`(function(exports, module) {\n${outputText}\n})`, { Math, Date, setTimeout, clearTimeout })(reading.exports, reading);
 const {
-  createReadingFairyController, pageTurnGap, readingFrameCues, resolveReadingFrame,
+  createReadingFairyController, pageTurnGap, readingMotion, readingArt, READING_KEYS, READING_SHEET,
   READING_TIMING, READING_TIMING_FAST, PAGE_TURN_STATES,
 } = reading.exports;
 
@@ -213,17 +213,38 @@ test('ending the session or unmounting clears every timer; a new session starts 
   assert.equal(clock.pending(), 1);
 });
 
-test('every state maps to storyboard poses in order, and missing art falls back safely', () => {
-  const frames = state => [...readingFrameCues(state, 800).map(cue => cue.frame)];
-  assert.deepEqual(['READING', 'PAGE_PREPARATION', 'PAGE_LIFT', 'PAGE_TURN', 'PAGE_SETTLE', 'RETURN_TO_READING'].flatMap(frames),
-    [0, 1, 2, 3, 4, 5, 0]);
-  assert.deepEqual([...readingFrameCues('PAGE_TURN', 800).map(cue => cue.atMs)], [0, 400]);
-  assert.deepEqual(frames('THINKING'), [1]);
-  assert.deepEqual(frames('PAUSED'), [0]);
-  assert.deepEqual(frames('IDLE'), [0]);
-  const art = ['r1', 'r2', 'r3', undefined, 'r5', 'r6'];
-  assert.equal(resolveReadingFrame(3, art), 0);
-  assert.equal(resolveReadingFrame(4, art), 4);
-  assert.equal(resolveReadingFrame(9, art), 0);
-  assert.equal(resolveReadingFrame(2, []), null);
+test('one page turn sweeps forward along the strip without stopping at a pose, then wraps to reading', () => {
+  const { reading, gather, reach, arc, settle, end } = READING_KEYS;
+  assert.equal(READING_SHEET.frames, end + 1);
+  const steps = [['PAGE_PREPARATION', reading], ['PAGE_LIFT', gather], ['PAGE_TURN', reach], ['PAGE_SETTLE', arc], ['RETURN_TO_READING', settle]]
+    .map(([state, at]) => ({ ...readingMotion(state, 600, at) }));
+  assert.deepEqual(steps.map(step => step.to), [gather, reach, arc, settle, end]);
+  // Easing only where the sweep begins and ends: no pause at gather, reach or arc.
+  assert.deepEqual(steps.map(step => step.easing), ['in', 'linear', 'linear', 'out', 'inOut']);
+  assert.equal(steps.at(-1).thenJumpTo, reading);
+  assert.equal(readingMotion('READING', null, reading), null);
+  assert.deepEqual({ ...readingMotion('READING', null, end) }, { to: reading, durationMs: 0, easing: 'linear' });
+});
+
+test('thinking raises her hand and returns the same way; a pause finishes any movement gently', () => {
+  const { reading, gather, arc, end } = READING_KEYS;
+  assert.equal(readingMotion('THINKING', 5_000, reading).to, gather);
+  assert.equal(readingMotion('THINKING', 5_000, reading).durationMs, 1_200);
+  const back = readingMotion('RETURN_TO_READING', 800, gather);
+  assert.equal(back.to, reading);
+  assert.equal(back.thenJumpTo, undefined);
+  // Paused mid-turn: glide forward to the end of the turn (never backwards through the page).
+  const midTurn = readingMotion('PAUSED', null, arc);
+  assert.equal(midTurn.to, end);
+  assert.equal(midTurn.thenJumpTo, reading);
+  assert.ok(midTurn.durationMs > 0 && midTurn.durationMs <= 1_000);
+  assert.equal(readingMotion('PAUSED', null, 3).to, reading);
+  assert.equal(readingMotion('IDLE', null, reading), null);
+});
+
+test('missing art falls back to the still reading pose, or to nothing', () => {
+  assert.equal(readingArt({ base: 'pose', sheet: 'strip' }), 'animated');
+  assert.equal(readingArt({ base: 'pose' }), 'still');
+  assert.equal(readingArt({ sheet: 'strip' }), null);
+  assert.equal(readingArt({}), null);
 });

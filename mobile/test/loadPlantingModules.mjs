@@ -23,6 +23,9 @@ export function loadPlantingModules(storage, react, nativeStorage, web = true, d
       if (request === 'react' && react) return react;
       if (request === 'expo-router' && react) return { useFocusEffect: (fn) => react.useEffect(fn, [fn]) };
       if (request === '@react-native-async-storage/async-storage') return nativeStorage ?? {};
+      // Native-only packages that Node cannot load: the installed version is unknown and OTA updates are off.
+      if (request === 'expo-application') return { nativeApplicationVersion: null, nativeBuildVersion: null, applicationId: null };
+      if (request === 'expo-updates') return { isEnabled: false, channel: null, updateId: null, isEmbeddedLaunch: true };
       if (request.startsWith('@/assets/') || /\.(png|webp)$/.test(request)) return request;
       if (request.startsWith('.')) {
         let target = path.resolve(path.dirname(file), request);

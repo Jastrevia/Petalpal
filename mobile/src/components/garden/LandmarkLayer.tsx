@@ -4,15 +4,17 @@ import SleepingMoonFairy from './fairy/SleepingMoonFairy';
 import SeatedSwingFairy from './fairy/SeatedSwingFairy';
 import {GardenProfile} from './performance/GardenRuntimePanel';
 import {runtimeAudit} from './performance/runtimeAudit';
-import { Blur, Circle, Group, Oval, Path, Rect } from '@shopify/react-native-skia';
+import { Blur, Circle, Group, Oval, Rect } from '@shopify/react-native-skia';
 import type { ReactNode } from 'react';
 import MoonBedEntity, { MOON_BED_HEIGHT, MOON_BED_WIDTH } from './MoonBedEntity';
 import TeaSetEntity, { TEA_SET_HEIGHT, TEA_SET_WIDTH } from './TeaSetEntity';
 import {
   GARDEN_ARCH_HEIGHT, GARDEN_ARCH_WIDTH, GardenArchEntity,
-  PAVILION_HEIGHT, PAVILION_WIDTH, PavilionEntity,
+  PAVILION_HEIGHT, PAVILION_WIDTH, PavilionEntity, DogHouseEntity,
 } from './StaticLandmarkEntities';
 import SwingEntity, { SWING_HEIGHT, SWING_WIDTH } from './SwingEntity';
+import { Snowy } from './weather/SnowLayer';
+import DogHouseOccupants from './critters/DogHouseOccupants';
 import TreehouseEntity, { TREEHOUSE_HEIGHT, TREEHOUSE_WIDTH } from './TreehouseEntity';
 import WaterfallEntity, { WATERFALL_HEIGHT, WATERFALL_WIDTH } from './WaterfallEntity';
 import { INITIAL_WATERFALL_PLACEMENT, type WaterfallMapPlacement } from './waterfallMapPlacement';
@@ -52,6 +54,9 @@ type LandmarkLayerProps = {
   moonBedPlacement?: { x: number; y: number; scale: number; rotation: number };
   gardenArchPlacement?: StaticLandmarkMapPlacement;
   pavilionPlacement?: StaticLandmarkMapPlacement;
+  dogHousePlacement?: StaticLandmarkMapPlacement;
+  /** The Garden critters' clock, for the dogs in their house (critters/DogHouseOccupants.tsx). */
+  dogHouseClock?: SharedValue<number>;
   teaSetPlacement?: { x: number; y: number; scale: number; rotation: number };
   waterfallPlacement?: WaterfallMapPlacement;
   waterfallActive?: boolean;
@@ -109,6 +114,8 @@ export default function LandmarkLayer({
   },
   gardenArchPlacement = STATIC_LANDMARK_MAP_PLACEMENTS.gardenArch,
   pavilionPlacement = STATIC_LANDMARK_MAP_PLACEMENTS.pavilion,
+  dogHousePlacement = STATIC_LANDMARK_MAP_PLACEMENTS.dogHouse,
+  dogHouseClock,
   teaSetPlacement = {
     x: TEA_SET_MAP_X, y: TEA_SET_MAP_Y, scale: TEA_SET_MAP_SCALE, rotation: TEA_SET_MAP_ROTATION,
   },
@@ -260,6 +267,8 @@ export default function LandmarkLayer({
       </Group>
       </GardenProfile>
       <GardenProfile name="Static landmarks" enabled={landmarksVisible && renderPass !== 'motion'}>
+      {/* Drawn after the ground's lying snow, so they carry their own (weather/SnowLayer.tsx). */}
+      <Snowy>
       <Group origin={gardenArchCenter}
         transform={[{ rotate: gardenArchPlacement.rotation * Math.PI / 180 }]}>
         <GardenArchEntity x={gardenArchPlacement.x} y={gardenArchPlacement.y}
@@ -270,6 +279,10 @@ export default function LandmarkLayer({
         <PavilionEntity x={pavilionPlacement.x} y={pavilionPlacement.y}
           scale={pavilionPlacement.scale} />
       </Group>
+      <DogHouseEntity x={dogHousePlacement.x} y={dogHousePlacement.y} scale={dogHousePlacement.scale} />
+      </Snowy>
+      {/* The dogs going in and resting inside, over the house (seen through its doorway). */}
+      {dogHouseClock ? <DogHouseOccupants clock={dogHouseClock} /> : null}
       {/* Tea Set is map-static and remains internally layered for future seating. */}
       </GardenProfile>
       {renderPass !== 'motion' && behindTeaSet}

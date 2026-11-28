@@ -49,7 +49,7 @@ export default function FairySwingTestScene() {
   const startInteraction=()=>{if(controller.request(target))setSnapshot(controller.snapshot());};
   const restartReview=()=>{
     const fresh=new FairyController(start);setController(fresh);setSnapshot(fresh.snapshot());
-    worldX.value=start.x;worldY.value=start.y;poseIndex.value=0;poseNext.value=0;poseMix.value=0;
+    worldX.set(start.x);worldY.set(start.y);poseIndex.set(0);poseNext.set(0);poseMix.set(0);
     phaseRef.current='';setPaused(false);
   };
   return <ScrollView contentContainerStyle={{padding:16,gap:12}}>

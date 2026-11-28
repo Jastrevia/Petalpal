@@ -102,7 +102,8 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   const [tab, setTab] = useState<Tab>(addingFriend ? 'requests' : 'friends');
   const [requestView, setRequestView] = useState<'incoming' | 'outgoing'>('incoming');
   const [sentTo, setSentTo] = useState<FriendUser | null>(null);
-  useEffect(() => { if (addingFriend) setTab('requests'); }, [addingFriend]);
+  const [addingFor, setAddingFor] = useState(addingFriend);
+  if (addingFor !== addingFriend) { setAddingFor(addingFriend); if (addingFriend) setTab('requests'); }
   // Live online/offline from the owner's user-room connection; the friends list gives the start.
   const [live, setLive] = useState<Record<string, boolean>>({});
   const [selfOnline, setSelfOnline] = useState(userRealtimeConnected());
@@ -118,6 +119,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   const mounted = useRef(false);
   const locked = useRef(false);
   const scope = useRef({ ownerId });
+  // eslint-disable-next-line react-hooks/refs -- a new owner gets a new scope object; async work compares it to drop stale results
   if (scope.current.ownerId !== ownerId) scope.current = { ownerId };
   const currentScope = scope.current;
 
@@ -145,6 +147,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   } }), [reload]);
   useEffect(() => {
     mounted.current = true; locked.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new owner starts from an empty list, then loads it
     setFriends([]); setRequests({ incoming: [], outgoing: [] }); setResults([]);
     setSearch(''); setSearched(false); setRemoving(null); setError(''); setMessage('');
     setManaging(false); setSentTo(null);
@@ -209,6 +212,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
   const handle = (user?: FriendUser) => user?.accountId ? `@${user.accountId}` : copy.noUsername;
   // How long ago a request was made, short enough for a list row: "2 days ago" / "2天前".
   const when = (iso?: string) => {
+    // eslint-disable-next-line react-hooks/purity -- relative time for the row label ("2 days ago")
     const minutes = iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)) : NaN;
     if (Number.isNaN(minutes)) return '';
     const zh = locale === 'zh-Hans', hours = Math.floor(minutes / 60), days = Math.floor(hours / 24);
@@ -273,6 +277,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     {heading(copy.myFriends, friends.length, <View {...onboardingTarget('friends.add')}>{pill(copy.add, copy.add, () => setTab('requests'), { disabled: !!busy, icon: null })}</View>)}
     <View {...onboardingTarget('friends.list')} style={styles.list}>
       {!busy && !friends.length ? <Text style={styles.caption}>{copy.none}</Text> : null}
+      {/* eslint-disable-next-line react-hooks/refs -- rows read refs only in their press handlers */}
       {friends.map(friend => {
         const allowed = friend.allowGardenVisits === true, name = nameOf(friend);
         return <View key={friend.id}>
@@ -321,6 +326,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
     {inSearch ? <>
       {heading(copy.results, results.length)}
       {!busy && !results.length ? <Text style={styles.caption}>{copy.noUsers}</Text> : null}
+      {/* eslint-disable-next-line react-hooks/refs -- rows read refs only in their press handlers */}
       {results.map(user => {
         const isFriend = friends.some(friend => friend.id === user.id);
         const outgoing = requests.outgoing.some(request => request.receiverId === user.id);
@@ -345,6 +351,7 @@ export function FriendsPanel({ addingFriend = false, onClose = () => {} }: {
       {requestView === 'incoming' ? <>
         {heading(copy.receivedTitle, requests.incoming.length)}
         {!busy && !requests.incoming.length ? <Text style={styles.caption}>{copy.noReceived}</Text> : null}
+        {/* eslint-disable-next-line react-hooks/refs -- rows read refs only in their press handlers */}
         {requests.incoming.map(request => <View key={request.id} style={styles.listRow}>
           {identity(request.sender, request.createdAt ? copy.requestedYou(when(request.createdAt)) : undefined)}
           {pill(copy.accept(request.sender?.name || 'friend request'), copy.acceptText, () => void respond(request, 'accept'), { disabled: !!busy, tone: 'cream', compact: true })}

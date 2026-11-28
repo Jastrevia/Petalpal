@@ -25,9 +25,10 @@ export function AlmanacView({ year, onBack, headingSize = 22 }: { year: number; 
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'notYet'>('loading');
   const [attempt, setAttempt] = useState(0);
   const [width, setWidth] = useState(0);
+  const [loadFor, setLoadFor] = useState({ year, attempt });
+  if (loadFor.year !== year || loadFor.attempt !== attempt) { setLoadFor({ year, attempt }); setState('loading'); }
   useEffect(() => {
     const controller = new AbortController();
-    setState('loading');
     loadAlmanac(year, controller.signal).then(next => { setBook(next); setState('ready'); })
       .catch(error => { if (!controller.signal.aborted) setState((error as { status?: number })?.status === 409 ? 'notYet' : 'error'); });
     return () => controller.abort();

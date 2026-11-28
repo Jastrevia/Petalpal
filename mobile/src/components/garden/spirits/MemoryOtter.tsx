@@ -31,6 +31,7 @@ export function Otter({clock,active=true,visible=true,network:provided,lotusOccl
   clock:SharedValue<number>;active?:boolean;visible?:boolean;network?:SwimNetwork;lotusOccluders?:readonly LotusOccluder[];
 }) {
   const network=useMemo(()=>provided ?? getSwimNetwork(),[provided]);
+  // eslint-disable-next-line react-hooks/purity -- Garden: a random first swim; useSharedValue keeps only its first value
   const swimmer=useSharedValue(createSwim(network,Math.floor(Math.random()*4294967296)));
   const sheet=useImage(ART), b02=useImage(OCCLUDERS[0].source), b01=useImage(OCCLUDERS[1].source),
     st01=useImage(OCCLUDERS[2].source), b02Front=useImage(OCCLUDERS[3].source),

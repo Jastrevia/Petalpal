@@ -1,5 +1,6 @@
 import { ColorMatrix, Group, Image, useImage } from '@shopify/react-native-skia';
 import { useCallback, useEffect, useState } from 'react';
+import { LOOKS, gardenWind } from './weather/gardenWeather';
 import {
   cancelAnimation, Easing, useDerivedValue, useReducedMotion, useSharedValue,
   withDelay, withRepeat, withTiming,
@@ -69,7 +70,13 @@ function useVegetationWind(
   }, [enabled, duration, delay, phase]);
 
   return useDerivedValue(() => {
-    const wind = enabled ? Math.sin(phase.value) * direction : 0;
+    // The weather's wind (gardenWind) widens the sway, adds a quicker flutter and leans the
+    // foliage downwind; calm weather keeps the original breathing motion.
+    const strength = gardenWind.value;
+    const extra = Math.max(0, strength - LOOKS.CLEAR.wind);
+    const wind = enabled
+      ? (Math.sin(phase.value) * (1 + 2.6 * extra) + extra * (0.55 * Math.sin(phase.value * 5 + 1.3) + 0.9)) * direction
+      : 0;
     return [
       { translateX: wind * driftX },
       { translateY: wind * driftY },

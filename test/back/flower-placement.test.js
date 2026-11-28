@@ -6,9 +6,16 @@ import { CLUSTER_FOOTPRINT_RADIUS, LAND_CLUSTER_SIZE, plantFlowerOnce } from "..
 
 // In-memory Flower rows behind the same calls the module makes inside its transaction.
 function fakeDatabase(rows) {
-  const locks = [];
+  const locks = [], days = new Map();
   const tx = {
     $queryRaw: async (strings, ...values) => { locks.push(values[0]); return [{ locked: "" }]; },
+    // The conditional upsert in lib/flower-quota.js.
+    $queryRawUnsafe: async (sql, userId, localDate, limit) => {
+      const key = `${userId}|${localDate}`, planted = days.get(key) ?? 0;
+      if (planted >= limit) return [];
+      days.set(key, planted + 1);
+      return [{ planted: planted + 1 }];
+    },
     flower: {
       findFirst: async ({ where }) => rows.find(row => row.id === where.id && row.userId === where.userId) ?? null,
       findMany: async ({ where }) => rows.filter(row => row.userId === where.userId && row.regionId === where.regionId
@@ -21,7 +28,7 @@ function fakeDatabase(rows) {
       }
     }
   };
-  return { locks, $transaction: callback => callback(tx) };
+  return { locks, days, $transaction: callback => callback(tx) };
 }
 const flower = (id, extra = {}) => ({ id, userId: "owner", worldX: null, worldY: null, regionId: null, placedAt: null,
   createdAt: new Date("2026-04-10T18:00:00Z"), sourceEvent: { localDate: "2026-04-10" }, dailyCheckIn: null,
@@ -67,6 +74,28 @@ test("placement is owner-scoped, inside the Garden and on the flower's own month
   await assert.rejects(plantFlowerOnce(db, { userId: "owner", flowerId: "legacy", body: { worldX: 10, worldY: 10, landId: "Land08" } }),
     { code: "WRONG_LAND" });
   assert.equal((await plantFlowerOnce(db, { userId: "owner", flowerId: "legacy", body: { worldX: 10, worldY: 10, landId: "Land07" } })).created, true);
+});
+
+test("planting is what uses one of the day's flowers", async () => {
+  const rows = ["a", "b", "c", "d"].map((id, i) => flower(id));
+  const db = fakeDatabase(rows);
+  const spot = i => ({ worldX: 900 + i * 200, worldY: 900, landId: "Land04" });
+  await plantFlowerOnce(db, { userId: "owner", flowerId: "a", body: spot(0), now });
+  assert.deepEqual([...db.days], [["owner|2026-10-27", 1]], "counted on the day of planting, in the account's zone");
+  // Sending the same spot again takes nothing more.
+  await plantFlowerOnce(db, { userId: "owner", flowerId: "a", body: spot(0), now });
+  assert.deepEqual([...db.days], [["owner|2026-10-27", 1]]);
+  await plantFlowerOnce(db, { userId: "owner", flowerId: "b", body: spot(1), now });
+  await assert.rejects(plantFlowerOnce(db, { userId: "owner", flowerId: "c", body: spot(2), now }),
+    { status: 409, code: "DAILY_FLOWER_LIMIT" });
+  assert.equal(rows[2].worldX, null, "a refused flower stays unplanted");
+  // The next day it can be planted.
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  assert.equal((await plantFlowerOnce(db, { userId: "owner", flowerId: "c", body: spot(2), now: tomorrow })).created, true);
+  // A Daily Grow flower took its place in the count when it grew.
+  rows[3].sourceEvent = null; rows[3].dailyCheckIn = { localDate: "2026-04-10" };
+  assert.equal((await plantFlowerOnce(db, { userId: "owner", flowerId: "d", body: spot(3), now: tomorrow })).created, true);
+  assert.equal(db.days.get("owner|2026-10-28"), 1);
 });
 
 test("clusters on the same land keep their spacing", async () => {

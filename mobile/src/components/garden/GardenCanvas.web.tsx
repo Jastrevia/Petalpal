@@ -19,11 +19,13 @@ type WebApi = {
 };
 const viewApi = () => (globalThis as unknown as { SkiaViewApi: WebApi }).SkiaViewApi;
 export default function GardenCanvas({ children, style, ref, active }: GardenCanvasProps) {
+  // eslint-disable-next-line react-hooks/immutability -- Skia's shared view id counter; taken once per canvas, as Skia's own Canvas does
   const nativeId = useMemo(() => SkiaViewNativeId.current++, []);
   // The pinned package publishes two declaration paths for the same Skia binding.
   const root = useMemo(() => new SkiaSGRoot(Skia as unknown as ConstructorParameters<typeof SkiaSGRoot>[0], nativeId), [nativeId]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeRef = useRef(active);
+  // eslint-disable-next-line react-hooks/refs -- Garden canvas: the frame loop reads the latest active flag without re-rendering the canvas owner
   activeRef.current = active;
   const redrawRef = useRef(() => {});
   const [runs] = useState(() => {
@@ -54,11 +56,13 @@ export default function GardenCanvas({ children, style, ref, active }: GardenCan
     },
   }) as CanvasRef, [nativeId]);
 
+  // eslint-disable-next-line react-hooks/immutability -- Garden canvas: the renderer's frame loop owns its local state for the canvas's life
   useLayoutEffect(() => {
     const canvas = canvasRef.current!;
     const kit = (globalThis as unknown as { CanvasKit: CanvasKit }).CanvasKit;
     const renderer = new GardenWebRenderer(kit, canvas);
     let awaitingPicture = false;
+    // eslint-disable-next-line react-hooks/immutability -- Garden canvas: hands the live renderer to static-run snapshots (a holder made once in useState)
     runs.snapshotter.current = renderer;
     // Snapshots die with their surface. Wait for the frame recorded without them rather than paint a hole.
     renderer.onSurfaceChanged = () => { if (runs.host.invalidateAll()) awaitingPicture = true; };

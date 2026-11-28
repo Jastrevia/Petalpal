@@ -1,71 +1,45 @@
 # EAS Build uploads only what the native app needs: the mobile/ folder.
-# (An .easignore replaces .gitignore for EAS, so the usual ignores are repeated here.)
-# Regenerate the root list if new top-level folders appear.
+# EAS CLI reads this file only at the Git repository root, and it replaces every .gitignore for
+# EAS (https://docs.expo.dev/build-reference/easignore/), so the usual ignores are repeated here.
+#
+# An allowlist: everything at the repository root stays out, tracked or not (the backend, web
+# client, art sources, experiments, docs, and any local file or folder that lands at the root),
+# except mobile/. That includes the shallow .git folder EAS would otherwise upload, which carries
+# every committed file (Resources/, experiments/ ...) a second time; no build step reads it.
+/*
+.git
+!/mobile/
 
-/.claude
-/.codex
-/.dockerignore
-/.env.auth-e2e.example
-/.env.example
-/.github
-/.gitignore
-/.kiro
-/AGENTS.md
-/CLAUDE.md
-/Dockerfile
-/Dockerfile.backend
-/Dockerfile.backend.dockerignore
-/Dockerfile.transition
-/Dockerfile.transition.dockerignore
-/FLOWER_PLANTING_V1_IMPLEMENTATION.md
-/FUTURE_TODO.md
-/INTEGRATION_DEPLOYMENT.md
-/INTEGRATION_OPTIMIZATION.md
-/LONG_TERM_AI.md
-/MANUAL_SECURITY_CHECKLIST.md
-/MOBILE.md
-/MODEL_SELECTION.md
-/PROJECT_PROGRESS.md
-/README.md
-/Resources
-/SECURITY.md
-/THIRD_PARTY_NOTICES.md
-/WARNING.md
-/client
-/cloudflare-worker
-/data
-/deploy
-/docker-compose.yml
-/docs
-/experiments
-/goemotions_test.py
-/graphify-out
-/lib
-/map_goemotions.py
-/moodClassifier.js
-/package-lock.json
-/package.json
-/prisma
-/prisma.config.ts
-/scripts
-/security.go.md
-/server.js
-/test
-/testMoodModel.js
-/time.md
-/trainMoodModel.js
-
-# Inside mobile/: dependencies are installed on the build server; local and generated files stay out
+# Inside mobile/: dependencies are installed on the build server; generated and local files stay out.
 node_modules
 /mobile/ios/
 /mobile/android/
 /mobile/dist/
+/mobile/web-build/
 /mobile/.expo/
 /mobile/.perf/
+/mobile/.claude/
+/mobile/.vscode/
 /mobile/test/
+/mobile/layout-matrix/
+/mobile/expo-env.d.ts
+.metro-health-check*
+*.tsbuildinfo
+*.orig.*
+
+# Local env files: the build takes its values from the EAS environment (eas.json "environment").
 /mobile/.env
-/mobile/.env.ios.development
-/mobile/.env.ios.usability-test
+/mobile/.env.*
+
+# Signing keys and profiles never go in the archive (EAS uses its remote credentials).
+*.p8
+*.p12
+*.jks
+*.key
+*.pem
+*.mobileprovision
+
 .DS_Store
 *.log
+npm-debug.*
 coverage/

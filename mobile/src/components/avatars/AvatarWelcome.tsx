@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../services/auth';
 import { finishSignUpGift, holdBondCelebration, loadSignUpGift, receiveWelcomeAvatars, setWelcomeActive, useAvatarCollection, useSignUpGiftPending } from '../../services/avatars';
@@ -39,10 +39,11 @@ export function AvatarWelcome({ locale, enabled }: { locale: BondLocale; enabled
     if (revealing && failed && !collection) { finishSignUpGift(); return; }
     // Only a collection that already holds the gift (one read before the account existed has none yet).
     if (!revealing || !collection?.welcome.gifted.length) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- takes the gifts once the collection holds them, together with finishing the sign-up gift
     setGift(collection.welcome.gifted);
     finishSignUpGift();
   }, [revealing, collection, failed]);
-  const grow = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  const grow = useState(() => [0, 1, 2].map(() => new Animated.Value(0)))[0];
   useEffect(() => {
     if (!gift) return;
     grow.forEach(value => value.setValue(0));

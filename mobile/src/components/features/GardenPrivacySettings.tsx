@@ -16,7 +16,9 @@ export function GardenPrivacySettings() {
   const [error, setError] = useState('');
   const lock = useRef(false);
   const scope = useRef({ ownerId, active: false });
+  // eslint-disable-next-line react-hooks/refs -- a new owner gets a new scope object; async work compares it to drop stale results
   if (scope.current.ownerId !== ownerId) scope.current = { ownerId, active: false };
+  // eslint-disable-next-line react-hooks/refs -- this render's scope, captured by update()
   const current = scope.current;
   const update = useCallback(async (value?: boolean) => {
     if (!ownerId || !current.active || scope.current !== current || lock.current) return;
@@ -31,9 +33,11 @@ export function GardenPrivacySettings() {
     }
   }, [ownerId, current]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new owner starts unknown, then loads its setting
     current.active = true; lock.current = false; setAllowed(null); setError('');
     void update();
     return () => { current.active = false; };
+  // eslint-disable-next-line react-hooks/refs -- the scope object is the effect's key
   }, [current, update]);
 
   return <FeatureSection title={zh ? '花园隐私' : 'Garden Privacy'}>

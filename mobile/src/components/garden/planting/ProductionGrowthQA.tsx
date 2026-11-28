@@ -14,7 +14,8 @@ export default function ProductionGrowthQA({onClose}:{onClose:()=>void}) {
   const [ownership,setOwnership]=useState(false),[heights,setHeights]=useState(false),[grid,setGrid]=useState(false);
   const {width}=useWindowDimensions(),canvasWidth=Math.min(900,width),height=480;
   const scenes=useMemo(()=>productionGrowth(productionQARecords(count)),[count]);
-  const reference=useMemo(approvedJuneGrowth,[]),referenceMetrics=useMemo(()=>measureGrowth(reference,6),[reference]);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- QA tool: fixed reference data, memoized once
+  const reference=useMemo(()=>approvedJuneGrowth(),[]),referenceMetrics=useMemo(()=>measureGrowth(reference,6),[reference]);
   const metrics=useMemo(()=>measureGrowth(scenes[0].growth,6),[scenes]);
   if(!__DEV__)return null;
   const region=getRegionInfo(6).bounds,scale=Math.min((canvasWidth-50)/region.width,(height-50)/region.height);

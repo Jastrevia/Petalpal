@@ -170,10 +170,11 @@ import { apiDocsEnabled, assertAllowedOrigin, isAllowedOrigin, trustProxySetting
 import { assertIntegrationEnvironment } from "./lib/integration-environment.js";
 import { httpSecurity, securityHeaders, privateResponse } from "./lib/http-security.js";
 import { historyFlowerSelect, historyFlowerMetadata, sessionMetadata } from "./lib/history-metadata.js";
-import { flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
+import { DAILY_EVENT_LIMIT, flowerLimitEnabled, flowerPlantingOpen, flowerQuotaToday, reserveFlowerPlanting } from "./lib/flower-quota.js";
 import { catalogFor, ITEM_TYPES, itemContext } from "./lib/items.js";
 import { deleteLook, outfitFor, saveLook, WardrobeError, wardrobeFor, wearLook, wearPieces } from "./lib/fairy-wardrobe.js";
 import { LayoutError, layoutFor, saveLayout } from "./lib/garden-layout.js";
+import { silktailFor } from "./lib/silktail.js";
 import { deitySummary } from "./lib/flower-deity.js";
 import { petHomesFor, PetHomeError, placePetHome } from "./lib/pet-homes.js";
 import { createWeatherService, gardenWeather, setWeatherLocation, WeatherError } from "./lib/weather.js";
@@ -184,17 +185,23 @@ import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./l
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
+import { installAppConfig, featurePaused } from "./lib/app-config.js";
+import { startServerMonitoring } from "./lib/monitoring.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // No-op unless PETALPAL_ENVIRONMENT=integration (isolated test service only).
 assertIntegrationEnvironment();
+// Error reports (Sentry) when SENTRY_DSN is set; lib/monitoring.js says what a report may contain.
+startServerMonitoring();
 const openapiDocument = YAML.parse(
   fs.readFileSync(path.join(__dirname, "docs", "openapi.yaml"), "utf8")
 );
 
 const app = express();
+// Responses do not name the framework (X-Powered-By: Express).
+app.disable("x-powered-by");
 app.use(httpSecurity);
 if (process.env.NATIVE_SECURITY_TEST === '1') {
   app.get('/', (_req, res) => res.set('Cache-Control', 'no-store').json({
@@ -461,6 +468,9 @@ app.post("/billing/webhooks/revenuecat", billingWebhookRateLimit, async (req, re
     return res.status(503).json({ error: "Billing sync unavailable" });
   }
 });
+
+// Live app switches and the uptime check, both readable without signing in (lib/app-config.js).
+installAppConfig(app, prisma);
 if (apiDocsEnabled()) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
 }
@@ -2332,7 +2342,10 @@ app.get("/api/flowers/today", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, timezone: true } });
     if (!user) return res.status(404).json({ error: "User not found" });
     const localDate = getLocalDate(normalizeTimezone(user.timezone) || "UTC");
-    res.json(await flowerQuotaToday(prisma, { userId: user.id, localDate, limit: await dailyFlowerLimitFor(prisma, user.id) }));
+    const flowers = await flowerQuotaToday(prisma, { userId: user.id, localDate, limit: await dailyFlowerLimitFor(prisma, user.id) });
+    if (!flowerLimitEnabled()) return res.json(flowers);
+    const written = await prisma.event.count({ where: { ownerId: user.id, localDate } });
+    res.json({ ...flowers, events: { limit: DAILY_EVENT_LIMIT, written, remaining: Math.max(0, DAILY_EVENT_LIMIT - written) } });
   } catch (err) {
     logServerError("GET /api/flowers/today error", err);
     res.status(500).json({ error: "Failed to load today's flowers" });
@@ -2592,9 +2605,10 @@ async function enrichCreatedEvent(event, primaryGardenMood, aiProcessingAllowed,
       where: { id: event.id, ownerId: event.ownerId },
       data: { primaryGardenMood, secondaryEmotions: safeEmotion.labels, ...metadata }
     });
-    // A third Event in one day is still saved; it just grows no flower (lib/flower-quota.js).
+    // Once the day's plantings are used, an Event is still saved; it just grows no flower
+    // (lib/flower-quota.js). Otherwise its flower waits to be planted, which is what uses one up.
     if (primaryGardenMood && !await database.flower.findUnique({ where: { sourceEventId: event.id } })) {
-      flowerQuota = await reserveFlowerPlanting(database, { userId: event.ownerId, localDate: event.localDate,
+      flowerQuota = await flowerPlantingOpen(database, { userId: event.ownerId, localDate: event.localDate,
         limit: await dailyFlowerLimitFor(database, event.ownerId) });
     }
     if (primaryGardenMood && flowerQuota?.granted !== false) {
@@ -2679,7 +2693,8 @@ app.post("/events", aiRateLimit, async (req, res) => {
       primaryGardenMood,
       enrichmentPending: Boolean(primaryGardenMood),
       occurredAt: new Date(),
-      idempotencyKey: req.get("idempotency-key")
+      idempotencyKey: req.get("idempotency-key"),
+      dailyEventLimit: flowerLimitEnabled() ? DAILY_EVENT_LIMIT : null
     });
     transactionElapsedMs = Date.now() - transactionStartedAt;
     if (result.created) await rewardCloseness(req.auth.userId, "EVENT", result.event.id);
@@ -2713,6 +2728,7 @@ app.post("/events", aiRateLimit, async (req, res) => {
     if (error?.code === CONTENT_REJECTED) return res.status(422).json(contentSafetyResponse(req,error));
     if (error?.code === "EVENT_TOO_LARGE") return res.status(413).json({ error: error.message });
     if (error?.code === "IDEMPOTENCY_CONFLICT") return res.status(409).json({ error: error.message });
+    if (error?.code === "DAILY_EVENT_LIMIT") return res.status(429).json({ error: error.message, code: error.code });
     if (transactionStartedAt !== null && transactionElapsedMs === null) transactionElapsedMs = Date.now() - transactionStartedAt;
     logServerError("POST /events error", error, transactionElapsedMs === null ? {} : { transactionElapsedMs });
     return res.status(500).json({ error: "Failed to create Event" });
@@ -3194,6 +3210,18 @@ app.get("/api/garden/layout", async (req, res) => {
   if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
   try { return res.json(await layoutFor(prisma, req.auth.userId)); }
   catch (error) { return sendLayoutError(res, error, "GET /api/garden/layout"); }
+});
+// The Silktail Fox's milestone visit (lib/silktail.js): the owner's own distinct Event days and
+// whether today (account local date) is the day the latest 14th was reached. Read-only; no content.
+app.get("/api/garden/silktail", async (req, res) => {
+  if (Object.keys(req.query).length) return res.status(400).json({ error: "Invalid query" });
+  try {
+    const state = await silktailFor(prisma, req.auth.userId);
+    return state ? res.json(state) : res.status(404).json({ error: "User not found" });
+  } catch (error) {
+    logServerError("GET /api/garden/silktail error", error);
+    return res.status(500).json({ error: "Failed to load the Silktail Fox" });
+  }
 });
 app.put("/api/garden/layout", async (req, res) => {
   try { return res.json(await saveLayout(prisma, req.auth.userId, req.body)); }
@@ -4118,6 +4146,10 @@ app.post("/users/:userId/flowers/:flowerId/support", requireSocialGardenAccess, 
     "/users/:userId/flowers/:flowerId/message", requireSocialGardenAccess,
     async (req, res) => {
       const startTime = Date.now();
+      // Paused from the backend's environment (APP_PAUSED_FEATURES=friendMessages): nothing new is saved.
+      if (featurePaused(process.env, "friendMessages")) {
+        return res.status(503).json({ error: "Messages are paused for now. Please come back a little later. 留言暂时关闭了，稍后再来。", code: "FEATURE_PAUSED" });
+      }
   
       try {
         const { userId, flowerId } = req.params;

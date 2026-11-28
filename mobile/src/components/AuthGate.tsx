@@ -59,15 +59,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Guest mode: signed out, the Garden opens first; the account pages show only once the guest reaches
   // something that needs an account (or taps a nav item), with a way back to the Garden.
   const [accountScreen, setAccountScreen] = useState(false);
-  const guest = useRef<Guest>({ requestAccount: () => setAccountScreen(true) }).current;
+  const guest = useState<Guest>(() => ({ requestAccount: () => setAccountScreen(true) }))[0];
   const pathname = usePathname();
 
-  useEffect(() => {
-    // A new identity starts clean: no password or other account's details stay in memory.
+  // A new identity starts clean: no password or other account's details stay in memory (reset while rendering,
+  // before the new identity's first frame; the first identity starts from these same initial values).
+  const identity = auth.identity?.uid;
+  const [identityFor, setIdentityFor] = useState(identity);
+  if (identityFor !== identity) {
+    setIdentityFor(identity);
     setName(''); setPassword(''); setConfirm(''); setProblem(''); setEmailPassword('');
     setConnect(null); setConnecting(false); setAvatar(LEGACY_AVATAR_IDS[0]); setCommunityAccepted(false);
     setMode(current => (current === 'forgotName' ? current : 'signIn'));
-  }, [auth.identity?.uid]);
+  }
   useEffect(() => {
     if (!auth.loading) void SplashScreen.hideAsync().catch(() => {});
   }, [auth.loading]);

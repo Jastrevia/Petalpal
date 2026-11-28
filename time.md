@@ -36,6 +36,7 @@ Change policy: see [§10](#10-change-policy). Security and privacy rules in
 | Report generation time | When the Weekly job runs and persists the report | Real time on the backend |
 | Ops-metrics active window | `activeUsers7d` / `activeUsers30d` in `ops_totals.csv` count owners with `Event.occurredAt` within 7 / 30 × 24 h before the database's `now()` at export time — rolling instants, not account-local calendar days | `totals` in [scripts/export-ops-metrics.mjs](scripts/export-ops-metrics.mjs) (IMPLEMENTED BUT UNTESTED: the test checks the lifetime totals only) |
 | Garden pet first week | The first seven account-timezone local dates counted from `User.createdAt`; the day's first planting in them brings pet food. `daysBetween(localDateForInstant(createdAt), today)` in `rewardFirstWeekPlanting` ([lib/fairy-closeness.js](lib/fairy-closeness.js)) |
+| Silktail Fox day | **Milestone:** the account-local date (`Event.localDate`) on which the owner's count of distinct Event dates reaches 14, 28, 42 …; the fox is in the Garden while the account-local today equals it (`silktailMilestone`/`silktailFor` in [lib/silktail.js](lib/silktail.js), `GET /api/garden/silktail`). Deleting all of a day's Events removes that day from the count. **Holidays:** the **device** local calendar date (not the account zone), from a built-in table: fixed dates (01-01, 02-14, 10-31, 12-25) and Chinese lunar festivals 2026–2035 (Hong Kong Observatory tables, UTC+8) in [mobile/src/components/garden/critters/silktailDays.ts](mobile/src/components/garden/critters/silktailDays.ts). The app ignores a milestone answer whose `today` differs from the device date (stale after midnight, or a traveller whose device zone differs from the account zone) and rechecks every 15 min while the Garden is open. **TESTED BEHAVIOR:** [test/back/silktail.test.js](test/back/silktail.test.js) (14th-day rule, reset, account-zone today), [mobile/test/silktail.test.mjs](mobile/test/silktail.test.mjs) (holiday table incl. 2027/2030 corrections, precedence) |
 | Ops-metrics day | The **UTC** calendar day of each stored instant (`User.createdAt`, `Event.occurredAt`, `Flower.createdAt`, AI audit/job `createdAt`), not the account `localDate`; an evening Event in Vancouver can land on the next UTC day. Aggregates only, for the internal dashboard | `day()` in [scripts/export-ops-metrics.mjs](scripts/export-ops-metrics.mjs); see [docs/analytics/POWER_BI.md](docs/analytics/POWER_BI.md) |
 
 ## 2. Event → Memory → Report lifecycle
@@ -355,15 +356,24 @@ of [test/back/weekly-short.test.js](test/back/weekly-short.test.js).
   still on and every account is one. No local date is involved, so time zones do not move the
   boundary. **VERIFIED:** [test/back/beta-cohort.test.js](test/back/beta-cohort.test.js).
 - **Daily flower limit** ([lib/flower-quota.js](lib/flower-quota.js), on unless
-  `DAILY_GROW_LIMIT_ENABLED=false`): at most 2 new flowers per account-local date, counted in
-  `DailyFlowerQuota(userId, localDate)`. An Event's flower counts against `Event.localDate` (set at
-  save from `User.timezone`); legacy Daily Grow and `GET /api/flowers/today` use the server's
-  current local date for the same zone. Deleting a flower never lowers the count; a third Event that
-  day is still saved, just without a flower. The new day's count starts at local midnight.
+  `DAILY_GROW_LIMIT_ENABLED=false`): at most 2 flowers planted per account-local date, counted in
+  `DailyFlowerQuota(userId, localDate)`. An Event's flower counts when it is planted, against the
+  local date of that moment in `User.timezone` (not `Event.localDate`), so an Event left unplanted
+  costs nothing and its flower can be planted another day. Legacy Daily Grow counts when it grows.
+  `GET /api/flowers/today` uses the server's current local date for the same zone. Deleting a flower
+  never lowers the count. An Event saved once the day's plantings are used is still saved, just
+  without a flower. The new day's count starts at local midnight.
   **VERIFIED:** [test/back/flower-quota.test.js](test/back/flower-quota.test.js) (the migration's
-  conditional upsert on PGlite, 4 concurrent reserves → 2 granted) and the `two Flowers a day` test in
-  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (third Event saved
-  without a Flower; deleting a Flower does not free the day).
+  conditional upsert on PGlite, 4 concurrent reserves → 2 granted),
+  [test/back/flower-placement.test.js](test/back/flower-placement.test.js) (planting takes the count,
+  a third planting is refused) and the `two Flowers a day` test in
+  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js) (unplanted Events take
+  nothing).
+- **Daily Event limit** (`DAILY_EVENT_LIMIT` in [lib/flower-quota.js](lib/flower-quota.js), same
+  switch): at most 4 Events per `Event.localDate`, because each is read by the AI. The next is refused
+  with 429 `DAILY_EVENT_LIMIT` before anything is written; an idempotent replay is never counted.
+  Journals are not limited. **VERIFIED:** `four Events a day` in
+  [test/back/haiku-event-emotion.test.js](test/back/haiku-event-emotion.test.js).
 - **Flower land = month** ([lib/flower-placement.js](lib/flower-placement.js)): Garden lands 1–12
   are the months. `POST /users/:userId/flowers/:flowerId/placement` accepts only the land of the
   flower's month: `Event.localDate`, else `DailyCheckIn.localDate`, else `Flower.createdAt` in

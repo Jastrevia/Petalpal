@@ -90,6 +90,7 @@ export function GardenHud({ onFocusFairy, paused = false }: { onFocusFairy?: () 
     if (!entryFeature) return;
     if (entryFeature === 'fairy') {
       router.setParams({ feature: undefined });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Garden: a deep link opens its feature once and clears the route parameter
       setOpenFeature(undefined);
       onFocusFairy?.();
       return;

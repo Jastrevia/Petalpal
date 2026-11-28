@@ -20,6 +20,7 @@ export function useBackendQa(ownerId: string | undefined, enabled: boolean) {
     }
   }, [ownerId, enabled]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- another owner drops the old summary, then refresh() asks (generation-guarded)
     setResult(null); setRequestState(null);
     void refresh();
     return () => { generation.current++; };
