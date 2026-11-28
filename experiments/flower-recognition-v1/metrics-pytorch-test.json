@@ -1,0 +1,136 @@
+{
+  "model": "best.pt",
+  "split": "test",
+  "mAP50": 0.4025,
+  "mAP50_95": 0.3225,
+  "precision": 0.5214,
+  "recall": 0.4011,
+  "ap50_per_class": {
+    "rose": 0.4007,
+    "sunflower": 0.5515,
+    "lily": 0.4662,
+    "lavender": 0.2156,
+    "other_flower": 0.3788
+  },
+  "photo_accuracy": 0.7381,
+  "photo_images": 294,
+  "photo_per_class": {
+    "rose": {
+      "images": 54,
+      "accuracy": 0.8519
+    },
+    "sunflower": {
+      "images": 13,
+      "accuracy": 0.6923
+    },
+    "lily": {
+      "images": 50,
+      "accuracy": 0.8
+    },
+    "lavender": {
+      "images": 42,
+      "accuracy": 0.8333
+    },
+    "other_flower": {
+      "images": 135,
+      "accuracy": 0.6444
+    }
+  },
+  "confusion": [
+    [
+      "lavender",
+      "lavender",
+      35
+    ],
+    [
+      "lavender",
+      "none",
+      1
+    ],
+    [
+      "lavender",
+      "other_flower",
+      6
+    ],
+    [
+      "lily",
+      "lily",
+      40
+    ],
+    [
+      "lily",
+      "none",
+      2
+    ],
+    [
+      "lily",
+      "other_flower",
+      7
+    ],
+    [
+      "lily",
+      "rose",
+      1
+    ],
+    [
+      "other_flower",
+      "lavender",
+      10
+    ],
+    [
+      "other_flower",
+      "lily",
+      5
+    ],
+    [
+      "other_flower",
+      "none",
+      7
+    ],
+    [
+      "other_flower",
+      "other_flower",
+      87
+    ],
+    [
+      "other_flower",
+      "rose",
+      22
+    ],
+    [
+      "other_flower",
+      "sunflower",
+      4
+    ],
+    [
+      "rose",
+      "lily",
+      1
+    ],
+    [
+      "rose",
+      "none",
+      2
+    ],
+    [
+      "rose",
+      "other_flower",
+      5
+    ],
+    [
+      "rose",
+      "rose",
+      46
+    ],
+    [
+      "sunflower",
+      "other_flower",
+      4
+    ],
+    [
+      "sunflower",
+      "sunflower",
+      9
+    ]
+  ]
+}
