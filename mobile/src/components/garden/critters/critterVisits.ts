@@ -35,7 +35,7 @@ export const MALTESE_SIZE = 49.6, MALTESE_SPEED = 38;
 // second to the puppy's one stride of 178 units each 1.23 s.
 export const MALTESE_RUN_SPEED = 145;
 export const CRITTERS: Readonly<Record<CritterId, CritterSpec>> = {
-  butterfly: { id: 'butterfly', kind: 'flyer', size: 60, speed: 46, altitude: [36, 90] },
+  butterfly: { id: 'butterfly', kind: 'flyer', size: 30, speed: 46, altitude: [36, 90] },
   bluebird: { id: 'bluebird', kind: 'flyer', size: 92, speed: 140, altitude: [120, 200] },
   // The rabbit's pace matches its painted hops: 45 units (about a body length) each 0.55 s burst.
   rabbit: { id: 'rabbit', kind: 'walker', size: 62, speed: 82.3, altitude: [0, 0] },
