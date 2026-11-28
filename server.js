@@ -185,12 +185,16 @@ import { createFeedback, FeedbackError, listFeedback, updateFeedback } from "./l
 import { billingPlans, billingSummary, dailyFlowerLimitFor, revenueCatWebhookAuthorized, syncEntitlement, webhookUserIds } from "./lib/billing.js";
 import { FlowerPlacementError, plantFlowerOnce } from "./lib/flower-placement.js";
 import { isBetaTester } from "./lib/beta-cohort.js";
+import { installAppConfig, featurePaused } from "./lib/app-config.js";
+import { startServerMonitoring } from "./lib/monitoring.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // No-op unless PETALPAL_ENVIRONMENT=integration (isolated test service only).
 assertIntegrationEnvironment();
+// Error reports (Sentry) when SENTRY_DSN is set; lib/monitoring.js says what a report may contain.
+startServerMonitoring();
 const openapiDocument = YAML.parse(
   fs.readFileSync(path.join(__dirname, "docs", "openapi.yaml"), "utf8")
 );
@@ -464,6 +468,9 @@ app.post("/billing/webhooks/revenuecat", billingWebhookRateLimit, async (req, re
     return res.status(503).json({ error: "Billing sync unavailable" });
   }
 });
+
+// Live app switches and the uptime check, both readable without signing in (lib/app-config.js).
+installAppConfig(app, prisma);
 if (apiDocsEnabled()) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
 }
@@ -4139,6 +4146,10 @@ app.post("/users/:userId/flowers/:flowerId/support", requireSocialGardenAccess, 
     "/users/:userId/flowers/:flowerId/message", requireSocialGardenAccess,
     async (req, res) => {
       const startTime = Date.now();
+      // Paused from the backend's environment (APP_PAUSED_FEATURES=friendMessages): nothing new is saved.
+      if (featurePaused(process.env, "friendMessages")) {
+        return res.status(503).json({ error: "Messages are paused for now. Please come back a little later. 留言暂时关闭了，稍后再来。", code: "FEATURE_PAUSED" });
+      }
   
       try {
         const { userId, flowerId } = req.params;

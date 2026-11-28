@@ -25,6 +25,7 @@ import { flowerMeaningText, flowerNameText } from '../../../services/flowerNames
 import { useMessageReactions } from '../../../services/messageReactions';
 import { PANEL_THEMES, usePanelTheme, type PanelTheme } from '../../features/PanelTheme';
 import { MODAL_ORIENTATIONS } from '../../../constants/orientation';
+import { useFeaturePaused } from '../../../services/appConfig';
 
 const MOOD_ZH: Record<string, string> = { SUNNY_BLOOM: '开心', PEACEFUL_BLOOM: '平静', GENTLE_BLOOM: '温柔', WONDER_BLOOM: '好奇', HEALING_BLOOM: '治愈', QUIET_BLOOM: '低落', DRIFTING_BLOOM: '迷茫', FIRE_BLOOM: '愤怒', Unknown: '未知' };
 const COPY = {
@@ -62,6 +63,8 @@ export default function FlowerDetailModal() {
     detailError,
   } = usePlanting();
   const [messageText, setMessageText] = useState('');
+  // Paused from the server (APP_PAUSED_FEATURES=friendMessages): the box gives way to a short note.
+  const messagesPaused = useFeaturePaused('friendMessages');
   const safety = useSafetyWatch(messageText);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const locale = useAppLocale(), zh = locale === 'zh-Hans', copy = COPY[locale];
@@ -284,7 +287,8 @@ export default function FlowerDetailModal() {
             </Pressable>
             </>}
           </View>
-          {!selectedFlowerIsOwner && <View style={styles.messageForm}><CommunityGuidelines />
+          {!selectedFlowerIsOwner && messagesPaused ? <Text style={styles.statusText}>{zh ? '留言暂时关闭了，稍后再来。' : 'Messages are paused for now. Please come back a little later.'}</Text> : null}
+          {!selectedFlowerIsOwner && !messagesPaused && <View style={styles.messageForm}><CommunityGuidelines />
             {safety.concern ? <SafetySupportInline concern={safety.concern} /> : null}{safety.sheet}
             <TextInput accessibilityLabel={copy.placeholder} multiline maxLength={300}
               placeholder={copy.placeholder} placeholderTextColor={theme.muted} value={messageText} onChangeText={setMessageText}
