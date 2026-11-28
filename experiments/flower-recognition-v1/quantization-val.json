@@ -1,0 +1,336 @@
+{
+  "split": "val",
+  "calibration_images": 100,
+  "head_nodes_kept_fp32": 24,
+  "models": {
+    "fp32": {
+      "model": "best.onnx",
+      "split": "val",
+      "mAP50": 0.4811,
+      "mAP50_95": 0.3722,
+      "precision": 0.5787,
+      "recall": 0.4453,
+      "ap50_per_class": {
+        "rose": 0.4348,
+        "sunflower": 0.8246,
+        "lily": 0.4817,
+        "lavender": 0.2864,
+        "other_flower": 0.378
+      },
+      "photo_accuracy": 0.7192,
+      "photo_images": 292,
+      "photo_per_class": {
+        "rose": {
+          "images": 53,
+          "accuracy": 0.8113
+        },
+        "sunflower": {
+          "images": 14,
+          "accuracy": 0.9286
+        },
+        "lily": {
+          "images": 50,
+          "accuracy": 0.78
+        },
+        "lavender": {
+          "images": 41,
+          "accuracy": 0.9024
+        },
+        "other_flower": {
+          "images": 134,
+          "accuracy": 0.5821
+        }
+      },
+      "confusion": [
+        [
+          "lavender",
+          "lavender",
+          37
+        ],
+        [
+          "lavender",
+          "other_flower",
+          4
+        ],
+        [
+          "lily",
+          "lily",
+          39
+        ],
+        [
+          "lily",
+          "other_flower",
+          11
+        ],
+        [
+          "other_flower",
+          "lavender",
+          17
+        ],
+        [
+          "other_flower",
+          "lily",
+          10
+        ],
+        [
+          "other_flower",
+          "none",
+          7
+        ],
+        [
+          "other_flower",
+          "other_flower",
+          78
+        ],
+        [
+          "other_flower",
+          "rose",
+          20
+        ],
+        [
+          "other_flower",
+          "sunflower",
+          2
+        ],
+        [
+          "rose",
+          "none",
+          2
+        ],
+        [
+          "rose",
+          "other_flower",
+          8
+        ],
+        [
+          "rose",
+          "rose",
+          43
+        ],
+        [
+          "sunflower",
+          "other_flower",
+          1
+        ],
+        [
+          "sunflower",
+          "sunflower",
+          13
+        ]
+      ],
+      "benchmark": {
+        "median_ms": 106.62,
+        "p95_ms": 110.82,
+        "runs": 100,
+        "threads": 1,
+        "size_mb": 10.67
+      }
+    },
+    "int8-full": {
+      "model": "best-int8-full.onnx",
+      "split": "val",
+      "mAP50": 0.0,
+      "mAP50_95": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "ap50_per_class": {
+        "rose": 0.0,
+        "sunflower": 0.0,
+        "lily": 0.0,
+        "lavender": 0.0,
+        "other_flower": 0.0
+      },
+      "photo_accuracy": 0.0,
+      "photo_images": 292,
+      "photo_per_class": {
+        "rose": {
+          "images": 53,
+          "accuracy": 0.0
+        },
+        "sunflower": {
+          "images": 14,
+          "accuracy": 0.0
+        },
+        "lily": {
+          "images": 50,
+          "accuracy": 0.0
+        },
+        "lavender": {
+          "images": 41,
+          "accuracy": 0.0
+        },
+        "other_flower": {
+          "images": 134,
+          "accuracy": 0.0
+        }
+      },
+      "confusion": [
+        [
+          "lavender",
+          "none",
+          41
+        ],
+        [
+          "lily",
+          "none",
+          50
+        ],
+        [
+          "other_flower",
+          "none",
+          134
+        ],
+        [
+          "rose",
+          "none",
+          53
+        ],
+        [
+          "sunflower",
+          "none",
+          14
+        ]
+      ],
+      "benchmark": {
+        "median_ms": 43.53,
+        "p95_ms": 53.02,
+        "runs": 100,
+        "threads": 1,
+        "size_mb": 3.19
+      }
+    },
+    "int8-fp32-head": {
+      "model": "best-int8-fp32-head.onnx",
+      "split": "val",
+      "mAP50": 0.4533,
+      "mAP50_95": 0.3451,
+      "precision": 0.5838,
+      "recall": 0.4371,
+      "ap50_per_class": {
+        "rose": 0.4184,
+        "sunflower": 0.7251,
+        "lily": 0.4833,
+        "lavender": 0.2783,
+        "other_flower": 0.3616
+      },
+      "photo_accuracy": 0.7192,
+      "photo_images": 292,
+      "photo_per_class": {
+        "rose": {
+          "images": 53,
+          "accuracy": 0.8113
+        },
+        "sunflower": {
+          "images": 14,
+          "accuracy": 0.9286
+        },
+        "lily": {
+          "images": 50,
+          "accuracy": 0.8
+        },
+        "lavender": {
+          "images": 41,
+          "accuracy": 0.8537
+        },
+        "other_flower": {
+          "images": 134,
+          "accuracy": 0.5896
+        }
+      },
+      "confusion": [
+        [
+          "lavender",
+          "lavender",
+          35
+        ],
+        [
+          "lavender",
+          "none",
+          1
+        ],
+        [
+          "lavender",
+          "other_flower",
+          5
+        ],
+        [
+          "lily",
+          "lily",
+          40
+        ],
+        [
+          "lily",
+          "other_flower",
+          10
+        ],
+        [
+          "other_flower",
+          "lavender",
+          17
+        ],
+        [
+          "other_flower",
+          "lily",
+          9
+        ],
+        [
+          "other_flower",
+          "none",
+          6
+        ],
+        [
+          "other_flower",
+          "other_flower",
+          79
+        ],
+        [
+          "other_flower",
+          "rose",
+          21
+        ],
+        [
+          "other_flower",
+          "sunflower",
+          2
+        ],
+        [
+          "rose",
+          "none",
+          1
+        ],
+        [
+          "rose",
+          "other_flower",
+          8
+        ],
+        [
+          "rose",
+          "rose",
+          43
+        ],
+        [
+          "rose",
+          "sunflower",
+          1
+        ],
+        [
+          "sunflower",
+          "other_flower",
+          1
+        ],
+        [
+          "sunflower",
+          "sunflower",
+          13
+        ]
+      ],
+      "benchmark": {
+        "median_ms": 42.53,
+        "p95_ms": 43.89,
+        "runs": 100,
+        "threads": 1,
+        "size_mb": 3.26
+      }
+    }
+  }
+}

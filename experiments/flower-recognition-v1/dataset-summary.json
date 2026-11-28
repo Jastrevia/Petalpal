@@ -1,0 +1,61 @@
+{
+  "seed": 20261127,
+  "classes": [
+    "rose",
+    "sunflower",
+    "lily",
+    "lavender",
+    "other_flower"
+  ],
+  "source": "Open Images V7 validation + test boxes; depiction boxes dropped",
+  "species_images_in_pool": 1252,
+  "generic_only_images_in_pool": 8542,
+  "generic_only_sampled": 700,
+  "download_failures": 0,
+  "depiction_boxes_dropped": 493,
+  "images_with_rotation_metadata_not_applied": 21,
+  "image_licences": {
+    "https://creativecommons.org/licenses/by/2.0/": 1952
+  },
+  "splits": {
+    "train": {
+      "boxes_lavender": 674,
+      "boxes_lily": 673,
+      "boxes_other_flower": 1689,
+      "boxes_rose": 956,
+      "boxes_sunflower": 152,
+      "images": 1366,
+      "images_primary_lavender": 193,
+      "images_primary_lily": 234,
+      "images_primary_other_flower": 627,
+      "images_primary_rose": 249,
+      "images_primary_sunflower": 63
+    },
+    "test": {
+      "boxes_lavender": 247,
+      "boxes_lily": 111,
+      "boxes_other_flower": 397,
+      "boxes_rose": 336,
+      "boxes_sunflower": 22,
+      "images": 294,
+      "images_primary_lavender": 42,
+      "images_primary_lily": 50,
+      "images_primary_other_flower": 135,
+      "images_primary_rose": 54,
+      "images_primary_sunflower": 13
+    },
+    "val": {
+      "boxes_lavender": 225,
+      "boxes_lily": 150,
+      "boxes_other_flower": 305,
+      "boxes_rose": 263,
+      "boxes_sunflower": 18,
+      "images": 292,
+      "images_primary_lavender": 41,
+      "images_primary_lily": 50,
+      "images_primary_other_flower": 134,
+      "images_primary_rose": 53,
+      "images_primary_sunflower": 14
+    }
+  }
+}
